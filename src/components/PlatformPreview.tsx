@@ -211,12 +211,12 @@ export function PlatformPreview({
       </div>
 
       {/* Action Buttons */}
-      <div className="p-4 border-t border-border flex items-center gap-2">
+      <div className="p-4 border-t border-border flex items-center gap-2 flex-wrap">
         <Button
           onClick={handleCopy}
           size="sm"
           variant="outline"
-          className="flex-1"
+          className="flex-1 min-h-[44px]"
         >
           {copied ? (
             <>
@@ -234,7 +234,7 @@ export function PlatformPreview({
           onClick={onRegenerate}
           size="sm"
           variant="outline"
-          className="flex-1"
+          className="flex-1 min-h-[44px]"
         >
           <RotateCw className="w-4 h-4 mr-2" />
           Regenerate
@@ -242,7 +242,7 @@ export function PlatformPreview({
         <Button
           onClick={onPublish}
           size="sm"
-          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="flex-1 min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
           disabled={isOverLimit}
           title={isOverLimit ? 'Cannot publish - content exceeds character limit' : 'Publish to platform'}
         >

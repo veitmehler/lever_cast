@@ -260,10 +260,10 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
       )}
 
       {/* Action Buttons */}
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 flex items-center gap-3 flex-wrap">
         <button
           onClick={toggleRecording}
-          className={`p-3 rounded-full transition-all ${
+          className={`p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full transition-all flex items-center justify-center ${
             isRecording
               ? 'bg-destructive text-destructive-foreground'
               : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
@@ -275,7 +275,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="p-3 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all"
+          className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center"
           title="Attach image"
         >
           <ImageIcon className="w-5 h-5" />
@@ -293,7 +293,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
         <Button
           onClick={handleGenerate}
           disabled={!content.trim() || isRecording}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
           <Sparkles className="w-4 h-4 mr-2" />
           Generate Posts

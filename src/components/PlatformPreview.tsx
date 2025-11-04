@@ -1,19 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, RotateCw, Send, Check } from 'lucide-react'
+import { Copy, RotateCw, Send, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter'
   content: string
+  image?: string
   onRegenerate: () => void
   onPublish: () => void
+}
+
+// Platform character limits
+const CHAR_LIMITS = {
+  linkedin: 3000,
+  twitter: 280,
 }
 
 export function PlatformPreview({
   platform,
   content,
+  image,
   onRegenerate,
   onPublish,
 }: PlatformPreviewProps) {
@@ -46,6 +55,25 @@ export function PlatformPreview({
   }
 
   const config = platformColors[platform]
+
+  // Character count logic
+  const charLimit = CHAR_LIMITS[platform]
+  const charCount = editedContent.length
+  const charPercentage = (charCount / charLimit) * 100
+
+  // Determine color based on percentage
+  const getCharCountColor = () => {
+    if (charCount > charLimit) {
+      return 'text-red-500 dark:text-red-400 font-bold'
+    } else if (charPercentage >= 95) {
+      return 'text-red-600 dark:text-red-500 font-semibold'
+    } else if (charPercentage >= 80) {
+      return 'text-yellow-600 dark:text-yellow-400 font-medium'
+    }
+    return 'text-muted-foreground'
+  }
+
+  const isOverLimit = charCount > charLimit
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -84,6 +112,18 @@ export function PlatformPreview({
               onChange={(e) => setEditedContent(e.target.value)}
               className="w-full min-h-[150px] p-3 rounded-lg border border-input bg-background text-foreground text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
             />
+            
+            {/* Show attached image in edit mode too */}
+            {image && (
+              <div className="mt-2">
+                <img 
+                  src={image} 
+                  alt="Attached to post" 
+                  className="rounded-lg max-h-48 w-full object-cover border border-border"
+                />
+              </div>
+            )}
+            
             <div className="flex gap-2">
               <Button
                 onClick={handleSave}
@@ -105,21 +145,67 @@ export function PlatformPreview({
             </div>
           </div>
         ) : (
-          <div
-            onClick={() => setIsEditing(true)}
-            className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-2 rounded transition-colors"
-          >
-            {editedContent}
-          </div>
+          <>
+            <div
+              onClick={() => setIsEditing(true)}
+              className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-2 rounded transition-colors"
+            >
+              {editedContent}
+            </div>
+            
+            {/* Attached Image */}
+            {image && (
+              <div className="mt-3">
+                <img 
+                  src={image} 
+                  alt="Attached to post" 
+                  className="rounded-lg max-h-64 w-full object-cover border border-border"
+                />
+              </div>
+            )}
+          </>
         )}
 
-        {/* Mock Engagement Stats */}
+        {/* Character Count & Mock Engagement Stats */}
         {!isEditing && (
-          <div className="mt-4 pt-3 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
-            <span>👍 12</span>
-            <span>💬 3</span>
-            <span>🔄 2</span>
-            <span>📤 1</span>
+          <>
+            {/* Character Counter */}
+            <div className="mt-3 flex items-center justify-between">
+              <div className={cn('text-xs flex items-center gap-1.5', getCharCountColor())}>
+                {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
+                <span>
+                  {charCount.toLocaleString()} / {charLimit.toLocaleString()} characters
+                </span>
+                {isOverLimit && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                    Over Limit
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Mock Engagement Stats */}
+            <div className="mt-3 pt-3 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
+              <span>👍 12</span>
+              <span>💬 3</span>
+              <span>🔄 2</span>
+              <span>📤 1</span>
+            </div>
+          </>
+        )}
+
+        {/* Character Counter in Edit Mode */}
+        {isEditing && (
+          <div className={cn('mt-2 text-xs flex items-center gap-1.5', getCharCountColor())}>
+            {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
+            <span>
+              {charCount.toLocaleString()} / {charLimit.toLocaleString()} characters
+            </span>
+            {isOverLimit && (
+              <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                Over Limit
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -157,6 +243,8 @@ export function PlatformPreview({
           onClick={onPublish}
           size="sm"
           className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+          disabled={isOverLimit}
+          title={isOverLimit ? 'Cannot publish - content exceeds character limit' : 'Publish to platform'}
         >
           <Send className="w-4 h-4 mr-2" />
           Publish

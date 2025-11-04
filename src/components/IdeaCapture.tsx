@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getTemplates, type Template } from '@/lib/templateStorage'
 
 interface IdeaCaptureProps {
-  onGenerate: (content: string, platform: 'linkedin' | 'twitter' | 'both') => void
+  onGenerate: (content: string, platform: 'linkedin' | 'twitter' | 'both', templateId?: string, image?: string) => void
 }
 
 export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
@@ -13,7 +14,16 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const loadedTemplates = getTemplates()
+    setTemplates(loadedTemplates)
+    // Default to "none" - no template selected
+    setSelectedTemplate('none')
+  }, [])
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -47,12 +57,27 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
 
   const handleGenerate = () => {
     if (content.trim()) {
-      onGenerate(content, platform)
+      // Pass undefined if "none" is selected, otherwise pass the template ID
+      const templateId = selectedTemplate === 'none' ? undefined : selectedTemplate
+      onGenerate(content, platform, templateId, selectedImage || undefined)
     }
   }
 
   const charCount = content.length
   const maxChars = 2000
+  const charPercentage = (charCount / maxChars) * 100
+
+  // Determine color based on percentage
+  const getCharCountColor = () => {
+    if (charCount > maxChars) {
+      return 'text-red-500 dark:text-red-400 font-bold'
+    } else if (charPercentage >= 95) {
+      return 'text-red-600 dark:text-red-500 font-semibold'
+    } else if (charPercentage >= 80) {
+      return 'text-yellow-600 dark:text-yellow-400 font-medium'
+    }
+    return 'text-muted-foreground'
+  }
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -76,8 +101,9 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
         />
         
         {/* Character Counter */}
-        <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
+        <div className={`absolute bottom-3 right-3 text-xs ${getCharCountColor()}`}>
           {charCount} / {maxChars}
+          {charCount > maxChars && ' ⚠️'}
         </div>
       </div>
 
@@ -111,44 +137,127 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
         </div>
       )}
 
-      {/* Platform Selection */}
-      <div className="mt-4">
-        <label className="text-sm font-medium text-card-foreground mb-2 block">
-          Target Platform
-        </label>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPlatform('linkedin')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              platform === 'linkedin'
-                ? 'bg-[#0A66C2] text-white'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            }`}
+      {/* Template & Platform Selection */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {/* Template Selection */}
+        <div>
+          <label className="text-sm font-medium text-card-foreground mb-2 block">
+            Content Template
+          </label>
+          <select
+            value={selectedTemplate}
+            onChange={(e) => setSelectedTemplate(e.target.value)}
+            className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
-            LinkedIn
-          </button>
-          <button
-            onClick={() => setPlatform('twitter')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              platform === 'twitter'
-                ? 'bg-[#1DA1F2] text-white'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            }`}
-          >
-            Twitter
-          </button>
-          <button
-            onClick={() => setPlatform('both')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              platform === 'both'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            }`}
-          >
-            Both
-          </button>
+            <option value="none">None (Raw AI)</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name} - {template.tone}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Platform Selection */}
+        <div>
+          <label className="text-sm font-medium text-card-foreground mb-2 block">
+            Target Platform
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPlatform('linkedin')}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                platform === 'linkedin'
+                  ? 'bg-[#0A66C2] text-white'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              LinkedIn
+            </button>
+            <button
+              onClick={() => setPlatform('twitter')}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                platform === 'twitter'
+                  ? 'bg-[#1DA1F2] text-white'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              Twitter
+            </button>
+            <button
+              onClick={() => setPlatform('both')}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                platform === 'both'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              Both
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Template Preview */}
+      {selectedTemplate !== 'none' && templates.find(t => t.id === selectedTemplate) && (
+        <div className="mt-4 p-4 rounded-lg bg-secondary/30 border border-border">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">
+                ✨ {templates.find(t => t.id === selectedTemplate)?.name} Template
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {templates.find(t => t.id === selectedTemplate)?.description}
+              </p>
+            </div>
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium">
+              {templates.find(t => t.id === selectedTemplate)?.tone}
+            </span>
+          </div>
+          
+          <div className="grid gap-3 md:grid-cols-2">
+            {/* LinkedIn Preview */}
+            {(platform === 'linkedin' || platform === 'both') && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-[#0A66C2] flex items-center justify-center text-white text-[10px] font-bold">
+                    in
+                  </div>
+                  <span className="text-xs font-medium text-foreground">LinkedIn Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.linkedinTemplate}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Twitter Preview */}
+            {(platform === 'twitter' || platform === 'both') && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-[#1DA1F2] flex items-center justify-center text-white text-[10px] font-bold">
+                    𝕏
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Twitter Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.twitterTemplate}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="text-[10px] text-muted-foreground">
+              💡 <span className="font-medium">How it works:</span> Type your raw idea above, then click Generate. AI will automatically format it using this template structure.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="mt-6 flex items-center gap-3">

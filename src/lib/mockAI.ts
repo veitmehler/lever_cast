@@ -1,4 +1,5 @@
 // Mock AI generation for design mode
+import { getTemplate, getDefaultTemplate } from './templateStorage'
 
 export interface GeneratedContent {
   linkedin?: string
@@ -78,23 +79,70 @@ What lessons have shaped your journey?`,
 // Simulate AI processing delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+// Extract key points from the idea
+function extractKeyPoints(idea: string): { point1: string; point2: string; point3: string } {
+  const sentences = idea.split(/[.!?]+/).filter(s => s.trim().length > 0)
+  
+  if (sentences.length >= 3) {
+    return {
+      point1: sentences[0].trim(),
+      point2: sentences[1].trim(),
+      point3: sentences[2].trim(),
+    }
+  }
+  
+  // Fallback to generic points
+  return {
+    point1: 'Start with why, not what',
+    point2: 'Listen more than you talk',
+    point3: 'Execution beats perfection',
+  }
+}
+
+// Apply template with variable substitution
+function applyTemplate(template: string, idea: string): string {
+  const points = extractKeyPoints(idea)
+  
+  return template
+    .replace(/{idea}/g, idea)
+    .replace(/{point1}/g, points.point1)
+    .replace(/{point2}/g, points.point2)
+    .replace(/{point3}/g, points.point3)
+}
+
 export async function generateContent(
   rawIdea: string,
-  platform: 'linkedin' | 'twitter' | 'both'
+  platform: 'linkedin' | 'twitter' | 'both',
+  templateId?: string
 ): Promise<GeneratedContent> {
   // Simulate API delay
   await delay(1500)
 
   const result: GeneratedContent = {}
 
-  if (platform === 'linkedin' || platform === 'both') {
-    const template = linkedInTemplates[Math.floor(Math.random() * linkedInTemplates.length)]
-    result.linkedin = template(rawIdea)
-  }
+  // Get the template to use
+  const selectedTemplate = templateId ? getTemplate(templateId) : getDefaultTemplate()
 
-  if (platform === 'twitter' || platform === 'both') {
-    const template = twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)]
-    result.twitter = template(rawIdea)
+  if (selectedTemplate) {
+    // Use custom template
+    if (platform === 'linkedin' || platform === 'both') {
+      result.linkedin = applyTemplate(selectedTemplate.linkedinTemplate, rawIdea)
+    }
+
+    if (platform === 'twitter' || platform === 'both') {
+      result.twitter = applyTemplate(selectedTemplate.twitterTemplate, rawIdea)
+    }
+  } else {
+    // Fallback to old random templates
+    if (platform === 'linkedin' || platform === 'both') {
+      const template = linkedInTemplates[Math.floor(Math.random() * linkedInTemplates.length)]
+      result.linkedin = template(rawIdea)
+    }
+
+    if (platform === 'twitter' || platform === 'both') {
+      const template = twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)]
+      result.twitter = template(rawIdea)
+    }
   }
 
   return result

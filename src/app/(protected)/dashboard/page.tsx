@@ -15,19 +15,23 @@ export default function DashboardPage() {
   const [rawIdea, setRawIdea] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
+  const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
 
   const handleGenerate = async (
     content: string,
-    platform: 'linkedin' | 'twitter' | 'both'
+    platform: 'linkedin' | 'twitter' | 'both',
+    templateId?: string,
+    image?: string
   ) => {
     setIsGenerating(true)
     setRawIdea(content)
     setSelectedPlatform(platform)
     setGeneratedContent(null)
     setCurrentDraftId(null)
+    setAttachedImage(image)
 
     try {
-      const result = await generateContent(content, platform)
+      const result = await generateContent(content, platform, templateId)
       setGeneratedContent(result)
       toast.success('Posts generated successfully!')
     } catch (error) {
@@ -69,13 +73,16 @@ export default function DashboardPage() {
     setIsGenerating(true)
 
     try {
+      // Use default template for regeneration
       const result = await generateContent(rawIdea, platform)
       setGeneratedContent((prev) => ({
         ...prev,
         ...result,
       }))
+      toast.success(`${platform} post regenerated!`)
     } catch (error) {
       console.error('Error regenerating content:', error)
+      toast.error('Failed to regenerate post')
     } finally {
       setIsGenerating(false)
     }
@@ -145,6 +152,7 @@ export default function DashboardPage() {
               <PlatformPreview
                 platform="linkedin"
                 content={generatedContent.linkedin}
+                image={attachedImage}
                 onRegenerate={() => handleRegenerate('linkedin')}
                 onPublish={() => handlePublish('linkedin', generatedContent.linkedin!)}
               />
@@ -153,6 +161,7 @@ export default function DashboardPage() {
               <PlatformPreview
                 platform="twitter"
                 content={generatedContent.twitter}
+                image={attachedImage}
                 onRegenerate={() => handleRegenerate('twitter')}
                 onPublish={() => handlePublish('twitter', generatedContent.twitter!)}
               />

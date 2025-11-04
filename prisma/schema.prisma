@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  clerkId    String   @unique
+  name       String?
+  email      String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  drafts     Draft[]
+  posts      Post[]
+  apiKeys    ApiKey[]
+  settings   Settings?
+
+  @@map("users")
+}
+
+model Draft {
+  id          String   @id @default(cuid())
+  userId      String
+  contentRaw  String
+  contentAi   String?
+  platform    String
+  status      String   @default("draft") // draft, published
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("drafts")
+}
+
+model Post {
+  id          String   @id @default(cuid())
+  userId      String
+  platform    String
+  content     String
+  publishedAt DateTime?
+  postUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("posts")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String   // openai, anthropic, etc.
+  encryptedKey String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model Settings {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  theme       String   @default("light")
+  sidebarState String  @default("open")
+  lastLogin   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}

@@ -1,0 +1,43 @@
+[
+  {
+    "id": "1",
+    "title": "How to build a successful startup",
+    "platform": "LinkedIn",
+    "status": "published",
+    "createdAt": "2024-11-01T09:00:00Z",
+    "publishedAt": "2024-11-01T10:30:00Z",
+    "preview": "Building a successful startup requires more than just a great idea...",
+    "content": "Building a successful startup requires more than just a great idea. Here are the key lessons I've learned:\n\n1. Focus on solving a real problem\n2. Build in public and gather feedback early\n3. Iterate quickly based on user input\n4. Don't try to do everything at once\n5. Surround yourself with the right people\n\nThe journey is challenging, but incredibly rewarding. What's the most important lesson you've learned in your entrepreneurial journey?\n\n#Startup #Entrepreneurship #BusinessTips",
+    "postUrl": "https://linkedin.com/posts/example/1"
+  },
+  {
+    "id": "2",
+    "title": "AI is transforming content creation",
+    "platform": "Twitter",
+    "status": "draft",
+    "createdAt": "2024-11-02T14:30:00Z",
+    "preview": "The future of content creation is here. AI tools are making it easier...",
+    "content": "The future of content creation is here. AI tools are making it easier than ever to:\n\n• Transform ideas into polished posts\n• Adapt content for multiple platforms\n• Maintain consistency in your voice\n• Save hours of manual work\n\nBut remember: AI is a tool to enhance creativity, not replace it. The best content still comes from authentic human experiences.\n\nWhat's your take on AI in content creation?"
+  },
+  {
+    "id": "3",
+    "title": "The power of personal branding",
+    "platform": "LinkedIn",
+    "status": "published",
+    "createdAt": "2024-11-03T11:15:00Z",
+    "publishedAt": "2024-11-03T12:00:00Z",
+    "preview": "Your personal brand is your most valuable asset in the digital age...",
+    "content": "Your personal brand is your most valuable asset in the digital age.\n\nIt's not about:\n❌ Being fake or inauthentic\n❌ Posting constantly for engagement\n❌ Following every trend\n\nIt IS about:\n✅ Sharing your genuine expertise\n✅ Providing value to your audience\n✅ Building trust over time\n\nYour reputation compounds. Invest in it wisely.\n\n#PersonalBrand #ProfessionalDevelopment #CareerGrowth",
+    "postUrl": "https://linkedin.com/posts/example/3"
+  },
+  {
+    "id": "4",
+    "title": "Quick tips for entrepreneurs",
+    "platform": "Twitter",
+    "status": "draft",
+    "createdAt": "2024-11-04T16:45:00Z",
+    "preview": "5 things I wish I knew before starting my first company...",
+    "content": "5 things I wish I knew before starting my first company:\n\n1. Your first idea will probably pivot\n2. Cash flow > revenue\n3. Hire slowly, fire quickly\n4. Marketing is as important as product\n5. Your mental health matters\n\nWhat would you add to this list?"
+  }
+]
+

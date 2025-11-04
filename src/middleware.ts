@@ -1,16 +1,16 @@
-import { authMiddleware } from '@clerk/nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default authMiddleware({
-  // Routes that can be accessed while signed out
-  publicRoutes: ['/', '/sign-in', '/sign-up'],
-  // Routes that can always be accessed, and have
-  // no authentication information
-  ignoredRoutes: ['/api/webhooks/clerk'],
-})
+// Design Mode: No authentication middleware - all routes are public
+export function middleware(request: NextRequest) {
+  return NextResponse.next()
+}
 
 export const config = {
-  // Protects all routes, including api/trpc.
-  // See https://clerk.com/docs/references/nextjs/auth-middleware
-  // for more information about configuring your Middleware
-  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
+  matcher: [
+    // Skip Next.js internals and all static files
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
 }

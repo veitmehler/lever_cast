@@ -1,0 +1,47 @@
+{
+  "appearance": {
+    "theme": "dark",
+    "sidebarCollapsed": false
+  },
+  "apiKeys": {
+    "openai": {
+      "provider": "openai",
+      "hasKey": true,
+      "masked": "••••••••••••••••••••sk-abc123"
+    },
+    "anthropic": {
+      "provider": "anthropic",
+      "hasKey": false,
+      "masked": null
+    },
+    "gemini": {
+      "provider": "gemini",
+      "hasKey": false,
+      "masked": null
+    },
+    "openrouter": {
+      "provider": "openrouter",
+      "hasKey": false,
+      "masked": null
+    }
+  },
+  "defaultLLMProvider": "openai",
+  "connectedAccounts": {
+    "linkedin": {
+      "connected": true,
+      "username": "johndoe",
+      "connectedAt": "2024-10-20T14:30:00Z"
+    },
+    "twitter": {
+      "connected": false,
+      "username": null,
+      "connectedAt": null
+    }
+  },
+  "preferences": {
+    "autoSave": true,
+    "autoSaveInterval": 5000,
+    "notifications": true
+  }
+}
+

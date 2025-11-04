@@ -1,0 +1,21 @@
+{
+  "id": "user_123",
+  "clerkId": "clerk_abc123",
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "joinedDate": "2024-10-15T08:00:00Z",
+  "plan": "free",
+  "settings": {
+    "theme": "dark",
+    "sidebarState": "expanded",
+    "defaultLLMProvider": "openai",
+    "lastLogin": "2024-11-04T10:00:00Z"
+  },
+  "stats": {
+    "postsCreated": 12,
+    "postsPublished": 8,
+    "drafts": 4,
+    "totalWords": 4250
+  }
+}
+

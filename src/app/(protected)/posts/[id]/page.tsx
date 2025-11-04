@@ -1,58 +1,57 @@
 'use client'
 
-import { use } from 'react'
+import { use, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Edit, Trash2, Share2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Trash2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-// Mock data
-const mockPostData: Record<string, any> = {
-  '1': {
-    id: '1',
-    title: 'How to build a successful startup',
-    platform: 'LinkedIn',
-    status: 'published',
-    createdAt: '2024-11-01',
-    publishedAt: '2024-11-01T10:30:00',
-    content: `Building a successful startup requires more than just a great idea. Here are the key lessons I've learned:
-
-1. Focus on solving a real problem
-2. Build in public and gather feedback early
-3. Iterate quickly based on user input
-4. Don't try to do everything at once
-5. Surround yourself with the right people
-
-The journey is challenging, but incredibly rewarding. What's the most important lesson you've learned in your entrepreneurial journey?
-
-#Startup #Entrepreneurship #BusinessTips`,
-    postUrl: 'https://linkedin.com/posts/example/1'
-  },
-  '2': {
-    id: '2',
-    title: 'AI is transforming content creation',
-    platform: 'Twitter',
-    status: 'draft',
-    createdAt: '2024-11-02',
-    content: `The future of content creation is here. AI tools are making it easier than ever to:
-
-• Transform ideas into polished posts
-• Adapt content for multiple platforms
-• Maintain consistency in your voice
-• Save hours of manual work
-
-But remember: AI is a tool to enhance creativity, not replace it. The best content still comes from authentic human experiences.
-
-What's your take on AI in content creation?`,
-  },
-}
+import { getDraft, deleteDraft, markAsPublished } from '@/lib/draftStorage'
+import { PlatformPreview } from '@/components/PlatformPreview'
+import { publishToPlatform } from '@/lib/mockAI'
+import { toast } from 'sonner'
 
 export default function PostDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
+  const router = useRouter()
   const { id } = use(params)
-  const post = mockPostData[id]
+  const [post, setPost] = useState(getDraft(id))
+
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this draft?')) {
+      const success = deleteDraft(id)
+      if (success) {
+        toast.success('Draft deleted successfully')
+        router.push('/posts')
+      } else {
+        toast.error('Failed to delete draft')
+      }
+    }
+  }
+
+  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
+    try {
+      const result = await publishToPlatform(platform, content)
+      if (result.success) {
+        markAsPublished(id)
+        setPost(getDraft(id))
+        toast.success(result.message, {
+          description: `Your ${platform} post is now live!`,
+        })
+      }
+    } catch (error) {
+      console.error('Error publishing:', error)
+      toast.error('Failed to publish post')
+    }
+  }
+
+  const handleRegenerate = () => {
+    toast.info('Regeneration coming soon', {
+      description: 'Return to dashboard to generate new versions',
+    })
+  }
 
   if (!post) {
     return (
@@ -67,7 +66,7 @@ export default function PostDetailPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* Back Button */}
       <Link
         href="/posts"
@@ -78,7 +77,7 @@ export default function PostDetailPage({
       </Link>
 
       {/* Post Header */}
-      <div className="mb-6">
+      <div className="mb-8">
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">{post.title}</h1>
@@ -103,60 +102,43 @@ export default function PostDetailPage({
             </div>
           </div>
           
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-            {post.status === 'published' && (
-              <Button variant="outline" size="sm">
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
-            )}
-            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-destructive hover:text-destructive"
+            onClick={handleDelete}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+
+        {/* Original Idea */}
+        <div className="rounded-lg border border-border bg-card p-6 mb-6">
+          <h3 className="text-sm font-semibold text-card-foreground mb-2">Original Idea</h3>
+          <p className="text-muted-foreground">{post.rawIdea}</p>
         </div>
       </div>
 
-      {/* Post Content */}
-      <div className="rounded-lg border border-border bg-card p-8">
-        <div className="prose prose-invert max-w-none">
-          <pre className="whitespace-pre-wrap font-sans text-card-foreground leading-relaxed">
-            {post.content}
-          </pre>
-        </div>
+      {/* Generated Content Preview */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {post.linkedinContent && (
+          <PlatformPreview
+            platform="linkedin"
+            content={post.linkedinContent}
+            onRegenerate={handleRegenerate}
+            onPublish={() => handlePublish('linkedin', post.linkedinContent!)}
+          />
+        )}
+        {post.twitterContent && (
+          <PlatformPreview
+            platform="twitter"
+            content={post.twitterContent}
+            onRegenerate={handleRegenerate}
+            onPublish={() => handlePublish('twitter', post.twitterContent!)}
+          />
+        )}
       </div>
-
-      {/* Published Info */}
-      {post.status === 'published' && post.postUrl && (
-        <div className="mt-6 rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-card-foreground">Published to {post.platform}</p>
-              <p className="text-xs text-muted-foreground">
-                {new Date(post.publishedAt).toLocaleString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </p>
-            </div>
-            <a
-              href={post.postUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
-            >
-              View on {post.platform} →
-            </a>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

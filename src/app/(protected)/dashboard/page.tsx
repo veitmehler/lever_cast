@@ -4,12 +4,17 @@ import { useState } from 'react'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { generateContent, publishToPlatform, GeneratedContent } from '@/lib/mockAI'
-import { Loader2 } from 'lucide-react'
+import { saveDraft, markAsPublished } from '@/lib/draftStorage'
+import { Loader2, Save } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
+  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
 
   const handleGenerate = async (
     content: string,
@@ -17,15 +22,44 @@ export default function DashboardPage() {
   ) => {
     setIsGenerating(true)
     setRawIdea(content)
+    setSelectedPlatform(platform)
     setGeneratedContent(null)
+    setCurrentDraftId(null)
 
     try {
       const result = await generateContent(content, platform)
       setGeneratedContent(result)
+      toast.success('Posts generated successfully!')
     } catch (error) {
       console.error('Error generating content:', error)
+      toast.error('Failed to generate posts')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleSaveDraft = () => {
+    if (!generatedContent || !rawIdea) return
+
+    try {
+      const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
+      
+      const draft = saveDraft({
+        title,
+        rawIdea,
+        linkedinContent: generatedContent.linkedin,
+        twitterContent: generatedContent.twitter,
+        platform: selectedPlatform,
+        status: 'draft',
+      })
+
+      setCurrentDraftId(draft.id)
+      toast.success('Draft saved successfully!', {
+        description: 'You can find it in the Posts page',
+      })
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      toast.error('Failed to save draft')
     }
   }
 
@@ -51,10 +85,17 @@ export default function DashboardPage() {
     try {
       const result = await publishToPlatform(platform, content)
       if (result.success) {
-        alert(result.message)
+        // Mark as published if we have a draft ID
+        if (currentDraftId) {
+          markAsPublished(currentDraftId)
+        }
+        toast.success(result.message, {
+          description: `Your ${platform} post is now live!`,
+        })
       }
     } catch (error) {
       console.error('Error publishing:', error)
+      toast.error('Failed to publish post')
     }
   }
 
@@ -88,7 +129,17 @@ export default function DashboardPage() {
       {/* Generated Content Preview */}
       {!isGenerating && generatedContent && (
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Your Generated Posts</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-foreground">Your Generated Posts</h2>
+            <Button
+              onClick={handleSaveDraft}
+              variant="outline"
+              disabled={!!currentDraftId}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {currentDraftId ? 'Saved' : 'Save Draft'}
+            </Button>
+          </div>
           <div className="grid gap-6 md:grid-cols-2">
             {generatedContent.linkedin && (
               <PlatformPreview

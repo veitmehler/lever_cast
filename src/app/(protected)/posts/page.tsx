@@ -1,54 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { FileText, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-// Mock data for prototype
-const mockPosts = [
-  {
-    id: '1',
-    title: 'How to build a successful startup',
-    platform: 'LinkedIn',
-    status: 'published',
-    createdAt: '2024-11-01',
-    preview: 'Building a successful startup requires more than just a great idea...'
-  },
-  {
-    id: '2',
-    title: 'AI is transforming content creation',
-    platform: 'Twitter',
-    status: 'draft',
-    createdAt: '2024-11-02',
-    preview: 'The future of content creation is here. AI tools are making it easier...'
-  },
-  {
-    id: '3',
-    title: 'The power of personal branding',
-    platform: 'LinkedIn',
-    status: 'published',
-    createdAt: '2024-11-03',
-    preview: 'Your personal brand is your most valuable asset in the digital age...'
-  },
-  {
-    id: '4',
-    title: 'Quick tips for entrepreneurs',
-    platform: 'Twitter',
-    status: 'draft',
-    createdAt: '2024-11-04',
-    preview: '5 things I wish I knew before starting my first company...'
-  },
-]
+import { getDrafts, type Draft } from '@/lib/draftStorage'
 
 type FilterStatus = 'all' | 'published' | 'draft'
 
 export default function PostsPage() {
   const [filter, setFilter] = useState<FilterStatus>('all')
+  const [drafts, setDrafts] = useState<Draft[]>([])
 
-  const filteredPosts = mockPosts.filter(post => {
+  // Load drafts from localStorage
+  useEffect(() => {
+    setDrafts(getDrafts())
+  }, [])
+
+  const filteredPosts = drafts.filter(draft => {
     if (filter === 'all') return true
-    return post.status === filter
+    return draft.status === filter
   })
 
   return (
@@ -77,7 +48,7 @@ export default function PostsPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          All ({mockPosts.length})
+          All ({drafts.length})
         </button>
         <button
           onClick={() => setFilter('draft')}
@@ -87,7 +58,7 @@ export default function PostsPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Drafts ({mockPosts.filter(p => p.status === 'draft').length})
+          Drafts ({drafts.filter(d => d.status === 'draft').length})
         </button>
         <button
           onClick={() => setFilter('published')}
@@ -97,43 +68,43 @@ export default function PostsPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Published ({mockPosts.filter(p => p.status === 'published').length})
+          Published ({drafts.filter(d => d.status === 'published').length})
         </button>
       </div>
 
       {/* Posts Grid */}
       <div className="grid gap-4 md:grid-cols-2">
-        {filteredPosts.map((post) => (
+        {filteredPosts.map((draft) => (
           <Link
-            key={post.id}
-            href={`/posts/${post.id}`}
+            key={draft.id}
+            href={`/posts/${draft.id}`}
             className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
                 <span className="text-xs font-medium text-muted-foreground uppercase">
-                  {post.platform}
+                  {draft.platform}
                 </span>
               </div>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  post.status === 'published'
+                  draft.status === 'published'
                     ? 'bg-primary/20 text-primary'
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {post.status}
+                {draft.status}
               </span>
             </div>
             <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
-              {post.title}
+              {draft.title}
             </h3>
             <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-              {post.preview}
+              {draft.rawIdea}
             </p>
             <p className="text-xs text-muted-foreground">
-              {new Date(post.createdAt).toLocaleDateString('en-US', {
+              {new Date(draft.createdAt).toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric'
@@ -147,12 +118,20 @@ export default function PostsPage() {
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No posts found</h3>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             {filter === 'all' 
-              ? 'Start creating your first post!'
+              ? 'Start creating your first post on the Dashboard!'
               : `No ${filter} posts yet.`
             }
           </p>
+          {filter === 'all' && (
+            <Link href="/dashboard">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Post
+              </Button>
+            </Link>
+          )}
         </div>
       )}
     </div>

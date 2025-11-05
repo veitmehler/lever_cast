@@ -9,8 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -31,17 +32,18 @@ model User {
 }
 
 model Draft {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   contentRaw  String
   contentAi   String?
   platform    String
-  status      String   @default("draft") // draft, published
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("draft") // draft, published
+  publishedAt DateTime? // When the draft was published (null if still draft)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("drafts")
 }

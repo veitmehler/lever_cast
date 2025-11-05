@@ -64,8 +64,10 @@ export function MobileNav() {
           <h1 className="text-lg font-semibold text-foreground">Levercast</h1>
         </div>
 
-        {/* Spacer for balance */}
-        <div className="w-10" />
+        {/* User profile placeholder - actual UserButton is in protected layout */}
+        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
+          U
+        </div>
       </div>
 
       {/* Overlay */}
@@ -125,8 +127,7 @@ export function MobileNav() {
           {/* Footer Info */}
           <div className="p-4 border-t border-sidebar-border">
             <div className="text-xs text-sidebar-foreground">
-              <p className="font-medium mb-1">Design Mode</p>
-              <p className="text-muted-foreground">No Auth Required</p>
+              <p className="font-medium">Authenticated</p>
             </div>
           </div>
         </div>

@@ -13,10 +13,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark')
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     // Load theme from localStorage
     const saved = localStorage.getItem('theme') as Theme
     if (saved) {
@@ -36,20 +34,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Apply theme on mount
+  // Apply theme
   useEffect(() => {
-    if (mounted) {
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else {
-        document.documentElement.classList.remove('dark')
-      }
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
     }
-  }, [theme, mounted])
-
-  if (!mounted) {
-    return null
-  }
+  }, [theme])
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

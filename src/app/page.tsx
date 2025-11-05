@@ -14,11 +14,18 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold">Levercast</h1>
           </div>
-          <Link href="/dashboard">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-              Try Demo
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/sign-in">
+              <Button variant="outline" className="hover:bg-primary/20 hover:border-primary/50">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                Try Demo
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

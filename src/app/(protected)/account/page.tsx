@@ -1,18 +1,37 @@
 'use client'
 
+import { useUser } from '@clerk/nextjs'
+import { useState, useEffect } from 'react'
 import { Mail, Calendar, Shield } from 'lucide-react'
-
-// Mock user data
-const mockUser = {
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  joinedDate: '2024-10-15',
-  plan: 'Free',
-  postsCreated: 12,
-  postsPublished: 8
-}
+import { getDrafts } from '@/lib/draftStorage'
 
 export default function AccountPage() {
+  const { user, isLoaded } = useUser()
+  const [stats, setStats] = useState({ postsCreated: 0, postsPublished: 0 })
+  
+  // Load stats from localStorage on client side only
+  useEffect(() => {
+    const drafts = getDrafts()
+    setStats({
+      postsCreated: drafts.length,
+      postsPublished: drafts.filter(d => d.status === 'published').length
+    })
+  }, [])
+  
+  if (!isLoaded) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Account</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const userName = user?.fullName || user?.firstName || 'User'
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress || 'No email'
+  const joinedDate = user?.createdAt ? new Date(user.createdAt) : new Date()
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -29,11 +48,19 @@ export default function AccountPage() {
 
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-lg font-bold">
-                {mockUser.name.charAt(0)}
-              </div>
+              {user?.imageUrl ? (
+                <img 
+                  src={user.imageUrl} 
+                  alt={userName}
+                  className="w-12 h-12 rounded-full"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-lg font-bold">
+                  {userName.charAt(0)}
+                </div>
+              )}
               <div>
-                <div className="font-medium text-card-foreground">{mockUser.name}</div>
+                <div className="font-medium text-card-foreground">{userName}</div>
                 <div className="text-sm text-muted-foreground">Free Plan</div>
               </div>
             </div>
@@ -43,7 +70,7 @@ export default function AccountPage() {
                 <Mail className="w-5 h-5 text-muted-foreground" />
                 <div>
                   <div className="text-sm text-muted-foreground">Email</div>
-                  <div className="text-card-foreground">{mockUser.email}</div>
+                  <div className="text-card-foreground">{userEmail}</div>
                 </div>
               </div>
 
@@ -52,7 +79,7 @@ export default function AccountPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">Member Since</div>
                   <div className="text-card-foreground">
-                    {new Date(mockUser.joinedDate).toLocaleDateString('en-US', {
+                    {joinedDate.toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
                       year: 'numeric'
@@ -79,14 +106,14 @@ export default function AccountPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg bg-secondary p-4">
               <div className="text-3xl font-bold text-foreground mb-1">
-                {mockUser.postsCreated}
+                {stats.postsCreated}
               </div>
               <div className="text-sm text-muted-foreground">Posts Created</div>
             </div>
 
             <div className="rounded-lg bg-secondary p-4">
               <div className="text-3xl font-bold text-foreground mb-1">
-                {mockUser.postsPublished}
+                {stats.postsPublished}
               </div>
               <div className="text-sm text-muted-foreground">Posts Published</div>
             </div>

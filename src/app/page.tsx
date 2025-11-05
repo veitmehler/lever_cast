@@ -20,9 +20,9 @@ export default function Home() {
                 Sign In
               </Button>
             </Link>
-            <Link href="/dashboard">
+            <Link href="/sign-up">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                Try Demo
+                Get Started
               </Button>
             </Link>
           </div>
@@ -48,10 +48,10 @@ export default function Home() {
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/dashboard">
+            <Link href="/sign-up">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
                 <Sparkles className="w-5 h-5 mr-2" />
-                Start Creating Free
+                Get Started Free
               </Button>
             </Link>
             <Button size="lg" variant="outline" className="text-lg px-8 py-6">
@@ -139,10 +139,10 @@ export default function Home() {
           <p className="text-xl text-muted-foreground mb-8">
             Join entrepreneurs turning ideas into engagement
           </p>
-          <Link href="/dashboard">
+          <Link href="/sign-up">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
               <Sparkles className="w-5 h-5 mr-2" />
-              Try Levercast Free
+              Get Started Free
             </Button>
           </Link>
         </div>
@@ -159,7 +159,7 @@ export default function Home() {
               <span className="font-semibold">Levercast</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Levercast. Design Mode Prototype.
+              © 2024 Levercast. All rights reserved.
             </p>
           </div>
         </div>

@@ -48,7 +48,7 @@ export async function GET() {
     // Get or create user
     const user = await getOrCreateUser(userId)
 
-    // Fetch all drafts for this user with published posts
+    // Fetch all drafts for this user with published and scheduled posts
     const drafts = await prisma.draft.findMany({
       where: {
         userId: user.id,
@@ -56,12 +56,16 @@ export async function GET() {
       include: {
         posts: {
           where: {
-            status: 'published',
+            status: {
+              in: ['published', 'scheduled'],
+            },
           },
           select: {
             id: true,
             platform: true,
             publishedAt: true,
+            scheduledAt: true,
+            status: true,
           },
         },
       },

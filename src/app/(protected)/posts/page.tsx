@@ -6,7 +6,7 @@ import { FileText, Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
-type FilterStatus = 'all' | 'published' | 'draft'
+type FilterStatus = 'all' | 'published' | 'draft' | 'scheduled'
 
 // Draft type matching database schema
 type Draft = {
@@ -26,7 +26,9 @@ type Draft = {
   posts?: Array<{
     id: string
     platform: string
-    publishedAt: Date
+    publishedAt: Date | null
+    scheduledAt: Date | null
+    status: string
   }>
 }
 
@@ -60,9 +62,24 @@ export default function PostsPage() {
   }, [])
 
   const filteredPosts = drafts.filter(draft => {
+    const hasScheduledPosts = draft.posts?.some(post => post.status === 'scheduled') || false
+    
     if (filter === 'all') return true
-    return draft.status === filter
+    if (filter === 'draft') {
+      // Exclude drafts that have scheduled posts from the Drafts tab
+      return draft.status === 'draft' && !hasScheduledPosts
+    }
+    if (filter === 'published') return draft.status === 'published'
+    if (filter === 'scheduled') {
+      // Show drafts that have scheduled posts
+      return hasScheduledPosts
+    }
+    return false
   })
+
+  const scheduledDrafts = drafts.filter(draft => 
+    draft.posts?.some(post => post.status === 'scheduled')
+  )
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -105,6 +122,16 @@ export default function PostsPage() {
           Drafts ({drafts.filter(d => d.status === 'draft').length})
         </button>
         <button
+          onClick={() => setFilter('scheduled')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+            filter === 'scheduled'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Scheduled ({scheduledDrafts.length})
+        </button>
+        <button
           onClick={() => setFilter('published')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             filter === 'published'
@@ -126,57 +153,98 @@ export default function PostsPage() {
       {/* Posts Grid */}
       {!isLoading && (
         <div className="grid gap-4 md:grid-cols-2">
-          {filteredPosts.map((draft) => (
-            <Link
-              key={draft.id}
-              href={`/posts/${draft.id}`}
-              className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <FileText className="w-5 h-5 text-primary" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase">
-                    {draft.platforms}
+          {filteredPosts.map((draft) => {
+            const scheduledPosts = draft.posts?.filter(p => p.status === 'scheduled') || []
+            const publishedPosts = draft.posts?.filter(p => p.status === 'published') || []
+            const earliestScheduledDate = scheduledPosts.length > 0
+              ? scheduledPosts.reduce((earliest, post) => {
+                  if (!earliest) return post.scheduledAt ? new Date(post.scheduledAt) : null
+                  if (!post.scheduledAt) return earliest
+                  const postDate = new Date(post.scheduledAt)
+                  return postDate < earliest ? postDate : earliest
+                }, null as Date | null)
+              : null
+
+            return (
+              <Link
+                key={draft.id}
+                href={`/posts/${draft.id}`}
+                className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase">
+                      {draft.platforms}
+                    </span>
+                    {publishedPosts.length > 0 && (
+                      <div className="flex gap-1">
+                        {publishedPosts.map((post) => (
+                          <span
+                            key={post.id}
+                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400"
+                            title={`Published to ${post.platform} on ${post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : 'N/A'}`}
+                          >
+                            ✓ {post.platform}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {scheduledPosts.length > 0 && (
+                      <div className="flex gap-1">
+                        {scheduledPosts.map((post) => (
+                          <span
+                            key={post.id}
+                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                            title={`Scheduled for ${post.platform} on ${post.scheduledAt ? new Date(post.scheduledAt).toLocaleDateString() : 'N/A'}`}
+                          >
+                            📅 {post.platform}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      draft.status === 'published'
+                        ? 'bg-primary/20 text-primary'
+                        : scheduledPosts.length > 0
+                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
+                          : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {scheduledPosts.length > 0 ? 'Scheduled' : draft.status}
                   </span>
-                  {draft.posts && draft.posts.length > 0 && (
-                    <div className="flex gap-1">
-                      {draft.posts.map((post) => (
-                        <span
-                          key={post.id}
-                          className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary"
-                          title={`Published to ${post.platform} on ${new Date(post.publishedAt).toLocaleDateString()}`}
-                        >
-                          ✓ {post.platform}
-                        </span>
-                      ))}
-                    </div>
+                </div>
+                <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
+                  {draft.title}
+                </h3>
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                  {draft.contentRaw}
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(draft.createdAt).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  {filter === 'scheduled' && earliestScheduledDate && (
+                    <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
+                      {earliestScheduledDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
                   )}
                 </div>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    draft.status === 'published'
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  {draft.status}
-                </span>
-              </div>
-              <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
-                {draft.title}
-              </h3>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                {draft.contentRaw}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {new Date(draft.createdAt).toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </p>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
         </div>
       )}
 

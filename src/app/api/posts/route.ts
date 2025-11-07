@@ -36,7 +36,7 @@ async function getOrCreateUser(clerkId: string) {
 }
 
 // GET /api/posts - Get all posts for the authenticated user
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const authResult = await auth()
     const userId = authResult.userId
@@ -45,17 +45,51 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get query parameters
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+
     // Get or create user
     const user = await getOrCreateUser(userId)
 
+    // Build where clause
+    const where: any = {
+      userId: user.id,
+    }
+
+    if (status) {
+      where.status = status
+    }
+
+    if (startDate || endDate) {
+      where.OR = []
+      if (startDate) {
+        where.OR.push({
+          publishedAt: { gte: new Date(startDate) },
+        })
+        where.OR.push({
+          scheduledAt: { gte: new Date(startDate) },
+        })
+      }
+      if (endDate) {
+        where.OR.push({
+          publishedAt: { lte: new Date(endDate) },
+        })
+        where.OR.push({
+          scheduledAt: { lte: new Date(endDate) },
+        })
+      }
+    }
+
     // Fetch all posts for this user
     const posts = await prisma.post.findMany({
-      where: {
-        userId: user.id,
-      },
-      orderBy: {
-        publishedAt: 'desc',
-      },
+      where,
+      orderBy: [
+        { scheduledAt: 'asc' },
+        { publishedAt: 'desc' },
+      ],
       include: {
         draft: {
           select: {
@@ -90,6 +124,7 @@ export async function POST(request: Request) {
       content,
       postUrl,
       status = 'published',
+      scheduledAt,
       errorMsg,
     } = body
 
@@ -101,11 +136,28 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate scheduledAt if provided
+    if (scheduledAt) {
+      const scheduledDate = new Date(scheduledAt)
+      if (isNaN(scheduledDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid scheduledAt date format' },
+          { status: 400 }
+        )
+      }
+      if (scheduledDate <= new Date()) {
+        return NextResponse.json(
+          { error: 'scheduledAt must be in the future' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Get or create user
     const user = await getOrCreateUser(userId)
 
-    // Check if a post already exists for this draft and platform
-    if (draftId) {
+    // Check if a post already exists for this draft and platform (only for published posts)
+    if (draftId && !scheduledAt) {
       const existingPost = await prisma.post.findFirst({
         where: {
           draftId,
@@ -122,6 +174,12 @@ export async function POST(request: Request) {
       }
     }
 
+    // Determine status and dates
+    const isScheduled = !!scheduledAt
+    const finalStatus = isScheduled ? 'scheduled' : status
+    const finalPublishedAt = isScheduled ? null : new Date()
+    const finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
+
     // Create the post
     const post = await prisma.post.create({
       data: {
@@ -130,13 +188,15 @@ export async function POST(request: Request) {
         platform,
         content,
         postUrl: postUrl || null,
-        status,
+        status: finalStatus,
+        publishedAt: finalPublishedAt,
+        scheduledAt: finalScheduledAt,
         errorMsg: errorMsg || null,
       },
     })
 
     // If draftId is provided and status is published, check if all platforms are published
-    if (draftId && status === 'published') {
+    if (draftId && finalStatus === 'published') {
       const draft = await prisma.draft.findUnique({
         where: { id: draftId },
       })
@@ -179,7 +239,17 @@ export async function POST(request: Request) {
     return NextResponse.json(post, { status: 201 })
   } catch (error) {
     console.error('Error creating post:', error)
-    return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    return NextResponse.json(
+      { 
+        error: 'Failed to create post',
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    )
   }
 }
 

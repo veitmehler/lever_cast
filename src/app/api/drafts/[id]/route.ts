@@ -58,13 +58,12 @@ export async function GET(
       },
       include: {
         posts: {
-          where: {
-            status: 'published',
-          },
           select: {
             id: true,
             platform: true,
             publishedAt: true,
+            scheduledAt: true,
+            status: true,
             postUrl: true,
           },
         },

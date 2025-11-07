@@ -106,6 +106,36 @@ export async function PATCH(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
+    // Validate scheduledAt if provided
+    if (body.scheduledAt !== undefined) {
+      if (body.scheduledAt === null) {
+        // Canceling schedule - convert to published if it was scheduled
+        if (existingPost.status === 'scheduled') {
+          body.status = 'published'
+          body.publishedAt = new Date()
+          body.scheduledAt = null
+        }
+      } else {
+        const scheduledDate = new Date(body.scheduledAt)
+        if (isNaN(scheduledDate.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid scheduledAt date format' },
+            { status: 400 }
+          )
+        }
+        if (scheduledDate <= new Date()) {
+          return NextResponse.json(
+            { error: 'scheduledAt must be in the future' },
+            { status: 400 }
+          )
+        }
+        // Rescheduling - update status and dates
+        body.status = 'scheduled'
+        body.scheduledAt = scheduledDate
+        body.publishedAt = null
+      }
+    }
+
     // Update the post
     const updatedPost = await prisma.post.update({
       where: { id },

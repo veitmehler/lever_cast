@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Copy, RotateCw, Send, Check, AlertCircle } from 'lucide-react'
+import { Copy, RotateCw, Send, Check, AlertCircle, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { ScheduleModal } from './ScheduleModal'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter'
@@ -11,11 +12,16 @@ interface PlatformPreviewProps {
   image?: string
   onRegenerate: () => void
   onPublish: (content: string) => void
+  onSchedule?: (content: string, scheduledAt: Date) => Promise<void>
+  onReschedule?: (postId: string, scheduledAt: Date) => Promise<void>
   onContentChange?: (platform: 'linkedin' | 'twitter', newContent: string) => void
   userName?: string
   userInitials?: string
   isPublished?: boolean
   publishedDate?: Date | null
+  isScheduled?: boolean
+  scheduledDate?: Date | null
+  scheduledPostId?: string | null
 }
 
 // Platform character limits
@@ -30,15 +36,22 @@ export function PlatformPreview({
   image,
   onRegenerate,
   onPublish,
+  onSchedule,
+  onReschedule,
   onContentChange,
   userName = 'John Doe',
   userInitials = 'JD',
   isPublished = false,
   publishedDate = null,
+  isScheduled = false,
+  scheduledDate = null,
+  scheduledPostId = null,
 }: PlatformPreviewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
   const [copied, setCopied] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [isRescheduling, setIsRescheduling] = useState(false)
 
   // Update editedContent when content prop changes
   useEffect(() => {
@@ -119,15 +132,23 @@ export function PlatformPreview({
           <div>
             <div className="font-semibold text-card-foreground text-sm">{userName}</div>
             <div className="text-xs text-muted-foreground">
-              {isPublished && publishedDate
-                ? `Published ${publishedDate.toLocaleDateString('en-US', {
+              {isScheduled && scheduledDate
+                ? `Scheduled for ${scheduledDate.toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric',
                     hour: 'numeric',
                     minute: '2-digit',
                   })}`
-                : 'Just now'}
+                : isPublished && publishedDate
+                  ? `Published ${publishedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}`
+                  : 'Just now'}
             </div>
           </div>
         </div>
@@ -263,40 +284,90 @@ export function PlatformPreview({
           size="sm"
           variant="outline"
           className="flex-1 min-h-[44px]"
+          disabled={isScheduled}
         >
           <RotateCw className="w-4 h-4 mr-2" />
           Regenerate
         </Button>
-        <Button
-          onClick={() => onPublish(editedContent)}
-          size="sm"
-          className={cn(
-            "flex-1 min-h-[44px]",
-            isPublished 
-              ? "bg-green-600 text-white hover:bg-green-700" 
-              : "bg-primary text-primary-foreground hover:bg-primary/90"
-          )}
-          disabled={isOverLimit || isPublished}
-          title={
-            isPublished 
-              ? `Already published to ${platform}` 
-              : isOverLimit 
-                ? 'Cannot publish - content exceeds character limit' 
-                : 'Publish to platform'
-          }
-        >
-          {isPublished ? (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Published
-            </>
-          ) : (
-            <>
+        {isScheduled ? (
+          <Button
+            onClick={() => {
+              if (onReschedule && scheduledPostId) {
+                setIsRescheduling(true)
+                setShowScheduleModal(true)
+              }
+            }}
+            size="sm"
+            className="flex-1 min-h-[44px] bg-orange-500 text-white hover:bg-orange-600"
+            disabled={!onReschedule || !scheduledPostId}
+            title={scheduledDate ? `Scheduled for ${scheduledDate.toLocaleDateString()}` : 'Scheduled'}
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Change Publish Date
+          </Button>
+        ) : isPublished ? (
+          <Button
+            size="sm"
+            className="flex-1 min-h-[44px] bg-green-600 text-white hover:bg-green-700"
+            disabled
+            title={`Published to ${platform}`}
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Published
+          </Button>
+        ) : (
+          <div className="flex-1 flex gap-1">
+            <Button
+              onClick={() => onPublish(editedContent)}
+              size="sm"
+              className="flex-1 min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={isOverLimit}
+              title={isOverLimit ? 'Cannot publish - content exceeds character limit' : 'Publish now'}
+            >
               <Send className="w-4 h-4 mr-2" />
-              Publish
-            </>
-          )}
-        </Button>
+              Publish Now
+            </Button>
+            {onSchedule && (
+              <Button
+                onClick={() => setShowScheduleModal(true)}
+                size="sm"
+                variant="outline"
+                className="min-h-[44px] px-3"
+                disabled={isOverLimit}
+                title="Schedule for later"
+              >
+                <Calendar className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        )}
+        {(onSchedule || onReschedule) && (
+          <ScheduleModal
+            isOpen={showScheduleModal}
+            onClose={() => {
+              setShowScheduleModal(false)
+              setIsRescheduling(false)
+            }}
+            onSchedule={async (scheduledAt) => {
+              if (isRescheduling && onReschedule && scheduledPostId) {
+                try {
+                  await onReschedule(scheduledPostId, scheduledAt)
+                  setShowScheduleModal(false)
+                  setIsRescheduling(false)
+                } catch (error) {
+                  // Error handled by parent
+                  setIsRescheduling(false)
+                }
+              } else if (onSchedule) {
+                await onSchedule(editedContent, scheduledAt)
+              }
+            }}
+            platform={platform}
+            content={editedContent}
+            initialDate={isScheduled ? scheduledDate : null}
+            isReschedule={isRescheduling || isScheduled}
+          />
+        )}
       </div>
     </div>
   )

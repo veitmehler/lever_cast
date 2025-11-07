@@ -183,6 +183,92 @@ export default function DashboardPage() {
     }
   }
 
+  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string, scheduledAt: Date) => {
+    try {
+      // First, save draft if not already saved
+      let draftId = currentDraftId
+      if (!draftId && rawIdea) {
+        const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
+        
+        const draftResponse = await fetch('/api/drafts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title,
+            contentRaw: rawIdea,
+            linkedinContent: generatedContent?.linkedin || null,
+            twitterContent: generatedContent?.twitter || null,
+            platforms: selectedPlatform,
+            status: 'draft',
+            attachedImage: attachedImage || null,
+          }),
+        })
+
+        if (!draftResponse.ok) {
+          const errorData = await draftResponse.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || 'Failed to save draft')
+        }
+
+        const draft = await draftResponse.json()
+        draftId = draft.id
+        setCurrentDraftId(draft.id)
+      } else if (draftId) {
+        // Ensure edited content is saved before scheduling
+        const updateData: Record<string, string> = {}
+        if (platform === 'linkedin' && generatedContent?.linkedin) {
+          updateData.linkedinContent = generatedContent.linkedin
+        } else if (platform === 'twitter' && generatedContent?.twitter) {
+          updateData.twitterContent = generatedContent.twitter
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await fetch(`/api/drafts/${draftId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+          })
+        }
+      }
+
+      // Create scheduled post
+      const postResponse = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: draftId || null,
+          platform,
+          content,
+          status: 'scheduled',
+          scheduledAt: scheduledAt.toISOString(),
+        }),
+      })
+
+      if (!postResponse.ok) {
+        const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to schedule post:', errorData)
+        const errorMessage = errorData.details
+          ? `${errorData.error || 'Failed to schedule post'}: ${errorData.details}`
+          : errorData.error || 'Failed to schedule post'
+        throw new Error(errorMessage)
+      }
+
+      toast.success('Post scheduled successfully!', {
+        description: `Your ${platform} post is scheduled for ${scheduledAt.toLocaleDateString()}`,
+      })
+    } catch (error) {
+      console.error('Error scheduling:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to schedule post'
+      toast.error(errorMessage)
+      throw error
+    }
+  }
+
   const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
     try {
       // First, save draft if not already saved (use current edited content)
@@ -338,6 +424,7 @@ export default function DashboardPage() {
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('linkedin')}
                 onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
                 onContentChange={handleContentChange}
               />
             )}
@@ -350,6 +437,7 @@ export default function DashboardPage() {
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('twitter')}
                 onPublish={(editedContent) => handlePublish('twitter', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
                 onContentChange={handleContentChange}
               />
             )}

@@ -62,9 +62,10 @@ model Post {
   draftId     String?   // Link back to the draft this was published from
   platform    String    // "linkedin" or "twitter"
   content     String    @db.Text // The actual content that was published
-  publishedAt DateTime  @default(now())
+  publishedAt DateTime? // When the post was actually published (nullable for scheduled posts)
+  scheduledAt DateTime? // When the post is scheduled to be published
   postUrl     String?   // URL to the published post (if available from API)
-  status      String    @default("published") // published, failed, deleted
+  status      String    @default("published") // published, scheduled, failed, deleted
   errorMsg    String?   // If publishing failed, store error
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -75,6 +76,7 @@ model Post {
 
   @@index([userId, platform, publishedAt])
   @@index([draftId])
+  @@index([userId, scheduledAt, status]) // For calendar queries
   @@map("posts")
 }
 

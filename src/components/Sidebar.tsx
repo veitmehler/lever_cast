@@ -10,7 +10,8 @@ import {
   User, 
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +24,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { label: 'Posts', href: '/posts', icon: <FileText className="w-5 h-5" /> },
+  { label: 'Calendar', href: '/calendar', icon: <Calendar className="w-5 h-5" /> },
   { label: 'Templates', href: '/templates', icon: <Sparkles className="w-5 h-5" /> },
   { label: 'Settings', href: '/settings', icon: <Settings className="w-5 h-5" /> },
   { label: 'Account', href: '/account', icon: <User className="w-5 h-5" /> },

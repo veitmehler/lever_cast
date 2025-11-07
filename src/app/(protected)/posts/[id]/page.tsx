@@ -28,7 +28,9 @@ type Draft = {
   posts?: Array<{
     id: string
     platform: string
-    publishedAt: Date
+    publishedAt: Date | null
+    scheduledAt: Date | null
+    status: string
     postUrl: string | null
   }>
 }
@@ -136,6 +138,46 @@ export default function PostDetailPage({
     }
   }
 
+  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string, scheduledAt: Date) => {
+    try {
+      // Create scheduled post
+      const postResponse = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: id,
+          platform,
+          content,
+          status: 'scheduled',
+          scheduledAt: scheduledAt.toISOString(),
+        }),
+      })
+
+      if (!postResponse.ok) {
+        const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to schedule post')
+      }
+
+      // Refresh the draft data
+      const draftResponse = await fetch(`/api/drafts/${id}`)
+      if (draftResponse.ok) {
+        const updatedDraft = await draftResponse.json()
+        setPost(updatedDraft)
+      }
+
+      toast.success('Post scheduled successfully!', {
+        description: `Your ${platform} post is scheduled for ${scheduledAt.toLocaleDateString()}`,
+      })
+    } catch (error) {
+      console.error('Error scheduling:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to schedule post'
+      toast.error(errorMessage)
+      throw error
+    }
+  }
+
   const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
     try {
       // Check if already published
@@ -192,12 +234,61 @@ export default function PostDetailPage({
   }
 
   const isPlatformPublished = (platform: 'linkedin' | 'twitter') => {
-    return post?.posts?.some(p => p.platform === platform) || false
+    return post?.posts?.some(p => p.platform === platform && p.status === 'published') || false
+  }
+
+  const isPlatformScheduled = (platform: 'linkedin' | 'twitter') => {
+    return post?.posts?.some(p => p.platform === platform && p.status === 'scheduled') || false
   }
 
   const getPublishedDate = (platform: 'linkedin' | 'twitter') => {
-    const publishedPost = post?.posts?.find(p => p.platform === platform)
-    return publishedPost ? new Date(publishedPost.publishedAt) : null
+    const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published')
+    return publishedPost?.publishedAt ? new Date(publishedPost.publishedAt) : null
+  }
+
+  const getScheduledDate = (platform: 'linkedin' | 'twitter') => {
+    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled')
+    return scheduledPost?.scheduledAt ? new Date(scheduledPost.scheduledAt) : null
+  }
+
+  const getScheduledPostId = (platform: 'linkedin' | 'twitter') => {
+    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled')
+    return scheduledPost?.id || null
+  }
+
+  const handleReschedule = async (postId: string, scheduledAt: Date) => {
+    try {
+      const postResponse = await fetch(`/api/posts/${postId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduledAt: scheduledAt.toISOString(),
+        }),
+      })
+
+      if (!postResponse.ok) {
+        const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to reschedule post')
+      }
+
+      // Refresh the draft data
+      const draftResponse = await fetch(`/api/drafts/${id}`)
+      if (draftResponse.ok) {
+        const updatedDraft = await draftResponse.json()
+        setPost(updatedDraft)
+      }
+
+      toast.success('Post rescheduled successfully!', {
+        description: `Your post is now scheduled for ${scheduledAt.toLocaleDateString()}`,
+      })
+    } catch (error) {
+      console.error('Error rescheduling:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reschedule post'
+      toast.error(errorMessage)
+      throw error
+    }
   }
 
   const handleRegenerate = () => {
@@ -293,9 +384,14 @@ export default function PostDetailPage({
             image={post.attachedImage || undefined}
             onRegenerate={handleRegenerate}
             onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
+            onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
+            onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
             onContentChange={handleContentChange}
             isPublished={isPlatformPublished('linkedin')}
             publishedDate={getPublishedDate('linkedin')}
+            isScheduled={isPlatformScheduled('linkedin')}
+            scheduledDate={getScheduledDate('linkedin')}
+            scheduledPostId={getScheduledPostId('linkedin')}
           />
         )}
         {post.twitterContent && (
@@ -307,9 +403,14 @@ export default function PostDetailPage({
             image={post.attachedImage || undefined}
             onRegenerate={handleRegenerate}
             onPublish={(editedContent) => handlePublish('twitter', editedContent)}
+            onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
+            onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
             onContentChange={handleContentChange}
             isPublished={isPlatformPublished('twitter')}
             publishedDate={getPublishedDate('twitter')}
+            isScheduled={isPlatformScheduled('twitter')}
+            scheduledDate={getScheduledDate('twitter')}
+            scheduledPostId={getScheduledPostId('twitter')}
           />
         )}
       </div>

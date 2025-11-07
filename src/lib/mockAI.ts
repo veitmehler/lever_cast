@@ -2,7 +2,7 @@
 
 export interface GeneratedContent {
   linkedin?: string
-  twitter?: string
+  twitter?: string | string[]
 }
 
 // Template interface matching database schema
@@ -155,7 +155,8 @@ function applyTemplate(template: string, idea: string): string {
 export async function generateContent(
   rawIdea: string,
   platform: 'linkedin' | 'twitter' | 'both',
-  templateId?: string
+  templateId?: string,
+  twitterFormat?: 'single' | 'thread'
 ): Promise<GeneratedContent> {
   // Try to use real AI API first
   const response = await fetch('/api/ai/generate', {
@@ -167,15 +168,29 @@ export async function generateContent(
       rawIdea,
       platform,
       templateId,
+      twitterFormat, // Pass format to API
     }),
   })
 
   if (response.ok) {
     const data = await response.json()
     if (data.content && (data.content.linkedin || data.content.twitter)) {
+      // Parse twitter content if it's a JSON string (thread)
+      let twitterContent = data.content.twitter
+      if (twitterContent && typeof twitterContent === 'string') {
+        try {
+          const parsed = JSON.parse(twitterContent)
+          if (Array.isArray(parsed)) {
+            twitterContent = parsed
+          }
+        } catch {
+          // Keep as string if not valid JSON
+        }
+      }
+      
       return {
         linkedin: data.content.linkedin,
-        twitter: data.content.twitter,
+        twitter: twitterContent,
       }
     }
   }

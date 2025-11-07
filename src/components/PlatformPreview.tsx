@@ -8,13 +8,13 @@ import { ScheduleModal } from './ScheduleModal'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter'
-  content: string
+  content: string | string[] // Support both single post and thread
   image?: string
   onRegenerate: () => void | Promise<void>
-  onPublish: (content: string) => void
-  onSchedule?: (content: string, scheduledAt: Date) => Promise<void>
+  onPublish: (content: string | string[]) => void
+  onSchedule?: (content: string | string[], scheduledAt: Date) => Promise<void>
   onReschedule?: (postId: string, scheduledAt: Date) => Promise<void>
-  onContentChange?: (platform: 'linkedin' | 'twitter', newContent: string) => void
+  onContentChange?: (platform: 'linkedin' | 'twitter', newContent: string | string[]) => void
   userName?: string
   userInitials?: string
   isPublished?: boolean
@@ -49,19 +49,52 @@ export function PlatformPreview({
   scheduledPostId = null,
   isRegenerating = false,
 }: PlatformPreviewProps) {
+  // Parse content to determine if it's a thread
+  const [tweets, setTweets] = useState<string[]>([])
+  const [isThread, setIsThread] = useState(false)
+  
+  useEffect(() => {
+    if (Array.isArray(content)) {
+      setTweets(content)
+      setIsThread(true)
+    } else if (typeof content === 'string') {
+      // Try to parse as JSON array
+      try {
+        const parsed = JSON.parse(content)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTweets(parsed)
+          setIsThread(true)
+        } else {
+          setTweets([content])
+          setIsThread(false)
+        }
+      } catch {
+        // Not JSON, treat as single tweet
+        setTweets([content])
+        setIsThread(false)
+      }
+    } else {
+      setTweets([])
+      setIsThread(false)
+    }
+  }, [content])
+
   const [isEditing, setIsEditing] = useState(false)
-  const [editedContent, setEditedContent] = useState(content)
+  const [editedTweets, setEditedTweets] = useState<string[]>(tweets)
   const [copied, setCopied] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [isRescheduling, setIsRescheduling] = useState(false)
 
-  // Update editedContent when content prop changes
+  // Update editedTweets when tweets change
   useEffect(() => {
-    setEditedContent(content)
-  }, [content])
+    setEditedTweets(tweets)
+  }, [tweets])
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(editedContent)
+    const textToCopy = isThread 
+      ? editedTweets.join('\n\n') 
+      : editedTweets[0] || ''
+    await navigator.clipboard.writeText(textToCopy)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -69,8 +102,12 @@ export function PlatformPreview({
   const handleSave = () => {
     setIsEditing(false)
     // Notify parent component of content change
-    if (onContentChange && editedContent !== content) {
-      onContentChange(platform, editedContent)
+    if (onContentChange) {
+      const newContent = isThread ? editedTweets : editedTweets[0]
+      const currentContent = isThread ? tweets : tweets[0]
+      if (JSON.stringify(newContent) !== JSON.stringify(currentContent)) {
+        onContentChange(platform, newContent)
+      }
     }
   }
 
@@ -89,14 +126,16 @@ export function PlatformPreview({
 
   const config = platformColors[platform]
 
-  // Character count logic
+  // Character count logic - handle threads
   const charLimit = CHAR_LIMITS[platform]
-  const charCount = editedContent.length
-  const charPercentage = (charCount / charLimit) * 100
+  const totalChars = editedTweets.reduce((sum, tweet) => sum + tweet.length, 0)
+  const maxChars = isThread ? editedTweets.length * charLimit : charLimit
+  const isOverLimit = editedTweets.some(tweet => tweet.length > charLimit)
+  const charPercentage = (totalChars / maxChars) * 100
 
   // Determine color based on percentage
   const getCharCountColor = () => {
-    if (charCount > charLimit) {
+    if (isOverLimit) {
       return 'text-red-500 dark:text-red-400 font-bold'
     } else if (charPercentage >= 95) {
       return 'text-red-600 dark:text-red-500 font-semibold'
@@ -105,8 +144,6 @@ export function PlatformPreview({
     }
     return 'text-muted-foreground'
   }
-
-  const isOverLimit = charCount > charLimit
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -168,12 +205,55 @@ export function PlatformPreview({
 
         {/* Editable Content */}
         {isEditing ? (
-          <div className="space-y-2">
-            <textarea
-              value={editedContent}
-              onChange={(e) => setEditedContent(e.target.value)}
-              className="w-full min-h-[150px] p-3 rounded-lg border border-input bg-background text-foreground text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-            />
+          <div className="space-y-4">
+            {editedTweets.map((tweet, index) => {
+              const isSummary = index === 0
+              const isReply = index > 0
+              
+              return (
+                <div key={index} className="space-y-2">
+                  {isThread && (
+                    <div className="flex items-center gap-2 mb-1">
+                      {isSummary ? (
+                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
+                          📌 Summary Post
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          💬 Reply {index}/{editedTweets.length - 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <textarea
+                    value={tweet}
+                    onChange={(e) => {
+                      const updated = [...editedTweets]
+                      updated[index] = e.target.value
+                      setEditedTweets(updated)
+                    }}
+                    className={cn(
+                      "w-full min-h-[150px] p-3 rounded-lg border border-input bg-background text-foreground text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none",
+                      isSummary && "border-l-4 border-primary",
+                      isReply && "border-l-4 border-muted"
+                    )}
+                  />
+                  <div className={cn('text-xs flex items-center gap-1.5', 
+                    tweet.length > charLimit ? 'text-red-500 dark:text-red-400 font-bold' : 'text-muted-foreground'
+                  )}>
+                    {tweet.length > charLimit && <AlertCircle className="w-3.5 h-3.5" />}
+                    <span>
+                      {tweet.length.toLocaleString()} / {charLimit.toLocaleString()} characters
+                    </span>
+                    {tweet.length > charLimit && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                        Over Limit
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             
             <div className="flex gap-2">
               <Button
@@ -186,7 +266,7 @@ export function PlatformPreview({
               <Button
                 onClick={() => {
                   setIsEditing(false)
-                  setEditedContent(content)
+                  setEditedTweets(tweets)
                 }}
                 size="sm"
                 variant="outline"
@@ -196,11 +276,40 @@ export function PlatformPreview({
             </div>
           </div>
         ) : (
-          <div
-            onClick={() => setIsEditing(true)}
-            className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-2 rounded transition-colors"
-          >
-            {editedContent}
+          <div className="space-y-4">
+            {editedTweets.map((tweet, index) => {
+              const isSummary = index === 0
+              const isReply = index > 0
+              
+              return (
+                <div 
+                  key={index}
+                  onClick={() => setIsEditing(true)}
+                  className={cn(
+                    "text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-3 rounded transition-colors",
+                    isSummary && "border-l-4 border-primary bg-primary/5",
+                    isReply && "border-l-4 border-muted ml-4"
+                  )}
+                >
+                  {isThread && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {isSummary ? (
+                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
+                          📌 Summary Post
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          💬 Reply {index}/{editedTweets.length - 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className={isReply ? "text-muted-foreground" : ""}>
+                    {tweet}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -212,7 +321,10 @@ export function PlatformPreview({
               <div className={cn('text-xs flex items-center gap-1.5', getCharCountColor())}>
                 {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
                 <span>
-                  {charCount.toLocaleString()} / {charLimit.toLocaleString()} characters
+                  {isThread 
+                    ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
+                    : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
+                  }
                 </span>
                 {isOverLimit && (
                   <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
@@ -237,7 +349,10 @@ export function PlatformPreview({
           <div className={cn('mt-2 text-xs flex items-center gap-1.5', getCharCountColor())}>
             {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
             <span>
-              {charCount.toLocaleString()} / {charLimit.toLocaleString()} characters
+              {isThread 
+                ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
+                : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
+              }
             </span>
             {isOverLimit && (
               <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
@@ -316,7 +431,7 @@ export function PlatformPreview({
         ) : (
           <div className="flex-1 flex gap-1">
             <Button
-              onClick={() => onPublish(editedContent)}
+              onClick={() => onPublish(isThread ? editedTweets : editedTweets[0])}
               size="sm"
               className="flex-1 min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={isOverLimit}
@@ -357,11 +472,11 @@ export function PlatformPreview({
                   setIsRescheduling(false)
                 }
               } else if (onSchedule) {
-                await onSchedule(editedContent, scheduledAt)
+                await onSchedule(isThread ? editedTweets : editedTweets[0], scheduledAt)
               }
             }}
             platform={platform}
-            content={editedContent}
+            content={isThread ? editedTweets.join('\n\n') : editedTweets[0] || ''}
             initialDate={isScheduled ? scheduledDate : null}
             isReschedule={isRescheduling || isScheduled}
           />

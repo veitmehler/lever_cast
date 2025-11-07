@@ -29,6 +29,7 @@ type Draft = {
     publishedAt: Date | null
     scheduledAt: Date | null
     status: string
+    parentPostId?: string | null // For filtering out reply posts
   }>
 }
 
@@ -62,24 +63,29 @@ export default function PostsPage() {
   }, [])
 
   const filteredPosts = drafts.filter(draft => {
-    const hasScheduledPosts = draft.posts?.some(post => post.status === 'scheduled') || false
+    // Only count summary posts (not replies) for filtering
+    const summaryPosts = draft.posts?.filter(post => !post.parentPostId) || []
+    const hasScheduledSummaryPosts = summaryPosts.some(post => post.status === 'scheduled')
+    const hasPublishedSummaryPosts = summaryPosts.some(post => post.status === 'published')
     
     if (filter === 'all') return true
     if (filter === 'draft') {
-      // Exclude drafts that have scheduled posts from the Drafts tab
-      return draft.status === 'draft' && !hasScheduledPosts
+      // Exclude drafts that have scheduled or published summary posts from the Drafts tab
+      return draft.status === 'draft' && !hasScheduledSummaryPosts && !hasPublishedSummaryPosts
     }
-    if (filter === 'published') return draft.status === 'published'
+    if (filter === 'published') return draft.status === 'published' || hasPublishedSummaryPosts
     if (filter === 'scheduled') {
-      // Show drafts that have scheduled posts
-      return hasScheduledPosts
+      // Show drafts that have scheduled summary posts
+      return hasScheduledSummaryPosts
     }
     return false
   })
 
-  const scheduledDrafts = drafts.filter(draft => 
-    draft.posts?.some(post => post.status === 'scheduled')
-  )
+  const scheduledDrafts = drafts.filter(draft => {
+    // Only count summary posts (not replies)
+    const summaryPosts = draft.posts?.filter(post => !post.parentPostId) || []
+    return summaryPosts.some(post => post.status === 'scheduled')
+  })
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -139,7 +145,10 @@ export default function PostsPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Published ({drafts.filter(d => d.status === 'published').length})
+          Published ({drafts.filter(d => {
+            const summaryPosts = d.posts?.filter(post => !post.parentPostId) || []
+            return d.status === 'published' || summaryPosts.some(post => post.status === 'published')
+          }).length})
         </button>
       </div>
 
@@ -154,8 +163,10 @@ export default function PostsPage() {
       {!isLoading && (
         <div className="grid gap-4 md:grid-cols-2">
           {filteredPosts.map((draft) => {
-            const scheduledPosts = draft.posts?.filter(p => p.status === 'scheduled') || []
-            const publishedPosts = draft.posts?.filter(p => p.status === 'published') || []
+            // Only show summary posts (not replies) in badges
+            const summaryPosts = draft.posts?.filter(p => !p.parentPostId) || []
+            const scheduledPosts = summaryPosts.filter(p => p.status === 'scheduled')
+            const publishedPosts = summaryPosts.filter(p => p.status === 'published')
             const earliestScheduledDate = scheduledPosts.length > 0
               ? scheduledPosts.reduce((earliest, post) => {
                   if (!earliest) return post.scheduledAt ? new Date(post.scheduledAt) : null
@@ -179,41 +190,53 @@ export default function PostsPage() {
                     </span>
                     {publishedPosts.length > 0 && (
                       <div className="flex gap-1">
-                        {publishedPosts.map((post) => (
-                          <span
-                            key={post.id}
-                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400"
-                            title={`Published to ${post.platform} on ${post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : 'N/A'}`}
-                          >
-                            ✓ {post.platform}
-                          </span>
-                        ))}
+                        {/* Group by platform to show only one badge per platform */}
+                        {Array.from(new Set(publishedPosts.map(p => p.platform))).map((platform) => {
+                          const platformPost = publishedPosts.find(p => p.platform === platform)
+                          return (
+                            <span
+                              key={platform}
+                              className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400"
+                              title={`Published to ${platform} on ${platformPost?.publishedAt ? new Date(platformPost.publishedAt).toLocaleDateString() : 'N/A'}`}
+                            >
+                              ✓ {platform}
+                            </span>
+                          )
+                        })}
                       </div>
                     )}
                     {scheduledPosts.length > 0 && (
                       <div className="flex gap-1">
-                        {scheduledPosts.map((post) => (
-                          <span
-                            key={post.id}
-                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-600 dark:text-orange-400"
-                            title={`Scheduled for ${post.platform} on ${post.scheduledAt ? new Date(post.scheduledAt).toLocaleDateString() : 'N/A'}`}
-                          >
-                            📅 {post.platform}
-                          </span>
-                        ))}
+                        {/* Group by platform to show only one badge per platform */}
+                        {Array.from(new Set(scheduledPosts.map(p => p.platform))).map((platform) => {
+                          const platformPost = scheduledPosts.find(p => p.platform === platform)
+                          return (
+                            <span
+                              key={platform}
+                              className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                              title={`Scheduled for ${platform} on ${platformPost?.scheduledAt ? new Date(platformPost.scheduledAt).toLocaleDateString() : 'N/A'}`}
+                            >
+                              📅 {platform}
+                            </span>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      draft.status === 'published'
+                      draft.status === 'published' || publishedPosts.length > 0
                         ? 'bg-primary/20 text-primary'
                         : scheduledPosts.length > 0
                           ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
                           : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {scheduledPosts.length > 0 ? 'Scheduled' : draft.status}
+                    {draft.status === 'published' || publishedPosts.length > 0
+                      ? 'Published'
+                      : scheduledPosts.length > 0
+                        ? 'Scheduled'
+                        : draft.status}
                   </span>
                 </div>
                 <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">

@@ -66,6 +66,7 @@ export async function GET() {
             publishedAt: true,
             scheduledAt: true,
             status: true,
+            parentPostId: true, // Include to filter out reply posts
           },
         },
       },
@@ -74,7 +75,26 @@ export async function GET() {
       },
     })
 
-    return NextResponse.json(drafts)
+    // Parse twitterContent if it's a JSON string (thread)
+    const formattedDrafts = drafts.map(draft => {
+      let twitterContent = draft.twitterContent
+      if (twitterContent && typeof twitterContent === 'string') {
+        try {
+          const parsed = JSON.parse(twitterContent)
+          if (Array.isArray(parsed)) {
+            twitterContent = parsed as any
+          }
+        } catch {
+          // Keep as string if not valid JSON
+        }
+      }
+      return {
+        ...draft,
+        twitterContent,
+      }
+    })
+
+    return NextResponse.json(formattedDrafts)
   } catch (error) {
     console.error('Error fetching drafts:', error)
     return NextResponse.json({ error: 'Failed to fetch drafts' }, { status: 500 })

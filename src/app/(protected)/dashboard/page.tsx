@@ -34,7 +34,8 @@ export default function DashboardPage() {
     content: string,
     platform: 'linkedin' | 'twitter' | 'both',
     templateId?: string,
-    image?: string
+    image?: string,
+    twitterFormat?: 'single' | 'thread'
   ) => {
     setIsGenerating(true)
     setRawIdea(content)
@@ -45,7 +46,7 @@ export default function DashboardPage() {
     setAttachedImage(image)
 
     try {
-      const result = await generateContent(content, platform, templateId)
+      const result = await generateContent(content, platform, templateId, twitterFormat)
       setGeneratedContent(result)
       toast.success('Posts generated successfully!')
     } catch (error) {
@@ -86,7 +87,9 @@ export default function DashboardPage() {
             title,
             contentRaw: rawIdea,
             linkedinContent: generatedContent.linkedin || null,
-            twitterContent: generatedContent.twitter || null,
+            twitterContent: Array.isArray(generatedContent.twitter) 
+              ? JSON.stringify(generatedContent.twitter) 
+              : (generatedContent.twitter || null),
             platforms: selectedPlatform,
             attachedImage: attachedImage || null,
           }),
@@ -110,7 +113,9 @@ export default function DashboardPage() {
             title,
             contentRaw: rawIdea,
             linkedinContent: generatedContent.linkedin || null,
-            twitterContent: generatedContent.twitter || null,
+            twitterContent: Array.isArray(generatedContent.twitter) 
+              ? JSON.stringify(generatedContent.twitter) 
+              : (generatedContent.twitter || null),
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -157,7 +162,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string) => {
+  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string | string[]) => {
     // Update local state immediately
     setGeneratedContent((prev) => ({
       ...prev,
@@ -169,9 +174,12 @@ export default function DashboardPage() {
       try {
         const updateData: Record<string, string> = {}
         if (platform === 'linkedin') {
-          updateData.linkedinContent = newContent
+          updateData.linkedinContent = newContent as string
         } else {
-          updateData.twitterContent = newContent
+          // Stringify if array, otherwise use as string
+          updateData.twitterContent = Array.isArray(newContent) 
+            ? JSON.stringify(newContent) 
+            : newContent
         }
 
         const response = await fetch(`/api/drafts/${currentDraftId}`, {
@@ -198,7 +206,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string, scheduledAt: Date) => {
+  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string | string[], scheduledAt: Date) => {
     try {
       // First, save draft if not already saved
       let draftId = currentDraftId
@@ -214,7 +222,9 @@ export default function DashboardPage() {
             title,
             contentRaw: rawIdea,
             linkedinContent: generatedContent?.linkedin || null,
-            twitterContent: generatedContent?.twitter || null,
+            twitterContent: Array.isArray(generatedContent?.twitter) 
+              ? JSON.stringify(generatedContent.twitter) 
+              : (generatedContent?.twitter || null),
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -235,7 +245,9 @@ export default function DashboardPage() {
         if (platform === 'linkedin' && generatedContent?.linkedin) {
           updateData.linkedinContent = generatedContent.linkedin
         } else if (platform === 'twitter' && generatedContent?.twitter) {
-          updateData.twitterContent = generatedContent.twitter
+          updateData.twitterContent = Array.isArray(generatedContent.twitter) 
+            ? JSON.stringify(generatedContent.twitter) 
+            : generatedContent.twitter
         }
 
         if (Object.keys(updateData).length > 0) {
@@ -249,28 +261,84 @@ export default function DashboardPage() {
         }
       }
 
-      // Create scheduled post
-      const postResponse = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          draftId: draftId || null,
-          platform,
-          content,
-          status: 'scheduled',
-          scheduledAt: scheduledAt.toISOString(),
-        }),
-      })
+      // Create scheduled post(s)
+      // For threads, schedule summary first, then replies
+      if (Array.isArray(content)) {
+        // Thread: Schedule summary first, then replies
+        // Step 1: Schedule the summary post (index 0)
+        const summaryResponse = await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftId: draftId || null,
+            platform,
+            content: content[0], // Summary post
+            status: 'scheduled',
+            scheduledAt: scheduledAt.toISOString(),
+          }),
+        })
 
-      if (!postResponse.ok) {
-        const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('Failed to schedule post:', errorData)
-        const errorMessage = errorData.details
-          ? `${errorData.error || 'Failed to schedule post'}: ${errorData.details}`
-          : errorData.error || 'Failed to schedule post'
-        throw new Error(errorMessage)
+        if (!summaryResponse.ok) {
+          const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || 'Failed to schedule summary post')
+        }
+
+        const summaryPost = await summaryResponse.json()
+        const summaryPostId = summaryPost.id
+
+        // Step 2: Schedule the replies (index > 0) as replies to the summary post
+        if (content.length > 1) {
+          const replyPromises = content.slice(1).map((tweet) =>
+            fetch('/api/posts', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                draftId: draftId || null,
+                platform,
+                content: tweet,
+                status: 'scheduled',
+                scheduledAt: scheduledAt.toISOString(),
+                parentPostId: summaryPostId, // Link to summary post
+              }),
+            })
+          )
+
+          const replyResponses = await Promise.all(replyPromises)
+          const failedReply = replyResponses.find(r => !r.ok)
+
+          if (failedReply) {
+            const errorData = await failedReply.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || 'Failed to schedule thread replies')
+          }
+        }
+      } else {
+        // Single post: Create one scheduled post
+        const postResponse = await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftId: draftId || null,
+            platform,
+            content,
+            status: 'scheduled',
+            scheduledAt: scheduledAt.toISOString(),
+          }),
+        })
+
+        if (!postResponse.ok) {
+          const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+          console.error('Failed to schedule post:', errorData)
+          const errorMessage = errorData.details
+            ? `${errorData.error || 'Failed to schedule post'}: ${errorData.details}`
+            : errorData.error || 'Failed to schedule post'
+          throw new Error(errorMessage)
+        }
       }
 
       toast.success('Post scheduled successfully!', {
@@ -284,7 +352,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
+  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string | string[]) => {
     try {
       // First, save draft if not already saved (use current edited content)
       let draftId = currentDraftId
@@ -300,7 +368,9 @@ export default function DashboardPage() {
             title,
             contentRaw: rawIdea,
             linkedinContent: generatedContent?.linkedin || null,
-            twitterContent: generatedContent?.twitter || null,
+            twitterContent: Array.isArray(generatedContent?.twitter) 
+              ? JSON.stringify(generatedContent.twitter) 
+              : (generatedContent?.twitter || null),
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -325,7 +395,9 @@ export default function DashboardPage() {
         if (platform === 'linkedin' && generatedContent?.linkedin) {
           updateData.linkedinContent = generatedContent.linkedin
         } else if (platform === 'twitter' && generatedContent?.twitter) {
-          updateData.twitterContent = generatedContent.twitter
+          updateData.twitterContent = Array.isArray(generatedContent.twitter) 
+            ? JSON.stringify(generatedContent.twitter) 
+            : generatedContent.twitter
         }
 
         // Only update if there are changes
@@ -341,32 +413,104 @@ export default function DashboardPage() {
       }
 
       // Simulate publishing (in real app, this would call social media APIs)
-      const result = await publishToPlatform(platform, content)
+      // For threads, publishToPlatform will be called for each tweet
+      const contentToPublish = Array.isArray(content) ? content : [content]
+      const result = await publishToPlatform(platform, contentToPublish[0])
       
       if (result.success) {
-        // Create a post record in the database
-        const postResponse = await fetch('/api/posts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            draftId: draftId || null,
-            platform,
-            content,
-            status: 'published',
-          }),
-        })
+        // Create post record(s) in the database
+        // For threads, publish summary first, then replies
+        if (Array.isArray(content)) {
+          // Thread: Publish summary first, then replies
+          // Step 1: Publish the summary post (index 0)
+          const summaryResponse = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              draftId: draftId || null,
+              platform,
+              content: content[0], // Summary post
+              status: 'published',
+            }),
+          })
 
-        if (!postResponse.ok) {
-          const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
-          console.error('Failed to save post:', errorData)
-          if (errorData.error?.includes('already published')) {
-            toast.error(errorData.error)
-          } else {
-            throw new Error(errorData.error || 'Failed to save post')
+          if (!summaryResponse.ok) {
+            const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
+            console.error('Failed to create summary post:', errorData)
+            if (errorData.error?.includes('already published')) {
+              toast.error(errorData.error)
+            } else {
+              const errorMessage = errorData.details
+                ? `${errorData.error || 'Failed to save summary post'}: ${errorData.details}`
+                : errorData.error || 'Failed to save summary post'
+              throw new Error(errorMessage)
+            }
+            return
           }
-          return
+
+          const summaryPost = await summaryResponse.json()
+          const summaryPostId = summaryPost.id
+
+          // Step 2: Publish the replies (index > 0) as replies to the summary post
+          if (content.length > 1) {
+            const replyPromises = content.slice(1).map((tweet) =>
+              fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  draftId: draftId || null,
+                  platform,
+                  content: tweet,
+                  status: 'published',
+                  parentPostId: summaryPostId, // Link to summary post
+                }),
+              })
+            )
+
+            const replyResponses = await Promise.all(replyPromises)
+            const failedReply = replyResponses.find(r => !r.ok)
+
+            if (failedReply) {
+              const errorData = await failedReply.json().catch(() => ({ error: 'Unknown error' }))
+              console.error('Failed to create reply posts:', errorData)
+              const errorMessage = errorData.details
+                ? `${errorData.error || 'Failed to save thread replies'}: ${errorData.details}`
+                : errorData.error || 'Failed to save thread replies'
+              throw new Error(errorMessage)
+            }
+          }
+        } else {
+          // Single post: Create one Post record
+          const postResponse = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              draftId: draftId || null,
+              platform,
+              content,
+              status: 'published',
+            }),
+          })
+
+          if (!postResponse.ok) {
+            const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+            console.error('Failed to save post:', errorData)
+            if (errorData.error?.includes('already published')) {
+              toast.error(errorData.error)
+            } else {
+              const errorMessage = errorData.details
+                ? `${errorData.error || 'Failed to save post'}: ${errorData.details}`
+                : errorData.error || 'Failed to save post'
+              throw new Error(errorMessage)
+            }
+            return
+          }
         }
 
         // Refresh draft data if we have a draftId

@@ -17,7 +17,7 @@ type Draft = {
   title: string
   contentRaw: string
   linkedinContent: string | null
-  twitterContent: string | null
+  twitterContent: string | string[] | null // Support both single and thread
   platforms: string
   templateId: string | null
   attachedImage: string | null
@@ -32,6 +32,7 @@ type Draft = {
     scheduledAt: Date | null
     status: string
     postUrl: string | null
+    parentPostId?: string | null // For filtering out reply posts
   }>
 }
 
@@ -71,6 +72,19 @@ export default function PostDetailPage({
         }
         
         const data = await response.json()
+        
+        // Parse twitterContent if it's a JSON string
+        if (data.twitterContent && typeof data.twitterContent === 'string') {
+          try {
+            const parsed = JSON.parse(data.twitterContent)
+            if (Array.isArray(parsed)) {
+              data.twitterContent = parsed
+            }
+          } catch {
+            // Keep as string if not valid JSON
+          }
+        }
+        
         setPost(data)
       } catch (error) {
         console.error('Error fetching draft:', error)
@@ -104,7 +118,7 @@ export default function PostDetailPage({
     }
   }
 
-  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string) => {
+  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string | string[]) => {
     // Update local state
     setPost((prev) => {
       if (!prev) return null
@@ -118,9 +132,12 @@ export default function PostDetailPage({
     try {
       const updateData: Record<string, string> = {}
       if (platform === 'linkedin') {
-        updateData.linkedinContent = newContent
+        updateData.linkedinContent = newContent as string
       } else {
-        updateData.twitterContent = newContent
+        // Stringify if array, otherwise use as string
+        updateData.twitterContent = Array.isArray(newContent) 
+          ? JSON.stringify(newContent) 
+          : newContent
       }
 
       const response = await fetch(`/api/drafts/${id}`, {
@@ -143,32 +160,101 @@ export default function PostDetailPage({
     }
   }
 
-  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string, scheduledAt: Date) => {
+  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string | string[], scheduledAt: Date) => {
     try {
-      // Create scheduled post
-      const postResponse = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          draftId: id,
-          platform,
-          content,
-          status: 'scheduled',
-          scheduledAt: scheduledAt.toISOString(),
-        }),
-      })
+      // Create scheduled post(s)
+      // For threads, schedule summary first, then replies
+      if (Array.isArray(content)) {
+        // Thread: Schedule summary first, then replies
+        // Step 1: Schedule the summary post (index 0)
+        const summaryResponse = await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftId: id,
+            platform,
+            content: content[0], // Summary post
+            status: 'scheduled',
+            scheduledAt: scheduledAt.toISOString(),
+          }),
+        })
 
-      if (!postResponse.ok) {
-        const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || 'Failed to schedule post')
+        if (!summaryResponse.ok) {
+          const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || 'Failed to schedule summary post')
+        }
+
+        const summaryPost = await summaryResponse.json()
+        const summaryPostId = summaryPost.id
+
+        // Step 2: Schedule the replies (index > 0) as replies to the summary post
+        if (content.length > 1) {
+          const replyPromises = content.slice(1).map((tweet) =>
+            fetch('/api/posts', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                draftId: id,
+                platform,
+                content: tweet,
+                status: 'scheduled',
+                scheduledAt: scheduledAt.toISOString(),
+                parentPostId: summaryPostId, // Link to summary post
+              }),
+            })
+          )
+
+          const replyResponses = await Promise.all(replyPromises)
+          const failedReply = replyResponses.find(r => !r.ok)
+
+          if (failedReply) {
+            const errorData = await failedReply.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || 'Failed to schedule thread replies')
+          }
+        }
+      } else {
+        // Single post: Create one scheduled post
+        const postResponse = await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftId: id,
+            platform,
+            content,
+            status: 'scheduled',
+            scheduledAt: scheduledAt.toISOString(),
+          }),
+        })
+
+        if (!postResponse.ok) {
+          const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || 'Failed to schedule post')
+        }
       }
 
       // Refresh the draft data
       const draftResponse = await fetch(`/api/drafts/${id}`)
       if (draftResponse.ok) {
         const updatedDraft = await draftResponse.json()
+        
+        // Parse twitterContent if it's a JSON string
+        if (updatedDraft.twitterContent && typeof updatedDraft.twitterContent === 'string') {
+          try {
+            const parsed = JSON.parse(updatedDraft.twitterContent)
+            if (Array.isArray(parsed)) {
+              updatedDraft.twitterContent = parsed
+            }
+          } catch {
+            // Keep as string if not valid JSON
+          }
+        }
+        
         setPost(updatedDraft)
       }
 
@@ -183,47 +269,121 @@ export default function PostDetailPage({
     }
   }
 
-  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
+  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string | string[]) => {
     try {
-      // Check if already published
-      const isPublished = post?.posts?.some(p => p.platform === platform)
+      // Check if already published (only check summary posts, not replies)
+      const isPublished = post?.posts?.some(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
       if (isPublished) {
         toast.error(`Already published to ${platform}`)
         return
       }
 
       // Simulate publishing (in real app, this would call social media APIs)
-      const result = await publishToPlatform(platform, content)
+      // For threads, publishToPlatform will be called for each tweet
+      const contentToPublish = Array.isArray(content) ? content : [content]
+      const result = await publishToPlatform(platform, contentToPublish[0])
       
       if (result.success) {
-        // Create a post record in the database
-        const postResponse = await fetch('/api/posts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            draftId: id,
-            platform,
-            content,
-            status: 'published',
-          }),
-        })
+        // Create post record(s) in the database
+        // For threads, publish summary first, then replies
+        if (Array.isArray(content)) {
+          // Thread: Publish summary first, then replies
+          // Step 1: Publish the summary post (index 0)
+          const summaryResponse = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              draftId: id,
+              platform,
+              content: content[0], // Summary post
+              status: 'published',
+            }),
+          })
 
-        if (!postResponse.ok) {
-          const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
-          if (errorData.error?.includes('already published')) {
-            toast.error(errorData.error)
-          } else {
-            throw new Error(errorData.error || 'Failed to save post')
+          if (!summaryResponse.ok) {
+            const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
+            if (errorData.error?.includes('already published')) {
+              toast.error(errorData.error)
+            } else {
+              throw new Error(errorData.error || 'Failed to save summary post')
+            }
+            return
           }
-          return
+
+          const summaryPost = await summaryResponse.json()
+          const summaryPostId = summaryPost.id
+
+          // Step 2: Publish the replies (index > 0) as replies to the summary post
+          if (content.length > 1) {
+            const replyPromises = content.slice(1).map((tweet) =>
+              fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  draftId: id,
+                  platform,
+                  content: tweet,
+                  status: 'published',
+                  parentPostId: summaryPostId, // Link to summary post
+                }),
+              })
+            )
+
+            const replyResponses = await Promise.all(replyPromises)
+            const failedReply = replyResponses.find(r => !r.ok)
+
+            if (failedReply) {
+              const errorData = await failedReply.json().catch(() => ({ error: 'Unknown error' }))
+              throw new Error(errorData.error || 'Failed to save thread replies')
+            }
+          }
+        } else {
+          // Single post: Create one Post record
+          const postResponse = await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              draftId: id,
+              platform,
+              content,
+              status: 'published',
+            }),
+          })
+
+          if (!postResponse.ok) {
+            const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+            if (errorData.error?.includes('already published')) {
+              toast.error(errorData.error)
+            } else {
+              throw new Error(errorData.error || 'Failed to save post')
+            }
+            return
+          }
         }
 
         // Refresh the draft data
         const draftResponse = await fetch(`/api/drafts/${id}`)
         if (draftResponse.ok) {
           const updatedDraft = await draftResponse.json()
+          
+          // Parse twitterContent if it's a JSON string
+          if (updatedDraft.twitterContent && typeof updatedDraft.twitterContent === 'string') {
+            try {
+              const parsed = JSON.parse(updatedDraft.twitterContent)
+              if (Array.isArray(parsed)) {
+                updatedDraft.twitterContent = parsed
+              }
+            } catch {
+              // Keep as string if not valid JSON
+            }
+          }
+          
           setPost(updatedDraft)
         }
 
@@ -239,25 +399,30 @@ export default function PostDetailPage({
   }
 
   const isPlatformPublished = (platform: 'linkedin' | 'twitter') => {
-    return post?.posts?.some(p => p.platform === platform && p.status === 'published') || false
+    // Only check summary posts (not replies)
+    return post?.posts?.some(p => p.platform === platform && p.status === 'published' && !p.parentPostId) || false
   }
 
   const isPlatformScheduled = (platform: 'linkedin' | 'twitter') => {
-    return post?.posts?.some(p => p.platform === platform && p.status === 'scheduled') || false
+    // Only check summary posts (not replies)
+    return post?.posts?.some(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId) || false
   }
 
   const getPublishedDate = (platform: 'linkedin' | 'twitter') => {
-    const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published')
+    // Only get summary posts (not replies)
+    const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
     return publishedPost?.publishedAt ? new Date(publishedPost.publishedAt) : null
   }
 
   const getScheduledDate = (platform: 'linkedin' | 'twitter') => {
-    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled')
+    // Only get summary posts (not replies)
+    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId)
     return scheduledPost?.scheduledAt ? new Date(scheduledPost.scheduledAt) : null
   }
 
   const getScheduledPostId = (platform: 'linkedin' | 'twitter') => {
-    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled')
+    // Only get summary posts (not replies)
+    const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId)
     return scheduledPost?.id || null
   }
 
@@ -305,11 +470,26 @@ export default function PostDetailPage({
     setIsRegenerating(prev => ({ ...prev, [platform]: true }))
 
     try {
+      // Determine if current content is a thread (for Twitter)
+      let twitterFormat: 'single' | 'thread' | undefined = undefined
+      if (platform === 'twitter') {
+        const currentContent = post.twitterContent
+        const isThread = Array.isArray(currentContent) || 
+          (typeof currentContent === 'string' && currentContent.trim().startsWith('['))
+        twitterFormat = isThread ? 'thread' : 'single'
+      }
+
       // Regenerate content using the original idea and template
+      // Skip template for threads
+      const templateId = (platform === 'twitter' && twitterFormat === 'thread') 
+        ? undefined 
+        : (post.templateId || undefined)
+      
       const result = await generateContent(
         post.contentRaw,
         platform,
-        post.templateId || undefined
+        templateId,
+        twitterFormat
       )
 
       const newContent = platform === 'linkedin' ? result.linkedin : result.twitter
@@ -321,9 +501,12 @@ export default function PostDetailPage({
       // Update the draft with new content
       const updateData: Record<string, string> = {}
       if (platform === 'linkedin') {
-        updateData.linkedinContent = newContent
+        updateData.linkedinContent = newContent as string
       } else {
-        updateData.twitterContent = newContent
+        // Stringify if array, otherwise use as string
+        updateData.twitterContent = Array.isArray(newContent) 
+          ? JSON.stringify(newContent) 
+          : (newContent as string)
       }
 
       const response = await fetch(`/api/drafts/${id}`, {

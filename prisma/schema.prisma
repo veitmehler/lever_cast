@@ -60,6 +60,7 @@ model Post {
   id          String    @id @default(cuid())
   userId      String
   draftId     String?   // Link back to the draft this was published from
+  parentPostId String?  // For Twitter threads: link to the parent post (summary)
   platform    String    // "linkedin" or "twitter"
   content     String    @db.Text // The actual content that was published
   publishedAt DateTime? // When the post was actually published (nullable for scheduled posts)
@@ -73,10 +74,13 @@ model Post {
   // Relations
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   draft       Draft?    @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  parentPost  Post?     @relation("PostReplies", fields: [parentPostId], references: [id], onDelete: Cascade)
+  replies     Post[]    @relation("PostReplies")
 
   @@index([userId, platform, publishedAt])
   @@index([draftId])
   @@index([userId, scheduledAt, status]) // For calendar queries
+  @@index([parentPostId]) // For thread queries
   @@map("posts")
 }
 

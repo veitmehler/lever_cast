@@ -19,7 +19,13 @@ type Template = {
 }
 
 interface IdeaCaptureProps {
-  onGenerate: (content: string, platform: 'linkedin' | 'twitter' | 'both', templateId?: string, image?: string) => void
+  onGenerate: (
+    content: string, 
+    platform: 'linkedin' | 'twitter' | 'both', 
+    templateId?: string, 
+    image?: string,
+    twitterFormat?: 'single' | 'thread'
+  ) => void
 }
 
 export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
@@ -27,6 +33,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
+  const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
@@ -135,7 +142,11 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
     if (content.trim()) {
       // Pass undefined if "none" is selected, otherwise pass the template ID
       const templateId = selectedTemplate === 'none' ? undefined : selectedTemplate
-      onGenerate(content, platform, templateId, selectedImage || undefined)
+      // Pass twitterFormat when Twitter is selected
+      const twitterFormatParam = (platform === 'twitter' || platform === 'both') 
+        ? twitterFormat 
+        : undefined
+      onGenerate(content, platform, templateId, selectedImage || undefined, twitterFormatParam)
     }
   }
 
@@ -281,6 +292,44 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           </div>
         </div>
       </div>
+
+      {/* Twitter Format Selection */}
+      {(platform === 'twitter' || platform === 'both') && (
+        <div className="mt-4">
+          <label className="text-sm font-medium text-card-foreground mb-2 block">
+            Twitter Format
+          </label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="twitterFormat"
+                value="single"
+                checked={twitterFormat === 'single'}
+                onChange={(e) => setTwitterFormat(e.target.value as 'single' | 'thread')}
+                className="w-4 h-4 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-card-foreground">Single Post</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="twitterFormat"
+                value="thread"
+                checked={twitterFormat === 'thread'}
+                onChange={(e) => setTwitterFormat(e.target.value as 'single' | 'thread')}
+                className="w-4 h-4 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-card-foreground">Thread</span>
+            </label>
+          </div>
+          {twitterFormat === 'thread' && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Create a thread with summary + key insights (templates not used for threads)
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Template Preview */}
       {selectedTemplate !== 'none' && templates.find(t => t.id === selectedTemplate) && (

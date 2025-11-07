@@ -126,6 +126,7 @@ export async function POST(request: Request) {
       status = 'published',
       scheduledAt,
       errorMsg,
+      parentPostId, // For Twitter threads: link to parent post
     } = body
 
     // Validate required fields
@@ -156,13 +157,15 @@ export async function POST(request: Request) {
     // Get or create user
     const user = await getOrCreateUser(userId)
 
-    // Check if a post already exists for this draft and platform (only for published posts)
-    if (draftId && !scheduledAt) {
+    // Check if a post already exists for this draft and platform
+    // For threads, only check if the summary post (no parentPostId) exists
+    if (draftId && !scheduledAt && !parentPostId) {
       const existingPost = await prisma.post.findFirst({
         where: {
           draftId,
           platform,
           status: 'published',
+          parentPostId: null, // Only check for summary posts
         },
       })
 
@@ -185,6 +188,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         draftId: draftId || null,
+        parentPostId: parentPostId || null,
         platform,
         content,
         postUrl: postUrl || null,
@@ -196,17 +200,19 @@ export async function POST(request: Request) {
     })
 
     // If draftId is provided and status is published, check if all platforms are published
-    if (draftId && finalStatus === 'published') {
+    // For threads, only check if the summary post (no parentPostId) is published
+    if (draftId && finalStatus === 'published' && !parentPostId) {
       const draft = await prisma.draft.findUnique({
         where: { id: draftId },
       })
 
       if (draft) {
-        // Get all published posts for this draft
+        // Get all published posts for this draft (only summary posts, not replies)
         const publishedPosts = await prisma.post.findMany({
           where: {
             draftId,
             status: 'published',
+            parentPostId: null, // Only count summary posts
           },
           select: {
             platform: true,

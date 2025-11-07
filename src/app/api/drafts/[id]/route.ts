@@ -65,6 +65,7 @@ export async function GET(
             scheduledAt: true,
             status: true,
             postUrl: true,
+            parentPostId: true, // Include to filter out reply posts
           },
         },
       },
@@ -74,7 +75,23 @@ export async function GET(
       return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     }
 
-    return NextResponse.json(draft)
+    // Parse twitterContent if it's a JSON string (thread)
+    let twitterContent = draft.twitterContent
+    if (twitterContent && typeof twitterContent === 'string') {
+      try {
+        const parsed = JSON.parse(twitterContent)
+        if (Array.isArray(parsed)) {
+          twitterContent = parsed as any
+        }
+      } catch {
+        // Keep as string if not valid JSON
+      }
+    }
+
+    return NextResponse.json({
+      ...draft,
+      twitterContent,
+    })
   } catch (error) {
     console.error('Error fetching draft:', error)
     return NextResponse.json({ error: 'Failed to fetch draft' }, { status: 500 })

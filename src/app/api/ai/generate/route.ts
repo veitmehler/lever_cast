@@ -62,6 +62,30 @@ async function getUserApiKeys(userId: string) {
   return decryptedKeys
 }
 
+function cleanSingleTweet(tweet: string): string {
+  // Remove headers, "=>", etc. from individual tweet
+  let cleaned = tweet.replace(/^=>\s*/, '').replace(/^#\s*.*?:\s*/i, '').trim()
+  
+  // Remove JSON code fences
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/g, '').replace(/```\s*$/g, '')
+  
+  // Remove numbered prefixes like "1/10", "2/10", etc. (but keep the content)
+  cleaned = cleaned.replace(/^\d+\/\d+\s*/, '').trim()
+  
+  // Remove standalone numbering patterns like "2/", "3/", etc. anywhere in the text
+  // This handles cases where AI generates "2/7 2/ Text" or "Text 2/ more text"
+  // Match patterns like "2/", "3/", "10/" with optional spaces around them
+  cleaned = cleaned.replace(/\s*\d+\/\s*/g, ' ').trim()
+  
+  // Remove any remaining patterns like "2/7 2/" at the start
+  cleaned = cleaned.replace(/^\d+\/\d+\s+\d+\/\s*/, '').trim()
+  
+  // Clean up multiple spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+  
+  return cleaned.trim()
+}
+
 // Clean generated content - remove headers, analysis sections, and metadata
 function cleanGeneratedContent(content: string, platform: 'linkedin' | 'twitter'): string {
   if (!content) return ''
@@ -307,7 +331,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { rawIdea, platform, templateId, provider } = body
+    const { rawIdea, platform, templateId, provider, twitterFormat } = body
 
     if (!rawIdea || !platform) {
       return NextResponse.json(
@@ -407,13 +431,24 @@ export async function POST(request: NextRequest) {
 
     // Generate content for each platform
     for (const plat of platformsToGenerate) {
-      const templateText = plat === 'linkedin' ? template?.linkedinTemplate : template?.twitterTemplate
-      const maxTokens = plat === 'linkedin' ? 1000 : 200 // LinkedIn allows more, Twitter is 280 chars
+      const isTwitterThread = plat === 'twitter' && twitterFormat === 'thread'
+      
+      // For threads, skip templates; for single posts, use templates
+      const templateText = isTwitterThread 
+        ? null 
+        : (plat === 'linkedin' ? template?.linkedinTemplate : template?.twitterTemplate)
+      
+      const maxTokens = plat === 'linkedin' 
+        ? 1000 
+        : (isTwitterThread ? 2000 : 200) // More tokens for threads
       
       // Build prompt using the new structure
       let prompt = `# CONTEXT:\n\n## RAW IDEA:\n\n${rawIdea}\n\n`
       
-      if (templateText) {
+      if (isTwitterThread) {
+        // THREAD MODE: Skip template, generate thread
+        prompt += `## TEMPLATE STRUCTURE:\n\nNo template structure. Create a thread with multiple posts.\n\n`
+      } else if (templateText) {
         const formattedTemplate = applyTemplate(templateText, rawIdea)
         prompt += `## TEMPLATE STRUCTURE:\n\n${formattedTemplate}\n\n`
       } else {
@@ -423,22 +458,39 @@ export async function POST(request: NextRequest) {
       prompt += `# TASK:\n\n`
       prompt += `1. Carefully review your CONTEXT.\n\n`
       prompt += `2. Identify the exact target audience for the RAW IDEA (do this mentally, do not include it in your response).\n\n`
-      prompt += `3. Your task now is to create a ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'} post based on the RAW IDEA.\n\n`
       
-      if (templateText) {
-        prompt += `4. You will create the post following the TEMPLATE STRUCTURE.\n\n`
-        prompt += `5. MAKE SURE the post follows the TEMPLATE STRUCTURE but feels natural, engaging, and resonates with your selected target audience.\n\n`
+      if (isTwitterThread) {
+        // THREAD MODE PROMPT
+        prompt += `3. Your task now is to create a Twitter/X thread with multiple posts based on the RAW IDEA.\n\n`
+        prompt += `STRUCTURE:\n`
+        prompt += `1. Post 1 (Summary): Create an engaging summary/hook post (under 280 characters) that introduces the topic and encourages readers to continue. This will be the main tweet.\n\n`
+        prompt += `2. Posts 2-N (Replies): Extract 1-8 key insights from the RAW IDEA. Each insight should be its own reply post (under 280 characters each).\n\n`
+        prompt += `3. Randomly decide how many insights (between 1-8) based on the depth and complexity of the RAW IDEA.\n\n`
+        prompt += `FORMAT: Return the thread as a JSON array where:\n`
+        prompt += `- First element: The summary post (no numbering, just the post text)\n`
+        prompt += `- Remaining elements: Key insights as plain text WITHOUT any numbering prefixes (no "2/", "3/", etc.)\n`
+        prompt += `Example: ["Summary tweet here", "Key insight 1 text", "Key insight 2 text", "Key insight 3 text"]\n\n`
+        prompt += `CRITICAL: Do NOT include numbering like "2/", "3/", "4/" in the reply posts. Just write the insight text directly. We will add numbering programmatically.\n\n`
+        prompt += `CRITICAL: Return ONLY a valid JSON array. Do NOT include any markdown code fences (\`\`\`), headers, explanations, or other text. Return ONLY the JSON array.`
       } else {
-        prompt += `4. Create a post that feels natural, engaging, and resonates with your selected target audience.\n\n`
+        // SINGLE POST MODE PROMPT
+        prompt += `3. Your task now is to create a ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'} post based on the RAW IDEA.\n\n`
+        
+        if (templateText) {
+          prompt += `4. You will create the post following the TEMPLATE STRUCTURE.\n\n`
+          prompt += `5. MAKE SURE the post follows the TEMPLATE STRUCTURE but feels natural, engaging, and resonates with your selected target audience.\n\n`
+        } else {
+          prompt += `4. Create a post that feels natural, engaging, and resonates with your selected target audience.\n\n`
+        }
+        
+        if (plat === 'twitter') {
+          prompt += `IMPORTANT: Keep the post under 280 characters.\n\n`
+        } else {
+          prompt += `Keep it professional and engaging, suitable for LinkedIn.\n\n`
+        }
+        
+        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", or any other headers. Return ONLY the actual post text that would be published on ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'}.`
       }
-      
-      if (plat === 'twitter') {
-        prompt += `IMPORTANT: Keep the post under 280 characters.\n\n`
-      } else {
-        prompt += `Keep it professional and engaging, suitable for LinkedIn.\n\n`
-      }
-      
-      prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", or any other headers. Return ONLY the actual post text that would be published on ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'}.`
 
       try {
         let generatedContent = ''
@@ -460,20 +512,138 @@ export async function POST(request: NextRequest) {
             throw new Error(`Unsupported provider: ${selectedProvider}`)
         }
 
-        // Clean up the response - remove any headers, analysis sections, etc.
-        generatedContent = cleanGeneratedContent(generatedContent, plat)
-        
-        // For Twitter, ensure it's under 280 characters
-        if (plat === 'twitter' && generatedContent.length > 280) {
-          generatedContent = generatedContent.substring(0, 277) + '...'
-        }
+        if (isTwitterThread) {
+          // THREAD MODE: Parse as JSON array
+          // First, clean up any code fences or extra formatting
+          let cleanedContent = generatedContent.trim()
+          
+          // Remove JSON code fences (```json, ```)
+          cleanedContent = cleanedContent.replace(/^```json\s*/i, '').replace(/^```\s*/g, '').replace(/```\s*$/g, '')
+          
+          // Try to find JSON array in the content (handle cases where there's extra text)
+          const jsonMatch = cleanedContent.match(/\[[\s\S]*\]/)
+          if (jsonMatch) {
+            cleanedContent = jsonMatch[0]
+          } else {
+            // If no JSON array found, try to construct one from lines
+            const lines = cleanedContent.split('\n').filter(line => {
+              const trimmed = line.trim()
+              return trimmed.length > 0 && 
+                     !trimmed.match(/^```/) && 
+                     !trimmed.match(/^json$/i) &&
+                     trimmed !== '[' &&
+                     trimmed !== ']'
+            })
+            
+            if (lines.length > 0) {
+              // Try to parse each line as a JSON string
+              const parsedLines = lines.map(line => {
+                let cleaned = line.trim()
+                // Remove quotes and commas
+                cleaned = cleaned.replace(/^["']|["'],?\s*$/g, '')
+                // Remove JSON array brackets if present
+                cleaned = cleaned.replace(/^\[/, '').replace(/\]$/, '')
+                return cleaned.trim()
+              }).filter(line => line.length > 0)
+              
+              if (parsedLines.length > 0) {
+                cleanedContent = JSON.stringify(parsedLines)
+              }
+            }
+          }
+          
+          try {
+            const parsed = JSON.parse(cleanedContent.trim())
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              // Validate and clean each tweet
+              const validTweets = parsed
+                .map((tweet, index) => {
+                  // Clean the tweet first to remove ALL numbering patterns
+                  let cleaned = cleanSingleTweet(String(tweet))
+                  
+                  // For replies (index > 0), add correct numbering like "2/7", "3/7", etc.
+                  if (index > 0) {
+                    const totalCount = parsed.length
+                    cleaned = `${index + 1}/${totalCount} ${cleaned}`
+                  }
+                  // Summary (index 0) should have no numbering
+                  
+                  return cleaned
+                })
+                .filter(tweet => tweet.length > 0 && tweet.length <= 280)
+              
+              if (validTweets.length === 0) {
+                throw new Error('No valid tweets in thread')
+              }
+              
+              // Store as JSON string
+              result[plat] = JSON.stringify(validTweets)
+            } else {
+              throw new Error('Invalid thread format')
+            }
+          } catch (e) {
+            // If parsing fails, try to extract tweets from text
+            const lines = generatedContent.split('\n').filter(line => {
+              const trimmed = line.trim()
+              return trimmed.length > 0 && 
+                     !trimmed.match(/^```/) && 
+                     !trimmed.match(/^json$/i) &&
+                     trimmed !== '[' &&
+                     trimmed !== ']'
+            })
+            
+            if (lines.length > 1) {
+              const tweets = lines
+                .map(line => {
+                  // Remove code fences
+                  let cleaned = line.replace(/^```json\s*/i, '').replace(/^```\s*/g, '').replace(/```\s*$/g, '')
+                  // Remove JSON array brackets
+                  cleaned = cleaned.replace(/^\[/, '').replace(/\]$/, '')
+                  // Remove quotes and commas
+                  cleaned = cleaned.replace(/^["']|["'],?\s*$/g, '')
+                  return cleaned.trim()
+                })
+                .filter(line => line.length > 0)
+                .map((line, index) => {
+                  // Remove existing numbering (both "2/7" and standalone "2/")
+                  let cleaned = line.replace(/^\d+\/\d+\s*/, '').replace(/^\d+\/\s*/, '').trim()
+                  // Also remove any standalone numbering patterns in the middle
+                  cleaned = cleaned.replace(/\s+\d+\/\s*/g, ' ').trim()
+                  
+                  // Add numbering for replies only
+                  if (index > 0) {
+                    cleaned = `${index + 1}/${lines.length} ${cleaned}`
+                  }
+                  
+                  return cleanSingleTweet(cleaned)
+                })
+                .filter(tweet => tweet.length > 0 && tweet.length <= 280)
+              
+              if (tweets.length > 0) {
+                result[plat] = JSON.stringify(tweets)
+              } else {
+                throw new Error('Failed to parse thread')
+              }
+            } else {
+              throw new Error('Failed to generate thread')
+            }
+          }
+        } else {
+          // SINGLE POST MODE: Store as plain string
+          generatedContent = cleanGeneratedContent(generatedContent, plat)
+          
+          // For Twitter, ensure it's under 280 characters
+          if (plat === 'twitter' && generatedContent.length > 280) {
+            generatedContent = generatedContent.substring(0, 277) + '...'
+          }
 
-        result[plat] = generatedContent || rawIdea
+          result[plat] = generatedContent || rawIdea
+        }
       } catch (error) {
         console.error(`Error generating ${plat} content with ${selectedProvider}:`, error)
         
-        // Fallback to template if AI generation fails
-        if (templateText) {
+        // Fallback to template if AI generation fails (only for single posts)
+        if (!isTwitterThread && templateText) {
           result[plat] = applyTemplate(templateText, rawIdea)
         } else {
           result[plat] = rawIdea

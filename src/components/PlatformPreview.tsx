@@ -153,6 +153,17 @@ export function PlatformPreview({
           </div>
         </div>
 
+        {/* Attached Image */}
+        {image && (
+          <div className="mb-3">
+            <img 
+              src={image} 
+              alt="Attached to post" 
+              className="rounded-lg max-h-64 w-full object-cover border border-border"
+            />
+          </div>
+        )}
+
         {/* Editable Content */}
         {isEditing ? (
           <div className="space-y-2">
@@ -161,17 +172,6 @@ export function PlatformPreview({
               onChange={(e) => setEditedContent(e.target.value)}
               className="w-full min-h-[150px] p-3 rounded-lg border border-input bg-background text-foreground text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
             />
-            
-            {/* Show attached image in edit mode too */}
-            {image && (
-              <div className="mt-2">
-                <img 
-                  src={image} 
-                  alt="Attached to post" 
-                  className="rounded-lg max-h-48 w-full object-cover border border-border"
-                />
-              </div>
-            )}
             
             <div className="flex gap-2">
               <Button
@@ -194,25 +194,12 @@ export function PlatformPreview({
             </div>
           </div>
         ) : (
-          <>
-            <div
-              onClick={() => setIsEditing(true)}
-              className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-2 rounded transition-colors"
-            >
-              {editedContent}
-            </div>
-            
-            {/* Attached Image */}
-            {image && (
-              <div className="mt-3">
-                <img 
-                  src={image} 
-                  alt="Attached to post" 
-                  className="rounded-lg max-h-64 w-full object-cover border border-border"
-                />
-              </div>
-            )}
-          </>
+          <div
+            onClick={() => setIsEditing(true)}
+            className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-2 rounded transition-colors"
+          >
+            {editedContent}
+          </div>
         )}
 
         {/* Character Count & Mock Engagement Stats */}

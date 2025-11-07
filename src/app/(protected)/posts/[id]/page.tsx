@@ -1,10 +1,10 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
-import { ArrowLeft, Trash2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { publishToPlatform } from '@/lib/mockAI'
@@ -45,6 +45,7 @@ export default function PostDetailPage({
   const { id } = use(params)
   const [post, setPost] = useState<Draft | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Get user display info
   const userName = user?.fullName || user?.firstName || 'User'
@@ -297,6 +298,107 @@ export default function PostDetailPage({
     })
   }
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        const imageDataUrl = reader.result as string
+        
+        // Store previous image value for error recovery
+        const previousImage = post?.attachedImage || null
+        
+        // Update local state immediately
+        setPost((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            attachedImage: imageDataUrl,
+          }
+        })
+
+        // Save to database
+        try {
+          const response = await fetch(`/api/drafts/${id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              attachedImage: imageDataUrl,
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to save image')
+          }
+
+          toast.success('Image attached successfully!')
+        } catch (error) {
+          console.error('Error saving image:', error)
+          toast.error('Failed to save image')
+          // Revert local state on error
+          setPost((prev) => {
+            if (!prev) return null
+            return {
+              ...prev,
+              attachedImage: previousImage,
+            }
+          })
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveImage = async () => {
+    // Store previous image value for error recovery
+    const previousImage = post?.attachedImage || null
+    
+    // Update local state immediately
+    setPost((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        attachedImage: null,
+      }
+    })
+
+    // Save to database
+    try {
+      const response = await fetch(`/api/drafts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attachedImage: null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to remove image')
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+
+      toast.success('Image removed successfully!')
+    } catch (error) {
+      console.error('Error removing image:', error)
+      toast.error('Failed to remove image')
+      // Revert local state on error
+      setPost((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          attachedImage: previousImage,
+        }
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
@@ -369,7 +471,51 @@ export default function PostDetailPage({
         {/* Original Idea */}
         <div className="rounded-lg border border-border bg-card p-6 mb-6">
           <h3 className="text-sm font-semibold text-card-foreground mb-2">Original Idea</h3>
-          <p className="text-muted-foreground">{post.contentRaw}</p>
+          <p className="text-muted-foreground mb-4">{post.contentRaw}</p>
+          
+          {/* Image Upload Section */}
+          <div className="mt-4 pt-4 border-t border-border">
+            <h4 className="text-sm font-semibold text-card-foreground mb-3">Attached Image</h4>
+            {post.attachedImage ? (
+              <div className="relative inline-block">
+                <img
+                  src={post.attachedImage}
+                  alt="Attached to post"
+                  className="rounded-lg max-h-48 w-auto object-cover border border-border"
+                />
+                <button
+                  onClick={handleRemoveImage}
+                  className="absolute top-2 right-2 p-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                  title="Remove image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  Add Image
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add an image to your post
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

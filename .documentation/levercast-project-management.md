@@ -4,14 +4,14 @@
 - Tasks are tagged as **Done**, **ToDo**, or **Backlog**
 - Completed tasks are ordered chronologically from top to bottom
 - Pending tasks are prioritized by their order in the associated list
-- **Production Mode Active** - Clerk authentication enabled with Google OAuth, localStorage still used for drafts/templates
+- **Production Mode Active** - Clerk authentication enabled with Google OAuth, database integration complete for templates, drafts, and posts
 
 ---
 
 ## Project Overview
-**Status**: ✅ Authentication Complete & Routes Protected - Ready for Database Integration  
-**Current Phase**: Production Mode Active - Database Integration Next  
-**Tech Stack**: Next.js 15, TypeScript, Tailwind CSS v4, Shadcn/ui, Prisma (ready for database integration), Clerk (fully active with route protection + Google OAuth)
+**Status**: ✅ Database Integration Complete - Templates, Drafts, and Posts Now Stored in PostgreSQL  
+**Current Phase**: Production Mode Active - Scheduling & Calendar Features Complete  
+**Tech Stack**: Next.js 15, TypeScript, Tailwind CSS v4, Shadcn/ui, Prisma (fully integrated with Supabase PostgreSQL), Clerk (fully active with route protection + Google OAuth)
 
 ---
 
@@ -160,6 +160,54 @@
 - ✅ **Create authentication testing guide**
 - ✅ **Update DESIGN_MODE.md to reflect Production Mode**
 
+### Database Integration & Backend (COMPLETED)
+- ✅ Set up Prisma with Supabase PostgreSQL connection
+- ✅ Create database schema for User, Draft, Post, Template, ApiKey, Settings, SocialConnection models
+- ✅ Build API routes for templates CRUD operations (/api/templates)
+- ✅ Build API routes for drafts CRUD operations (/api/drafts)
+- ✅ Build API routes for posts CRUD operations (/api/posts)
+- ✅ Implement getOrCreateUser helper function for Clerk user sync
+- ✅ Migrate templates from localStorage to database
+- ✅ Migrate drafts from localStorage to database
+- ✅ Update Templates page to fetch from database API
+- ✅ Update Posts page to fetch from database API
+- ✅ Update Dashboard to save drafts and posts to database
+- ✅ Update PlatformPreview to display real user data from Clerk
+- ✅ Fix duplicate post publishing prevention
+- ✅ Implement draft status tracking (draft/published)
+- ✅ Add publishedAt tracking for drafts
+- ✅ Update Account page to fetch statistics from database
+- ✅ Update Settings page to persist theme and sidebar state to database
+- ✅ Remove localStorage dependencies (templateStorage.ts, draftStorage.ts)
+- ✅ Fix Node.js v22 macOS network interface bug with NODE_OPTIONS
+- ✅ Resolve Prisma SSL certificate issues with directUrl configuration
+- ✅ Handle schema mismatches with programmatic database updates
+
+### Post Scheduling & Calendar Features (COMPLETED)
+- ✅ Add scheduledAt field to Post model in Prisma schema
+- ✅ Make publishedAt nullable for scheduled posts
+- ✅ Add 'scheduled' status to Post model
+- ✅ Create ScheduleModal component with date/time picker
+- ✅ Implement post scheduling functionality on Dashboard
+- ✅ Implement post scheduling functionality on Post detail page
+- ✅ Add Content Calendar page (/calendar) with month view
+- ✅ Create ContentCalendar component using react-calendar
+- ✅ Create CalendarDayView component for daily post details
+- ✅ Build calendar API route (/api/posts/calendar) with date range filtering
+- ✅ Add Calendar navigation item to sidebar
+- ✅ Display scheduled posts in calendar with orange indicators
+- ✅ Display published posts in calendar with green indicators
+- ✅ Add Scheduled tab to Posts page
+- ✅ Filter scheduled posts out of Drafts tab
+- ✅ Display scheduled date in bottom right of Scheduled tab cards
+- ✅ Implement reschedule functionality for scheduled posts
+- ✅ Update PlatformPreview with "Change Publish Date" button for scheduled posts
+- ✅ Add visual indicators (badges) for published and scheduled platforms
+- ✅ Fix calendar font colors to use #343434 for better visibility
+- ✅ Update API routes to support scheduled post creation and updates
+- ✅ Prevent duplicate scheduled posts for same draft/platform
+- ✅ Add proper date formatting and time display throughout
+
 ### Documentation
 - ✅ Create phase-1-navigation-map.md
 - ✅ Create phase-2-idea-capture.md
@@ -168,6 +216,7 @@
 - ✅ Create dashboard-fixes.md
 - ✅ Create troubleshooting.md
 - ✅ Create mobile-implementation.md
+- ✅ Create scheduling-calendar-implementation-plan.md
 - ✅ Update DESIGN_MODE.md with complete status
 
 ---
@@ -191,11 +240,11 @@
 - 📋 Write transition guide from Design Mode to Production
 
 ### Preparation for Production
-- 📋 Plan database migration strategy (localStorage → PostgreSQL)
-- 📋 Design Prisma schema for user data, drafts, and templates
-- 📋 Create API endpoint specifications for all CRUD operations
 - 📋 Define real LLM integration requirements (OpenAI/Anthropic/OpenRouter)
 - 📋 Set up production environment configuration
+- 📋 Implement scheduled post publishing automation (cron job or queue system)
+- 📋 Add email notifications for scheduled posts
+- 📋 Add post analytics and tracking
 
 ---
 
@@ -238,12 +287,13 @@
 ### Content Features
 - 🔮 Recent ideas history (quick access to last 10)
 - 🔮 Idea favorites/bookmarks
-- 🔮 Content scheduling calendar
 - 🔮 Post analytics dashboard
 - 🔮 Multi-image support (carousels)
 - 🔮 Video upload and preview
 - 🔮 Hashtag suggestions
 - 🔮 Emoji picker integration
+- 🔮 Bulk scheduling for multiple posts
+- 🔮 Recurring post scheduling
 
 ### Onboarding & UX
 - 🔮 First-time user onboarding tour
@@ -264,19 +314,18 @@
 ### Real Social Media Integration
 - 🔮 LinkedIn OAuth and posting API
 - 🔮 Twitter/X OAuth and posting API
-- 🔮 Post scheduling system
-- 🔮 Publishing queue management
+- 🔮 Automated publishing queue management
 - 🔮 Cross-posting with platform-specific formatting
 - 🔮 Post performance tracking
+- 🔮 Auto-publish scheduled posts when time arrives
 
 ### Database & Backend
-- 🔮 Migrate localStorage data to PostgreSQL with Prisma
-- 🔮 Build API routes for all CRUD operations
-- 🔮 Implement user-specific data isolation (by Clerk userId)
 - 🔮 Add audit logging for user actions
 - 🔮 Set up automated database backups
 - 🔮 Implement rate limiting for API endpoints
 - 🔮 Add database connection pooling
+- 🔮 Optimize database queries with proper indexing
+- 🔮 Add database migration scripts for production
 
 ### Team & Collaboration (Post-MVP)
 - 🔮 Shared workspaces
@@ -290,11 +339,12 @@
 - 🔮 "RackStyle" - personalized AI voice training
 - 🔮 Thread creation for Twitter
 - 🔮 LinkedIn carousel post support
-- 🔮 Content calendar with planning
 - 🔮 AI content suggestions based on trends
 - 🔮 Competitor analysis
 - 🔮 SEO optimization suggestions
 - 🔮 Browser extension for quick capture
+- 🔮 Calendar export (iCal format)
+- 🔮 Calendar view filters (by platform, status)
 
 ---
 
@@ -309,7 +359,7 @@
 - ⚠️ Voice recording is simulated (needs real implementation)
 - ⚠️ No actual LLM API calls (using mock templates)
 - ⚠️ No real social media publishing APIs integrated
-- ⚠️ Data still persists in localStorage (needs migration to database)
+- ⚠️ Scheduled posts need automated publishing system (cron job/queue)
 
 ### To Address Before Production
 - ⚠️ Remove all mock data and simulations
@@ -337,9 +387,12 @@
 
 ### Production Ready Criteria (In Progress)
 - [x] Real authentication working (Clerk with Google OAuth)
-- [ ] Database integration complete (Prisma ready, needs migration from localStorage)
+- [x] Database integration complete (Prisma + Supabase PostgreSQL fully integrated)
+- [x] Templates, drafts, and posts stored in database
+- [x] Post scheduling and calendar features implemented
 - [ ] Real AI API integration (mock templates still in use)
 - [ ] Social media OAuth working (ready for LinkedIn/Twitter API setup)
+- [ ] Automated scheduled post publishing (cron job/queue system)
 - [ ] Production deployment configured
 - [ ] Monitoring and logging set up
 - [ ] Security audit passed
@@ -362,10 +415,12 @@
 - ✅ **Mobile Experience** - November 4, 2024
 - ✅ **Design Mode Complete** - November 4, 2024
 - ✅ **Authentication Integration** - November 5, 2024
+- ✅ **Database Integration** - November 2024
+- ✅ **Post Scheduling & Calendar** - November 2024
 
 ### Upcoming Milestones
 - 📅 **User Testing & Feedback** - TBD
-- 📅 **Database Migration (localStorage → PostgreSQL)** - TBD
+- 📅 **Automated Scheduled Post Publishing** - TBD
 - 📅 **AI API Integration (Real LLM)** - TBD
 - 📅 **Social Media OAuth & Publishing API** - TBD
 - 📅 **Production Deployment Setup** - TBD
@@ -413,7 +468,7 @@
 
 ### Key Technical Decisions
 1. **Design Mode First**: Decided to prototype without authentication for faster iteration
-2. **localStorage for Prototyping**: Using browser storage instead of database for Design Mode
+2. **localStorage for Prototyping**: Used browser storage during Design Mode, now fully migrated to PostgreSQL
 3. **Mock AI**: Using template-based generation instead of real LLM calls for prototyping
 4. **Templates System**: Users can create and manage their own templates (added during development)
 5. **Character Limits**: Implemented strict platform limits with visual warnings
@@ -421,7 +476,10 @@
 7. **Default to No Template**: "None (Raw AI)" is default, templates are opt-in
 8. **Mobile First**: Implemented full responsive design with mobile nav, bottom bar, and forced sidebar collapse on tablet
 9. **Clerk for Authentication**: Integrated Clerk with Google OAuth for production-ready auth
-10. **Hybrid Storage**: Authentication via Clerk, user data still in localStorage (temporary until database migration)
+10. **Database Integration**: Migrated all user data (templates, drafts, posts) from localStorage to PostgreSQL via Prisma
+11. **Post Scheduling**: Implemented full scheduling system with calendar view and reschedule functionality
+12. **User Data Isolation**: All database queries filtered by authenticated user's Clerk ID
+13. **API-First Architecture**: All data operations go through Next.js API routes with Prisma client
 
 ### Design Philosophy
 - **User First**: Prototype quickly to test with real users
@@ -440,7 +498,25 @@
 
 ## Change Log
 
-### November 5, 2024 (Latest)
+### November 2024 (Latest - Database & Scheduling)
+- Migrated templates from localStorage to PostgreSQL database
+- Migrated drafts from localStorage to PostgreSQL database
+- Created API routes for templates, drafts, and posts CRUD operations
+- Implemented getOrCreateUser helper for Clerk user synchronization
+- Added post scheduling functionality with date/time picker
+- Created Content Calendar page with month view
+- Added Scheduled tab to Posts page
+- Implemented reschedule functionality for scheduled posts
+- Updated PlatformPreview to show scheduled status and reschedule button
+- Fixed calendar styling with proper font colors (#343434)
+- Added visual indicators for published and scheduled posts
+- Updated all pages to fetch data from database APIs
+- Removed localStorage dependencies (templateStorage.ts, draftStorage.ts)
+- Fixed duplicate post publishing prevention
+- Added proper error handling and loading states throughout
+- **Status**: Database integration complete, scheduling features fully functional ✅
+
+### November 5, 2024
 - Integrated Clerk authentication with Google OAuth
 - Converted sign-in/sign-up to catch-all routes for OAuth callbacks
 - Created Providers component wrapping ClerkProvider and ThemeProvider
@@ -484,29 +560,29 @@
 ## Next Actions
 
 ### Immediate (This Week)
-1. User testing with authenticated users (Google OAuth flow)
-2. Test complete user journey: sign-up → create post → save draft → publish
-3. Verify authentication persistence across sessions
-4. Test on mobile devices (iOS/Android) with authentication
-5. Document any authentication-related bugs
+1. Test scheduled post functionality end-to-end
+2. Verify calendar displays all scheduled and published posts correctly
+3. Test reschedule functionality across different scenarios
+4. Verify database queries are properly filtered by user
+5. Test mobile calendar experience
 
 ### Short Term (Next 2 Weeks)
-1. Plan database migration from localStorage to PostgreSQL
-2. Design Prisma schema for drafts, templates, and user preferences
-3. Create database sync strategy for authenticated users
-4. Set up database seeding and migrations
-5. Build API routes for CRUD operations
+1. Implement automated scheduled post publishing system (cron job or queue)
+2. Add email notifications for scheduled posts
+3. Test database performance with larger datasets
+4. Optimize database queries with proper indexing
+5. Add post analytics and tracking
 
 ### Long Term (Next Month)
-1. Migrate all localStorage data to database with Prisma
-2. Integrate real AI API (OpenAI, Anthropic, or OpenRouter)
-3. Set up LinkedIn and Twitter OAuth for publishing
-4. Implement actual social media posting APIs
+1. Integrate real AI API (OpenAI, Anthropic, or OpenRouter)
+2. Set up LinkedIn and Twitter OAuth for publishing
+3. Implement actual social media posting APIs
+4. Add automated publishing for scheduled posts
 5. Prepare for beta launch with real users
 
 ---
 
-**Last Updated**: November 5, 2024  
-**Project Status**: ✅ Authentication Integrated (Clerk + Google OAuth) - Production Mode Active  
-**Next Milestone**: Database Migration (localStorage → PostgreSQL with Prisma)
+**Last Updated**: November 2024  
+**Project Status**: ✅ Database Integration Complete - Templates, Drafts, Posts, and Scheduling Fully Functional  
+**Next Milestone**: Automated Scheduled Post Publishing System
 

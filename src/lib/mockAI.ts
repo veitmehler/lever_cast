@@ -157,39 +157,39 @@ export async function generateContent(
   platform: 'linkedin' | 'twitter' | 'both',
   templateId?: string
 ): Promise<GeneratedContent> {
-  // Simulate API delay
-  await delay(1500)
+  // Try to use real AI API first
+  const response = await fetch('/api/ai/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      rawIdea,
+      platform,
+      templateId,
+    }),
+  })
 
-  const result: GeneratedContent = {}
-
-  // Get the template to use (these are now async functions)
-  const selectedTemplate = templateId 
-    ? await getTemplate(templateId) 
-    : await getDefaultTemplate()
-
-  if (selectedTemplate && selectedTemplate.linkedinTemplate && selectedTemplate.twitterTemplate) {
-    // Use custom template
-    if (platform === 'linkedin' || platform === 'both') {
-      result.linkedin = applyTemplate(selectedTemplate.linkedinTemplate, rawIdea)
-    }
-
-    if (platform === 'twitter' || platform === 'both') {
-      result.twitter = applyTemplate(selectedTemplate.twitterTemplate, rawIdea)
-    }
-  } else {
-    // Fallback to old random templates
-    if (platform === 'linkedin' || platform === 'both') {
-      const template = linkedInTemplates[Math.floor(Math.random() * linkedInTemplates.length)]
-      result.linkedin = template(rawIdea)
-    }
-
-    if (platform === 'twitter' || platform === 'both') {
-      const template = twitterTemplates[Math.floor(Math.random() * twitterTemplates.length)]
-      result.twitter = template(rawIdea)
+  if (response.ok) {
+    const data = await response.json()
+    if (data.content && (data.content.linkedin || data.content.twitter)) {
+      return {
+        linkedin: data.content.linkedin,
+        twitter: data.content.twitter,
+      }
     }
   }
 
-  return result
+  // Handle error response
+  const errorData = await response.json().catch(() => ({}))
+  
+  // Check if it's a "no API key" error
+  if (errorData.requiresApiKey || errorData.provider === 'template') {
+    throw new Error('NO_API_KEY')
+  }
+  
+  // Other API errors
+  throw new Error('API_ERROR')
 }
 
 // Mock publish function

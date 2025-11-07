@@ -36,35 +36,116 @@ export default function SettingsPage() {
   })
   const [maskedKeys, setMaskedKeys] = useState<Record<string, string>>({})
   const [selectedProvider, setSelectedProvider] = useState('openai')
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({
+    openai: 'gpt-4o-mini',
+    anthropic: 'claude-3-5-sonnet-20241022',
+    gemini: 'gemini-pro',
+    openrouter: 'openai/gpt-4o-mini',
+  })
+  const [providerModels, setProviderModels] = useState<Record<string, Array<{ value: string; label: string }>>>({
+    openai: [],
+    anthropic: [],
+    gemini: [],
+    openrouter: [],
+  })
+  const [isLoadingModels, setIsLoadingModels] = useState<Record<string, boolean>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingAISettings, setIsSavingAISettings] = useState(false)
   const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([])
   const [isLoadingConnections, setIsLoadingConnections] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState<Record<string, boolean>>({})
+  const [editingApiKeys, setEditingApiKeys] = useState<Record<string, boolean>>({})
 
-  // Fetch API keys on mount
+  // Fetch settings and API keys on mount
   useEffect(() => {
-    const fetchApiKeys = async () => {
+    const fetchSettings = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/api-keys')
-        if (response.ok) {
-          const keys: ApiKeyData[] = await response.json()
+        
+        // Fetch settings
+        const settingsResponse = await fetch('/api/settings')
+        if (settingsResponse.ok) {
+          const settings = await settingsResponse.json()
+          if (settings.defaultProvider) {
+            setSelectedProvider(settings.defaultProvider)
+          }
+          if (settings.defaultModel) {
+            try {
+              const models = JSON.parse(settings.defaultModel)
+              setSelectedModels(prev => ({ ...prev, ...models }))
+            } catch (e) {
+              // If not JSON, ignore
+            }
+          }
+        }
+
+        // Fetch API keys
+        const keysResponse = await fetch('/api/api-keys')
+        if (keysResponse.ok) {
+          const keys: ApiKeyData[] = await keysResponse.json()
           const masked: Record<string, string> = {}
           keys.forEach(key => {
             masked[key.provider] = key.maskedKey
           })
           setMaskedKeys(masked)
+          
+          // Fetch models for providers that have API keys
+          Object.keys(masked).forEach(provider => {
+            if (masked[provider]) {
+              fetchModelsForProvider(provider)
+            }
+          })
         }
       } catch (error) {
-        console.error('Error fetching API keys:', error)
+        console.error('Error fetching settings:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchApiKeys()
+    fetchSettings()
   }, [])
+
+  // Fetch models when API keys are saved
+  useEffect(() => {
+    Object.keys(maskedKeys).forEach(provider => {
+      if (maskedKeys[provider]) {
+        fetchModelsForProvider(provider)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maskedKeys])
+
+  // Function to fetch models for a provider
+  const fetchModelsForProvider = async (provider: string) => {
+    if (!maskedKeys[provider]) return // No API key, can't fetch models
+    
+    setIsLoadingModels(prev => ({ ...prev, [provider]: true }))
+    try {
+      const response = await fetch(`/api/ai/models/${provider}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.models && data.models.length > 0) {
+          setProviderModels(prev => ({
+            ...prev,
+            [provider]: data.models,
+          }))
+          // Set default model if not already set
+          if (!selectedModels[provider] && data.models[0]) {
+            setSelectedModels(prev => ({
+              ...prev,
+              [provider]: data.models[0].value,
+            }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching models for ${provider}:`, error)
+    } finally {
+      setIsLoadingModels(prev => ({ ...prev, [provider]: false }))
+    }
+  }
 
   // Fetch social connections on mount
   useEffect(() => {
@@ -111,6 +192,9 @@ export default function SettingsPage() {
         const result: ApiKeyData = await response.json()
         setMaskedKeys(prev => ({ ...prev, [provider]: result.maskedKey }))
         setApiKeys(prev => ({ ...prev, [provider]: '' })) // Clear input
+        setEditingApiKeys(prev => ({ ...prev, [provider]: false }))
+        // Fetch models for this provider
+        fetchModelsForProvider(provider)
         toast.success(`${provider} API key saved successfully`)
       } else {
         const error = await response.json()
@@ -165,6 +249,13 @@ export default function SettingsPage() {
           gemini: '',
           openrouter: ''
         })
+        setEditingApiKeys({})
+        // Fetch models for all providers that have keys
+        Object.keys(masked).forEach(provider => {
+          if (masked[provider]) {
+            fetchModelsForProvider(provider)
+          }
+        })
         toast.success('All API keys saved successfully')
       } else {
         toast.error('Some API keys failed to save')
@@ -174,6 +265,35 @@ export default function SettingsPage() {
       toast.error('Failed to save API keys')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleSaveAISettings = async () => {
+    try {
+      setIsSavingAISettings(true)
+      const response = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          defaultProvider: selectedProvider,
+          defaultModel: JSON.stringify(selectedModels),
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('AI settings saved successfully')
+      } else {
+        const error = await response.json()
+        console.error('Failed to save AI settings:', error)
+        toast.error(error.details || error.error || 'Failed to save AI settings')
+      }
+    } catch (error) {
+      console.error('Error saving AI settings:', error)
+      toast.error('Failed to save AI settings')
+    } finally {
+      setIsSavingAISettings(false)
     }
   }
 
@@ -231,20 +351,89 @@ export default function SettingsPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">AI Provider Settings</h2>
           
-          <div className="mb-4">
-            <label className="text-sm font-medium text-card-foreground mb-2 block">
-              Default LLM Provider
-            </label>
-            <select
-              value={selectedProvider}
-              onChange={(e) => setSelectedProvider(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">
+                Default LLM Provider
+              </label>
+              <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select which provider to use by default when generating content
+              </p>
+            </div>
+
+            {/* Model Selection for each provider */}
+            <div className="space-y-3">
+              {Object.keys(providerModels).map((provider) => {
+                const hasApiKey = !!maskedKeys[provider]
+                const models = providerModels[provider] || []
+                const isLoadingModel = isLoadingModels[provider]
+                
+                return (
+                  <div key={provider}>
+                    <label className="text-sm font-medium text-card-foreground mb-2 block capitalize">
+                      {provider === 'openrouter' ? 'OpenRouter' : provider} Model
+                      {hasApiKey && isLoadingModel && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          <Loader2 className="w-3 h-3 inline animate-spin" /> Loading models...
+                        </span>
+                      )}
+                      {hasApiKey && !isLoadingModel && models.length === 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">(No models available)</span>
+                      )}
+                    </label>
+                    <select
+                      value={selectedModels[provider] || models[0]?.value || ''}
+                      onChange={(e) => setSelectedModels(prev => ({ ...prev, [provider]: e.target.value }))}
+                      disabled={models.length === 0}
+                      className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {models.length > 0 ? (
+                        models.map((model) => (
+                          <option key={model.value} value={model.value}>
+                            {model.label}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">No models available</option>
+                      )}
+                    </select>
+                    {!hasApiKey && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Add an API key to see available models
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <Button
+              onClick={handleSaveAISettings}
+              disabled={isSavingAISettings}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <option value="openai">OpenAI (GPT-4)</option>
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="openrouter">OpenRouter</option>
-            </select>
+              {isSavingAISettings ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving AI Settings...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save AI Settings
+                </>
+              )}
+            </Button>
           </div>
 
           {isLoading ? (
@@ -256,32 +445,33 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 {Object.keys(apiKeys).map((provider) => {
                   const hasExistingKey = !!maskedKeys[provider]
+                  const isEditing = editingApiKeys[provider] || false
                   const inputValue = apiKeys[provider] || ''
-                  const displayValue = inputValue || (hasExistingKey ? maskedKeys[provider] : '')
+                  const displayValue = inputValue || (hasExistingKey && !isEditing ? maskedKeys[provider] : '')
                   
                   return (
                     <div key={provider}>
                       <label className="text-sm font-medium text-card-foreground mb-2 block capitalize">
                         {provider} API Key
-                        {hasExistingKey && !inputValue && (
+                        {hasExistingKey && !isEditing && !inputValue && (
                           <span className="ml-2 text-xs text-muted-foreground">(Saved)</span>
                         )}
                       </label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <input
-                            type={showApiKeys[provider] && inputValue ? 'text' : 'password'}
-                            value={displayValue}
+                            type={showApiKeys[provider] && (inputValue || isEditing) ? 'text' : 'password'}
+                            value={isEditing ? inputValue : displayValue}
                             onChange={(e) => {
-                              if (!hasExistingKey || inputValue) {
-                                setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
+                              setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
+                              if (!isEditing && hasExistingKey) {
+                                setEditingApiKeys(prev => ({ ...prev, [provider]: true }))
                               }
                             }}
-                            placeholder={hasExistingKey ? maskedKeys[provider] : `Enter your ${provider} API key`}
-                            disabled={hasExistingKey && !inputValue}
-                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            placeholder={hasExistingKey && !isEditing ? maskedKeys[provider] : `Enter your ${provider} API key`}
+                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                           />
-                          {inputValue && (
+                          {(inputValue || isEditing) && (
                             <button
                               onClick={() => toggleApiKeyVisibility(provider)}
                               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -294,12 +484,15 @@ export default function SettingsPage() {
                             </button>
                           )}
                         </div>
-                        {inputValue && (
+                        {(inputValue || isEditing) && (
                           <Button
                             variant="outline"
                             size="sm"
                             disabled={!inputValue || isSaving}
-                            onClick={() => handleSaveApiKey(provider)}
+                            onClick={() => {
+                              handleSaveApiKey(provider)
+                              setEditingApiKeys(prev => ({ ...prev, [provider]: false }))
+                            }}
                             className="px-3"
                           >
                             {isSaving ? (
@@ -307,6 +500,19 @@ export default function SettingsPage() {
                             ) : (
                               <Check className="w-4 h-4" />
                             )}
+                          </Button>
+                        )}
+                        {hasExistingKey && !isEditing && !inputValue && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingApiKeys(prev => ({ ...prev, [provider]: true }))
+                              setApiKeys(prev => ({ ...prev, [provider]: '' }))
+                            }}
+                            className="px-3"
+                          >
+                            Edit
                           </Button>
                         )}
                       </div>

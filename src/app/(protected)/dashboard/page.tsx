@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { generateContent, publishToPlatform, GeneratedContent } from '@/lib/mockAI'
+import { ApiKeyRequiredModal } from '@/components/ApiKeyRequiredModal'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,9 @@ export default function DashboardPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  const [apiKeyErrorReason, setApiKeyErrorReason] = useState<'no_key' | 'api_error'>('no_key')
   
   // Get user display info
   const userName = user?.fullName || user?.firstName || 'User'
@@ -35,6 +39,7 @@ export default function DashboardPage() {
     setIsGenerating(true)
     setRawIdea(content)
     setSelectedPlatform(platform)
+    setSelectedTemplateId(templateId)
     setGeneratedContent(null)
     setCurrentDraftId(null)
     setAttachedImage(image)
@@ -45,7 +50,17 @@ export default function DashboardPage() {
       toast.success('Posts generated successfully!')
     } catch (error) {
       console.error('Error generating content:', error)
-      toast.error('Failed to generate posts')
+      
+      // Check if it's an API key error
+      if (error instanceof Error && error.message === 'NO_API_KEY') {
+        setApiKeyErrorReason('no_key')
+        setShowApiKeyModal(true)
+      } else if (error instanceof Error && error.message === 'API_ERROR') {
+        setApiKeyErrorReason('api_error')
+        setShowApiKeyModal(true)
+      } else {
+        toast.error('Failed to generate posts')
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -127,8 +142,8 @@ export default function DashboardPage() {
     setIsGenerating(true)
 
     try {
-      // Use default template for regeneration
-      const result = await generateContent(rawIdea, platform)
+      // Use the same template that was used for initial generation
+      const result = await generateContent(rawIdea, platform, selectedTemplateId)
       setGeneratedContent((prev) => ({
         ...prev,
         ...result,
@@ -426,6 +441,7 @@ export default function DashboardPage() {
                 onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
                 onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
                 onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
               />
             )}
             {generatedContent.twitter && (
@@ -439,6 +455,7 @@ export default function DashboardPage() {
                 onPublish={(editedContent) => handlePublish('twitter', editedContent)}
                 onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
                 onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
               />
             )}
           </div>
@@ -477,6 +494,13 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* API Key Required Modal */}
+      <ApiKeyRequiredModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        reason={apiKeyErrorReason}
+      />
     </div>
   )
 }

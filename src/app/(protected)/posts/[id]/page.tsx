@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs'
 import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformPreview } from '@/components/PlatformPreview'
-import { publishToPlatform } from '@/lib/mockAI'
+import { generateContent, publishToPlatform } from '@/lib/mockAI'
 import { toast } from 'sonner'
 
 // Draft type matching database schema
@@ -45,6 +45,10 @@ export default function PostDetailPage({
   const { id } = use(params)
   const [post, setPost] = useState<Draft | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRegenerating, setIsRegenerating] = useState<Record<'linkedin' | 'twitter', boolean>>({
+    linkedin: false,
+    twitter: false,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Get user display info
@@ -292,10 +296,65 @@ export default function PostDetailPage({
     }
   }
 
-  const handleRegenerate = () => {
-    toast.info('Regeneration coming soon', {
-      description: 'Return to dashboard to generate new versions',
-    })
+  const handleRegenerate = async (platform: 'linkedin' | 'twitter') => {
+    if (!post || !post.contentRaw) {
+      toast.error('Cannot regenerate: missing original idea')
+      return
+    }
+
+    setIsRegenerating(prev => ({ ...prev, [platform]: true }))
+
+    try {
+      // Regenerate content using the original idea and template
+      const result = await generateContent(
+        post.contentRaw,
+        platform,
+        post.templateId || undefined
+      )
+
+      const newContent = platform === 'linkedin' ? result.linkedin : result.twitter
+
+      if (!newContent) {
+        throw new Error('Failed to generate new content')
+      }
+
+      // Update the draft with new content
+      const updateData: Record<string, string> = {}
+      if (platform === 'linkedin') {
+        updateData.linkedinContent = newContent
+      } else {
+        updateData.twitterContent = newContent
+      }
+
+      const response = await fetch(`/api/drafts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save regenerated content')
+      }
+
+      // Refresh the draft data
+      const draftResponse = await fetch(`/api/drafts/${id}`)
+      if (draftResponse.ok) {
+        const updatedDraft = await draftResponse.json()
+        setPost(updatedDraft)
+      }
+
+      toast.success(`${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} post regenerated!`, {
+        description: 'Review the new version and decide which one you prefer',
+      })
+    } catch (error) {
+      console.error('Error regenerating:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to regenerate post'
+      toast.error(errorMessage)
+    } finally {
+      setIsRegenerating(prev => ({ ...prev, [platform]: false }))
+    }
   }
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,7 +587,7 @@ export default function PostDetailPage({
             userName={userName}
             userInitials={userInitials}
             image={post.attachedImage || undefined}
-            onRegenerate={handleRegenerate}
+            onRegenerate={() => handleRegenerate('linkedin')}
             onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
             onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
             onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
@@ -538,6 +597,7 @@ export default function PostDetailPage({
             isScheduled={isPlatformScheduled('linkedin')}
             scheduledDate={getScheduledDate('linkedin')}
             scheduledPostId={getScheduledPostId('linkedin')}
+            isRegenerating={isRegenerating.linkedin}
           />
         )}
         {post.twitterContent && (
@@ -547,7 +607,7 @@ export default function PostDetailPage({
             userName={userName}
             userInitials={userInitials}
             image={post.attachedImage || undefined}
-            onRegenerate={handleRegenerate}
+            onRegenerate={() => handleRegenerate('twitter')}
             onPublish={(editedContent) => handlePublish('twitter', editedContent)}
             onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
             onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
@@ -557,6 +617,7 @@ export default function PostDetailPage({
             isScheduled={isPlatformScheduled('twitter')}
             scheduledDate={getScheduledDate('twitter')}
             scheduledPostId={getScheduledPostId('twitter')}
+            isRegenerating={isRegenerating.twitter}
           />
         )}
       </div>

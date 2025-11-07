@@ -10,7 +10,7 @@ interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter'
   content: string
   image?: string
-  onRegenerate: () => void
+  onRegenerate: () => void | Promise<void>
   onPublish: (content: string) => void
   onSchedule?: (content: string, scheduledAt: Date) => Promise<void>
   onReschedule?: (postId: string, scheduledAt: Date) => Promise<void>
@@ -22,6 +22,7 @@ interface PlatformPreviewProps {
   isScheduled?: boolean
   scheduledDate?: Date | null
   scheduledPostId?: string | null
+  isRegenerating?: boolean
 }
 
 // Platform character limits
@@ -46,6 +47,7 @@ export function PlatformPreview({
   isScheduled = false,
   scheduledDate = null,
   scheduledPostId = null,
+  isRegenerating = false,
 }: PlatformPreviewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
@@ -271,10 +273,19 @@ export function PlatformPreview({
           size="sm"
           variant="outline"
           className="flex-1 min-h-[44px]"
-          disabled={isScheduled}
+          disabled={isRegenerating}
         >
-          <RotateCw className="w-4 h-4 mr-2" />
-          Regenerate
+          {isRegenerating ? (
+            <>
+              <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+              Regenerating...
+            </>
+          ) : (
+            <>
+              <RotateCw className="w-4 h-4 mr-2" />
+              Regenerate
+            </>
+          )}
         </Button>
         {isScheduled ? (
           <Button

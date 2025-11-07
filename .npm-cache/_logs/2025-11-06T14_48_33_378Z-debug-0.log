@@ -1,0 +1,19 @@
+0 verbose cli /Users/veitmehler/.nvm/versions/node/v22.20.0/bin/node /Users/veitmehler/.nvm/versions/node/v22.20.0/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@10.9.3
+2 info using node@v22.20.0
+3 silly config load:file:/Users/veitmehler/.nvm/versions/node/v22.20.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/veitmehler/Documents/AI_Products/Lever_Cast/lever_cast/.npmrc
+5 silly config load:file:/Users/veitmehler/.npmrc
+6 silly config load:file:/Users/veitmehler/.nvm/versions/node/v22.20.0/etc/npmrc
+7 verbose title npm exec ts-node scripts/add-published-at-to-drafts.ts
+8 verbose argv "exec" "--" "ts-node" "scripts/add-published-at-to-drafts.ts"
+9 verbose logfile logs-max:10 dir:/Users/veitmehler/Documents/AI_Products/Lever_Cast/lever_cast/.npm-cache/_logs/2025-11-06T14_48_33_378Z-
+10 verbose logfile /Users/veitmehler/Documents/AI_Products/Lever_Cast/lever_cast/.npm-cache/_logs/2025-11-06T14_48_33_378Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose cwd /Users/veitmehler/Documents/AI_Products/Lever_Cast/lever_cast
+13 verbose os Darwin 23.5.0
+14 verbose node v22.20.0
+15 verbose npm  v10.9.3
+16 verbose exit 1
+17 verbose code 1
+18 error A complete log of this run can be found in: /Users/veitmehler/Documents/AI_Products/Lever_Cast/lever_cast/.npm-cache/_logs/2025-11-06T14_48_33_378Z-debug-0.log

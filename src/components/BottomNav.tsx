@@ -7,12 +7,14 @@ import {
   LayoutDashboard, 
   FileText, 
   Sparkles,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Posts', href: '/posts', icon: FileText },
+  { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]

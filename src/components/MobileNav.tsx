@@ -10,6 +10,7 @@ import {
   Settings, 
   User, 
   Sparkles,
+  Calendar,
   Menu,
   X 
 } from 'lucide-react'
@@ -17,6 +18,7 @@ import {
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Posts', href: '/posts', icon: FileText },
+  { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },
   { label: 'Account', href: '/account', icon: User },

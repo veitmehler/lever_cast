@@ -23,44 +23,58 @@ model User {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  drafts     Draft[]
-  posts      Post[]
-  apiKeys    ApiKey[]
-  settings   Settings?
+  drafts              Draft[]
+  posts               Post[]
+  apiKeys             ApiKey[]
+  settings            Settings?
+  templates           Template[]
+  socialConnections   SocialConnection[]
 
   @@map("users")
 }
 
 model Draft {
+  id               String    @id @default(cuid())
+  userId           String
+  title            String    // Short title/preview
+  contentRaw       String    @db.Text // User's original idea
+  linkedinContent  String?   @db.Text // AI-generated LinkedIn post
+  twitterContent   String?   @db.Text // AI-generated Twitter post
+  platforms        String    // JSON array: ["linkedin", "twitter"] or "both"
+  templateId       String?   // Which template was used
+  attachedImage    String?   // Base64 or URL to image
+  status           String    @default("draft") // draft, published
+  publishedAt      DateTime? // When the draft was published
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts            Post[]    // A draft can result in multiple posts (one per platform)
+
+  @@index([userId, status])
+  @@map("drafts")
+}
+
+model Post {
   id          String    @id @default(cuid())
   userId      String
-  contentRaw  String
-  contentAi   String?
-  platform    String
-  status      String    @default("draft") // draft, published
-  publishedAt DateTime? // When the draft was published (null if still draft)
+  draftId     String?   // Link back to the draft this was published from
+  platform    String    // "linkedin" or "twitter"
+  content     String    @db.Text // The actual content that was published
+  publishedAt DateTime  @default(now())
+  postUrl     String?   // URL to the published post (if available from API)
+  status      String    @default("published") // published, failed, deleted
+  errorMsg    String?   // If publishing failed, store error
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   // Relations
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draft       Draft?    @relation(fields: [draftId], references: [id], onDelete: SetNull)
 
-  @@map("drafts")
-}
-
-model Post {
-  id          String   @id @default(cuid())
-  userId      String
-  platform    String
-  content     String
-  publishedAt DateTime?
-  postUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId, platform, publishedAt])
+  @@index([draftId])
   @@map("posts")
 }
 
@@ -91,4 +105,47 @@ model Settings {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("settings")
+}
+
+model Template {
+  id                String   @id @default(cuid())
+  userId            String
+  name              String
+  tone              String   // professional, casual, inspirational, question-based, storytelling
+  description       String
+  linkedinTemplate  String   @db.Text
+  twitterTemplate   String   @db.Text
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ensure only one default template per user
+  @@index([userId, isDefault])
+  @@map("templates")
+}
+
+model SocialConnection {
+  id            String   @id @default(cuid())
+  userId        String
+  platform      String   // "linkedin" or "twitter"
+  accessToken   String   @db.Text // OAuth access token (encrypted)
+  refreshToken  String?  @db.Text // OAuth refresh token (encrypted, if applicable)
+  tokenExpiry   DateTime? // When the access token expires
+  platformUserId String? // The user's ID on the social platform
+  platformUsername String? // The user's username/handle
+  isActive      Boolean  @default(true) // Can be disabled without deleting
+  lastUsed      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One connection per platform per user
+  @@unique([userId, platform])
+  @@index([userId, isActive])
+  @@map("social_connections")
 }

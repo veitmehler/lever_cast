@@ -3,7 +3,20 @@
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getTemplates, type Template } from '@/lib/templateStorage'
+
+// Template type matching database schema
+type Template = {
+  id: string
+  userId: string
+  name: string
+  tone: 'professional' | 'casual' | 'inspirational' | 'question-based' | 'storytelling'
+  description: string
+  linkedinTemplate: string
+  twitterTemplate: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 interface IdeaCaptureProps {
   onGenerate: (content: string, platform: 'linkedin' | 'twitter' | 'both', templateId?: string, image?: string) => void
@@ -16,11 +29,74 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Fetch templates from API
+  const fetchTemplates = async () => {
+    try {
+      setIsLoadingTemplates(true)
+      console.log('[IdeaCapture] Fetching templates...')
+      const response = await fetch('/api/templates')
+      
+      console.log('[IdeaCapture] Response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('[IdeaCapture] Templates fetched:', data.length, 'templates')
+        setTemplates(data)
+        
+        // If no templates exist, seed default ones
+        if (data.length === 0) {
+          console.log('[IdeaCapture] No templates found, seeding defaults...')
+          await seedTemplates()
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[IdeaCapture] Failed to fetch templates:', response.status, errorData)
+        // Try to seed templates as fallback
+        console.log('[IdeaCapture] Attempting to seed templates as fallback...')
+        await seedTemplates()
+      }
+    } catch (error) {
+      console.error('[IdeaCapture] Error fetching templates:', error)
+      // Try to seed templates as fallback
+      try {
+        console.log('[IdeaCapture] Attempting to seed templates as fallback...')
+        await seedTemplates()
+      } catch (seedError) {
+        console.error('[IdeaCapture] Failed to seed templates:', seedError)
+      }
+    } finally {
+      setIsLoadingTemplates(false)
+      console.log('[IdeaCapture] Templates loading complete. Current templates:', templates.length)
+    }
+  }
+
+  // Seed default templates
+  const seedTemplates = async () => {
+    try {
+      console.log('[IdeaCapture] Seeding templates...')
+      const response = await fetch('/api/templates/seed', {
+        method: 'POST',
+      })
+      
+      console.log('[IdeaCapture] Seed response status:', response.status)
+      
+      if (response.ok) {
+        console.log('[IdeaCapture] Templates seeded successfully, refetching...')
+        await fetchTemplates()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[IdeaCapture] Failed to seed templates:', response.status, errorData)
+      }
+    } catch (error) {
+      console.error('[IdeaCapture] Error seeding templates:', error)
+    }
+  }
+
   useEffect(() => {
-    const loadedTemplates = getTemplates()
-    setTemplates(loadedTemplates)
+    fetchTemplates()
     // Default to "none" - no template selected
     setSelectedTemplate('none')
   }, [])
@@ -147,15 +223,23 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           <select
             value={selectedTemplate}
             onChange={(e) => setSelectedTemplate(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            disabled={isLoadingTemplates}
+            className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="none">None (Raw AI)</option>
+            <option value="none">
+              {isLoadingTemplates ? 'Loading templates...' : 'None (Raw AI)'}
+            </option>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>
                 {template.name} - {template.tone}
               </option>
             ))}
           </select>
+          {!isLoadingTemplates && templates.length === 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              No templates available. You can create templates on the Templates page.
+            </p>
+          )}
         </div>
 
         {/* Platform Selection */}

@@ -3,9 +3,22 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Star, StarOff, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getTemplates, deleteTemplate, setDefaultTemplate, saveTemplate, updateTemplate, type Template } from '@/lib/templateStorage'
 import { TemplateEditor } from '@/components/TemplateEditor'
 import { toast } from 'sonner'
+
+// Template type matching database schema
+export type Template = {
+  id: string
+  userId: string
+  name: string
+  tone: 'professional' | 'casual' | 'inspirational' | 'question-based' | 'storytelling'
+  description: string
+  linkedinTemplate: string
+  twitterTemplate: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
@@ -13,29 +26,90 @@ export default function TemplatesPage() {
   const [isViewing, setIsViewing] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch templates from API
+  const fetchTemplates = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/templates')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTemplates(data)
+        
+        // If no templates exist, seed default ones
+        if (data.length === 0) {
+          await seedTemplates()
+        }
+      } else {
+        toast.error('Failed to fetch templates')
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+      toast.error('Failed to fetch templates')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Seed default templates
+  const seedTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates/seed', {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        await fetchTemplates()
+        toast.success('Default templates loaded')
+      }
+    } catch (error) {
+      console.error('Error seeding templates:', error)
+    }
+  }
 
   useEffect(() => {
-    setTemplates(getTemplates())
+    fetchTemplates()
   }, [])
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this template?')) {
-      const success = deleteTemplate(id)
-      if (success) {
-        setTemplates(getTemplates())
-        toast.success('Template deleted successfully')
-      } else {
+      try {
+        const response = await fetch(`/api/templates/${id}`, {
+          method: 'DELETE',
+        })
+
+        if (response.ok) {
+          await fetchTemplates()
+          toast.success('Template deleted successfully')
+        } else {
+          const error = await response.json()
+          toast.error(error.error || 'Failed to delete template')
+        }
+      } catch (error) {
+        console.error('Error deleting template:', error)
         toast.error('Failed to delete template')
       }
     }
   }
 
-  const handleSetDefault = (id: string) => {
-    const success = setDefaultTemplate(id)
-    if (success) {
-      setTemplates(getTemplates())
-      toast.success('Default template updated')
-    } else {
+  const handleSetDefault = async (id: string) => {
+    try {
+      const response = await fetch(`/api/templates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDefault: true }),
+      })
+
+      if (response.ok) {
+        await fetchTemplates()
+        toast.success('Default template updated')
+      } else {
+        toast.error('Failed to update default template')
+      }
+    } catch (error) {
+      console.error('Error setting default template:', error)
       toast.error('Failed to update default template')
     }
   }
@@ -55,24 +129,43 @@ export default function TemplatesPage() {
     setIsEditing(true)
   }
 
-  const handleSaveTemplate = (templateData: Omit<Template, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingTemplate) {
-      // Update existing template
-      const updated = updateTemplate(editingTemplate.id, templateData)
-      if (updated) {
-        setTemplates(getTemplates())
-        toast.success('Template updated successfully')
+  const handleSaveTemplate = async (templateData: Omit<Template, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      if (editingTemplate) {
+        // Update existing template
+        const response = await fetch(`/api/templates/${editingTemplate.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(templateData),
+        })
+
+        if (response.ok) {
+          await fetchTemplates()
+          toast.success('Template updated successfully')
+        } else {
+          toast.error('Failed to update template')
+        }
       } else {
-        toast.error('Failed to update template')
+        // Create new template
+        const response = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(templateData),
+        })
+
+        if (response.ok) {
+          await fetchTemplates()
+          toast.success('Template created successfully')
+        } else {
+          toast.error('Failed to create template')
+        }
       }
-    } else {
-      // Create new template
-      const newTemplate = saveTemplate(templateData)
-      setTemplates(getTemplates())
-      toast.success('Template created successfully')
+      setIsEditing(false)
+      setEditingTemplate(null)
+    } catch (error) {
+      console.error('Error saving template:', error)
+      toast.error('Failed to save template')
     }
-    setIsEditing(false)
-    setEditingTemplate(null)
   }
 
   const handleCancelEdit = () => {
@@ -110,9 +203,18 @@ export default function TemplatesPage() {
         </Button>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading templates...</p>
+        </div>
+      )}
+
       {/* Template Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        {templates.map((template) => (
+      {!isLoading && templates.length > 0 && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+          {templates.map((template) => (
           <div
             key={template.id}
             className="rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-all group relative"
@@ -175,8 +277,9 @@ export default function TemplatesPage() {
               </Button>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Template Preview Modal */}
       {isViewing && selectedTemplate && (
@@ -259,7 +362,7 @@ export default function TemplatesPage() {
         />
       )}
 
-      {templates.length === 0 && (
+      {!isLoading && templates.length === 0 && (
         <div className="text-center py-12">
           <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No templates found</h3>

@@ -34,13 +34,36 @@ export function Sidebar() {
   const [mounted, setMounted] = useState(false)
   const [isLargeScreen, setIsLargeScreen] = useState(false)
 
-  // Load sidebar state from localStorage after mount
+  // Load sidebar state from API after mount
   useEffect(() => {
-    setMounted(true)
-    const saved = localStorage.getItem('sidebar-collapsed')
-    if (saved !== null) {
-      setIsCollapsed(JSON.parse(saved))
+    const fetchSidebarState = async () => {
+      try {
+        const response = await fetch('/api/settings')
+        if (response.ok) {
+          const settings = await response.json()
+          if (settings.sidebarState) {
+            setIsCollapsed(settings.sidebarState === 'collapsed')
+          }
+        } else {
+          // Fallback to localStorage if API fails
+          const saved = localStorage.getItem('sidebar-collapsed')
+          if (saved !== null) {
+            setIsCollapsed(JSON.parse(saved))
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching sidebar state:', error)
+        // Fallback to localStorage if API fails
+        const saved = localStorage.getItem('sidebar-collapsed')
+        if (saved !== null) {
+          setIsCollapsed(JSON.parse(saved))
+        }
+      } finally {
+        setMounted(true)
+      }
     }
+
+    fetchSidebarState()
   }, [])
 
   // Track screen size for responsive behavior
@@ -55,11 +78,25 @@ export function Sidebar() {
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  // Save sidebar state to localStorage
-  const toggleSidebar = () => {
+  // Save sidebar state to API
+  const toggleSidebar = async () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
-    localStorage.setItem('sidebar-collapsed', JSON.stringify(newState))
+    
+    // Save to API (non-blocking)
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sidebarState: newState ? 'collapsed' : 'open' }),
+      })
+    } catch (error) {
+      console.error('Error saving sidebar state:', error)
+      // Fallback to localStorage if API fails
+      localStorage.setItem('sidebar-collapsed', JSON.stringify(newState))
+    }
   }
 
   // Force collapsed on tablet (md to lg)

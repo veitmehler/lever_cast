@@ -4,11 +4,11 @@ import { useState } from 'react'
 import { X, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { Template } from '@/lib/templateStorage'
+import type { Template } from '@/app/(protected)/templates/page'
 
 interface TemplateEditorProps {
   template?: Template | null
-  onSave: (template: Omit<Template, 'id' | 'createdAt' | 'updatedAt'>) => void
+  onSave: (template: Omit<Template, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => void
   onCancel: () => void
 }
 

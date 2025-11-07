@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Copy, RotateCw, Send, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -10,7 +10,12 @@ interface PlatformPreviewProps {
   content: string
   image?: string
   onRegenerate: () => void
-  onPublish: () => void
+  onPublish: (content: string) => void
+  onContentChange?: (platform: 'linkedin' | 'twitter', newContent: string) => void
+  userName?: string
+  userInitials?: string
+  isPublished?: boolean
+  publishedDate?: Date | null
 }
 
 // Platform character limits
@@ -25,10 +30,20 @@ export function PlatformPreview({
   image,
   onRegenerate,
   onPublish,
+  onContentChange,
+  userName = 'John Doe',
+  userInitials = 'JD',
+  isPublished = false,
+  publishedDate = null,
 }: PlatformPreviewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
   const [copied, setCopied] = useState(false)
+
+  // Update editedContent when content prop changes
+  useEffect(() => {
+    setEditedContent(content)
+  }, [content])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(editedContent)
@@ -38,7 +53,10 @@ export function PlatformPreview({
 
   const handleSave = () => {
     setIsEditing(false)
-    // In real implementation, would save the edited content
+    // Notify parent component of content change
+    if (onContentChange && editedContent !== content) {
+      onContentChange(platform, editedContent)
+    }
   }
 
   const platformColors = {
@@ -93,14 +111,24 @@ export function PlatformPreview({
 
       {/* Mock Platform UI */}
       <div className="p-4 bg-secondary/30">
-        {/* Mock User Info */}
+        {/* User Info */}
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
-            JD
+            {userInitials}
           </div>
           <div>
-            <div className="font-semibold text-card-foreground text-sm">John Doe</div>
-            <div className="text-xs text-muted-foreground">Just now</div>
+            <div className="font-semibold text-card-foreground text-sm">{userName}</div>
+            <div className="text-xs text-muted-foreground">
+              {isPublished && publishedDate
+                ? `Published ${publishedDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}`
+                : 'Just now'}
+            </div>
           </div>
         </div>
 
@@ -240,14 +268,34 @@ export function PlatformPreview({
           Regenerate
         </Button>
         <Button
-          onClick={onPublish}
+          onClick={() => onPublish(editedContent)}
           size="sm"
-          className="flex-1 min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
-          disabled={isOverLimit}
-          title={isOverLimit ? 'Cannot publish - content exceeds character limit' : 'Publish to platform'}
+          className={cn(
+            "flex-1 min-h-[44px]",
+            isPublished 
+              ? "bg-green-600 text-white hover:bg-green-700" 
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          )}
+          disabled={isOverLimit || isPublished}
+          title={
+            isPublished 
+              ? `Already published to ${platform}` 
+              : isOverLimit 
+                ? 'Cannot publish - content exceeds character limit' 
+                : 'Publish to platform'
+          }
         >
-          <Send className="w-4 h-4 mr-2" />
-          Publish
+          {isPublished ? (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Published
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4 mr-2" />
+              Publish
+            </>
+          )}
         </Button>
       </div>
     </div>

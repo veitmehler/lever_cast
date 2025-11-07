@@ -1,21 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { generateContent, publishToPlatform, GeneratedContent } from '@/lib/mockAI'
-import { saveDraft, markAsPublished } from '@/lib/draftStorage'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
 export default function DashboardPage() {
+  const { user } = useUser()
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
+  
+  // Get user display info
+  const userName = user?.fullName || user?.firstName || 'User'
+  const userInitials = user?.firstName && user?.lastName 
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : user?.firstName 
+      ? user.firstName.slice(0, 2).toUpperCase()
+      : 'U'
 
   const handleGenerate = async (
     content: string,
@@ -42,28 +51,73 @@ export default function DashboardPage() {
     }
   }
 
-  const handleSaveDraft = () => {
-    if (!generatedContent || !rawIdea) return
+  const handleSaveDraft = async () => {
+    if (!generatedContent || !rawIdea) {
+      toast.error('Please generate content first')
+      return
+    }
 
     try {
       const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
       
-      const draft = saveDraft({
-        title,
-        rawIdea,
-        linkedinContent: generatedContent.linkedin,
-        twitterContent: generatedContent.twitter,
-        platform: selectedPlatform,
-        status: 'draft',
-      })
+      // If draft already exists, update it instead of creating a new one
+      if (currentDraftId) {
+        const response = await fetch(`/api/drafts/${currentDraftId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title,
+            contentRaw: rawIdea,
+            linkedinContent: generatedContent.linkedin || null,
+            twitterContent: generatedContent.twitter || null,
+            platforms: selectedPlatform,
+            attachedImage: attachedImage || null,
+          }),
+        })
 
-      setCurrentDraftId(draft.id)
-      toast.success('Draft saved successfully!', {
-        description: 'You can find it in the Posts page',
-      })
+        if (!response.ok) {
+          throw new Error('Failed to update draft')
+        }
+
+        toast.success('Draft updated successfully!', {
+          description: 'Your changes have been saved',
+        })
+      } else {
+        // Create new draft
+        const response = await fetch('/api/drafts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title,
+            contentRaw: rawIdea,
+            linkedinContent: generatedContent.linkedin || null,
+            twitterContent: generatedContent.twitter || null,
+            platforms: selectedPlatform,
+            status: 'draft',
+            attachedImage: attachedImage || null,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || 'Failed to save draft')
+        }
+
+        const draft = await response.json()
+        setCurrentDraftId(draft.id)
+        
+        toast.success('Draft saved successfully!', {
+          description: 'You can find it in the Posts page',
+        })
+      }
     } catch (error) {
       console.error('Error saving draft:', error)
-      toast.error('Failed to save draft')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save draft'
+      toast.error(errorMessage)
     }
   }
 
@@ -88,21 +142,149 @@ export default function DashboardPage() {
     }
   }
 
+  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string) => {
+    // Update local state immediately
+    setGeneratedContent((prev) => ({
+      ...prev,
+      [platform]: newContent,
+    }))
+
+    // If draft is already saved, update it in the database
+    if (currentDraftId) {
+      try {
+        const updateData: Record<string, string> = {}
+        if (platform === 'linkedin') {
+          updateData.linkedinContent = newContent
+        } else {
+          updateData.twitterContent = newContent
+        }
+
+        const response = await fetch(`/api/drafts/${currentDraftId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        })
+
+        if (response.ok) {
+          toast.success('Changes saved', { duration: 2000 })
+        } else {
+          console.error('Failed to save edited content')
+          toast.error('Failed to save changes')
+        }
+      } catch (error) {
+        console.error('Error saving edited content:', error)
+        toast.error('Failed to save changes')
+      }
+    } else {
+      // If no draft exists yet, show a message that changes will be saved when draft is created
+      toast.info('Changes will be saved when you publish or save draft', { duration: 2000 })
+    }
+  }
+
   const handlePublish = async (platform: 'linkedin' | 'twitter', content: string) => {
     try {
-      const result = await publishToPlatform(platform, content)
-      if (result.success) {
-        // Mark as published if we have a draft ID
-        if (currentDraftId) {
-          markAsPublished(currentDraftId)
+      // First, save draft if not already saved (use current edited content)
+      let draftId = currentDraftId
+      if (!draftId && rawIdea) {
+        const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
+        
+        const draftResponse = await fetch('/api/drafts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title,
+            contentRaw: rawIdea,
+            linkedinContent: generatedContent?.linkedin || null,
+            twitterContent: generatedContent?.twitter || null,
+            platforms: selectedPlatform,
+            status: 'draft',
+            attachedImage: attachedImage || null,
+          }),
+        })
+
+        if (!draftResponse.ok) {
+          const errorData = await draftResponse.json().catch(() => ({ error: 'Unknown error' }))
+          console.error('Failed to save draft:', errorData)
+          const errorMessage = errorData.details
+            ? `${errorData.error || 'Failed to save draft'}: ${errorData.details}`
+            : errorData.error || 'Unknown error'
+          throw new Error(`Failed to save draft: ${errorMessage}`)
         }
+
+        const draft = await draftResponse.json()
+        draftId = draft.id
+        setCurrentDraftId(draft.id)
+      } else if (draftId) {
+        // If draft exists, ensure edited content is saved before publishing
+        const updateData: Record<string, string> = {}
+        if (platform === 'linkedin' && generatedContent?.linkedin) {
+          updateData.linkedinContent = generatedContent.linkedin
+        } else if (platform === 'twitter' && generatedContent?.twitter) {
+          updateData.twitterContent = generatedContent.twitter
+        }
+
+        // Only update if there are changes
+        if (Object.keys(updateData).length > 0) {
+          await fetch(`/api/drafts/${draftId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+          })
+        }
+      }
+
+      // Simulate publishing (in real app, this would call social media APIs)
+      const result = await publishToPlatform(platform, content)
+      
+      if (result.success) {
+        // Create a post record in the database
+        const postResponse = await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftId: draftId || null,
+            platform,
+            content,
+            status: 'published',
+          }),
+        })
+
+        if (!postResponse.ok) {
+          const errorData = await postResponse.json().catch(() => ({ error: 'Unknown error' }))
+          console.error('Failed to save post:', errorData)
+          if (errorData.error?.includes('already published')) {
+            toast.error(errorData.error)
+          } else {
+            throw new Error(errorData.error || 'Failed to save post')
+          }
+          return
+        }
+
+        // Refresh draft data if we have a draftId
+        if (draftId) {
+          const draftResponse = await fetch(`/api/drafts/${draftId}`)
+          if (draftResponse.ok) {
+            const updatedDraft = await draftResponse.json()
+            setCurrentDraftId(updatedDraft.id)
+          }
+        }
+
         toast.success(result.message, {
           description: `Your ${platform} post is now live!`,
         })
       }
     } catch (error) {
       console.error('Error publishing:', error)
-      toast.error('Failed to publish post')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to publish post'
+      toast.error(errorMessage)
     }
   }
 
@@ -140,11 +322,10 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-foreground">Your Generated Posts</h2>
             <Button
               onClick={handleSaveDraft}
-              variant="outline"
-              disabled={!!currentDraftId}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Save className="w-4 h-4 mr-2" />
-              {currentDraftId ? 'Saved' : 'Save Draft'}
+              {currentDraftId ? 'Update Draft' : 'Save to Drafts'}
             </Button>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
@@ -153,8 +334,11 @@ export default function DashboardPage() {
                 platform="linkedin"
                 content={generatedContent.linkedin}
                 image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('linkedin')}
-                onPublish={() => handlePublish('linkedin', generatedContent.linkedin!)}
+                onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
+                onContentChange={handleContentChange}
               />
             )}
             {generatedContent.twitter && (
@@ -162,8 +346,11 @@ export default function DashboardPage() {
                 platform="twitter"
                 content={generatedContent.twitter}
                 image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('twitter')}
-                onPublish={() => handlePublish('twitter', generatedContent.twitter!)}
+                onPublish={(editedContent) => handlePublish('twitter', editedContent)}
+                onContentChange={handleContentChange}
               />
             )}
           </div>

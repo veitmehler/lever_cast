@@ -2,19 +2,61 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getDrafts, type Draft } from '@/lib/draftStorage'
+import { toast } from 'sonner'
 
 type FilterStatus = 'all' | 'published' | 'draft'
+
+// Draft type matching database schema
+type Draft = {
+  id: string
+  userId: string
+  title: string
+  contentRaw: string
+  linkedinContent: string | null
+  twitterContent: string | null
+  platforms: string
+  templateId: string | null
+  attachedImage: string | null
+  status: string
+  publishedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+  posts?: Array<{
+    id: string
+    platform: string
+    publishedAt: Date
+  }>
+}
 
 export default function PostsPage() {
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [drafts, setDrafts] = useState<Draft[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load drafts from localStorage
+  // Fetch drafts from API
+  const fetchDrafts = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/drafts')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch drafts')
+      }
+      
+      const data = await response.json()
+      setDrafts(data)
+    } catch (error) {
+      console.error('Error fetching drafts:', error)
+      toast.error('Failed to load drafts')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    setDrafts(getDrafts())
+    fetchDrafts()
   }, [])
 
   const filteredPosts = drafts.filter(draft => {
@@ -32,10 +74,12 @@ export default function PostsPage() {
             Manage your drafts and published content
           </p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="w-4 h-4 mr-2" />
-          New Post
-        </Button>
+        <Link href="/dashboard">
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="w-4 h-4 mr-2" />
+            New Post
+          </Button>
+        </Link>
       </div>
 
       {/* Filter Tabs */}
@@ -72,49 +116,71 @@ export default function PostsPage() {
         </button>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      )}
+
       {/* Posts Grid */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {filteredPosts.map((draft) => (
-          <Link
-            key={draft.id}
-            href={`/posts/${draft.id}`}
-            className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                <span className="text-xs font-medium text-muted-foreground uppercase">
-                  {draft.platform}
+      {!isLoading && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredPosts.map((draft) => (
+            <Link
+              key={draft.id}
+              href={`/posts/${draft.id}`}
+              className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase">
+                    {draft.platforms}
+                  </span>
+                  {draft.posts && draft.posts.length > 0 && (
+                    <div className="flex gap-1">
+                      {draft.posts.map((post) => (
+                        <span
+                          key={post.id}
+                          className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary"
+                          title={`Published to ${post.platform} on ${new Date(post.publishedAt).toLocaleDateString()}`}
+                        >
+                          ✓ {post.platform}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    draft.status === 'published'
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {draft.status}
                 </span>
               </div>
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  draft.status === 'published'
-                    ? 'bg-primary/20 text-primary'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {draft.status}
-              </span>
-            </div>
-            <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
-              {draft.title}
-            </h3>
-            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-              {draft.rawIdea}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {new Date(draft.createdAt).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </p>
-          </Link>
-        ))}
-      </div>
+              <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
+                {draft.title}
+              </h3>
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                {draft.contentRaw}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(draft.createdAt).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </p>
+            </Link>
+          ))}
+        </div>
+      )}
 
-      {filteredPosts.length === 0 && (
+      {!isLoading && filteredPosts.length === 0 && (
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No posts found</h3>

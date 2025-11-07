@@ -2,21 +2,53 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useState, useEffect } from 'react'
-import { Mail, Calendar, Shield } from 'lucide-react'
-import { getDrafts } from '@/lib/draftStorage'
+import { Mail, Calendar, Shield, Loader2 } from 'lucide-react'
 
 export default function AccountPage() {
   const { user, isLoaded } = useUser()
   const [stats, setStats] = useState({ postsCreated: 0, postsPublished: 0 })
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
   
-  // Load stats from localStorage on client side only
+  // Load stats from database APIs
   useEffect(() => {
-    const drafts = getDrafts()
-    setStats({
-      postsCreated: drafts.length,
-      postsPublished: drafts.filter(d => d.status === 'published').length
-    })
-  }, [])
+    const fetchStats = async () => {
+      try {
+        setIsLoadingStats(true)
+        
+        // Fetch drafts and posts in parallel
+        const [draftsResponse, postsResponse] = await Promise.all([
+          fetch('/api/drafts'),
+          fetch('/api/posts'),
+        ])
+
+        let postsCreated = 0
+        let postsPublished = 0
+
+        if (draftsResponse.ok) {
+          const drafts = await draftsResponse.json()
+          postsCreated = drafts.length
+        }
+
+        if (postsResponse.ok) {
+          const posts = await postsResponse.json()
+          postsPublished = posts.filter((p: { status: string }) => p.status === 'published').length
+        }
+
+        setStats({
+          postsCreated,
+          postsPublished,
+        })
+      } catch (error) {
+        console.error('Error fetching stats:', error)
+      } finally {
+        setIsLoadingStats(false)
+      }
+    }
+
+    if (isLoaded) {
+      fetchStats()
+    }
+  }, [isLoaded])
   
   if (!isLoaded) {
     return (
@@ -103,21 +135,27 @@ export default function AccountPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Usage Statistics</h2>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-secondary p-4">
-              <div className="text-3xl font-bold text-foreground mb-1">
-                {stats.postsCreated}
-              </div>
-              <div className="text-sm text-muted-foreground">Posts Created</div>
+          {isLoadingStats ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg bg-secondary p-4">
+                <div className="text-3xl font-bold text-foreground mb-1">
+                  {stats.postsCreated}
+                </div>
+                <div className="text-sm text-muted-foreground">Posts Created</div>
+              </div>
 
-            <div className="rounded-lg bg-secondary p-4">
-              <div className="text-3xl font-bold text-foreground mb-1">
-                {stats.postsPublished}
+              <div className="rounded-lg bg-secondary p-4">
+                <div className="text-3xl font-bold text-foreground mb-1">
+                  {stats.postsPublished}
+                </div>
+                <div className="text-sm text-muted-foreground">Posts Published</div>
               </div>
-              <div className="text-sm text-muted-foreground">Posts Published</div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Subscription Info */}

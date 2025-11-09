@@ -32,6 +32,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [content, setContent] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -108,14 +109,53 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
     setSelectedTemplate('none')
   }, [])
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string)
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      alert('Image size must be less than 10MB')
+      return
+    }
+
+    setIsUploadingImage(true)
+
+    try {
+      // Upload to Supabase Storage
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to upload image')
       }
-      reader.readAsDataURL(file)
+
+      const result = await response.json()
+      
+      // Store the Supabase Storage URL instead of base64
+      setSelectedImage(result.url)
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload image')
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -408,10 +448,15 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center"
-          title="Attach image"
+          disabled={isUploadingImage}
+          className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isUploadingImage ? 'Uploading image...' : 'Attach image'}
         >
-          <ImageIcon className="w-5 h-5" />
+          {isUploadingImage ? (
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <ImageIcon className="w-5 h-5" />
+          )}
         </button>
         <input
           ref={fileInputRef}

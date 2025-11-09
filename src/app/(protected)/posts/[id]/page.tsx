@@ -562,60 +562,90 @@ export default function PostDetailPage({
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const imageDataUrl = reader.result as string
-        
-        // Store previous image value for error recovery
-        const previousImage = post?.attachedImage || null
-        
-        // Update local state immediately
-        setPost((prev) => {
-          if (!prev) return null
-          return {
-            ...prev,
-            attachedImage: imageDataUrl,
-          }
-        })
+    if (!file) return
 
-        // Save to database
-        try {
-          const response = await fetch(`/api/drafts/${id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              attachedImage: imageDataUrl,
-            }),
-          })
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
 
-          if (!response.ok) {
-            throw new Error('Failed to save image')
-          }
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast.error('Image size must be less than 10MB')
+      return
+    }
 
-          toast.success('Image attached successfully!')
-        } catch (error) {
-          console.error('Error saving image:', error)
-          toast.error('Failed to save image')
-          // Revert local state on error
-          setPost((prev) => {
-            if (!prev) return null
-            return {
-              ...prev,
-              attachedImage: previousImage,
-            }
-          })
-        }
+    // Store previous image value for error recovery
+    const previousImage = post?.attachedImage || null
+
+    try {
+      // Upload to Supabase Storage
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadResponse = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to upload image')
       }
-      reader.readAsDataURL(file)
+
+      const uploadResult = await uploadResponse.json()
+      const imageUrl = uploadResult.url
+
+      // Update local state immediately
+      setPost((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          attachedImage: imageUrl,
+        }
+      })
+
+      // Save URL to database
+      const response = await fetch(`/api/drafts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attachedImage: imageUrl,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save image')
+      }
+
+      toast.success('Image attached successfully!')
+    } catch (error) {
+      console.error('Error uploading/saving image:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to upload image')
+      // Revert local state on error
+      setPost((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          attachedImage: previousImage,
+        }
+      })
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
   const handleRemoveImage = async () => {
+    if (!post?.attachedImage) return
+
     // Store previous image value for error recovery
-    const previousImage = post?.attachedImage || null
+    const previousImage = post.attachedImage
     
     // Update local state immediately
     setPost((prev) => {
@@ -626,8 +656,27 @@ export default function PostDetailPage({
       }
     })
 
-    // Save to database
     try {
+      // Delete from Supabase Storage if it's a Supabase URL
+      // (Skip deletion if it's a base64 data URL from old data)
+      if (previousImage && !previousImage.startsWith('data:')) {
+        try {
+          await fetch('/api/images/upload', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: previousImage,
+            }),
+          })
+        } catch (deleteError) {
+          // Log but don't fail - image might already be deleted or not in storage
+          console.warn('Failed to delete image from storage:', deleteError)
+        }
+      }
+
+      // Save to database
       const response = await fetch(`/api/drafts/${id}`, {
         method: 'PATCH',
         headers: {

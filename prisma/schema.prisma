@@ -66,6 +66,7 @@ model Post {
   publishedAt DateTime? // When the post was actually published (nullable for scheduled posts)
   scheduledAt DateTime? // When the post is scheduled to be published
   postUrl     String?   // URL to the published post (if available from API)
+  tweetId     String?   // Twitter/X tweet ID (for replies and verification)
   status      String    @default("published") // published, scheduled, failed, deleted
   errorMsg    String?   // If publishing failed, store error
   createdAt   DateTime  @default(now())
@@ -81,6 +82,7 @@ model Post {
   @@index([draftId])
   @@index([userId, scheduledAt, status]) // For calendar queries
   @@index([parentPostId]) // For thread queries
+  @@index([tweetId]) // For quick tweet ID lookups
   @@map("posts")
 }
 

@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { encrypt, decrypt } from '@/lib/encryption'
+import { generateOAuthState } from '@/lib/oauth'
 
 // Valid platform names
 const VALID_PLATFORMS = ['linkedin', 'twitter']
+
+// OAuth configuration
+const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID
+const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET
+const LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
+
+const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID
+const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET
+const TWITTER_REDIRECT_URI = process.env.TWITTER_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/twitter/callback`
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -71,18 +83,60 @@ export async function POST(
       )
     }
 
-    // TODO: Implement OAuth flow
-    // For now, return a placeholder response
-    // In production, this would:
-    // 1. Generate OAuth state token
-    // 2. Redirect to platform's OAuth authorization URL
-    // 3. Store state token in session/database
-    
+    // Generate OAuth state token
+    const state = generateOAuthState(clerkId, platform)
+
+    let redirectUrl: string
+
+    if (platform === 'linkedin') {
+      if (!LINKEDIN_CLIENT_ID) {
+        return NextResponse.json(
+          { error: 'LinkedIn OAuth not configured. Please set LINKEDIN_CLIENT_ID environment variable.' },
+          { status: 500 }
+        )
+      }
+
+      // LinkedIn OAuth 2.0 authorization URL
+      // Note: w_member_social scope requires "Share on LinkedIn" product approval
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: LINKEDIN_CLIENT_ID,
+        redirect_uri: LINKEDIN_REDIRECT_URI,
+        state,
+        scope: 'openid profile email w_member_social', // w_member_social requires "Share on LinkedIn" product
+      })
+
+      redirectUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`
+    } else if (platform === 'twitter') {
+      if (!TWITTER_CLIENT_ID) {
+        return NextResponse.json(
+          { error: 'Twitter/X OAuth not configured. Please set TWITTER_CLIENT_ID environment variable.' },
+          { status: 500 }
+        )
+      }
+
+      // Twitter OAuth 2.0 authorization URL
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: TWITTER_CLIENT_ID,
+        redirect_uri: TWITTER_REDIRECT_URI,
+        state,
+        scope: 'tweet.read tweet.write users.read offline.access', // Required scopes for posting
+        code_challenge: state, // Simplified PKCE (in production, use proper PKCE)
+        code_challenge_method: 'plain',
+      })
+
+      redirectUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`
+    } else {
+      return NextResponse.json(
+        { error: `Unsupported platform: ${platform}` },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json({
-      message: `OAuth flow for ${platform} not yet implemented`,
+      redirectUrl,
       platform,
-      // In production, return redirect URL:
-      // redirectUrl: `https://${platform}.com/oauth/authorize?...`
     })
   } catch (error) {
     console.error('Error initiating OAuth flow:', error)

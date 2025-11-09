@@ -148,22 +148,66 @@ export default function SettingsPage() {
   }
 
   // Fetch social connections on mount
-  useEffect(() => {
-    const fetchConnections = async () => {
-      try {
-        setIsLoadingConnections(true)
-        const response = await fetch('/api/social/connections')
-        if (response.ok) {
-          const connections: SocialConnection[] = await response.json()
-          setSocialConnections(connections)
-        }
-      } catch (error) {
-        console.error('Error fetching social connections:', error)
-      } finally {
-        setIsLoadingConnections(false)
+  const fetchConnections = async () => {
+    try {
+      setIsLoadingConnections(true)
+      const response = await fetch('/api/social/connections')
+      if (response.ok) {
+        const connections: SocialConnection[] = await response.json()
+        setSocialConnections(connections)
       }
+    } catch (error) {
+      console.error('Error fetching social connections:', error)
+    } finally {
+      setIsLoadingConnections(false)
+    }
+  }
+
+  // Check for OAuth callback messages in URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const connected = searchParams.get('connected')
+    const error = searchParams.get('error')
+
+    if (connected === 'true') {
+      toast.success('Account connected successfully!')
+      // Refresh connections list
+      fetchConnections()
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings')
     }
 
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        'oauth_not_configured': 'OAuth not configured. Please check environment variables.',
+        'invalid_state': 'Invalid OAuth state. Please try again.',
+        'token_exchange_failed': 'Failed to exchange authorization code. Please try again.',
+        'profile_fetch_failed': 'Failed to fetch profile. Please try again.',
+        'unauthorized_scope_error': 'LinkedIn app needs "Share on LinkedIn" product approval. See instructions below.',
+      }
+      const errorMsg = errorMessages[error] || `Connection failed: ${error}`
+      toast.error(errorMsg, {
+        duration: 10000, // Show longer for important errors
+      })
+      
+      // Show detailed message for scope errors
+      if (error === 'unauthorized_scope_error') {
+        console.error('LinkedIn Scope Error:', 'Your LinkedIn app needs to request access to "Share on LinkedIn" product.')
+        console.error('Steps:')
+        console.error('1. Go to https://www.linkedin.com/developers/')
+        console.error('2. Select your app')
+        console.error('3. Go to "Products" tab')
+        console.error('4. Request access to "Share on LinkedIn"')
+        console.error('5. Wait for approval (can take a few days)')
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [])
+
+  // Fetch social connections on mount
+  useEffect(() => {
     fetchConnections()
   }, [])
 
@@ -565,21 +609,23 @@ export default function SettingsPage() {
                     const response = await fetch(`/api/social/${platform}`, {
                       method: 'POST',
                     })
+                    const data = await response.json()
+                    
                     if (response.ok) {
-                      const data = await response.json()
                       if (data.redirectUrl) {
                         // Redirect to OAuth URL
                         window.location.href = data.redirectUrl
                       } else {
-                        toast.info('OAuth flow not yet implemented')
+                        toast.error('OAuth flow not configured. Please check server logs.')
                       }
                     } else {
-                      const error = await response.json()
-                      toast.error(error.error || 'Failed to connect')
+                      // Show the actual error from the API
+                      console.error(`OAuth error for ${platform}:`, data)
+                      toast.error(data.error || `Failed to connect ${platform}. Please check that OAuth credentials are configured.`)
                     }
                   } catch (error) {
                     console.error('Error connecting platform:', error)
-                    toast.error('Failed to connect')
+                    toast.error(`Failed to connect ${platform}. Check console for details.`)
                   }
                 }
 

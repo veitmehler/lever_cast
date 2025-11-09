@@ -5,6 +5,7 @@ const isPublicRoute = createRouteMatcher([
   '/',                    // Landing page
   '/sign-in(.*)',        // Sign-in and all sub-routes
   '/sign-up(.*)',        // Sign-up and all sub-routes
+  '/api/posts/publish-scheduled', // Cron endpoint (protected by CRON_SECRET in production)
 ])
 
 export default clerkMiddleware(async (auth, request) => {

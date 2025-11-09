@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
-import { generateContent, publishToPlatform, GeneratedContent } from '@/lib/mockAI'
+import { generateContent, GeneratedContent } from '@/lib/mockAI'
 import { ApiKeyRequiredModal } from '@/components/ApiKeyRequiredModal'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
@@ -282,7 +282,11 @@ export default function DashboardPage() {
 
         if (!summaryResponse.ok) {
           const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || 'Failed to schedule summary post')
+          console.error('[Dashboard] Failed to schedule summary post:', errorData)
+          const errorMessage = errorData.details
+            ? `${errorData.error || 'Failed to schedule summary post'}: ${errorData.details}`
+            : errorData.error || 'Failed to schedule summary post'
+          throw new Error(errorMessage)
         }
 
         const summaryPost = await summaryResponse.json()
@@ -412,12 +416,33 @@ export default function DashboardPage() {
         }
       }
 
-      // Simulate publishing (in real app, this would call social media APIs)
-      // For threads, publishToPlatform will be called for each tweet
-      const contentToPublish = Array.isArray(content) ? content : [content]
-      const result = await publishToPlatform(platform, contentToPublish[0])
+      // Publish to social media via API
+      const publishResponse = await fetch('/api/posts/publish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform,
+          content: Array.isArray(content) ? content : content,
+          draftId: draftId || null,
+          imageUrl: attachedImage || undefined,
+        }),
+      })
+
+      if (!publishResponse.ok) {
+        const errorData = await publishResponse.json().catch(() => ({ error: 'Unknown error' }))
+        const errorMessage = errorData.details
+          ? `${errorData.error || 'Failed to publish'}: ${errorData.details}`
+          : errorData.error || 'Failed to publish'
+        throw new Error(errorMessage)
+      }
+
+      const publishResult = await publishResponse.json()
+      const postUrl = Array.isArray(publishResult.postUrl) ? publishResult.postUrl[0] : publishResult.postUrl
+      const tweetIds = publishResult.tweetIds || (publishResult.tweetId ? [publishResult.tweetId] : [])
       
-      if (result.success) {
+      if (publishResult.success) {
         // Create post record(s) in the database
         // For threads, publish summary first, then replies
         if (Array.isArray(content)) {
@@ -433,6 +458,8 @@ export default function DashboardPage() {
               platform,
               content: content[0], // Summary post
               status: 'published',
+              postUrl: Array.isArray(publishResult.postUrl) ? publishResult.postUrl[0] : publishResult.postUrl,
+              tweetId: tweetIds[0] || null,
             }),
           })
 
@@ -455,7 +482,7 @@ export default function DashboardPage() {
 
           // Step 2: Publish the replies (index > 0) as replies to the summary post
           if (content.length > 1) {
-            const replyPromises = content.slice(1).map((tweet) =>
+            const replyPromises = content.slice(1).map((tweet, index) =>
               fetch('/api/posts', {
                 method: 'POST',
                 headers: {
@@ -467,6 +494,10 @@ export default function DashboardPage() {
                   content: tweet,
                   status: 'published',
                   parentPostId: summaryPostId, // Link to summary post
+                  postUrl: Array.isArray(publishResult.postUrl) && publishResult.postUrl[index + 1] 
+                    ? publishResult.postUrl[index + 1] 
+                    : null,
+                  tweetId: tweetIds[index + 1] || null,
                 }),
               })
             )
@@ -495,6 +526,8 @@ export default function DashboardPage() {
               platform,
               content,
               status: 'published',
+              postUrl: postUrl || null,
+              tweetId: tweetIds[0] || null,
             }),
           })
 
@@ -522,9 +555,12 @@ export default function DashboardPage() {
           }
         }
 
-        toast.success(result.message, {
+        toast.success(publishResult.message || `Post successfully published to ${platform}!`, {
           description: `Your ${platform} post is now live!`,
         })
+      } else {
+        // Publishing failed
+        throw new Error(publishResult.error || 'Failed to publish post')
       }
     } catch (error) {
       console.error('Error publishing:', error)

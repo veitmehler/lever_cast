@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { encrypt } from '@/lib/encryption'
+import { verifyOAuthState } from '@/lib/oauth'
 
 // Valid platform names
 const VALID_PLATFORMS = ['linkedin', 'twitter']
+
+// OAuth configuration
+const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID
+const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET
+const LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
+
+const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID
+const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET
+const TWITTER_REDIRECT_URI = process.env.TWITTER_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/twitter/callback`
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -90,21 +102,138 @@ export async function GET(
       )
     }
 
-    // TODO: Implement OAuth token exchange
-    // For now, return a placeholder response
-    // In production, this would:
-    // 1. Verify state token matches stored value
-    // 2. Exchange authorization code for access token
-    // 3. Fetch user profile from platform API
-    // 4. Store encrypted tokens in database
-    
+    // Verify state token
+    if (!verifyOAuthState(state, clerkId, platform)) {
+      return NextResponse.redirect(
+        new URL('/settings?error=invalid_state', request.url)
+      )
+    }
+
     const user = await getOrCreateUser(clerkId)
 
-    // Placeholder: In production, use real OAuth tokens
-    const accessToken = 'placeholder_access_token'
-    const refreshToken = 'placeholder_refresh_token'
-    const platformUserId = 'placeholder_user_id'
-    const platformUsername = 'placeholder_username'
+    let accessToken: string
+    let refreshToken: string | null = null
+    let tokenExpiry: Date | null = null
+    let platformUserId: string
+    let platformUsername: string
+
+    // Exchange authorization code for access token
+    if (platform === 'linkedin') {
+      if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
+        return NextResponse.redirect(
+          new URL('/settings?error=oauth_not_configured', request.url)
+        )
+      }
+
+      // Exchange code for token
+      const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: LINKEDIN_REDIRECT_URI,
+          client_id: LINKEDIN_CLIENT_ID,
+          client_secret: LINKEDIN_CLIENT_SECRET,
+        }),
+      })
+
+      if (!tokenResponse.ok) {
+        const error = await tokenResponse.json().catch(() => ({ error_description: 'Unknown error' }))
+        console.error('LinkedIn token exchange error:', error)
+        return NextResponse.redirect(
+          new URL(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`, request.url)
+        )
+      }
+
+      const tokenData = await tokenResponse.json()
+      accessToken = tokenData.access_token
+      refreshToken = tokenData.refresh_token || null
+      tokenExpiry = tokenData.expires_in 
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null
+
+      // Fetch user profile
+      const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      })
+
+      if (!profileResponse.ok) {
+        return NextResponse.redirect(
+          new URL('/settings?error=profile_fetch_failed', request.url)
+        )
+      }
+
+      const profile = await profileResponse.json()
+      platformUserId = profile.sub
+      platformUsername = profile.name || profile.email || 'LinkedIn User'
+
+    } else if (platform === 'twitter') {
+      if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
+        return NextResponse.redirect(
+          new URL('/settings?error=oauth_not_configured', request.url)
+        )
+      }
+
+      // Exchange code for token (Twitter uses Basic Auth)
+      const basicAuth = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64')
+      
+      const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: TWITTER_REDIRECT_URI,
+          code_verifier: state, // Simplified PKCE (should use proper PKCE in production)
+        }),
+      })
+
+      if (!tokenResponse.ok) {
+        const error = await tokenResponse.json().catch(() => ({ error_description: 'Unknown error' }))
+        console.error('Twitter token exchange error:', error)
+        return NextResponse.redirect(
+          new URL(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`, request.url)
+        )
+      }
+
+      const tokenData = await tokenResponse.json()
+      accessToken = tokenData.access_token
+      refreshToken = tokenData.refresh_token || null
+      tokenExpiry = tokenData.expires_in 
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null
+
+      // Fetch user profile
+      const profileResponse = await fetch('https://api.twitter.com/2/users/me?user.fields=username,name', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      })
+
+      if (!profileResponse.ok) {
+        return NextResponse.redirect(
+          new URL('/settings?error=profile_fetch_failed', request.url)
+        )
+      }
+
+      const profile = await profileResponse.json()
+      platformUserId = profile.data.id
+      platformUsername = profile.data.username || profile.data.name || 'Twitter User'
+
+    } else {
+      return NextResponse.json(
+        { error: `Unsupported platform: ${platform}` },
+        { status: 400 }
+      )
+    }
 
     // Check if connection already exists
     const existingConnection = await prisma.socialConnection.findUnique({
@@ -123,6 +252,7 @@ export async function GET(
         data: {
           accessToken: encrypt(accessToken),
           refreshToken: refreshToken ? encrypt(refreshToken) : null,
+          tokenExpiry: tokenExpiry,
           platformUserId,
           platformUsername,
           isActive: true,
@@ -137,6 +267,7 @@ export async function GET(
           platform,
           accessToken: encrypt(accessToken),
           refreshToken: refreshToken ? encrypt(refreshToken) : null,
+          tokenExpiry: tokenExpiry,
           platformUserId,
           platformUsername,
           isActive: true,

@@ -123,6 +123,7 @@ export async function POST(request: Request) {
       platform,
       content,
       postUrl,
+      tweetId,
       status = 'published',
       scheduledAt,
       errorMsg,
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
         platform,
         content,
         postUrl: postUrl || null,
+        tweetId: tweetId || null,
         status: finalStatus,
         publishedAt: finalPublishedAt,
         scheduledAt: finalScheduledAt,
@@ -244,10 +246,18 @@ export async function POST(request: Request) {
 
     return NextResponse.json(post, { status: 201 })
   } catch (error) {
-    console.error('Error creating post:', error)
-    console.error('Error details:', {
+    console.error('[Posts API] Error creating post:', error)
+    console.error('[Posts API] Error details:', {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      body: {
+        draftId,
+        platform,
+        hasContent: !!content,
+        scheduledAt,
+        parentPostId,
+        tweetId,
+      },
     })
     return NextResponse.json(
       { 

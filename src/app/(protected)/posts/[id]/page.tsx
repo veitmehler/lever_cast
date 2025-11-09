@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs'
 import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformPreview } from '@/components/PlatformPreview'
-import { generateContent, publishToPlatform } from '@/lib/mockAI'
+import { generateContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
 
 // Draft type matching database schema
@@ -278,12 +278,32 @@ export default function PostDetailPage({
         return
       }
 
-      // Simulate publishing (in real app, this would call social media APIs)
-      // For threads, publishToPlatform will be called for each tweet
-      const contentToPublish = Array.isArray(content) ? content : [content]
-      const result = await publishToPlatform(platform, contentToPublish[0])
+      // Publish to social media via API
+      const publishResponse = await fetch('/api/posts/publish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform,
+          content: Array.isArray(content) ? content : content,
+          draftId: id,
+          imageUrl: post?.attachedImage || undefined,
+        }),
+      })
+
+      if (!publishResponse.ok) {
+        const errorData = await publishResponse.json().catch(() => ({ error: 'Unknown error' }))
+        const errorMessage = errorData.details
+          ? `${errorData.error || 'Failed to publish'}: ${errorData.details}`
+          : errorData.error || 'Failed to publish'
+        throw new Error(errorMessage)
+      }
+
+      const publishResult = await publishResponse.json()
+      const postUrl = Array.isArray(publishResult.postUrl) ? publishResult.postUrl[0] : publishResult.postUrl
       
-      if (result.success) {
+      if (publishResult.success) {
         // Create post record(s) in the database
         // For threads, publish summary first, then replies
         if (Array.isArray(content)) {

@@ -98,7 +98,6 @@ export async function postToTwitter(
 
     // Check if token is expired and try to refresh
     let accessToken = connection.accessToken
-    let shouldRefresh = false
     
     if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
       console.log(`[Twitter API] Token expired, checking for refresh token...`)
@@ -134,7 +133,7 @@ export async function postToTwitter(
         return { success: false, error: 'Twitter/X access token expired. Please reconnect your account.' }
       }
     }
-    const tweetData: any = {
+    const tweetData: { text: string; reply?: { in_reply_to_tweet_id: string } } = {
       text: content,
     }
 
@@ -175,9 +174,9 @@ export async function postToTwitter(
 
     if (!postResponse.ok) {
       const errorText = await postResponse.text()
-      let error: any
+      let error: { detail?: string; title?: string; message?: string }
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as { detail?: string; title?: string; message?: string }
       } catch {
         error = { detail: errorText || 'Unknown error' }
       }
@@ -198,14 +197,90 @@ export async function postToTwitter(
       if (postResponse.status === 429) {
         // Extract reset time from headers
         const rateLimitReset = postResponse.headers.get('x-rate-limit-reset')
+        const rateLimitRemaining = postResponse.headers.get('x-rate-limit-remaining')
+        const rateLimitLimit = postResponse.headers.get('x-rate-limit-limit')
         const resetTime = rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000) : null
         const minutesUntilReset = resetTime ? Math.ceil((resetTime.getTime() - Date.now()) / 60000) : null
         
-        if (minutesUntilReset !== null) {
-          errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}.`
-        } else {
-          errorMessage = `Rate limit exceeded. Twitter allows 300 tweets per 3-hour window. Please wait before trying again.`
+        // Determine which rate limit window based on remaining count and reset time
+        const hoursUntilReset = resetTime ? (resetTime.getTime() - Date.now()) / (1000 * 60 * 60) : null
+        const remaining = rateLimitRemaining ? parseInt(rateLimitRemaining) : null
+        
+        // Better detection: Use remaining count to identify which limit is hit
+        // 24-hour limit (Free plan): 17 tweets max, so remaining will be 0-17
+        // 24-hour limit (Basic plan): 100 tweets max, so remaining will be 0-100
+        // 15-minute limit: Usually 100 tweets, so remaining will be 0-100
+        // 3-hour limit: Usually 300 tweets, so remaining will be 0-300
+        let is24HourLimit = false
+        let is15MinLimit = false
+        let is3HourLimit = false
+        
+        if (remaining !== null) {
+          // If remaining is very high (like 1079998), it's likely the 3-hour window limit
+          // But if we're getting 429, we've hit SOME limit, so check reset time
+          if (remaining > 1000) {
+            // High remaining but 429 error suggests a different limit window
+            // Check reset time to determine
+            if (hoursUntilReset !== null && hoursUntilReset >= 20) {
+              is24HourLimit = true // 24-hour limit resets in 20+ hours
+            } else if (hoursUntilReset !== null && hoursUntilReset >= 1 && hoursUntilReset < 4) {
+              is3HourLimit = true // 3-hour limit resets in 1-4 hours
+            }
+          }
+          // If remaining is 0-17, it's likely the 24-hour Free plan limit
+          else if (remaining <= 17) {
+            is24HourLimit = true
+          }
+          // If remaining is 0-100 and reset is in 20+ hours, it's likely the 24-hour Basic plan limit
+          else if (remaining <= 100 && hoursUntilReset !== null && hoursUntilReset >= 20) {
+            is24HourLimit = true
+          }
+          // If reset is very soon (< 1 hour) and remaining is low, it's likely the 15-minute limit
+          else if (hoursUntilReset !== null && hoursUntilReset < 1 && remaining <= 100) {
+            is15MinLimit = true
+          }
+          // If reset is in 1-4 hours, it's likely the 3-hour limit
+          else if (hoursUntilReset !== null && hoursUntilReset >= 1 && hoursUntilReset < 4) {
+            is3HourLimit = true
+          }
+          // Default: if reset is soon but remaining is high, assume 24-hour limit
+          else if (hoursUntilReset !== null && hoursUntilReset < 24) {
+            is24HourLimit = true
+          }
         }
+        
+        if (minutesUntilReset !== null) {
+          if (is24HourLimit) {
+            const hours = Math.floor(hoursUntilReset || 0)
+            const minutes = Math.floor(((hoursUntilReset || 0) - hours) * 60)
+            if (hours > 0) {
+              errorMessage = `Rate limit exceeded (24-hour window). Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 17 tweets per 24 hours (Free plan) or 100 tweets per 24 hours (Basic plan).`
+            } else {
+              errorMessage = `Rate limit exceeded (24-hour window). Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 17 tweets per 24 hours (Free plan) or 100 tweets per 24 hours (Basic plan).`
+            }
+          } else if (is3HourLimit) {
+            const hours = Math.floor(hoursUntilReset || 0)
+            const minutes = Math.floor(((hoursUntilReset || 0) - hours) * 60)
+            errorMessage = `Rate limit exceeded (3-hour window). Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 300 tweets per 3-hour window.`
+          } else if (is15MinLimit) {
+            errorMessage = `Rate limit exceeded (15-minute window). Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 100 tweets per 15 minutes (Pro plan) or fewer on Basic/Free plans.`
+          } else {
+            errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}.`
+          }
+        } else {
+          errorMessage = `Rate limit exceeded. Twitter API rate limits: 100 tweets per 15 minutes (Pro), 100 tweets per 24 hours (Basic), or 17 tweets per 24 hours (Free). Please wait before trying again.`
+        }
+        
+        console.log(`[Twitter API] Rate limit details:`, {
+          remaining: rateLimitRemaining,
+          limit: rateLimitLimit,
+          reset: resetTime?.toISOString(),
+          minutesUntilReset,
+          hoursUntilReset,
+          is15MinLimit,
+          is3HourLimit,
+          is24HourLimit,
+        })
       } else if (postResponse.status === 401) {
         // If we get 401, try refreshing token once more (in case token expired between check and request)
         if (connection.refreshToken) {

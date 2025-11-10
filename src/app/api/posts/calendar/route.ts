@@ -94,7 +94,16 @@ export async function GET(request: Request) {
     })
 
     // Group posts by date
-    const postsByDate: Record<string, any[]> = {}
+    const postsByDate: Record<string, Array<{
+      id: string
+      platform: string
+      status: string
+      content: string
+      publishedAt: Date | null
+      scheduledAt: Date | null
+      draftId: string | null
+      draft: { title: string } | null
+    }>> = {}
 
     posts.forEach((post) => {
       // Use scheduledAt for scheduled posts, publishedAt for published posts

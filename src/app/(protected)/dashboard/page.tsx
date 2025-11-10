@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
+import { ScheduleModal } from '@/components/ScheduleModal'
 import { generateContent, GeneratedContent } from '@/lib/mockAI'
 import { ApiKeyRequiredModal } from '@/components/ApiKeyRequiredModal'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, Send, Calendar } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -21,6 +22,9 @@ export default function DashboardPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [apiKeyErrorReason, setApiKeyErrorReason] = useState<'no_key' | 'api_error'>('no_key')
+  const [isBulkPublishing, setIsBulkPublishing] = useState(false)
+  const [isBulkScheduling, setIsBulkScheduling] = useState(false)
+  const [showBulkScheduleModal, setShowBulkScheduleModal] = useState(false)
   
   // Get user display info
   const userName = user?.fullName || user?.firstName || 'User'
@@ -277,6 +281,7 @@ export default function DashboardPage() {
             content: content[0], // Summary post
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
+            threadOrder: 0, // Summary post is always order 0
           }),
         })
 
@@ -294,7 +299,7 @@ export default function DashboardPage() {
 
         // Step 2: Schedule the replies (index > 0) as replies to the summary post
         if (content.length > 1) {
-          const replyPromises = content.slice(1).map((tweet) =>
+          const replyPromises = content.slice(1).map((tweet, index) =>
             fetch('/api/posts', {
               method: 'POST',
               headers: {
@@ -307,6 +312,7 @@ export default function DashboardPage() {
                 status: 'scheduled',
                 scheduledAt: scheduledAt.toISOString(),
                 parentPostId: summaryPostId, // Link to summary post
+                threadOrder: index + 1, // Replies start at 1
               }),
             })
           )
@@ -460,6 +466,7 @@ export default function DashboardPage() {
               status: 'published',
               postUrl: Array.isArray(publishResult.postUrl) ? publishResult.postUrl[0] : publishResult.postUrl,
               tweetId: tweetIds[0] || null,
+              threadOrder: 0, // Summary post is always order 0
             }),
           })
 
@@ -494,6 +501,7 @@ export default function DashboardPage() {
                   content: tweet,
                   status: 'published',
                   parentPostId: summaryPostId, // Link to summary post
+                  threadOrder: index + 1, // Replies start at 1
                   postUrl: Array.isArray(publishResult.postUrl) && publishResult.postUrl[index + 1] 
                     ? publishResult.postUrl[index + 1] 
                     : null,
@@ -569,6 +577,83 @@ export default function DashboardPage() {
     }
   }
 
+  // Handle bulk publish all platforms
+  const handleBulkPublishAll = async () => {
+    if (!generatedContent) {
+      toast.error('No content to publish')
+      return
+    }
+
+    setIsBulkPublishing(true)
+    try {
+      const publishPromises: Promise<void>[] = []
+
+      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'both')) {
+        publishPromises.push(handlePublish('linkedin', generatedContent.linkedin))
+      }
+
+      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
+        const twitterContent = Array.isArray(generatedContent.twitter) 
+          ? generatedContent.twitter 
+          : generatedContent.twitter
+        publishPromises.push(handlePublish('twitter', twitterContent))
+      }
+
+      if (publishPromises.length === 0) {
+        toast.error('No platforms selected to publish')
+        return
+      }
+
+      await Promise.all(publishPromises)
+      toast.success('All posts published successfully!')
+    } catch (error) {
+      console.error('Error bulk publishing:', error)
+      toast.error('Failed to publish some posts')
+    } finally {
+      setIsBulkPublishing(false)
+    }
+  }
+
+  // Handle bulk schedule all platforms
+  const handleBulkScheduleAll = async (scheduledDate: Date) => {
+    if (!generatedContent) {
+      toast.error('No content to schedule')
+      return
+    }
+
+    setIsBulkScheduling(true)
+    try {
+      const schedulePromises: Promise<void>[] = []
+
+      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'both')) {
+        schedulePromises.push(handleSchedule('linkedin', generatedContent.linkedin, scheduledDate))
+      }
+
+      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
+        const twitterContent = Array.isArray(generatedContent.twitter) 
+          ? generatedContent.twitter 
+          : generatedContent.twitter
+        schedulePromises.push(handleSchedule('twitter', twitterContent, scheduledDate))
+      }
+
+      if (schedulePromises.length === 0) {
+        toast.error('No platforms selected to schedule')
+        return
+      }
+
+      await Promise.all(schedulePromises)
+      toast.success('All posts scheduled successfully!', {
+        description: `Scheduled for ${scheduledDate.toLocaleDateString()}`,
+      })
+      setShowBulkScheduleModal(false)
+    } catch (error) {
+      console.error('Error bulk scheduling:', error)
+      toast.error('Failed to schedule some posts')
+    } finally {
+      setIsBulkScheduling(false)
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
@@ -601,13 +686,49 @@ export default function DashboardPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-foreground">Your Generated Posts</h2>
-            <Button
-              onClick={handleSaveDraft}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {currentDraftId ? 'Update Draft' : 'Save to Drafts'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkScheduleModal(true)}
+                disabled={isBulkScheduling}
+              >
+                {isBulkScheduling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Schedule All
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleBulkPublishAll}
+                disabled={isBulkPublishing}
+              >
+                {isBulkPublishing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Publish All Now
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleSaveDraft}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {currentDraftId ? 'Update Draft' : 'Save to Drafts'}
+              </Button>
+            </div>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             {generatedContent.linkedin && (
@@ -639,6 +760,23 @@ export default function DashboardPage() {
               />
             )}
           </div>
+          
+          {/* Bulk Schedule Modal */}
+          {showBulkScheduleModal && (
+            <ScheduleModal
+              isOpen={showBulkScheduleModal}
+              onClose={() => setShowBulkScheduleModal(false)}
+              onSchedule={handleBulkScheduleAll}
+              platform={selectedPlatform === 'both' ? 'linkedin' : selectedPlatform}
+              content={
+                selectedPlatform === 'both' 
+                  ? `${generatedContent.linkedin || ''}\n\n${Array.isArray(generatedContent.twitter) ? generatedContent.twitter.join('\n\n') : generatedContent.twitter || ''}`
+                  : selectedPlatform === 'linkedin'
+                    ? generatedContent.linkedin || ''
+                    : Array.isArray(generatedContent.twitter) ? generatedContent.twitter.join('\n\n') : generatedContent.twitter || ''
+              }
+            />
+          )}
         </div>
       )}
 

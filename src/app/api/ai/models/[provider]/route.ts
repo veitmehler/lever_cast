@@ -143,20 +143,20 @@ export async function GET(
           })
 
           if (response.ok) {
-            const data = await response.json()
+            const data = await response.json() as { data: Array<{ id: string; name?: string }> }
             models = data.data
-              .filter((model: any) => 
+              .filter((model: { id: string; name?: string }) => 
                 model.id && 
                 (model.id.includes('openai') || 
                  model.id.includes('anthropic') || 
                  model.id.includes('google') ||
                  model.id.includes('meta-llama'))
               )
-              .map((model: any) => ({
+              .map((model: { id: string; name?: string }) => ({
                 value: model.id,
                 label: model.name || model.id,
               }))
-              .sort((a: any, b: any) => a.label.localeCompare(b.label))
+              .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label))
           } else {
             // Fallback to common models if API fails
             models = [

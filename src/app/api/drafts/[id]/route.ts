@@ -81,7 +81,7 @@ export async function GET(
       try {
         const parsed = JSON.parse(twitterContent)
         if (Array.isArray(parsed)) {
-          twitterContent = parsed as any
+          twitterContent = parsed as string[]
         }
       } catch {
         // Keep as string if not valid JSON
@@ -170,6 +170,12 @@ export async function DELETE(
     if (!existingDraft) {
       return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     }
+
+    // Delete all associated posts first (including replies)
+    // This ensures we don't leave orphaned posts in the database
+    await prisma.post.deleteMany({
+      where: { draftId: id },
+    })
 
     // Delete the draft
     await prisma.draft.delete({

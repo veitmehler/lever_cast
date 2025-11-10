@@ -55,7 +55,14 @@ export async function GET(request: Request) {
     const user = await getOrCreateUser(userId)
 
     // Build where clause
-    const where: any = {
+    const where: {
+      userId: string
+      status?: string
+      OR?: Array<{
+        publishedAt?: { gte?: Date; lte?: Date }
+        scheduledAt?: { gte?: Date; lte?: Date }
+      }>
+    } = {
       userId: user.id,
     }
 
@@ -128,6 +135,7 @@ export async function POST(request: Request) {
       scheduledAt,
       errorMsg,
       parentPostId, // For Twitter threads: link to parent post
+      threadOrder, // For Twitter threads: 0 = summary, 1+ = replies
     } = body
 
     // Validate required fields
@@ -190,6 +198,7 @@ export async function POST(request: Request) {
         userId: user.id,
         draftId: draftId || null,
         parentPostId: parentPostId || null,
+        threadOrder: threadOrder !== undefined ? threadOrder : null,
         platform,
         content,
         postUrl: postUrl || null,

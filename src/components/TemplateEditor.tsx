@@ -187,10 +187,10 @@ What do you think?`
             <div className="rounded-lg border border-border bg-primary/10 p-4">
               <h4 className="text-sm font-semibold text-foreground mb-2">Template Variables</h4>
               <p className="text-xs text-muted-foreground mb-2">
-                Use these placeholders in your templates - they'll be replaced with AI-generated content:
+                Use these placeholders in your templates - they&apos;ll be replaced with AI-generated content:
               </p>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li><code className="text-primary bg-primary/20 px-1.5 py-0.5 rounded">{'{idea}'}</code> - The user's main idea/topic</li>
+                <li><code className="text-primary bg-primary/20 px-1.5 py-0.5 rounded">{'{idea}'}</code> - The user&apos;s main idea/topic</li>
                 <li><code className="text-primary bg-primary/20 px-1.5 py-0.5 rounded">{'{point1}'}</code> - First key point extracted from the idea</li>
                 <li><code className="text-primary bg-primary/20 px-1.5 py-0.5 rounded">{'{point2}'}</code> - Second key point extracted from the idea</li>
                 <li><code className="text-primary bg-primary/20 px-1.5 py-0.5 rounded">{'{point3}'}</code> - Third key point extracted from the idea</li>

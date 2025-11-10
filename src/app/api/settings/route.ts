@@ -120,7 +120,13 @@ export async function PATCH(request: NextRequest) {
     } else {
       console.log('Updating existing settings record')
       // Build update data object
-      const updateData: any = {
+      const updateData: {
+        lastLogin: Date
+        theme?: string
+        sidebarState?: string
+        defaultProvider?: string | null
+        defaultModel?: string | null
+      } = {
         lastLogin: new Date(),
       }
 

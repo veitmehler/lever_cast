@@ -178,6 +178,7 @@ export default function PostDetailPage({
             content: content[0], // Summary post
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
+            threadOrder: 0, // Summary post is always order 0
           }),
         })
 
@@ -191,7 +192,7 @@ export default function PostDetailPage({
 
         // Step 2: Schedule the replies (index > 0) as replies to the summary post
         if (content.length > 1) {
-          const replyPromises = content.slice(1).map((tweet) =>
+          const replyPromises = content.slice(1).map((tweet, index) =>
             fetch('/api/posts', {
               method: 'POST',
               headers: {
@@ -204,6 +205,7 @@ export default function PostDetailPage({
                 status: 'scheduled',
                 scheduledAt: scheduledAt.toISOString(),
                 parentPostId: summaryPostId, // Link to summary post
+                threadOrder: index + 1, // Replies start at 1
               }),
             })
           )
@@ -301,7 +303,6 @@ export default function PostDetailPage({
       }
 
       const publishResult = await publishResponse.json()
-      const postUrl = Array.isArray(publishResult.postUrl) ? publishResult.postUrl[0] : publishResult.postUrl
       
       if (publishResult.success) {
         // Create post record(s) in the database
@@ -319,6 +320,7 @@ export default function PostDetailPage({
               platform,
               content: content[0], // Summary post
               status: 'published',
+              threadOrder: 0, // Summary post is always order 0
             }),
           })
 
@@ -337,7 +339,7 @@ export default function PostDetailPage({
 
           // Step 2: Publish the replies (index > 0) as replies to the summary post
           if (content.length > 1) {
-            const replyPromises = content.slice(1).map((tweet) =>
+            const replyPromises = content.slice(1).map((tweet, index) =>
               fetch('/api/posts', {
                 method: 'POST',
                 headers: {
@@ -349,6 +351,7 @@ export default function PostDetailPage({
                   content: tweet,
                   status: 'published',
                   parentPostId: summaryPostId, // Link to summary post
+                  threadOrder: index + 1, // Replies start at 1
                 }),
               })
             )
@@ -723,7 +726,7 @@ export default function PostDetailPage({
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
         <h1 className="text-2xl font-bold text-foreground mb-2">Post not found</h1>
-        <p className="text-muted-foreground mb-6">The post you're looking for doesn't exist.</p>
+        <p className="text-muted-foreground mb-6">The post you&apos;re looking for doesn&apos;t exist.</p>
         <Link href="/posts">
           <Button variant="outline">Back to Posts</Button>
         </Link>

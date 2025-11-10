@@ -18,6 +18,7 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "scripts/**", // Ignore script files (they use require() which is fine for Node scripts)
     ],
   },
 ];

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FileText, Plus, Loader2 } from 'lucide-react'
+import { FileText, Plus, Loader2, Trash2, Send, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { ScheduleModal } from '@/components/ScheduleModal'
 
 type FilterStatus = 'all' | 'published' | 'draft' | 'scheduled'
 
@@ -37,6 +38,12 @@ export default function PostsPage() {
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedDrafts, setSelectedDrafts] = useState<Set<string>>(new Set())
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isScheduling, setIsScheduling] = useState(false)
+  const [showBulkScheduleModal, setShowBulkScheduleModal] = useState(false)
 
   // Fetch drafts from API
   const fetchDrafts = async () => {
@@ -87,6 +94,363 @@ export default function PostsPage() {
     return summaryPosts.some(post => post.status === 'scheduled')
   })
 
+  // Handle checkbox selection
+  const handleSelectDraft = (draftId: string, index: number, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const newSelected = new Set(selectedDrafts)
+
+    // Handle Shift+Click for range selection
+    if (event.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index)
+      const end = Math.max(lastSelectedIndex, index)
+      const draftsToSelect = filteredPosts.slice(start, end + 1)
+      draftsToSelect.forEach(d => newSelected.add(d.id))
+    } else {
+      // Toggle single selection
+      if (newSelected.has(draftId)) {
+        newSelected.delete(draftId)
+      } else {
+        newSelected.add(draftId)
+      }
+    }
+
+    setSelectedDrafts(newSelected)
+    setLastSelectedIndex(index)
+  }
+
+  // Handle select all
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedDrafts(new Set(filteredPosts.map(d => d.id)))
+    } else {
+      setSelectedDrafts(new Set())
+    }
+    setLastSelectedIndex(null)
+  }
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedDrafts.size === 0) {
+      toast.error('Please select at least one draft to delete')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedDrafts.size} draft(s)?`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const deletePromises = Array.from(selectedDrafts).map(draftId =>
+        fetch(`/api/drafts/${draftId}`, {
+          method: 'DELETE',
+        })
+      )
+
+      const results = await Promise.all(deletePromises)
+      const failed = results.filter(r => !r.ok)
+
+      if (failed.length > 0) {
+        toast.error(`Failed to delete ${failed.length} draft(s)`)
+      } else {
+        toast.success(`Successfully deleted ${selectedDrafts.size} draft(s)`)
+        setSelectedDrafts(new Set())
+        await fetchDrafts()
+      }
+    } catch (error) {
+      console.error('Error deleting drafts:', error)
+      toast.error('Failed to delete drafts')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Handle bulk publish
+  const handleBulkPublish = async () => {
+    if (selectedDrafts.size === 0) {
+      toast.error('Please select at least one draft to publish')
+      return
+    }
+
+    setIsPublishing(true)
+    try {
+      const publishPromises = Array.from(selectedDrafts).map(async (draftId) => {
+        // Fetch draft details
+        const draftResponse = await fetch(`/api/drafts/${draftId}`)
+        if (!draftResponse.ok) {
+          throw new Error(`Failed to fetch draft ${draftId}`)
+        }
+        const draft = await draftResponse.json()
+
+        // Determine platforms to publish
+        const platforms: ('linkedin' | 'twitter')[] = []
+        if (draft.platforms === 'both') {
+          platforms.push('linkedin', 'twitter')
+        } else if (draft.platforms === 'linkedin') {
+          platforms.push('linkedin')
+        } else if (draft.platforms === 'twitter') {
+          platforms.push('twitter')
+        }
+
+        // Publish to each platform
+        const platformPromises = platforms.map(async (platform) => {
+          const content = platform === 'linkedin' 
+            ? draft.linkedinContent 
+            : draft.twitterContent
+
+          if (!content) {
+            return { platform, success: false, error: 'No content for platform' }
+          }
+
+          // Parse Twitter content if it's a JSON string (thread)
+          let twitterContent: string | string[] = content
+          if (platform === 'twitter' && typeof content === 'string') {
+            try {
+              const parsed = JSON.parse(content)
+              if (Array.isArray(parsed)) {
+                twitterContent = parsed
+              }
+            } catch {
+              // Keep as string if not valid JSON
+            }
+          }
+
+          const publishResponse = await fetch('/api/posts/publish', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              platform,
+              content: twitterContent,
+              draftId: draft.id,
+              imageUrl: draft.attachedImage || undefined,
+            }),
+          })
+
+          if (!publishResponse.ok) {
+            const errorData = await publishResponse.json().catch(() => ({ error: 'Unknown error' }))
+            return { platform, success: false, error: errorData.error || 'Failed to publish' }
+          }
+
+          return { platform, success: true }
+        })
+
+        const results = await Promise.all(platformPromises)
+        return { draftId, results }
+      })
+
+      const allResults = await Promise.all(publishPromises)
+      const successCount = allResults.filter(r => 
+        r.results.every(p => p.success)
+      ).length
+      const partialCount = allResults.filter(r => 
+        r.results.some(p => p.success) && r.results.some(p => !p.success)
+      ).length
+      const failedCount = allResults.filter(r => 
+        r.results.every(p => !p.success)
+      ).length
+
+      if (successCount > 0) {
+        toast.success(`Successfully published ${successCount} draft(s)`)
+      }
+      if (partialCount > 0) {
+        toast.warning(`${partialCount} draft(s) partially published`)
+      }
+      if (failedCount > 0) {
+        toast.error(`Failed to publish ${failedCount} draft(s)`)
+      }
+
+      setSelectedDrafts(new Set())
+      await fetchDrafts()
+    } catch (error) {
+      console.error('Error publishing drafts:', error)
+      toast.error('Failed to publish drafts')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  // Handle bulk schedule
+  const handleBulkSchedule = async (scheduledAt: Date) => {
+    if (selectedDrafts.size === 0) {
+      toast.error('Please select at least one draft to schedule')
+      return
+    }
+
+    setIsScheduling(true)
+    try {
+      const schedulePromises = Array.from(selectedDrafts).map(async (draftId) => {
+        // Fetch draft details
+        const draftResponse = await fetch(`/api/drafts/${draftId}`)
+        if (!draftResponse.ok) {
+          throw new Error(`Failed to fetch draft ${draftId}`)
+        }
+        const draft = await draftResponse.json()
+
+        // Determine platforms to schedule
+        const platforms: ('linkedin' | 'twitter')[] = []
+        if (draft.platforms === 'both') {
+          platforms.push('linkedin', 'twitter')
+        } else if (draft.platforms === 'linkedin') {
+          platforms.push('linkedin')
+        } else if (draft.platforms === 'twitter') {
+          platforms.push('twitter')
+        }
+
+        // Schedule to each platform
+        const platformPromises = platforms.map(async (platform) => {
+          const content = platform === 'linkedin' 
+            ? draft.linkedinContent 
+            : draft.twitterContent
+
+          if (!content) {
+            return { platform, success: false, error: 'No content for platform' }
+          }
+
+          // Parse Twitter content if it's a JSON string (thread)
+          let twitterContent: string | string[] = content
+          if (platform === 'twitter' && typeof content === 'string') {
+            try {
+              const parsed = JSON.parse(content)
+              if (Array.isArray(parsed)) {
+                twitterContent = parsed
+              }
+            } catch {
+              // Keep as string if not valid JSON
+            }
+          }
+
+          // Handle Twitter threads
+          if (platform === 'twitter' && Array.isArray(twitterContent)) {
+            // Schedule summary post first
+            const summaryResponse = await fetch('/api/posts', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                platform: 'twitter',
+                content: twitterContent[0],
+                draftId: draft.id,
+                scheduledAt: scheduledAt.toISOString(),
+                status: 'scheduled',
+                threadOrder: 0,
+              }),
+            })
+
+            if (!summaryResponse.ok) {
+              const errorData = await summaryResponse.json().catch(() => ({ error: 'Unknown error' }))
+              return { platform, success: false, error: errorData.error || 'Failed to schedule summary post' }
+            }
+
+            const summaryPost = await summaryResponse.json()
+
+            // Schedule reply posts
+            const replyPromises = twitterContent.slice(1).map(async (replyContent, index) => {
+              const replyResponse = await fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  platform: 'twitter',
+                  content: replyContent,
+                  draftId: draft.id,
+                  parentPostId: summaryPost.id,
+                  scheduledAt: scheduledAt.toISOString(),
+                  status: 'scheduled',
+                  threadOrder: index + 1,
+                }),
+              })
+
+              if (!replyResponse.ok) {
+                const errorData = await replyResponse.json().catch(() => ({ error: 'Unknown error' }))
+                return { success: false, error: errorData.error || 'Failed to schedule reply' }
+              }
+
+              return { success: true }
+            })
+
+            const replyResults = await Promise.all(replyPromises)
+            const failedReplies = replyResults.filter(r => !r.success)
+            
+            if (failedReplies.length > 0) {
+              return { platform, success: false, error: `Failed to schedule ${failedReplies.length} reply post(s)` }
+            }
+
+            return { platform, success: true }
+          } else {
+            // Single post (LinkedIn or single Twitter post)
+            const scheduleResponse = await fetch('/api/posts', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                platform,
+                content: typeof twitterContent === 'string' ? twitterContent : twitterContent[0],
+                draftId: draft.id,
+                scheduledAt: scheduledAt.toISOString(),
+                status: 'scheduled',
+              }),
+            })
+
+            if (!scheduleResponse.ok) {
+              const errorData = await scheduleResponse.json().catch(() => ({ error: 'Unknown error' }))
+              return { platform, success: false, error: errorData.error || 'Failed to schedule' }
+            }
+
+            return { platform, success: true }
+          }
+        })
+
+        const results = await Promise.all(platformPromises)
+        return { draftId, results }
+      })
+
+      const allResults = await Promise.all(schedulePromises)
+      const successCount = allResults.filter(r => 
+        r.results.every(p => p.success)
+      ).length
+      const partialCount = allResults.filter(r => 
+        r.results.some(p => p.success) && r.results.some(p => !p.success)
+      ).length
+      const failedCount = allResults.filter(r => 
+        r.results.every(p => !p.success)
+      ).length
+
+      if (successCount > 0) {
+        toast.success(`Successfully scheduled ${successCount} draft(s)`, {
+          description: `Scheduled for ${scheduledAt.toLocaleDateString()}`,
+        })
+      }
+      if (partialCount > 0) {
+        toast.warning(`${partialCount} draft(s) partially scheduled`)
+      }
+      if (failedCount > 0) {
+        toast.error(`Failed to schedule ${failedCount} draft(s)`)
+      }
+
+      setSelectedDrafts(new Set())
+      setShowBulkScheduleModal(false)
+      await fetchDrafts()
+    } catch (error) {
+      console.error('Error scheduling drafts:', error)
+      toast.error('Failed to schedule drafts')
+    } finally {
+      setIsScheduling(false)
+    }
+  }
+
+  // Clear selection when filter changes
+  useEffect(() => {
+    setSelectedDrafts(new Set())
+    setLastSelectedIndex(null)
+  }, [filter])
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
@@ -104,6 +468,83 @@ export default function PostsPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Bulk Actions Bar - Only show in Drafts tab when items are selected */}
+      {filter === 'draft' && selectedDrafts.size > 0 && (
+        <div className="mb-4 p-4 rounded-lg border border-border bg-card flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-foreground">
+              {selectedDrafts.size} draft{selectedDrafts.size !== 1 ? 's' : ''} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedDrafts(new Set())
+                setLastSelectedIndex(null)
+              }}
+            >
+              Clear Selection
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkScheduleModal(true)}
+              disabled={isScheduling}
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Schedule Selected
+                </>
+              )}
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleBulkPublish}
+              disabled={isPublishing}
+            >
+              {isPublishing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Publish Selected
+                </>
+              )}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Selected
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6 border-b border-border">
@@ -125,7 +566,14 @@ export default function PostsPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Drafts ({drafts.filter(d => d.status === 'draft').length})
+          Drafts ({drafts.filter(d => {
+            // Only count summary posts (not replies) for filtering
+            const summaryPosts = d.posts?.filter(post => !post.parentPostId) || []
+            const hasScheduledSummaryPosts = summaryPosts.some(post => post.status === 'scheduled')
+            const hasPublishedSummaryPosts = summaryPosts.some(post => post.status === 'published')
+            // Match the same logic as filteredPosts for draft filter
+            return d.status === 'draft' && !hasScheduledSummaryPosts && !hasPublishedSummaryPosts
+          }).length})
         </button>
         <button
           onClick={() => setFilter('scheduled')}
@@ -159,10 +607,26 @@ export default function PostsPage() {
         </div>
       )}
 
+      {/* Select All Checkbox - Only show in Drafts tab */}
+      {!isLoading && filter === 'draft' && filteredPosts.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="select-all"
+            checked={selectedDrafts.size === filteredPosts.length && filteredPosts.length > 0}
+            onChange={handleSelectAll}
+            className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+          />
+          <label htmlFor="select-all" className="text-sm text-muted-foreground cursor-pointer">
+            Select all ({filteredPosts.length})
+          </label>
+        </div>
+      )}
+
       {/* Posts Grid */}
       {!isLoading && (
         <div className="grid gap-4 md:grid-cols-2">
-          {filteredPosts.map((draft) => {
+          {filteredPosts.map((draft, index) => {
             // Only show summary posts (not replies) in badges
             const summaryPosts = draft.posts?.filter(p => !p.parentPostId) || []
             const scheduledPosts = summaryPosts.filter(p => p.status === 'scheduled')
@@ -176,13 +640,26 @@ export default function PostsPage() {
                 }, null as Date | null)
               : null
 
+            const isSelected = selectedDrafts.has(draft.id)
+
             return (
-              <Link
+              <div
                 key={draft.id}
-                href={`/posts/${draft.id}`}
-                className="block rounded-lg border border-border bg-card p-6 hover:border-primary/50 transition-colors group"
+                className={`relative rounded-lg border ${
+                  isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card'
+                } p-6 hover:border-primary/50 transition-colors group`}
               >
-                <div className="flex items-start justify-between mb-3">
+                <Link
+                  href={`/posts/${draft.id}`}
+                  className="block"
+                  onClick={(e) => {
+                    // Prevent navigation if clicking on checkbox area
+                    if ((e.target as HTMLElement).closest('.checkbox-container')) {
+                      e.preventDefault()
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <FileText className="w-5 h-5 text-primary" />
                     <span className="text-xs font-medium text-muted-foreground uppercase">
@@ -223,21 +700,65 @@ export default function PostsPage() {
                       </div>
                     )}
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      draft.status === 'published' || publishedPosts.length > 0
-                        ? 'bg-primary/20 text-primary'
+                  <div className="flex items-center gap-2">
+                    {/* Checkbox - Only show in Drafts tab */}
+                    {filter === 'draft' && (
+                      <div
+                        className="checkbox-container"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            // Empty handler - state is controlled by onClick
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            
+                            // Handle Shift+Click for range selection first
+                            if (e.shiftKey && lastSelectedIndex !== null) {
+                              const start = Math.min(lastSelectedIndex, index)
+                              const end = Math.max(lastSelectedIndex, index)
+                              const draftsToSelect = filteredPosts.slice(start, end + 1)
+                              const rangeSelected = new Set(selectedDrafts)
+                              draftsToSelect.forEach(d => rangeSelected.add(d.id))
+                              setSelectedDrafts(rangeSelected)
+                              setLastSelectedIndex(index)
+                            } else {
+                              // Toggle single selection
+                              const newSelected = new Set(selectedDrafts)
+                              if (newSelected.has(draft.id)) {
+                                newSelected.delete(draft.id)
+                              } else {
+                                newSelected.add(draft.id)
+                              }
+                              setSelectedDrafts(newSelected)
+                              setLastSelectedIndex(index)
+                            }
+                          }}
+                          className="w-5 h-5 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                        />
+                      </div>
+                    )}
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        draft.status === 'published' || publishedPosts.length > 0
+                          ? 'bg-primary/20 text-primary'
+                          : scheduledPosts.length > 0
+                            ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
+                            : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {draft.status === 'published' || publishedPosts.length > 0
+                        ? 'Published'
                         : scheduledPosts.length > 0
-                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
-                          : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {draft.status === 'published' || publishedPosts.length > 0
-                      ? 'Published'
-                      : scheduledPosts.length > 0
-                        ? 'Scheduled'
-                        : draft.status}
-                  </span>
+                          ? 'Scheduled'
+                          : draft.status}
+                    </span>
+                  </div>
                 </div>
                 <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
                   {draft.title}
@@ -265,7 +786,8 @@ export default function PostsPage() {
                     </p>
                   )}
                 </div>
-              </Link>
+                </Link>
+              </div>
             )
           })}
         </div>
@@ -290,6 +812,17 @@ export default function PostsPage() {
             </Link>
           )}
         </div>
+      )}
+
+      {/* Bulk Schedule Modal */}
+      {showBulkScheduleModal && (
+        <ScheduleModal
+          isOpen={showBulkScheduleModal}
+          onClose={() => setShowBulkScheduleModal(false)}
+          onSchedule={handleBulkSchedule}
+          platform="linkedin" // Default platform, but handleBulkSchedule handles all platforms
+          content={`Scheduling ${selectedDrafts.size} draft(s)`}
+        />
       )}
     </div>
   )

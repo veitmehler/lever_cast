@@ -82,7 +82,7 @@ export async function GET() {
         try {
           const parsed = JSON.parse(twitterContent)
           if (Array.isArray(parsed)) {
-            twitterContent = parsed as any
+            twitterContent = parsed as string[]
           }
         } catch {
           // Keep as string if not valid JSON

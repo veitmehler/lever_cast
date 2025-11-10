@@ -41,8 +41,9 @@ export async function GET(request: Request) {
         scheduledAt: true,
         parentPostId: true,
         platform: true,
+        threadOrder: true,
       },
-      take: 10, // Limit to first 10 for debugging
+      take: 20, // Increase limit to see more posts
     })
     console.log(`[Publish Scheduled] Debug: Found ${allPastScheduled.length} posts with scheduledAt <= now (any status):`, 
       allPastScheduled.map(p => ({
@@ -51,11 +52,41 @@ export async function GET(request: Request) {
         scheduledAt: p.scheduledAt?.toISOString(),
         parentPostId: p.parentPostId,
         platform: p.platform,
+        threadOrder: p.threadOrder,
+        isSummary: p.threadOrder === 0 && !p.parentPostId,
+      }))
+    )
+    
+    // Also check specifically for summary posts
+    const summaryPosts = await prisma.post.findMany({
+      where: {
+        status: 'scheduled',
+        scheduledAt: {
+          lte: now,
+        },
+        threadOrder: 0,
+        parentPostId: null,
+        platform: 'twitter',
+      },
+      select: {
+        id: true,
+        status: true,
+        scheduledAt: true,
+        threadOrder: true,
+      },
+    })
+    console.log(`[Publish Scheduled] Debug: Found ${summaryPosts.length} summary posts (threadOrder=0, parentPostId=null) scheduled:`, 
+      summaryPosts.map(p => ({
+        id: p.id,
+        status: p.status,
+        scheduledAt: p.scheduledAt?.toISOString(),
+        threadOrder: p.threadOrder,
       }))
     )
     
     // Find all scheduled posts where scheduledAt <= now
-    const scheduledPosts = await prisma.post.findMany({
+    // Sort by scheduledAt first, then we'll sort by threadOrder in memory
+    const scheduledPostsRaw = await prisma.post.findMany({
       where: {
         status: 'scheduled',
         scheduledAt: {
@@ -81,8 +112,46 @@ export async function GET(request: Request) {
       },
     })
 
+    // Debug: Check if summary posts are in the raw results
+    const summaryPostsInRaw = scheduledPostsRaw.filter(p => p.threadOrder === 0 && !p.parentPostId)
+    console.log(`[Publish Scheduled] Debug: Found ${summaryPostsInRaw.length} summary posts in raw query results:`, 
+      summaryPostsInRaw.map(p => ({
+        id: p.id,
+        platform: p.platform,
+        threadOrder: p.threadOrder,
+        scheduledAt: p.scheduledAt?.toISOString(),
+        status: p.status,
+      }))
+    )
+
+    // Sort posts: threadOrder 0 (summary) first, then 1, 2, 3... (replies), then nulls last
+    // CRITICAL: Sort by threadOrder FIRST, regardless of scheduledAt time
+    // This ensures summary posts are always processed before replies, even if replies have earlier scheduledAt
+    const scheduledPosts = scheduledPostsRaw.sort((a, b) => {
+      // Handle null threadOrder (non-thread posts)
+      if (a.threadOrder === null && b.threadOrder === null) return 0
+      if (a.threadOrder === null) return 1 // nulls come last
+      if (b.threadOrder === null) return -1
+      
+      // Both have threadOrder - sort by threadOrder FIRST (0 comes before 1, 2, 3...)
+      const orderDiff = a.threadOrder - b.threadOrder
+      if (orderDiff !== 0) return orderDiff
+      
+      // If same threadOrder, then sort by scheduledAt
+      if (a.scheduledAt && b.scheduledAt) {
+        return a.scheduledAt.getTime() - b.scheduledAt.getTime()
+      }
+      return 0
+    })
+
     console.log(`[Publish Scheduled] Found ${scheduledPosts.length} scheduled post(s) due for publishing`)
-    
+    console.log(`[Publish Scheduled] Processing order:`, scheduledPosts.map(p => ({
+      id: p.id,
+      platform: p.platform,
+      threadOrder: p.threadOrder,
+      parentPostId: p.parentPostId,
+      scheduledAt: p.scheduledAt?.toISOString(),
+    })))
     if (scheduledPosts.length === 0) {
       return NextResponse.json({ 
         message: 'No scheduled posts due for publishing',
@@ -105,35 +174,44 @@ export async function GET(request: Request) {
         console.log(`[Publish Scheduled] Post details:`, {
           id: post.id,
           platform: post.platform,
+          threadOrder: post.threadOrder,
           hasParentPostId: !!post.parentPostId,
           parentPostId: post.parentPostId,
           status: post.status,
+          isThreadSummary: post.threadOrder === 0 && !post.parentPostId,
+          isSinglePost: post.threadOrder === null && !post.parentPostId,
         })
         
         // For Twitter threads, check if this is a reply (has parentPostId)
         // Replies should be published after the parent post is published
+        // Since we sort by threadOrder, parent (threadOrder=0) comes before replies (threadOrder=1+)
         if (post.parentPostId) {
-          console.log(`[Publish Scheduled] Post ${post.id} is a reply to ${post.parentPostId}`)
-          // Check if parent post is published
-          const parentPost = await prisma.post.findUnique({
-            where: { id: post.parentPostId },
-            select: { tweetId: true, status: true, id: true },
-          })
+          console.log(`[Publish Scheduled] Post ${post.id} is a reply (threadOrder: ${post.threadOrder}) to ${post.parentPostId}`)
           
-          console.log(`[Publish Scheduled] Parent post check result:`, {
-            found: !!parentPost,
-            parentId: parentPost?.id,
-            parentStatus: parentPost?.status,
-            parentTweetId: parentPost?.tweetId,
-          })
+          // Find the parent post - check if it was published in this batch first
+          const parentWasPublished = results.published.includes(post.parentPostId)
           
-          if (!parentPost || parentPost.status !== 'published') {
-            // Skip this reply - parent not published yet
-            // This ensures thread replies are published in order
-            console.log(`[Publish Scheduled] Skipping reply ${post.id} - parent ${post.parentPostId} not published yet (status: ${parentPost?.status || 'not found'})`)
-            continue
+          if (!parentWasPublished) {
+            // Parent not in this batch - check database
+            const parentPost = await prisma.post.findUnique({
+              where: { id: post.parentPostId },
+              select: { tweetId: true, status: true, id: true },
+            })
+            
+            if (!parentPost || parentPost.status !== 'published') {
+              console.log(`[Publish Scheduled] Skipping reply ${post.id} - parent ${post.parentPostId} not published yet (status: ${parentPost?.status || 'not found'})`)
+              continue
+            }
           }
+          
           console.log(`[Publish Scheduled] Parent post ${post.parentPostId} is published, proceeding with reply`)
+        } else {
+          // This is either a single post (threadOrder: null) or a thread summary (threadOrder: 0)
+          if (post.threadOrder === null) {
+            console.log(`[Publish Scheduled] Post ${post.id} is a single post (not a thread), proceeding to publish`)
+          } else {
+            console.log(`[Publish Scheduled] Post ${post.id} is a thread summary post (threadOrder: ${post.threadOrder}), proceeding to publish`)
+          }
         }
 
         // Publish to platform using real APIs
@@ -150,28 +228,41 @@ export async function GET(request: Request) {
           
           console.log(`[Publish Scheduled] Publishing Twitter post ${post.id} for user ${post.user.id}`)
           
-          // For Twitter threads, if this is a reply, get the parent post's tweet ID directly from database
+          // For Twitter threads, if this is a reply, get the parent post's tweet ID
           let replyToTweetId: string | undefined = undefined
           if (post.parentPostId) {
-            const parentPost = await prisma.post.findUnique({
-              where: { id: post.parentPostId },
-              select: { tweetId: true, status: true },
-            })
-
-            if (!parentPost || parentPost.status !== 'published') {
-              console.log(`[Publish Scheduled] Skipping reply ${post.id} - parent ${post.parentPostId} not published yet`)
-              continue
-            }
-
-            // Use tweetId directly from database (no URL parsing needed!)
-            if (parentPost?.tweetId) {
-              replyToTweetId = parentPost.tweetId
-              console.log(`[Publish Scheduled] Found parent tweet ID from database: ${replyToTweetId}`)
+            // Check if parent was published in this batch first
+            if (results.published.includes(post.parentPostId)) {
+              // Parent was published in this batch - get tweetId from database
+              const parentPost = await prisma.post.findUnique({
+                where: { id: post.parentPostId },
+                select: { tweetId: true },
+              })
               
-              // Add delay for replies to ensure parent tweet is processed (no verification needed)
-              await new Promise(resolve => setTimeout(resolve, 3000))
+              if (parentPost?.tweetId) {
+                replyToTweetId = parentPost.tweetId
+                console.log(`[Publish Scheduled] Found parent tweet ID from batch: ${replyToTweetId}`)
+              }
             } else {
-              console.warn(`[Publish Scheduled] Parent post ${post.parentPostId} has no tweetId`)
+              // Parent not in this batch - check database
+              const parentPost = await prisma.post.findUnique({
+                where: { id: post.parentPostId },
+                select: { tweetId: true, status: true },
+              })
+
+              if (!parentPost || parentPost.status !== 'published') {
+                console.log(`[Publish Scheduled] Skipping reply ${post.id} - parent ${post.parentPostId} not published yet`)
+                continue
+              }
+
+              if (parentPost?.tweetId) {
+                replyToTweetId = parentPost.tweetId
+                console.log(`[Publish Scheduled] Found parent tweet ID from database: ${replyToTweetId}`)
+                // Add delay for replies to ensure parent tweet is processed
+                await new Promise(resolve => setTimeout(resolve, 3000))
+              } else {
+                console.warn(`[Publish Scheduled] Parent post ${post.parentPostId} has no tweetId`)
+              }
             }
           }
 
@@ -252,10 +343,6 @@ export async function GET(request: Request) {
           const isRateLimit = publishResult.error?.toLowerCase().includes('rate limit')
           
           if (isRateLimit) {
-            // Extract reset time from error message if available
-            const resetMatch = publishResult.error?.match(/resets at ([^\.]+)/)
-            const resetTime = resetMatch ? new Date(resetMatch[1]) : null
-            
             // If we have a reset time, we could potentially reschedule, but for now just keep as scheduled
             // The cron job will retry every minute, and once the rate limit resets, it will succeed
             console.log(`[Publish Scheduled] Post ${post.id} rate limited, keeping as scheduled for retry`)

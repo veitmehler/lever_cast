@@ -49,7 +49,19 @@ export async function postToLinkedIn(
     const personUrn = `urn:li:person:${profile.sub}` // LinkedIn uses 'sub' as the person ID
 
     // Prepare the post content
-    const postData: any = {
+    const postData: {
+      author: string
+      lifecycleState: string
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: { text: string }
+          shareMediaCategory: string
+        }
+      }
+      visibility: {
+        'com.linkedin.ugc.MemberNetworkVisibility': string
+      }
+    } = {
       author: personUrn,
       lifecycleState: 'PUBLISHED',
       specificContent: {

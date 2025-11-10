@@ -61,6 +61,7 @@ model Post {
   userId      String
   draftId     String?   // Link back to the draft this was published from
   parentPostId String?  // For Twitter threads: link to the parent post (summary)
+  threadOrder Int?      // For Twitter threads: 0 = summary, 1+ = replies (order within thread)
   platform    String    // "linkedin" or "twitter"
   content     String    @db.Text // The actual content that was published
   publishedAt DateTime? // When the post was actually published (nullable for scheduled posts)
@@ -83,6 +84,7 @@ model Post {
   @@index([userId, scheduledAt, status]) // For calendar queries
   @@index([parentPostId]) // For thread queries
   @@index([tweetId]) // For quick tweet ID lookups
+  @@index([draftId, threadOrder]) // For thread ordering
   @@map("posts")
 }
 

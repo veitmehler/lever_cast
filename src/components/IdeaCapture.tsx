@@ -4,6 +4,57 @@ import { useState, useRef, useEffect } from 'react'
 import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+// TypeScript definitions for Web Speech API
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+  message?: string
+}
+
+interface SpeechRecognitionResultList {
+  length: number
+  item(index: number): SpeechRecognitionResult
+  [index: number]: SpeechRecognitionResult
+}
+
+interface SpeechRecognitionResult {
+  length: number
+  item(index: number): SpeechRecognitionAlternative
+  [index: number]: SpeechRecognitionAlternative
+  isFinal: boolean
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string
+  confidence: number
+}
+
+interface Window {
+  SpeechRecognition: {
+    new (): SpeechRecognition
+  }
+  webkitSpeechRecognition: {
+    new (): SpeechRecognition
+  }
+}
+
 // Template type matching database schema
 type Template = {
   id: string
@@ -39,6 +90,8 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const [recognitionError, setRecognitionError] = useState<string | null>(null)
 
   // Fetch templates from API
   const fetchTemplates = async () => {
@@ -107,6 +160,96 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
     fetchTemplates()
     // Default to "none" - no template selected
     setSelectedTemplate('none')
+
+    // Initialize Speech Recognition API
+    if (typeof window !== 'undefined') {
+      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      
+      if (SpeechRecognitionConstructor) {
+        const recognition = new SpeechRecognitionConstructor() as SpeechRecognition
+        recognition.continuous = true // Keep listening until stopped
+        recognition.interimResults = true // Show interim results
+        recognition.lang = 'en-US' // Set language
+
+        recognition.onstart = () => {
+          console.log('[Voice] Speech recognition started')
+          setRecognitionError(null)
+        }
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = ''
+          let finalTranscript = ''
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' '
+            } else {
+              interimTranscript += transcript
+            }
+          }
+
+          // Update content with final transcript
+          if (finalTranscript) {
+            setContent(prev => {
+              // Remove any previous interim text and add final transcript
+              const cleaned = prev.replace(interimTranscript, '').trim()
+              return cleaned + (cleaned ? ' ' : '') + finalTranscript.trim()
+            })
+          } else if (interimTranscript) {
+            // Show interim results (optional - can be removed if not desired)
+            // For now, we'll only add final results to avoid clutter
+          }
+        }
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('[Voice] Speech recognition error:', event.error)
+          setIsRecording(false)
+          
+          let errorMessage = 'Speech recognition error'
+          switch (event.error) {
+            case 'no-speech':
+              errorMessage = 'No speech detected. Please try again.'
+              break
+            case 'audio-capture':
+              errorMessage = 'No microphone found. Please check your microphone settings.'
+              break
+            case 'not-allowed':
+              errorMessage = 'Microphone permission denied. Please allow microphone access and try again.'
+              break
+            case 'network':
+              errorMessage = 'Network error. Please check your connection.'
+              break
+            case 'aborted':
+              // User stopped recording, not an error
+              return
+            default:
+              errorMessage = `Speech recognition error: ${event.error}`
+          }
+          setRecognitionError(errorMessage)
+        }
+
+        recognition.onend = () => {
+          console.log('[Voice] Speech recognition ended')
+          setIsRecording(false)
+        }
+
+        recognitionRef.current = recognition
+      } else {
+        setRecognitionError('Speech recognition is not supported in this browser. Please use Chrome or Edge.')
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+      }
+    }
   }, [])
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,14 +310,32 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   }
 
   const toggleRecording = () => {
-    setIsRecording(!isRecording)
-    // In a real implementation, this would start/stop actual recording
-    if (!isRecording) {
-      // Simulate recording for 2 seconds
-      setTimeout(() => {
+    if (!recognitionRef.current) {
+      setRecognitionError('Speech recognition is not available. Please use Chrome or Edge browser.')
+      return
+    }
+
+    if (isRecording) {
+      // Stop recording
+      try {
+        recognitionRef.current.stop()
         setIsRecording(false)
-        setContent(prev => prev + ' [Voice recording transcription would appear here]')
-      }, 2000)
+        setRecognitionError(null)
+      } catch (error) {
+        console.error('[Voice] Error stopping recognition:', error)
+        setIsRecording(false)
+      }
+    } else {
+      // Start recording
+      try {
+        setRecognitionError(null)
+        recognitionRef.current.start()
+        setIsRecording(true)
+      } catch (error) {
+        console.error('[Voice] Error starting recognition:', error)
+        setRecognitionError('Failed to start recording. Please try again.')
+        setIsRecording(false)
+      }
     }
   }
 
@@ -260,7 +421,14 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             <div className="w-1 h-4 bg-primary rounded animate-pulse" style={{ animationDelay: '300ms' }} />
             <div className="w-1 h-4 bg-primary rounded animate-pulse" style={{ animationDelay: '450ms' }} />
           </div>
-          <span className="text-sm font-medium text-foreground">Recording...</span>
+          <span className="text-sm font-medium text-foreground">Recording... Speak now</span>
+        </div>
+      )}
+
+      {/* Recognition Error */}
+      {recognitionError && (
+        <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+          <p className="text-sm text-destructive">{recognitionError}</p>
         </div>
       )}
 

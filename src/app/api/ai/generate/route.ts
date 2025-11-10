@@ -87,7 +87,7 @@ function cleanSingleTweet(tweet: string): string {
 }
 
 // Clean generated content - remove headers, analysis sections, and metadata
-function cleanGeneratedContent(content: string, platform: 'linkedin' | 'twitter'): string {
+function cleanGeneratedContent(content: string): string {
   if (!content) return ''
   
   let cleaned = content.trim()
@@ -238,8 +238,8 @@ First you will receive your context, then you will receive your task.`
     system: systemMessage,
   })
 
-  const textContent = response.content.find((block: any) => block.type === 'text')
-  return textContent?.text || ''
+  const textContent = response.content.find((block: { type: string; text?: string }) => block.type === 'text')
+  return (textContent as { text: string } | undefined)?.text || ''
 }
 
 // Generate content using Google Gemini
@@ -365,13 +365,13 @@ export async function POST(request: NextRequest) {
     if (settings.defaultModel) {
       try {
         defaultModels = JSON.parse(settings.defaultModel)
-      } catch (e) {
+      } catch {
         // Ignore parse errors
       }
     }
 
     // Get template if provided
-    let template: any = null
+    let template: { linkedinTemplate: string | null; twitterTemplate: string | null } | null = null
     if (templateId) {
       template = await prisma.template.findFirst({
         where: {
@@ -581,7 +581,7 @@ export async function POST(request: NextRequest) {
             } else {
               throw new Error('Invalid thread format')
             }
-          } catch (e) {
+          } catch {
             // If parsing fails, try to extract tweets from text
             const lines = generatedContent.split('\n').filter(line => {
               const trimmed = line.trim()
@@ -630,7 +630,7 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // SINGLE POST MODE: Store as plain string
-          generatedContent = cleanGeneratedContent(generatedContent, plat)
+          generatedContent = cleanGeneratedContent(generatedContent)
           
           // For Twitter, ensure it's under 280 characters
           if (plat === 'twitter' && generatedContent.length > 280) {

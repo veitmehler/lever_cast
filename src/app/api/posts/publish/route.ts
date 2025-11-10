@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { platform, content, draftId, imageUrl } = body
+    const { platform, content, imageUrl } = body
 
     if (!platform || !content) {
       return NextResponse.json(

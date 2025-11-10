@@ -68,8 +68,11 @@ model Post {
   scheduledAt DateTime? // When the post is scheduled to be published
   postUrl     String?   // URL to the published post (if available from API)
   tweetId     String?   // Twitter/X tweet ID (for replies and verification)
+  imageUrl    String?   // URL of image published with this post (Supabase Storage URL)
   status      String    @default("published") // published, scheduled, failed, deleted
   errorMsg    String?   // If publishing failed, store error
+  analyticsLastSyncedAt DateTime? // When analytics were last fetched
+  analyticsData Json?   // Store analytics as JSON (platform-specific structure)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

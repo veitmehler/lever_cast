@@ -6,8 +6,10 @@
 import { getSocialConnection } from './socialConnections'
 import { encrypt } from './encryption'
 import { prisma } from './prisma'
+import { downloadImageFromStorage } from './supabase'
 
 const TWITTER_API_BASE = 'https://api.twitter.com/2'
+const TWITTER_API_V1_BASE = 'https://api.twitter.com/1.1'
 
 interface TwitterPostResponse {
   data: {
@@ -76,12 +78,105 @@ export async function verifyTweetExists(
 }
 
 /**
+ * Upload an image to Twitter/X
+ * @param userId - User ID
+ * @param imageUrl - Supabase Storage URL of the image
+ * @returns Media ID string for use in tweet
+ */
+export async function uploadImageToTwitter(
+  userId: string,
+  imageUrl: string
+): Promise<string> {
+  try {
+    console.log(`[Twitter API] Uploading image for user ${userId}`)
+    
+    // Get Twitter connection
+    const connection = await getSocialConnection(userId, 'twitter')
+    if (!connection) {
+      throw new Error('Twitter/X account not connected')
+    }
+
+    // Check if token is expired and refresh if needed
+    let accessToken = connection.accessToken
+    
+    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+      if (connection.refreshToken) {
+        const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
+        if (refreshResult) {
+          accessToken = refreshResult.accessToken
+          const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
+          
+          await prisma.socialConnection.update({
+            where: {
+              userId_platform: {
+                userId,
+                platform: 'twitter',
+              },
+            },
+            data: {
+              accessToken: encrypt(refreshResult.accessToken),
+              refreshToken: refreshResult.refreshToken ? encrypt(refreshResult.refreshToken) : undefined,
+              tokenExpiry: newExpiry,
+            },
+          })
+        } else {
+          throw new Error('Twitter/X access token expired and refresh failed')
+        }
+      } else {
+        throw new Error('Twitter/X access token expired')
+      }
+    }
+
+    // Download image from Supabase Storage
+    const imageBuffer = await downloadImageFromStorage(imageUrl)
+    
+    // Upload to Twitter using v1.1 media/upload endpoint
+    // Twitter requires multipart/form-data with the image as binary data
+    const formData = new FormData()
+    const blob = new Blob([imageBuffer])
+    formData.append('media', blob)
+
+    const uploadResponse = await fetch(`${TWITTER_API_V1_BASE}/media/upload.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        // Don't set Content-Type header - let fetch set it with boundary for multipart/form-data
+      },
+      body: formData,
+    })
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
+      console.error('[Twitter API] Image upload failed:', {
+        status: uploadResponse.status,
+        error: errorText,
+      })
+      throw new Error(`Failed to upload image: ${uploadResponse.status} ${uploadResponse.statusText}`)
+    }
+
+    const uploadResult = await uploadResponse.json()
+    const mediaId = uploadResult.media_id_string || uploadResult.media_id
+    
+    if (!mediaId) {
+      throw new Error('Twitter API did not return media ID')
+    }
+
+    console.log(`[Twitter API] Image uploaded successfully, media_id: ${mediaId}`)
+    return mediaId
+  } catch (error) {
+    console.error('[Twitter API] Error uploading image:', error)
+    throw error
+  }
+}
+
+/**
  * Post a single tweet to Twitter/X
  */
 export async function postToTwitter(
   userId: string,
   content: string,
-  replyToTweetId?: string
+  replyToTweetId?: string,
+  imageUrl?: string
 ): Promise<{ success: true; postUrl: string; tweetId: string } | { success: false; error: string }> {
   try {
     console.log(`[Twitter API] Posting tweet for user ${userId}, replyTo: ${replyToTweetId || 'none'}`)
@@ -133,7 +228,22 @@ export async function postToTwitter(
         return { success: false, error: 'Twitter/X access token expired. Please reconnect your account.' }
       }
     }
-    const tweetData: { text: string; reply?: { in_reply_to_tweet_id: string } } = {
+    // Upload image if provided
+    let mediaId: string | undefined
+    if (imageUrl) {
+      try {
+        mediaId = await uploadImageToTwitter(userId, imageUrl)
+      } catch (error) {
+        console.error('[Twitter API] Failed to upload image, falling back to text-only post:', error)
+        // Continue with text-only post if image upload fails
+      }
+    }
+
+    const tweetData: { 
+      text: string
+      reply?: { in_reply_to_tweet_id: string }
+      media?: { media_ids: string[] }
+    } = {
       text: content,
     }
 
@@ -141,6 +251,13 @@ export async function postToTwitter(
     if (replyToTweetId) {
       tweetData.reply = {
         in_reply_to_tweet_id: replyToTweetId,
+      }
+    }
+
+    // If image was uploaded, add media_ids
+    if (mediaId) {
+      tweetData.media = {
+        media_ids: [mediaId],
       }
     }
 
@@ -396,7 +513,8 @@ export async function postToTwitter(
  */
 export async function postTwitterThread(
   userId: string,
-  tweets: string[]
+  tweets: string[],
+  imageUrl?: string
 ): Promise<{ success: true; postUrls: string[]; tweetIds: string[] } | { success: false; error: string }> {
   if (tweets.length === 0) {
     return { success: false, error: 'No tweets provided' }
@@ -406,8 +524,9 @@ export async function postTwitterThread(
   const tweetIds: string[] = []
   let previousTweetId: string | undefined
 
-  // Post the first tweet (summary)
-  const firstResult = await postToTwitter(userId, tweets[0])
+  // Post the first tweet (summary) with image if provided
+  // Only attach image to the first tweet
+  const firstResult = await postToTwitter(userId, tweets[0], undefined, imageUrl)
   if (!firstResult.success) {
     return firstResult
   }
@@ -501,6 +620,114 @@ export async function refreshTwitterToken(
     }
   } catch (error) {
     console.error('[Twitter API] Error refreshing token:', error)
+    return null
+  }
+}
+
+/**
+ * Get Twitter/X analytics for a tweet
+ * @param userId - User ID
+ * @param tweetId - Tweet ID
+ * @returns Analytics data (impressions, likes, retweets, replies, quoteTweets, views)
+ */
+export async function getTwitterAnalytics(
+  userId: string,
+  tweetId: string
+): Promise<{
+  impressions?: number
+  likes?: number
+  retweets?: number
+  replies?: number
+  quoteTweets?: number
+  views?: number
+} | null> {
+  try {
+    console.log(`[Twitter API] Fetching analytics for tweet ${tweetId}`)
+    
+    // Get Twitter connection
+    const connection = await getSocialConnection(userId, 'twitter')
+    if (!connection) {
+      console.error(`[Twitter API] No connection found for user ${userId}`)
+      return null
+    }
+
+    // Check if token is expired and refresh if needed
+    let accessToken = connection.accessToken
+    
+    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+      if (connection.refreshToken) {
+        const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
+        if (refreshResult) {
+          accessToken = refreshResult.accessToken
+          const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
+          
+          await prisma.socialConnection.update({
+            where: {
+              userId_platform: {
+                userId,
+                platform: 'twitter',
+              },
+            },
+            data: {
+              accessToken: encrypt(refreshResult.accessToken),
+              refreshToken: refreshResult.refreshToken ? encrypt(refreshResult.refreshToken) : undefined,
+              tokenExpiry: newExpiry,
+            },
+          })
+        } else {
+          console.error(`[Twitter API] Token refresh failed`)
+          return null
+        }
+      } else {
+        console.error(`[Twitter API] Token expired but no refresh token available`)
+        return null
+      }
+    }
+
+    // Fetch tweet with metrics
+    const response = await fetch(
+      `${TWITTER_API_BASE}/tweets/${tweetId}?tweet.fields=public_metrics,non_public_metrics`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Twitter API] Failed to fetch analytics:', {
+        status: response.status,
+        error: errorText,
+      })
+      return null
+    }
+
+    const result = await response.json()
+    const tweet = result.data
+
+    if (!tweet) {
+      console.error('[Twitter API] Tweet not found in response')
+      return null
+    }
+
+    // Extract metrics
+    const publicMetrics = tweet.public_metrics || {}
+    const nonPublicMetrics = tweet.non_public_metrics || {}
+
+    const analytics = {
+      impressions: nonPublicMetrics.impression_count || undefined,
+      likes: publicMetrics.like_count || 0,
+      retweets: publicMetrics.retweet_count || 0,
+      replies: publicMetrics.reply_count || 0,
+      quoteTweets: publicMetrics.quote_count || 0,
+      views: nonPublicMetrics.user_profile_clicks || undefined,
+    }
+
+    console.log(`[Twitter API] Analytics fetched successfully for tweet ${tweetId}`)
+    return analytics
+  } catch (error) {
+    console.error('[Twitter API] Error fetching analytics:', error)
     return null
   }
 }

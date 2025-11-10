@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT,
+ADD COLUMN IF NOT EXISTS "analyticsLastSyncedAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "analyticsData" JSONB;
+

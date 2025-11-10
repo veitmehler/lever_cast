@@ -131,6 +131,7 @@ export async function POST(request: Request) {
       content,
       postUrl,
       tweetId,
+      imageUrl,
       status = 'published',
       scheduledAt,
       errorMsg,
@@ -193,6 +194,8 @@ export async function POST(request: Request) {
     const finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
 
     // Create the post
+    // Only store imageUrl for summary posts (threadOrder 0 or null)
+    const shouldStoreImage = imageUrl && (threadOrder === null || threadOrder === 0)
     const post = await prisma.post.create({
       data: {
         userId: user.id,
@@ -203,6 +206,7 @@ export async function POST(request: Request) {
         content,
         postUrl: postUrl || null,
         tweetId: tweetId || null,
+        imageUrl: shouldStoreImage ? imageUrl : null,
         status: finalStatus,
         publishedAt: finalPublishedAt,
         scheduledAt: finalScheduledAt,

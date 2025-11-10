@@ -423,17 +423,27 @@ export default function DashboardPage() {
       }
 
       // Publish to social media via API
+      const publishPayload = {
+        platform,
+        content: Array.isArray(content) ? content : content,
+        draftId: draftId || null,
+        imageUrl: attachedImage || undefined,
+      }
+      
+      console.log('[Dashboard] Publishing with payload:', {
+        platform,
+        contentLength: Array.isArray(content) ? content.length : content?.length,
+        draftId: draftId || null,
+        imageUrl: attachedImage || 'none',
+        attachedImageState: attachedImage,
+      })
+      
       const publishResponse = await fetch('/api/posts/publish', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          platform,
-          content: Array.isArray(content) ? content : content,
-          draftId: draftId || null,
-          imageUrl: attachedImage || undefined,
-        }),
+        body: JSON.stringify(publishPayload),
       })
 
       if (!publishResponse.ok) {

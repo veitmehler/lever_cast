@@ -104,6 +104,7 @@ export async function GET(request: Request) {
           select: {
             id: true,
             platforms: true,
+            attachedImage: true,
           },
         },
       },
@@ -214,12 +215,15 @@ export async function GET(request: Request) {
           }
         }
 
+        // Get imageUrl from draft if available
+        const imageUrl = post.draft?.attachedImage || null
+
         // Publish to platform using real APIs
         let publishResult: { success: boolean; message: string; postUrl?: string; tweetId?: string; error?: string }
         
         if (post.platform === 'linkedin') {
           const { postToLinkedIn } = await import('@/lib/linkedinApi')
-          const result = await postToLinkedIn(post.user.id, post.content)
+          const result = await postToLinkedIn(post.user.id, post.content, imageUrl || undefined)
           publishResult = result.success
             ? { success: true, message: 'Published to LinkedIn', postUrl: result.postUrl }
             : { success: false, message: result.error, error: result.error }
@@ -266,7 +270,9 @@ export async function GET(request: Request) {
             }
           }
 
-          const result = await postToTwitter(post.user.id, post.content, replyToTweetId)
+          // For Twitter threads, only attach image to summary post (threadOrder 0 or null)
+          const shouldAttachImage = imageUrl && (post.threadOrder === null || post.threadOrder === 0)
+          const result = await postToTwitter(post.user.id, post.content, replyToTweetId, shouldAttachImage ? imageUrl : undefined)
           console.log(`[Publish Scheduled] Twitter API result for post ${post.id}:`, result.success ? 'SUCCESS' : `FAILED: ${result.error}`)
 
           publishResult = result.success
@@ -280,6 +286,8 @@ export async function GET(request: Request) {
           console.log(`[Publish Scheduled] Successfully published post ${post.id} to ${post.platform}`)
           
           // Update post status to published
+          // Only store imageUrl for summary posts (threadOrder 0 or null)
+          const shouldStoreImage = imageUrl && (post.threadOrder === null || post.threadOrder === 0)
           await prisma.post.update({
             where: { id: post.id },
             data: {
@@ -288,6 +296,7 @@ export async function GET(request: Request) {
               scheduledAt: null, // Clear scheduledAt since it's now published
               postUrl: publishResult.postUrl || null,
               tweetId: publishResult.tweetId || null, // Save tweetId directly
+              imageUrl: shouldStoreImage ? imageUrl : null,
             },
           })
 

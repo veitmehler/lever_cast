@@ -57,6 +57,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { platform, content, imageUrl } = body
 
+    console.log(`[Publish API] Received publish request:`, {
+      platform,
+      contentLength: Array.isArray(content) ? content.length : content?.length,
+      imageUrl: imageUrl || 'none',
+    })
+
     if (!platform || !content) {
       return NextResponse.json(
         { error: 'Missing required fields: platform, content' },
@@ -72,11 +78,12 @@ export async function POST(request: NextRequest) {
 
     if (platform === 'linkedin') {
       const contentStr = Array.isArray(content) ? content[0] : content
+      console.log(`[Publish API] Publishing to LinkedIn with imageUrl: ${imageUrl || 'none'}`)
       publishResult = await postToLinkedIn(user.id, contentStr, imageUrl)
     } else if (platform === 'twitter') {
       if (Array.isArray(content)) {
-        // Twitter thread
-        const threadResult = await postTwitterThread(user.id, content)
+        // Twitter thread - only attach image to first tweet
+        const threadResult = await postTwitterThread(user.id, content, imageUrl)
         if (threadResult.success) {
           publishResult = { success: true, postUrl: threadResult.postUrls, tweetIds: threadResult.tweetIds }
         } else {
@@ -84,7 +91,7 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Single tweet
-        const tweetResult = await postToTwitter(user.id, content)
+        const tweetResult = await postToTwitter(user.id, content, undefined, imageUrl)
         if (tweetResult.success) {
           publishResult = { success: true, postUrl: tweetResult.postUrl, tweetId: tweetResult.tweetId }
         } else {
@@ -105,12 +112,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return success with post URL(s) and tweet ID(s)
+    // Return success with post URL(s), tweet ID(s), and imageUrl
     return NextResponse.json({
       success: true,
       postUrl: publishResult.postUrl,
       tweetId: 'tweetId' in publishResult ? publishResult.tweetId : undefined,
       tweetIds: 'tweetIds' in publishResult ? publishResult.tweetIds : undefined,
+      imageUrl: imageUrl || undefined,
       message: `Post successfully published to ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter/X'}!`,
     })
   } catch (error) {

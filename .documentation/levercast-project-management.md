@@ -251,6 +251,26 @@
 - ✅ Update dashboard and post detail pages to use real publishing APIs
 - ✅ Remove mock publishing functionality
 
+### Bulk Actions & Voice Input (COMPLETED)
+- ✅ Implement bulk selection on /posts page with checkbox and Shift+Click range selection
+- ✅ Add bulk delete functionality for multiple drafts
+- ✅ Add bulk publish functionality for multiple drafts
+- ✅ Add bulk schedule functionality with ScheduleModal integration
+- ✅ Add "Publish All Now" button on dashboard for all generated content
+- ✅ Add "Schedule All Now" button on dashboard with ScheduleModal integration
+- ✅ Fix draft count on /posts page to exclude scheduled/published posts
+- ✅ Improve checkbox visual alignment with status badge
+- ✅ Fix checkbox state update to show immediately when clicked
+- ✅ Implement Web Speech API integration for voice-to-text input
+- ✅ Add real-time transcription with continuous recording
+- ✅ Add error handling for microphone permissions and browser compatibility
+- ✅ Add visual feedback for recording state and errors
+- ✅ Improve Twitter rate limit detection (24-hour vs 15-minute vs 3-hour)
+- ✅ Use remaining count and reset time for accurate limit identification
+- ✅ Improve error messages with specific limit information and reset times
+- ✅ Improve scheduled publishing logging to distinguish single posts vs thread summaries
+- ✅ Add better error handling for rate-limited posts
+
 ### Twitter/X Thread Features (COMPLETED)
 - ✅ Add Twitter thread generation option (single post vs. thread)
 - ✅ Implement thread generation with summary + 1-8 key insights
@@ -453,7 +473,7 @@
 - ⚠️ Font preload warnings in console
 - ⚠️ Sentry ERR_BLOCKED_BY_CLIENT errors (ad blockers)
 - ⚠️ Clerk "Development Mode" warning (normal in dev, will disappear in production)
-- ⚠️ Voice recording is simulated (needs real implementation)
+- ⚠️ Voice input requires Chrome or Edge browser (Web Speech API not supported in Safari/Firefox)
 - ⚠️ LinkedIn image upload API not yet implemented (images stored but not published to LinkedIn - text-only posts supported)
 - ⚠️ Twitter/X image upload API not yet implemented (images stored but not published to Twitter/X)
 
@@ -519,6 +539,7 @@
 - ✅ **Twitter/X Thread Features** - December 2024
 - ✅ **Automated Scheduled Publishing** - December 2024
 - ✅ **Supabase Storage Integration** - December 2024
+- ✅ **Bulk Actions & Voice Input** - December 2024
 
 ### Upcoming Milestones
 - 📅 **User Testing & Feedback** - TBD
@@ -590,6 +611,9 @@
 22. **Supabase Storage for Images**: Migrated from base64 database storage to Supabase Storage for ~84% cost reduction and better performance
 23. **Service Role Key for Storage**: Using service role key in API routes for secure server-side image operations
 24. **Backward Compatible Image Migration**: Existing base64 images still work, new uploads use Supabase Storage
+25. **Bulk Actions Pattern**: Implemented checkbox selection with Shift+Click for range selection, following common UI patterns
+26. **Voice Input with Web Speech API**: Using browser-native Speech Recognition API for voice-to-text, requires Chrome/Edge
+27. **Rate Limit Detection**: Using remaining count and reset time to accurately identify which Twitter API limit is hit
 
 ### Design Philosophy
 - **User First**: Prototype quickly to test with real users
@@ -608,7 +632,20 @@
 
 ## Change Log
 
-### December 2024 (Latest - Real AI, Social Media Publishing, Automation & Storage)
+### December 2024 (Latest - Bulk Actions, Voice Input & Rate Limit Improvements)
+- Implemented bulk selection and actions on /posts page (checkboxes, Shift+Click, bulk delete/publish/schedule)
+- Added bulk publish and schedule functionality on dashboard
+- Fixed draft count calculation to exclude scheduled/published posts
+- Improved checkbox UI alignment and state management
+- Implemented Web Speech API for voice-to-text input with real-time transcription
+- Added comprehensive error handling for microphone permissions and browser compatibility
+- Improved Twitter rate limit detection to accurately identify 24-hour vs 15-minute vs 3-hour limits
+- Enhanced error messages with specific limit information and reset times
+- Improved scheduled publishing logging to distinguish single posts from thread summaries
+- Added better visual feedback for recording state and errors
+- **Status**: Bulk actions and voice input fully functional ✅
+
+### December 2024 (Earlier - Real AI, Social Media Publishing, Automation & Storage)
 - Replaced mock template-based generation with real LLM API calls (OpenAI, Anthropic, Gemini, OpenRouter)
 - Implemented dynamic model fetching from provider APIs
 - Added API key management with encrypted storage in database
@@ -728,6 +765,6 @@
 ---
 
 **Last Updated**: December 2024  
-**Project Status**: ✅ Production Ready - Real AI Integration, Social Media Publishing, Automated Scheduling, Twitter Threads, and Supabase Storage Complete  
+**Project Status**: ✅ Production Ready - Real AI Integration, Social Media Publishing, Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, and Voice Input Complete  
 **Next Milestone**: Production Deployment & User Testing
 

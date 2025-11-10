@@ -124,3 +124,26 @@ export function extractFilePathFromUrl(url: string): string | null {
   }
 }
 
+/**
+ * Download an image from Supabase Storage URL
+ * @param imageUrl - Full Supabase Storage public URL
+ * @returns Buffer containing the image binary data
+ */
+export async function downloadImageFromStorage(imageUrl: string): Promise<Buffer> {
+  try {
+    // Fetch the image from the public URL
+    const response = await fetch(imageUrl)
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
+    }
+    
+    // Convert response to buffer
+    const arrayBuffer = await response.arrayBuffer()
+    return Buffer.from(arrayBuffer)
+  } catch (error) {
+    console.error('[Supabase] Error downloading image:', error)
+    throw new Error(`Failed to download image from storage: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+

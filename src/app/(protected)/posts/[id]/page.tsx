@@ -7,6 +7,7 @@ import { useUser } from '@clerk/nextjs'
 import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformPreview } from '@/components/PlatformPreview'
+import { PostAnalytics } from '@/components/PostAnalytics'
 import { generateContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
 
@@ -33,6 +34,8 @@ type Draft = {
     status: string
     postUrl: string | null
     parentPostId?: string | null // For filtering out reply posts
+    analyticsData?: any | null // Analytics data (JSON)
+    analyticsLastSyncedAt?: Date | null // Last sync timestamp
   }>
 }
 
@@ -449,6 +452,70 @@ export default function PostDetailPage({
     return scheduledPost?.id || null
   }
 
+  const getPublishedPostAnalytics = (platform: 'linkedin' | 'twitter') => {
+    // Only get summary posts (not replies)
+    const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
+    return {
+      postId: publishedPost?.id || null,
+      analytics: publishedPost?.analyticsData || null,
+      lastSyncedAt: publishedPost?.analyticsLastSyncedAt || null,
+    }
+  }
+
+  const handleRefreshAnalytics = async (platform: 'linkedin' | 'twitter') => {
+    try {
+      // Get the published post ID for this platform
+      const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
+      
+      if (!publishedPost?.id) {
+        toast.error('No published post found for this platform')
+        return
+      }
+
+      toast.info('Refreshing analytics...')
+      
+      // Trigger single-post analytics sync
+      const response = await fetch(`/api/posts/${publishedPost.id}/sync-analytics`, {
+        method: 'POST',
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to refresh analytics')
+      }
+
+      const result = await response.json()
+      
+      if (result.success) {
+        // Refresh the draft data to get updated analytics
+        const draftResponse = await fetch(`/api/drafts/${id}`)
+        if (draftResponse.ok) {
+          const updatedDraft = await draftResponse.json()
+          
+          // Parse twitterContent if it's a JSON string
+          if (updatedDraft.twitterContent && typeof updatedDraft.twitterContent === 'string') {
+            try {
+              const parsed = JSON.parse(updatedDraft.twitterContent)
+              if (Array.isArray(parsed)) {
+                updatedDraft.twitterContent = parsed
+              }
+            } catch {
+              // Keep as string if not valid JSON
+            }
+          }
+          
+          setPost(updatedDraft)
+          toast.success('Analytics refreshed successfully!')
+        }
+      } else {
+        toast.error(result.message || 'Analytics not available for this post')
+      }
+    } catch (error) {
+      console.error('Error refreshing analytics:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to refresh analytics')
+    }
+  }
+
   const handleReschedule = async (postId: string, scheduledAt: Date) => {
     try {
       const postResponse = await fetch(`/api/posts/${postId}`, {
@@ -782,98 +849,122 @@ export default function PostDetailPage({
           </Button>
         </div>
 
-        {/* Original Idea */}
-        <div className="rounded-lg border border-border bg-card p-6 mb-6">
-          <h3 className="text-sm font-semibold text-card-foreground mb-2">Original Idea</h3>
-          <p className="text-muted-foreground mb-4">{post.contentRaw}</p>
-          
-          {/* Image Upload Section */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <h4 className="text-sm font-semibold text-card-foreground mb-3">Attached Image</h4>
-            {post.attachedImage ? (
-              <div className="relative inline-block">
-                <img
-                  src={post.attachedImage}
-                  alt="Attached to post"
-                  className="rounded-lg max-h-48 w-auto object-cover border border-border"
-                />
-                <button
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 p-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                  title="Remove image"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  Add Image
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Add an image to your post
-                </p>
-              </div>
-            )}
+        {/* Original Idea - Only show for drafts and scheduled posts, not published */}
+        {!(isPlatformPublished('linkedin') || isPlatformPublished('twitter')) && (
+          <div className="rounded-lg border border-border bg-card p-6 mb-6">
+            <h3 className="text-sm font-semibold text-card-foreground mb-2">Original Idea</h3>
+            <p className="text-muted-foreground mb-4">{post.contentRaw}</p>
+            
+            {/* Image Upload Section */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-semibold text-card-foreground mb-3">Attached Image</h4>
+              {post.attachedImage ? (
+                <div className="relative inline-block">
+                  <img
+                    src={post.attachedImage}
+                    alt="Attached to post"
+                    className="rounded-lg max-h-48 w-auto object-cover border border-border"
+                  />
+                  <button
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 p-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    title="Remove image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Add Image
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Add an image to your post
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Generated Content Preview */}
       <div className="grid gap-6 md:grid-cols-2">
         {post.linkedinContent && (
-          <PlatformPreview
-            platform="linkedin"
-            content={post.linkedinContent}
-            userName={userName}
-            userInitials={userInitials}
-            image={post.attachedImage || undefined}
-            onRegenerate={() => handleRegenerate('linkedin')}
-            onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
-            onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
-            onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
-            onContentChange={handleContentChange}
-            isPublished={isPlatformPublished('linkedin')}
-            publishedDate={getPublishedDate('linkedin')}
-            isScheduled={isPlatformScheduled('linkedin')}
-            scheduledDate={getScheduledDate('linkedin')}
-            scheduledPostId={getScheduledPostId('linkedin')}
-            isRegenerating={isRegenerating.linkedin}
-          />
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="linkedin"
+              content={post.linkedinContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('linkedin')}
+              onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('linkedin')}
+              publishedDate={getPublishedDate('linkedin')}
+              isScheduled={isPlatformScheduled('linkedin')}
+              scheduledDate={getScheduledDate('linkedin')}
+              scheduledPostId={getScheduledPostId('linkedin')}
+              isRegenerating={isRegenerating.linkedin}
+            />
+            {isPlatformPublished('linkedin') && (
+              <PostAnalytics
+                platform="linkedin"
+                analytics={getPublishedPostAnalytics('linkedin').analytics}
+                lastSyncedAt={getPublishedPostAnalytics('linkedin').lastSyncedAt}
+                postId={getPublishedPostAnalytics('linkedin').postId || ''}
+                onRefresh={() => handleRefreshAnalytics('linkedin')}
+              />
+            )}
+          </div>
         )}
         {post.twitterContent && (
-          <PlatformPreview
-            platform="twitter"
-            content={post.twitterContent}
-            userName={userName}
-            userInitials={userInitials}
-            image={post.attachedImage || undefined}
-            onRegenerate={() => handleRegenerate('twitter')}
-            onPublish={(editedContent) => handlePublish('twitter', editedContent)}
-            onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
-            onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
-            onContentChange={handleContentChange}
-            isPublished={isPlatformPublished('twitter')}
-            publishedDate={getPublishedDate('twitter')}
-            isScheduled={isPlatformScheduled('twitter')}
-            scheduledDate={getScheduledDate('twitter')}
-            scheduledPostId={getScheduledPostId('twitter')}
-            isRegenerating={isRegenerating.twitter}
-          />
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="twitter"
+              content={post.twitterContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('twitter')}
+              onPublish={(editedContent) => handlePublish('twitter', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('twitter', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('twitter')}
+              publishedDate={getPublishedDate('twitter')}
+              isScheduled={isPlatformScheduled('twitter')}
+              scheduledDate={getScheduledDate('twitter')}
+              scheduledPostId={getScheduledPostId('twitter')}
+              isRegenerating={isRegenerating.twitter}
+            />
+            {isPlatformPublished('twitter') && (
+              <PostAnalytics
+                platform="twitter"
+                analytics={getPublishedPostAnalytics('twitter').analytics}
+                lastSyncedAt={getPublishedPostAnalytics('twitter').lastSyncedAt}
+                postId={getPublishedPostAnalytics('twitter').postId || ''}
+                onRefresh={() => handleRefreshAnalytics('twitter')}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

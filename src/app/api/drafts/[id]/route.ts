@@ -66,6 +66,8 @@ export async function GET(
             status: true,
             postUrl: true,
             parentPostId: true, // Include to filter out reply posts
+            analyticsData: true, // Include analytics data
+            analyticsLastSyncedAt: true, // Include last sync timestamp
           },
         },
       },

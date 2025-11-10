@@ -763,9 +763,29 @@ export default function PostsPage() {
                 <h3 className="text-lg font-semibold text-card-foreground mb-2 group-hover:text-primary transition-colors">
                   {draft.title}
                 </h3>
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                  {draft.contentRaw}
-                </p>
+                {/* Only show original idea for drafts and scheduled posts, not published */}
+                {!(filter === 'published' || publishedPosts.length > 0) && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {draft.contentRaw}
+                  </p>
+                )}
+                {/* For published posts, show published content preview instead */}
+                {(filter === 'published' || publishedPosts.length > 0) && (
+                  <div className="mb-3">
+                    {draft.linkedinContent && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {draft.linkedinContent}
+                      </p>
+                    )}
+                    {draft.twitterContent && !draft.linkedinContent && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {Array.isArray(draft.twitterContent) 
+                          ? draft.twitterContent[0] 
+                          : draft.twitterContent}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {new Date(draft.createdAt).toLocaleDateString('en-US', {

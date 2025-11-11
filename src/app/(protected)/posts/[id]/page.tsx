@@ -34,7 +34,7 @@ type Draft = {
     status: string
     postUrl: string | null
     parentPostId?: string | null // For filtering out reply posts
-    analyticsData?: any | null // Analytics data (JSON)
+    analyticsData?: Record<string, unknown> | null // Analytics data (JSON)
     analyticsLastSyncedAt?: Date | null // Last sync timestamp
   }>
 }

@@ -577,10 +577,36 @@ export async function getLinkedInAnalytics(
 
     if (!response.ok) {
       const errorText = await response.text()
+      let errorData: any = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
+      
       console.error('[LinkedIn API] Failed to fetch analytics:', {
         status: response.status,
         error: errorText,
       })
+      
+      // Check if it's a permission error (403)
+      if (response.status === 403) {
+        const errorCode = errorData.code || ''
+        const errorMessage = errorData.message || errorText || ''
+        const errorString = JSON.stringify(errorData).toLowerCase()
+        
+        if (
+          errorCode === 'ACCESS_DENIED' ||
+          errorMessage.includes('ACCESS_DENIED') ||
+          errorMessage.includes('permissions') ||
+          errorMessage.includes('Not enough permissions') ||
+          errorString.includes('access_denied') ||
+          errorString.includes('permissions')
+        ) {
+          // Throw a specific error for permission issues
+          throw new Error('LINKEDIN_PERMISSIONS_REQUIRED')
+        }
+      }
       
       // LinkedIn Analytics API may not be available or may require different permissions
       // Return null to indicate analytics are not available
@@ -593,6 +619,13 @@ export async function getLinkedInAnalytics(
     console.log(`[LinkedIn API] Analytics endpoint accessed but full implementation requires additional setup`)
     return null
   } catch (error) {
+    // Re-throw permission errors so they can be handled by the caller
+    // Don't log these as errors since they're expected and handled upstream
+    if (error instanceof Error && error.message === 'LINKEDIN_PERMISSIONS_REQUIRED') {
+      throw error
+    }
+    
+    // Log and return null for other errors
     console.error('[LinkedIn API] Error fetching analytics:', error)
     return null
   }

@@ -56,9 +56,9 @@ async function getOrCreateUser(clerkId: string) {
 }
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     platform: string
-  }
+  }>
 }
 
 // POST /api/social/[platform] - Initiate OAuth flow
@@ -74,7 +74,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { platform } = context.params
+    const { platform } = await context.params
 
     if (!VALID_PLATFORMS.includes(platform)) {
       return NextResponse.json(
@@ -97,13 +97,18 @@ export async function POST(
       }
 
       // LinkedIn OAuth 2.0 authorization URL
-      // Note: w_member_social scope requires "Share on LinkedIn" product approval
+      // Note: 
+      // - w_member_social scope requires "Share on LinkedIn" product approval (for posting)
+      // - r_member_social scope is required for reading posts and analytics, BUT:
+      //   LinkedIn has currently restricted access to r_member_social and is not accepting new requests
+      //   See: https://stackoverflow.com/questions/79774322/r-member-social-scope-permission-in-linkedin-api
+      //   Analytics will not be available until LinkedIn reopens access to this permission
       const params = new URLSearchParams({
         response_type: 'code',
         client_id: LINKEDIN_CLIENT_ID,
         redirect_uri: LINKEDIN_REDIRECT_URI,
         state,
-        scope: 'openid profile email w_member_social', // w_member_social requires "Share on LinkedIn" product
+        scope: 'openid profile email w_member_social', // r_member_social not available - LinkedIn has restricted access
       })
 
       redirectUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`
@@ -160,7 +165,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { platform } = context.params
+    const { platform } = await context.params
 
     if (!VALID_PLATFORMS.includes(platform)) {
       return NextResponse.json(

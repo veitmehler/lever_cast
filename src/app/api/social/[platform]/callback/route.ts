@@ -56,9 +56,9 @@ async function getOrCreateUser(clerkId: string) {
 }
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     platform: string
-  }
+  }>
 }
 
 // GET /api/social/[platform]/callback - Handle OAuth callback
@@ -74,7 +74,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { platform } = context.params
+    const { platform } = await context.params
 
     if (!VALID_PLATFORMS.includes(platform)) {
       return NextResponse.json(
@@ -90,8 +90,16 @@ export async function GET(
     const error = searchParams.get('error')
 
     if (error) {
+      // Handle specific LinkedIn scope errors gracefully
+      const errorDescription = searchParams.get('error_description') || ''
+      if (error === 'unauthorized_scope_error' && errorDescription.includes('r_member_social')) {
+        // r_member_social is not approved yet - redirect with a helpful message
+        return NextResponse.redirect(
+          new URL(`/settings?error=scope_not_approved&scope=r_member_social&message=${encodeURIComponent('The r_member_social permission is required for analytics but is not yet approved for your LinkedIn app. Please request this permission in your LinkedIn Developer Portal.')}`, request.url)
+        )
+      }
       return NextResponse.redirect(
-        new URL(`/settings?error=${encodeURIComponent(error)}`, request.url)
+        new URL(`/settings?error=${encodeURIComponent(error)}${errorDescription ? '&error_description=' + encodeURIComponent(errorDescription) : ''}`, request.url)
       )
     }
 

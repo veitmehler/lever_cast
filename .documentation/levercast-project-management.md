@@ -151,7 +151,7 @@
 - ✅ Fix sign-out redirect functionality
 - ✅ Clear build cache to resolve server action errors
 - ✅ Verify UserButton displays correctly with profile picture
-- ✅ **Enable middleware route protection (November 5, 2024)**
+- ✅ **Enable middleware route protection (November 5, 2025)**
 - ✅ **Define public routes (/, /sign-in, /sign-up)**
 - ✅ **Update landing page CTAs to point to sign-up instead of dashboard**
 - ✅ **Remove "Design Mode Prototype" footer text**
@@ -391,6 +391,29 @@
   - Log image upload progress and dimensions
   - Log LinkedIn API responses and errors
   - Log analytics sync progress and results
+- ✅ Add analytics display UI and single-post refresh
+  - Create PostAnalytics component for displaying post analytics
+  - Show Twitter analytics (impressions, views, likes, retweets, replies, quote tweets)
+  - Show LinkedIn analytics (impressions, clicks, likes, comments, shares)
+  - Display last sync timestamp
+  - Show empty state when analytics not available
+  - Add refresh button for manual analytics sync
+  - Create /api/posts/[id]/sync-analytics route for single-post refresh
+  - Update Post Detail page to display analytics below published post previews
+  - Hide original idea section for published posts
+  - Update Posts list page to hide original idea for published posts
+- ✅ Fix LinkedIn analytics permission handling
+  - Update error messages to reflect LinkedIn's restriction of r_member_social permission
+  - LinkedIn has restricted access to analytics and is not accepting new requests
+  - Update UI to show clear message: "LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly."
+  - Remove r_member_social from OAuth scope (not available)
+- ✅ Fix Next.js 15 compatibility issues
+  - Update route handlers to await params (Next.js 15 requirement)
+  - Fix params.platform errors in OAuth routes (/api/social/[platform] and callback)
+  - Update RouteContext types to use Promise<{ platform: string }>
+- ✅ Remove fake engagement metrics from preview cards
+  - Remove mock engagement stats (👍 12 💬 3 🔄 2 📤 1) from PlatformPreview component
+  - Keep character count display only for cleaner UI
 
 ### Documentation
 - ✅ Create phase-1-navigation-map.md
@@ -536,7 +559,7 @@
 - ⚠️ Sentry ERR_BLOCKED_BY_CLIENT errors (ad blockers)
 - ⚠️ Clerk "Development Mode" warning (normal in dev, will disappear in production)
 - ⚠️ Voice input requires Chrome or Edge browser (Web Speech API not supported in Safari/Firefox)
-- ⚠️ LinkedIn analytics API requires additional permissions (placeholder implemented, full integration pending)
+- ⚠️ LinkedIn analytics unavailable - LinkedIn has restricted access to r_member_social permission and is not accepting new requests. Users are directed to check analytics on LinkedIn directly.
 
 ### To Address Before Production
 - ⚠️ Remove all mock data and simulations
@@ -585,26 +608,26 @@
 ## Timeline & Milestones
 
 ### Completed Milestones
-- ✅ **Project Initialization** - November 2024
-- ✅ **Phase 1: Core Layout** - November 2024
-- ✅ **Phase 2: Idea Capture** - November 2024
-- ✅ **Phase 3: Enhanced Features** - November 2024
-- ✅ **Template System** - November 2024
-- ✅ **Character Limits** - November 2024
-- ✅ **Image Support** - November 2024
-- ✅ **Mobile Experience** - November 4, 2024
-- ✅ **Design Mode Complete** - November 4, 2024
-- ✅ **Authentication Integration** - November 5, 2024
-- ✅ **Database Integration** - November 2024
-- ✅ **Post Scheduling & Calendar** - November 2024
-- ✅ **Real AI Integration** - December 2024
-- ✅ **Social Media OAuth & Publishing** - December 2024
-- ✅ **Twitter/X Thread Features** - December 2024
-- ✅ **Automated Scheduled Publishing** - December 2024
-- ✅ **Supabase Storage Integration** - December 2024
-- ✅ **Bulk Actions & Voice Input** - December 2024
-- ✅ **LinkedIn & Twitter Image Publishing** - December 2024
-- ✅ **Analytics Tracking & Sync** - December 2024
+- ✅ **Project Initialization** - November 2025
+- ✅ **Phase 1: Core Layout** - November 2025
+- ✅ **Phase 2: Idea Capture** - November 2025
+- ✅ **Phase 3: Enhanced Features** - November 2025
+- ✅ **Template System** - November 2025
+- ✅ **Character Limits** - November 2025
+- ✅ **Image Support** - November 2025
+- ✅ **Mobile Experience** - November 4, 2025
+- ✅ **Design Mode Complete** - November 4, 2025
+- ✅ **Authentication Integration** - November 5, 2025
+- ✅ **Database Integration** - November 2025
+- ✅ **Post Scheduling & Calendar** - November 2025
+- ✅ **Real AI Integration** - November 2025
+- ✅ **Social Media OAuth & Publishing** - November 2025
+- ✅ **Twitter/X Thread Features** - November 2025
+- ✅ **Automated Scheduled Publishing** - November 2025
+- ✅ **Supabase Storage Integration** - November 2025
+- ✅ **Bulk Actions & Voice Input** - November 2025
+- ✅ **LinkedIn & Twitter Image Publishing** - November 2025
+- ✅ **Analytics UI & Error Handling** - November 2025
 
 ### Upcoming Milestones
 - 📅 **User Testing & Feedback** - TBD
@@ -697,7 +720,32 @@
 
 ## Change Log
 
-### December 2024 (Latest - Image Publishing & Analytics Sync)
+### November 2025 (Latest - Analytics UI, Error Handling & UI Improvements)
+- Added analytics display UI and single-post refresh functionality
+  - Created PostAnalytics component for displaying post analytics
+  - Show Twitter analytics (impressions, views, likes, retweets, replies, quote tweets)
+  - Show LinkedIn analytics (impressions, clicks, likes, comments, shares)
+  - Display last sync timestamp and empty states
+  - Add refresh button for manual analytics sync per post
+  - Create /api/posts/[id]/sync-analytics route for single-post refresh
+  - Update Post Detail page to display analytics below published post previews
+  - Hide original idea section for published posts
+  - Update Posts list page to hide original idea for published posts
+- Fixed LinkedIn analytics permission handling
+  - Updated error messages to reflect LinkedIn's restriction of r_member_social permission
+  - LinkedIn has restricted access to analytics and is not accepting new requests
+  - Updated UI to show clear message: "LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly."
+  - Removed r_member_social from OAuth scope (not available)
+- Fixed Next.js 15 compatibility issues
+  - Updated route handlers to await params (Next.js 15 requirement)
+  - Fixed params.platform errors in OAuth routes (/api/social/[platform] and callback)
+  - Updated RouteContext types to use Promise<{ platform: string }>
+- Removed fake engagement metrics from preview cards
+  - Removed mock engagement stats (👍 12 💬 3 🔄 2 📤 1) from PlatformPreview component
+  - Kept character count display only for cleaner UI
+- **Status**: Analytics UI complete, LinkedIn analytics unavailable due to LinkedIn restrictions ✅
+
+### November 2025 (Earlier - Image Publishing & Analytics Sync)
 - Implemented LinkedIn image publishing API integration
   - Fixed media field structure to use 'media' instead of 'id' with required 'description' and 'title' fields
   - Implemented proper asset upload flow with registerUpload endpoint
@@ -726,7 +774,7 @@
 - Added comprehensive logging for debugging image uploads and analytics sync
 - **Status**: Image publishing and analytics sync fully functional ✅
 
-### December 2024 (Earlier - Bulk Actions, Voice Input & Rate Limit Improvements)
+### November 2025 (Earlier - Bulk Actions, Voice Input & Rate Limit Improvements)
 - Implemented bulk selection and actions on /posts page (checkboxes, Shift+Click, bulk delete/publish/schedule)
 - Added bulk publish and schedule functionality on dashboard
 - Fixed draft count calculation to exclude scheduled/published posts
@@ -739,7 +787,7 @@
 - Added better visual feedback for recording state and errors
 - **Status**: Bulk actions and voice input fully functional ✅
 
-### December 2024 (Earlier - Real AI, Social Media Publishing, Automation & Storage)
+### November 2025 (Earlier - Real AI, Social Media Publishing, Automation & Storage)
 - Replaced mock template-based generation with real LLM API calls (OpenAI, Anthropic, Gemini, OpenRouter)
 - Implemented dynamic model fetching from provider APIs
 - Added API key management with encrypted storage in database
@@ -773,7 +821,7 @@
 - Maintained backward compatibility with existing base64 images
 - **Status**: Production ready - All core features implemented ✅
 
-### November 2024 (Database & Scheduling)
+### November 2025 (Earlier - Database & Scheduling)
 - Migrated templates from localStorage to PostgreSQL database
 - Migrated drafts from localStorage to PostgreSQL database
 - Created API routes for templates, drafts, and posts CRUD operations
@@ -791,7 +839,7 @@
 - Added proper error handling and loading states throughout
 - **Status**: Database integration complete, scheduling features fully functional ✅
 
-### November 5, 2024
+### November 5, 2025
 - Integrated Clerk authentication with Google OAuth
 - Converted sign-in/sign-up to catch-all routes for OAuth callbacks
 - Created Providers component wrapping ClerkProvider and ThemeProvider
@@ -804,7 +852,7 @@
 - Resolved server action errors with cache clearing
 - **Status**: Authentication fully working, ready for database migration ✅
 
-### November 4, 2024
+### November 4, 2025
 - Implemented full mobile experience with responsive navigation
 - Created MobileNav component with hamburger menu and slide-out drawer
 - Added BottomNav component with 4 quick-access items
@@ -814,7 +862,7 @@
 - Created mobile-implementation.md documentation
 - **Status**: Fully responsive across all devices ✅
 
-### November 4, 2024 (Earlier)
+### November 4, 2025 (Earlier)
 - Completed Phase 3 enhanced features
 - Implemented full template CRUD system
 - Added character limit indicators with color coding
@@ -822,7 +870,7 @@
 - Updated all documentation
 - **Status**: Design Mode feature-complete ✅
 
-### November 2024 (Earlier)
+### November 2025 (Earlier)
 - Project initialization
 - Phase 1: Core layout and navigation
 - Phase 2: Idea capture and AI generation
@@ -858,7 +906,7 @@
 
 ---
 
-**Last Updated**: December 2024  
-**Project Status**: ✅ Production Ready - Real AI Integration, Social Media Publishing, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, and Analytics Tracking Complete  
+**Last Updated**: November 2025  
+**Project Status**: ✅ Production Ready - Real AI Integration, Social Media Publishing, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display Complete (LinkedIn analytics unavailable due to LinkedIn API restrictions)  
 **Next Milestone**: Production Deployment & User Testing
 

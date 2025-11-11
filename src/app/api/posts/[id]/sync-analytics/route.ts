@@ -55,13 +55,55 @@ export async function POST(
       // Fetch Twitter analytics
       analytics = await getTwitterAnalytics(user.id, post.tweetId)
     } else if (post.platform === 'linkedin' && post.postUrl) {
-      // Extract post ID from LinkedIn URL
-      const linkedInPostIdMatch = post.postUrl.match(/\/feed\/update\/([^\/\?]+)/)
-      const linkedInPostId = linkedInPostIdMatch ? linkedInPostIdMatch[1] : null
+      // Extract LinkedIn post URN from URL
+      // LinkedIn post URLs can be in format: https://www.linkedin.com/feed/update/{URN}
+      // Or the postUrl might already be the URN itself (urn:li:share:...)
+      let linkedInPostId: string | null = null
+      
+      // Check if postUrl is already a URN
+      if (post.postUrl.startsWith('urn:li:share:')) {
+        linkedInPostId = post.postUrl
+      } else {
+        // Try to extract from URL format: /feed/update/{URN}
+        const urlMatch = post.postUrl.match(/\/feed\/update\/(urn:li:share:[^\/\?]+|[^\/\?]+)/)
+        if (urlMatch) {
+          linkedInPostId = urlMatch[1]
+          // If it's not already a URN, construct it
+          if (!linkedInPostId.startsWith('urn:li:share:')) {
+            linkedInPostId = `urn:li:share:${linkedInPostId}`
+          }
+        }
+      }
 
       if (linkedInPostId) {
-        // Fetch LinkedIn analytics
-        analytics = await getLinkedInAnalytics(user.id, linkedInPostId)
+        try {
+          console.log('[Sync Analytics] Calling getLinkedInAnalytics with:', { userId: user.id, linkedInPostId })
+          // Fetch LinkedIn analytics
+          analytics = await getLinkedInAnalytics(user.id, linkedInPostId)
+          console.log('[Sync Analytics] getLinkedInAnalytics returned:', analytics)
+        } catch (error) {
+          console.log('[Sync Analytics] Caught error from getLinkedInAnalytics:', {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorType: error instanceof Error ? error.constructor.name : typeof error,
+            errorStack: error instanceof Error ? error.stack : undefined,
+          })
+          
+          // Check if it's a permissions error
+          if (error instanceof Error && error.message === 'LINKEDIN_PERMISSIONS_REQUIRED') {
+            console.log('[Sync Analytics] Returning 403 for permissions error')
+            return NextResponse.json({
+              success: false,
+              message: 'LinkedIn analytics requires additional permissions',
+              error: 'permissions_required',
+              details: 'LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly.',
+            }, { status: 403 })
+          }
+          // Re-throw other errors
+          console.log('[Sync Analytics] Re-throwing error (not permissions error)')
+          throw error
+        }
+      } else {
+        console.log('[Sync Analytics] linkedInPostId is null, cannot fetch analytics')
       }
     }
 

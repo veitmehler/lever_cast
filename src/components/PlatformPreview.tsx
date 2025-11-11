@@ -313,35 +313,24 @@ export function PlatformPreview({
           </div>
         )}
 
-        {/* Character Count & Mock Engagement Stats */}
+        {/* Character Count */}
         {!isEditing && (
-          <>
-            {/* Character Counter */}
-            <div className="mt-3 flex items-center justify-between">
-              <div className={cn('text-xs flex items-center gap-1.5', getCharCountColor())}>
-                {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
-                <span>
-                  {isThread 
-                    ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
-                    : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
-                  }
+          <div className="mt-3 flex items-center justify-between">
+            <div className={cn('text-xs flex items-center gap-1.5', getCharCountColor())}>
+              {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
+              <span>
+                {isThread 
+                  ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
+                  : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
+                }
+              </span>
+              {isOverLimit && (
+                <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                  Over Limit
                 </span>
-                {isOverLimit && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
-                    Over Limit
-                  </span>
-                )}
-              </div>
+              )}
             </div>
-
-            {/* Mock Engagement Stats */}
-            <div className="mt-3 pt-3 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
-              <span>👍 12</span>
-              <span>💬 3</span>
-              <span>🔄 2</span>
-              <span>📤 1</span>
-            </div>
-          </>
+          </div>
         )}
 
         {/* Character Counter in Edit Mode */}

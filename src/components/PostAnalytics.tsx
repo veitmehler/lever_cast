@@ -1,6 +1,7 @@
 'use client'
 
-import { BarChart3, Eye, Heart, MessageCircle, Share2, TrendingUp, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { BarChart3, Eye, Heart, MessageCircle, Share2, TrendingUp, Clock, AlertCircle } from 'lucide-react'
 
 // Analytics data types
 type TwitterAnalytics = {
@@ -31,6 +32,52 @@ interface PostAnalyticsProps {
 }
 
 export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRefresh }: PostAnalyticsProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const handleRefresh = async () => {
+    if (!postId || isRefreshing) return
+    
+    setIsRefreshing(true)
+    setErrorMessage(null)
+    
+    try {
+      const response = await fetch(`/api/posts/${postId}/sync-analytics`, {
+        method: 'POST',
+      })
+      
+      // Parse JSON response (even for error responses)
+      let result: any = {}
+      try {
+        result = await response.json()
+      } catch (e) {
+        // If JSON parsing fails, use the status text
+        result = { message: response.statusText || 'Unknown error' }
+      }
+      
+      if (response.ok && result.success) {
+        // Success - call the refresh callback to update the parent component
+        if (onRefresh) {
+          onRefresh()
+        }
+        // Clear any previous error messages
+        setErrorMessage(null)
+      } else {
+        // Handle error response
+        if (result.error === 'permissions_required' || response.status === 403) {
+          setErrorMessage(result.details || result.message || 'LinkedIn analytics requires additional permissions. Please reconnect your LinkedIn account.')
+        } else {
+          setErrorMessage(result.message || 'Failed to refresh analytics')
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing analytics:', error)
+      setErrorMessage('Failed to refresh analytics. Please try again.')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (!analytics) {
     return (
       <div className="rounded-lg border border-border bg-card p-4">
@@ -46,33 +93,35 @@ export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRef
             </span>
           )}
         </div>
-        <p className="text-sm text-muted-foreground">
-          Analytics data not available yet. Analytics are synced daily at 2 AM UTC.
-        </p>
+        {errorMessage ? (
+          <div className="mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-destructive font-medium mb-1">Permission Required</p>
+                <p className="text-xs text-muted-foreground">{errorMessage}</p>
+                {platform === 'linkedin' && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {platform === 'linkedin' 
+              ? 'LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly.'
+              : 'Analytics data not available yet. Analytics are synced daily at 2 AM UTC.'}
+          </p>
+        )}
         {postId && (
           <button
-            onClick={async () => {
-              try {
-                const response = await fetch(`/api/posts/${postId}/sync-analytics`, {
-                  method: 'POST',
-                })
-                
-                if (response.ok) {
-                  const result = await response.json()
-                  if (result.success) {
-                    // Call the refresh callback to update the parent component
-                    if (onRefresh) {
-                      onRefresh()
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Error refreshing analytics:', error)
-              }
-            }}
-            className="mt-2 text-xs text-primary hover:underline"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="mt-2 text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Refresh now
+            {isRefreshing ? 'Refreshing...' : 'Refresh now'}
           </button>
         )}
       </div>
@@ -163,30 +212,24 @@ export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRef
             </div>
           )}
         </div>
+        {errorMessage && (
+          <div className="mt-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-destructive font-medium mb-1">Permission Required</p>
+                <p className="text-xs text-muted-foreground">{errorMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
         {postId && (
           <button
-            onClick={async () => {
-              try {
-                const response = await fetch(`/api/posts/${postId}/sync-analytics`, {
-                  method: 'POST',
-                })
-                
-                if (response.ok) {
-                  const result = await response.json()
-                  if (result.success) {
-                    // Call the refresh callback to update the parent component
-                    if (onRefresh) {
-                      onRefresh()
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Error refreshing analytics:', error)
-              }
-            }}
-            className="mt-3 text-xs text-primary hover:underline"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="mt-3 text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Refresh analytics
+            {isRefreshing ? 'Refreshing...' : 'Refresh analytics'}
           </button>
         )}
       </div>
@@ -266,12 +309,29 @@ export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRef
           </div>
         )}
       </div>
-      {onRefresh && (
+      {errorMessage && (
+        <div className="mt-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-destructive font-medium mb-1">Permission Required</p>
+              <p className="text-xs text-muted-foreground">{errorMessage}</p>
+              {platform === 'linkedin' && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  LinkedIn analytics is currently unavailable. LinkedIn has restricted access to analytics. Please check on LinkedIn directly.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {postId && (
         <button
-          onClick={onRefresh}
-          className="mt-3 text-xs text-primary hover:underline"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="mt-3 text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Refresh analytics
+          {isRefreshing ? 'Refreshing...' : 'Refresh analytics'}
         </button>
       )}
     </div>

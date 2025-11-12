@@ -2,7 +2,14 @@ import { randomBytes } from 'crypto'
 
 // In-memory store for OAuth state tokens
 // In production, consider using Redis or database for distributed systems
-const oauthStateStore = new Map<string, { clerkId: string; platform: string; expiresAt: Date }>()
+type OAuthStateData = {
+  clerkId: string
+  platform: string
+  expiresAt: Date
+  codeVerifier?: string
+}
+
+const oauthStateStore = new Map<string, OAuthStateData>()
 
 // Clean up expired states every 10 minutes
 setInterval(() => {
@@ -17,38 +24,45 @@ setInterval(() => {
 /**
  * Generate a secure OAuth state token
  */
-export function generateOAuthState(clerkId: string, platform: string): string {
+export function generateOAuthState(clerkId: string, platform: string): { state: string; codeVerifier: string } {
   const state = randomBytes(32).toString('hex')
+  const codeVerifier = randomBytes(32).toString('base64url')
+
   oauthStateStore.set(state, {
     clerkId,
     platform,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000), // Expires in 10 minutes
+    codeVerifier,
   })
-  return state
+  return { state, codeVerifier }
 }
 
 /**
  * Verify and consume an OAuth state token
  */
-export function verifyOAuthState(state: string, clerkId: string, platform: string): boolean {
+export function verifyOAuthState(
+  state: string,
+  clerkId: string,
+  platform: string
+): { valid: true; codeVerifier?: string } | { valid: false } {
   const stored = oauthStateStore.get(state)
   if (!stored) {
-    return false
+    return { valid: false }
   }
-  
+
   // Check expiration
   if (stored.expiresAt < new Date()) {
     oauthStateStore.delete(state)
-    return false
+    return { valid: false }
   }
-  
+
   // Verify clerkId and platform match
   if (stored.clerkId !== clerkId || stored.platform !== platform) {
-    return false
+    return { valid: false }
   }
-  
+
   // Consume the state (one-time use)
   oauthStateStore.delete(state)
-  return true
+  return { valid: true, codeVerifier: stored.codeVerifier }
 }
 

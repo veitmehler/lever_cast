@@ -4,10 +4,11 @@ import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
-import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { PostAnalytics } from '@/components/PostAnalytics'
+import { ImageGenerationModal } from '@/components/ImageGenerationModal'
 import { generateContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
 
@@ -54,6 +55,7 @@ export default function PostDetailPage({
     twitter: false,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
 
   // Get user display info
   const userName = user?.fullName || user?.firstName || 'User'
@@ -780,6 +782,47 @@ export default function PostDetailPage({
     }
   }
 
+  const handleImageGenerated = async (imageUrl: string) => {
+    // Update local state immediately
+    setPost((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        attachedImage: imageUrl,
+      }
+    })
+
+    try {
+      // Save URL to database
+      const response = await fetch(`/api/drafts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attachedImage: imageUrl,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save generated image')
+      }
+
+      toast.success('Image attached successfully!')
+    } catch (error) {
+      console.error('Error saving generated image:', error)
+      toast.error('Failed to save generated image')
+      // Revert local state on error
+      setPost((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          attachedImage: null,
+        }
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
@@ -874,26 +917,38 @@ export default function PostDetailPage({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2"
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    Add Image
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Upload Image
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsImageGenerationModalOpen(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Generate with AI
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Add an image to your post
+                    Upload an image or generate one with AI
                   </p>
                 </div>
               )}
@@ -901,6 +956,15 @@ export default function PostDetailPage({
           </div>
         )}
       </div>
+
+      {/* Image Generation Modal */}
+      <ImageGenerationModal
+        isOpen={isImageGenerationModalOpen}
+        onClose={() => setIsImageGenerationModalOpen(false)}
+        onImageGenerated={handleImageGenerated}
+        postContent={post.contentRaw}
+        draftId={id}
+      />
 
       {/* Generated Content Preview */}
       <div className="grid gap-6 md:grid-cols-2">

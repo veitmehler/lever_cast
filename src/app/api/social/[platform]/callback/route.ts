@@ -83,6 +83,23 @@ export async function GET(
       )
     }
 
+    const stateCookieName = `oauth_state_${platform}`
+    let stateCookieData: { state: string; codeVerifier?: string } | null = null
+    const stateCookieValue = request.cookies.get(stateCookieName)?.value
+    if (stateCookieValue) {
+      try {
+        stateCookieData = JSON.parse(stateCookieValue)
+      } catch (cookieError) {
+        console.warn('Failed to parse OAuth state cookie:', cookieError)
+      }
+    }
+
+    const redirectWithCleanup = (relativePath: string) => {
+      const response = NextResponse.redirect(new URL(relativePath, request.url))
+      response.cookies.delete(stateCookieName)
+      return response
+    }
+
     // Get OAuth parameters from query string
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
@@ -94,13 +111,9 @@ export async function GET(
       const errorDescription = searchParams.get('error_description') || ''
       if (error === 'unauthorized_scope_error' && errorDescription.includes('r_member_social')) {
         // r_member_social is not approved yet - redirect with a helpful message
-        return NextResponse.redirect(
-          new URL(`/settings?error=scope_not_approved&scope=r_member_social&message=${encodeURIComponent('The r_member_social permission is required for analytics but is not yet approved for your LinkedIn app. Please request this permission in your LinkedIn Developer Portal.')}`, request.url)
-        )
+        return redirectWithCleanup(`/settings?error=scope_not_approved&scope=r_member_social&message=${encodeURIComponent('The r_member_social permission is required for analytics but is not yet approved for your LinkedIn app. Please request this permission in your LinkedIn Developer Portal.')}`)
       }
-      return NextResponse.redirect(
-        new URL(`/settings?error=${encodeURIComponent(error)}${errorDescription ? '&error_description=' + encodeURIComponent(errorDescription) : ''}`, request.url)
-      )
+      return redirectWithCleanup(`/settings?error=${encodeURIComponent(error)}${errorDescription ? '&error_description=' + encodeURIComponent(errorDescription) : ''}`)
     }
 
     if (!code || !state) {
@@ -111,10 +124,17 @@ export async function GET(
     }
 
     // Verify state token
-    if (!verifyOAuthState(state, clerkId, platform)) {
-      return NextResponse.redirect(
-        new URL('/settings?error=invalid_state', request.url)
-      )
+    let stateVerification = verifyOAuthState(state, clerkId, platform)
+
+    if (!stateVerification.valid && stateCookieData?.state === state) {
+      stateVerification = {
+        valid: true,
+        codeVerifier: stateCookieData.codeVerifier,
+      }
+    }
+
+    if (!stateVerification.valid) {
+      return redirectWithCleanup('/settings?error=invalid_state')
     }
 
     const user = await getOrCreateUser(clerkId)
@@ -128,9 +148,7 @@ export async function GET(
     // Exchange authorization code for access token
     if (platform === 'linkedin') {
       if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
-        return NextResponse.redirect(
-          new URL('/settings?error=oauth_not_configured', request.url)
-        )
+        return redirectWithCleanup('/settings?error=oauth_not_configured')
       }
 
       // Exchange code for token
@@ -151,12 +169,16 @@ export async function GET(
       if (!tokenResponse.ok) {
         const error = await tokenResponse.json().catch(() => ({ error_description: 'Unknown error' }))
         console.error('LinkedIn token exchange error:', error)
-        return NextResponse.redirect(
-          new URL(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`, request.url)
-        )
+        return redirectWithCleanup(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`)
       }
 
       const tokenData = await tokenResponse.json()
+      console.log('[Twitter OAuth] Token exchange successful', {
+        scope: tokenData.scope,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type,
+        usedCookieState: stateCookieData?.state === state,
+      })
       accessToken = tokenData.access_token
       refreshToken = tokenData.refresh_token || null
       tokenExpiry = tokenData.expires_in 
@@ -171,9 +193,7 @@ export async function GET(
       })
 
       if (!profileResponse.ok) {
-        return NextResponse.redirect(
-          new URL('/settings?error=profile_fetch_failed', request.url)
-        )
+        return redirectWithCleanup('/settings?error=profile_fetch_failed')
       }
 
       const profile = await profileResponse.json()
@@ -182,9 +202,12 @@ export async function GET(
 
     } else if (platform === 'twitter') {
       if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
-        return NextResponse.redirect(
-          new URL('/settings?error=oauth_not_configured', request.url)
-        )
+        return redirectWithCleanup('/settings?error=oauth_not_configured')
+      }
+
+      if (!stateVerification.codeVerifier) {
+        console.error('Twitter OAuth callback missing codeVerifier for state')
+        return redirectWithCleanup('/settings?error=invalid_state')
       }
 
       // Exchange code for token (Twitter uses Basic Auth)
@@ -200,16 +223,14 @@ export async function GET(
           grant_type: 'authorization_code',
           code,
           redirect_uri: TWITTER_REDIRECT_URI,
-          code_verifier: state, // Simplified PKCE (should use proper PKCE in production)
+          code_verifier: stateVerification.codeVerifier,
         }),
       })
 
       if (!tokenResponse.ok) {
         const error = await tokenResponse.json().catch(() => ({ error_description: 'Unknown error' }))
         console.error('Twitter token exchange error:', error)
-        return NextResponse.redirect(
-          new URL(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`, request.url)
-        )
+        return redirectWithCleanup(`/settings?error=${encodeURIComponent(error.error_description || 'token_exchange_failed')}`)
       }
 
       const tokenData = await tokenResponse.json()
@@ -227,9 +248,7 @@ export async function GET(
       })
 
       if (!profileResponse.ok) {
-        return NextResponse.redirect(
-          new URL('/settings?error=profile_fetch_failed', request.url)
-        )
+        return redirectWithCleanup('/settings?error=profile_fetch_failed')
       }
 
       const profile = await profileResponse.json()
@@ -285,14 +304,13 @@ export async function GET(
     }
 
     // Redirect back to settings page
-    return NextResponse.redirect(
-      new URL('/settings?connected=true', request.url)
-    )
+    return redirectWithCleanup('/settings?connected=true')
   } catch (error) {
     console.error('Error handling OAuth callback:', error)
-    return NextResponse.redirect(
-      new URL('/settings?error=oauth_failed', request.url)
-    )
+    const response = NextResponse.redirect(new URL('/settings?error=oauth_failed', request.url))
+    response.cookies.delete('oauth_state_twitter')
+    response.cookies.delete('oauth_state_linkedin')
+    return response
   }
 }
 

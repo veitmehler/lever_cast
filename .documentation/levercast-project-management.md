@@ -271,6 +271,18 @@
 - ✅ Improve scheduled publishing logging to distinguish single posts vs thread summaries
 - ✅ Add better error handling for rate-limited posts
 
+### Twitter/X API Rate Limit Tracking (COMPLETED)
+- ✅ Create TwitterApiRequest model to track all API request attempts (not just successful posts)
+- ✅ Track requests BEFORE making API calls to ensure accurate counting
+- ✅ Count API requests (not posts) for 24-hour rate limit detection
+- ✅ Fix rate limit detection to properly identify 24-hour vs 15-minute windows
+- ✅ Add comprehensive logging showing both header-based and database-based rate limit tracking
+- ✅ Update request records with success/failure status after API responses
+- ✅ Calculate accurate 24-hour reset times based on oldest request in window
+- ✅ Improve error messages to show request count and accurate reset times
+- ✅ Fix issue where Twitter's x-rate-limit-reset header only shows shortest window (15-min), not 24-hour limit
+- ✅ Add pre-flight rate limit check to prevent unnecessary API calls when limit is exceeded
+
 ### Twitter/X Thread Features (COMPLETED)
 - ✅ Add Twitter thread generation option (single post vs. thread)
 - ✅ Implement thread generation with summary + 1-8 key insights
@@ -357,6 +369,22 @@
 - ✅ Update Supabase helper functions
   - Add downloadImageFromStorage function to retrieve image buffers
   - Support downloading images from Supabase Storage URLs for API uploads
+
+### AI Image Generation (COMPLETED)
+- ✅ Add image generation settings fields to Settings model (defaultImageProvider, defaultImageModel, defaultImageStyle)
+- ✅ Create image generation service (src/lib/imageGeneration.ts) with Fal.ai, OpenAI DALL-E, and Replicate support
+- ✅ Create image generation API route (/api/images/generate)
+- ✅ Extend /api/ai/models/[provider] to support image generation models
+- ✅ Update /api/settings route to handle image generation settings
+- ✅ Extend /api/api-keys route to support image provider API keys (fal, openai-dalle, replicate)
+- ✅ Create ImageGenerationModal component with prompt preview, style input, provider/model selection
+- ✅ Add AI Image Generation Settings section to settings page
+- ✅ Add "Generate Image with AI" button to dashboard and post detail pages
+- ✅ Implement prompt generation from post content with optional style instructions
+- ✅ Upload generated images to Supabase Storage
+- ✅ Store image generation metadata (prompt, provider) in Draft model
+- ✅ Fix Fal.ai API integration to use correct client library and response structure
+- ✅ **Status**: AI image generation fully functional ✅
 
 ### Analytics Tracking & Sync (COMPLETED)
 - ✅ Add analytics tracking fields to Post model
@@ -702,6 +730,7 @@
 25. **Bulk Actions Pattern**: Implemented checkbox selection with Shift+Click for range selection, following common UI patterns
 26. **Voice Input with Web Speech API**: Using browser-native Speech Recognition API for voice-to-text, requires Chrome/Edge
 27. **Rate Limit Detection**: Using remaining count and reset time to accurately identify which Twitter API limit is hit
+28. **API Request Tracking for Rate Limits**: Track all API request attempts (not just successful posts) in database to accurately detect 24-hour rate limits, since Twitter's x-rate-limit-reset header only shows shortest window (15-min), not 24-hour limit
 
 ### Design Philosophy
 - **User First**: Prototype quickly to test with real users
@@ -720,7 +749,29 @@
 
 ## Change Log
 
-### November 2025 (Latest - Analytics UI, Error Handling & UI Improvements)
+### November 2025 (Latest - Twitter API Rate Limit Tracking Improvements)
+- Implemented comprehensive Twitter API request tracking system
+  - Created TwitterApiRequest database model to track all POST /2/tweets request attempts
+  - Track requests BEFORE making API calls to ensure accurate counting (even if request fails)
+  - Count API requests (not successful posts) for accurate 24-hour rate limit detection
+  - Fixed issue where Twitter's x-rate-limit-reset header only shows shortest window (15-min), not 24-hour limit
+- Improved rate limit detection and error handling
+  - Added pre-flight rate limit check to prevent unnecessary API calls when limit is exceeded
+  - Calculate accurate 24-hour reset times based on oldest request in rolling 24-hour window
+  - Enhanced logging to show both header-based (15-min/3-hour) and database-based (24-hour) rate limit tracking
+  - Updated error messages to show request count and accurate reset times
+  - Properly distinguish between 15-minute, 3-hour, and 24-hour rate limit windows
+- Updated request record tracking
+  - Log request attempt immediately before API call
+  - Update request record with status code, success/failure, and error message after response
+  - Handle errors gracefully with proper request record updates in catch blocks
+- Database schema updates
+  - Added TwitterApiRequest model with userId, endpoint, statusCode, success, errorMessage, requestedAt fields
+  - Added index on userId and requestedAt for efficient 24-hour window queries
+  - Updated User model relation to include twitterApiRequests
+- **Status**: Twitter API rate limit tracking fully functional, accurately detects 24-hour limits ✅
+
+### November 2025 (Earlier - Analytics UI, Error Handling & UI Improvements)
 - Added analytics display UI and single-post refresh functionality
   - Created PostAnalytics component for displaying post analytics
   - Show Twitter analytics (impressions, views, likes, retweets, replies, quote tweets)
@@ -907,6 +958,6 @@
 ---
 
 **Last Updated**: November 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, Social Media Publishing, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display Complete (LinkedIn analytics unavailable due to LinkedIn API restrictions)  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai, OpenAI DALL-E, Replicate), Social Media Publishing, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete (LinkedIn analytics unavailable due to LinkedIn API restrictions)  
 **Next Milestone**: Production Deployment & User Testing
 

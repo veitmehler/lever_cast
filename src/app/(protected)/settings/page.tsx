@@ -56,6 +56,30 @@ export default function SettingsPage() {
   const [isLoadingConnections, setIsLoadingConnections] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState<Record<string, boolean>>({})
   const [editingApiKeys, setEditingApiKeys] = useState<Record<string, boolean>>({})
+  const [showImageApiKeys, setShowImageApiKeys] = useState<Record<string, boolean>>({})
+
+  // Image generation settings
+  const [imageApiKeys, setImageApiKeys] = useState<Record<string, string>>({
+    fal: '',
+    'openai-dalle': '',
+    replicate: '',
+  })
+  const [imageMaskedKeys, setImageMaskedKeys] = useState<Record<string, string>>({})
+  const [selectedImageProvider, setSelectedImageProvider] = useState('fal')
+  const [selectedImageModels, setSelectedImageModels] = useState<Record<string, string>>({
+    fal: 'fal-ai/flux/schnell',
+    'openai-dalle': 'dall-e-3',
+    replicate: 'stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf',
+  })
+  const [imageProviderModels, setImageProviderModels] = useState<Record<string, Array<{ value: string; label: string }>>>({
+    fal: [],
+    'openai-dalle': [],
+    replicate: [],
+  })
+  const [isLoadingImageModels, setIsLoadingImageModels] = useState<Record<string, boolean>>({})
+  const [isSavingImageSettings, setIsSavingImageSettings] = useState(false)
+  const [defaultImageStyle, setDefaultImageStyle] = useState('')
+  const [editingImageApiKeys, setEditingImageApiKeys] = useState<Record<string, boolean>>({})
 
   // Fetch settings and API keys on mount
   useEffect(() => {
@@ -78,6 +102,22 @@ export default function SettingsPage() {
               // If not JSON, ignore
             }
           }
+
+          // Fetch image generation settings
+          if (settings.defaultImageProvider) {
+            setSelectedImageProvider(settings.defaultImageProvider)
+          }
+          if (settings.defaultImageModel) {
+            try {
+              const models = JSON.parse(settings.defaultImageModel)
+              setSelectedImageModels(prev => ({ ...prev, ...models }))
+            } catch (e) {
+              // If not JSON, ignore
+            }
+          }
+          if (settings.defaultImageStyle) {
+            setDefaultImageStyle(settings.defaultImageStyle)
+          }
         }
 
         // Fetch API keys
@@ -97,6 +137,26 @@ export default function SettingsPage() {
             }
           })
         }
+
+        // Fetch image API keys
+        const imageKeysResponse = await fetch('/api/api-keys')
+        if (imageKeysResponse.ok) {
+          const keys: ApiKeyData[] = await imageKeysResponse.json()
+          const masked: Record<string, string> = {}
+          keys.forEach(key => {
+            if (['fal', 'openai-dalle', 'replicate'].includes(key.provider)) {
+              masked[key.provider] = key.maskedKey
+            }
+          })
+          setImageMaskedKeys(masked)
+          
+          // Fetch models for image providers that have API keys
+          Object.keys(masked).forEach(provider => {
+            if (masked[provider]) {
+              fetchImageModelsForProvider(provider)
+            }
+          })
+        }
       } catch (error) {
         console.error('Error fetching settings:', error)
       } finally {
@@ -107,15 +167,112 @@ export default function SettingsPage() {
     fetchSettings()
   }, [])
 
-  // Fetch models when API keys are saved
+  // Function to fetch image models for a provider
+  const fetchImageModelsForProvider = async (provider: string) => {
+    if (!imageMaskedKeys[provider]) return // No API key, can't fetch models
+    
+    setIsLoadingImageModels(prev => ({ ...prev, [provider]: true }))
+    try {
+      const response = await fetch(`/api/ai/models/${provider}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.models && data.models.length > 0) {
+          setImageProviderModels(prev => ({
+            ...prev,
+            [provider]: data.models,
+          }))
+          // Set default model if not already set
+          if (!selectedImageModels[provider] && data.models[0]) {
+            setSelectedImageModels(prev => ({
+              ...prev,
+              [provider]: data.models[0].value,
+            }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching image models for ${provider}:`, error)
+    } finally {
+      setIsLoadingImageModels(prev => ({ ...prev, [provider]: false }))
+    }
+  }
+
+  // Fetch image models when API keys are saved
   useEffect(() => {
-    Object.keys(maskedKeys).forEach(provider => {
-      if (maskedKeys[provider]) {
-        fetchModelsForProvider(provider)
+    Object.keys(imageMaskedKeys).forEach(provider => {
+      if (imageMaskedKeys[provider]) {
+        fetchImageModelsForProvider(provider)
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maskedKeys])
+  }, [imageMaskedKeys])
+
+  const handleSaveImageApiKey = async (provider: string) => {
+    const apiKey = imageApiKeys[provider]?.trim()
+    if (!apiKey) {
+      toast.error('Please enter an API key')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      const response = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider, apiKey }),
+      })
+
+      if (response.ok) {
+        const result: ApiKeyData = await response.json()
+        setImageMaskedKeys(prev => ({ ...prev, [provider]: result.maskedKey }))
+        setImageApiKeys(prev => ({ ...prev, [provider]: '' })) // Clear input
+        setEditingImageApiKeys(prev => ({ ...prev, [provider]: false }))
+        // Fetch models for this provider
+        fetchImageModelsForProvider(provider)
+        toast.success(`${provider} API key saved successfully`)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to save API key')
+      }
+    } catch (error) {
+      console.error('Error saving API key:', error)
+      toast.error('Failed to save API key')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveImageSettings = async () => {
+    try {
+      setIsSavingImageSettings(true)
+      const response = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          defaultImageProvider: selectedImageProvider,
+          defaultImageModel: JSON.stringify(selectedImageModels),
+          defaultImageStyle: defaultImageStyle,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('Image generation settings saved successfully')
+      } else {
+        const error = await response.json()
+        console.error('Failed to save image settings:', error)
+        toast.error(error.details || error.error || 'Failed to save image settings')
+      }
+    } catch (error) {
+      console.error('Error saving image settings:', error)
+      toast.error('Failed to save image settings')
+    } finally {
+      setIsSavingImageSettings(false)
+    }
+  }
 
   // Function to fetch models for a provider
   const fetchModelsForProvider = async (provider: string) => {
@@ -582,6 +739,201 @@ export default function SettingsPage() {
                   </>
                 )}
               </Button>
+            </>
+          )}
+        </div>
+
+        {/* AI Image Generation Settings */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-4">AI Image Generation Settings</h2>
+          
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">
+                Default Image Provider
+              </label>
+              <select
+                value={selectedImageProvider}
+                onChange={(e) => setSelectedImageProvider(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="fal">Fal.ai</option>
+                <option value="openai-dalle">OpenAI DALL-E</option>
+                <option value="replicate">Replicate</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select which provider to use by default when generating images
+              </p>
+            </div>
+
+            {/* Model Selection for each image provider */}
+            <div className="space-y-3">
+              {['fal', 'openai-dalle', 'replicate'].map((provider) => {
+                const hasApiKey = !!imageMaskedKeys[provider]
+                const models = imageProviderModels[provider] || []
+                const isLoadingModel = isLoadingImageModels[provider]
+                const providerLabel = provider === 'openai-dalle' ? 'OpenAI DALL-E' : provider === 'fal' ? 'Fal.ai' : 'Replicate'
+                
+                return (
+                  <div key={provider}>
+                    <label className="text-sm font-medium text-card-foreground mb-2 block">
+                      {providerLabel} Model
+                      {hasApiKey && isLoadingModel && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          <Loader2 className="w-3 h-3 inline animate-spin" /> Loading models...
+                        </span>
+                      )}
+                      {hasApiKey && !isLoadingModel && models.length === 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">(No models available)</span>
+                      )}
+                    </label>
+                    <select
+                      value={selectedImageModels[provider] || models[0]?.value || ''}
+                      onChange={(e) => setSelectedImageModels(prev => ({ ...prev, [provider]: e.target.value }))}
+                      disabled={models.length === 0}
+                      className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {models.length > 0 ? (
+                        models.map((model) => (
+                          <option key={model.value} value={model.value}>
+                            {model.label}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">No models available</option>
+                      )}
+                    </select>
+                    {!hasApiKey && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Add an API key to see available models
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-card-foreground mb-2 block">
+                Default Style Instructions
+              </label>
+              <textarea
+                value={defaultImageStyle}
+                onChange={(e) => setDefaultImageStyle(e.target.value)}
+                placeholder="e.g., minimalist, professional, colorful, abstract..."
+                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Default style instructions to append to image generation prompts
+              </p>
+            </div>
+
+            <Button
+              onClick={handleSaveImageSettings}
+              disabled={isSavingImageSettings}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isSavingImageSettings ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving Image Settings...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Image Settings
+                </>
+              )}
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {['fal', 'openai-dalle', 'replicate'].map((provider) => {
+                  const hasExistingKey = !!imageMaskedKeys[provider]
+                  const isEditing = editingImageApiKeys[provider] || false
+                  const inputValue = imageApiKeys[provider] || ''
+                  const displayValue = inputValue || (hasExistingKey && !isEditing ? imageMaskedKeys[provider] : '')
+                  const providerLabel = provider === 'openai-dalle' ? 'OpenAI DALL-E' : provider === 'fal' ? 'Fal.ai' : 'Replicate'
+                  
+                  return (
+                    <div key={provider}>
+                      <label className="text-sm font-medium text-card-foreground mb-2 block">
+                        {providerLabel} API Key
+                        {hasExistingKey && !isEditing && !inputValue && (
+                          <span className="ml-2 text-xs text-muted-foreground">(Saved)</span>
+                        )}
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type={showImageApiKeys[provider] && (inputValue || isEditing) ? 'text' : 'password'}
+                            value={isEditing ? inputValue : displayValue}
+                            onChange={(e) => {
+                              setImageApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
+                              if (!isEditing && hasExistingKey) {
+                                setEditingImageApiKeys(prev => ({ ...prev, [provider]: true }))
+                              }
+                            }}
+                            placeholder={hasExistingKey && !isEditing ? imageMaskedKeys[provider] : `Enter your ${providerLabel} API key`}
+                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                          {(inputValue || isEditing) && (
+                            <button
+                              onClick={() => {
+                                setShowImageApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showImageApiKeys[provider] ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        {(inputValue || isEditing) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!inputValue || isSaving}
+                            onClick={() => {
+                              handleSaveImageApiKey(provider)
+                              setEditingImageApiKeys(prev => ({ ...prev, [provider]: false }))
+                            }}
+                            className="px-3"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </Button>
+                        )}
+                        {hasExistingKey && !isEditing && !inputValue && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingImageApiKeys(prev => ({ ...prev, [provider]: true }))
+                              setImageApiKeys(prev => ({ ...prev, [provider]: '' }))
+                            }}
+                            className="px-3"
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </>
           )}
         </div>

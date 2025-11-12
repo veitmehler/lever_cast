@@ -8,6 +8,7 @@
 
   * Idea Capture (text + voice)
   * AI Processing (LLM integration)
+  * AI Image Generation (Fal.ai, OpenAI DALL-E, Replicate)
   * Preview & Editing (LinkedIn/Twitter UI)
   * Publishing (OAuth integration)
   * API Key & Account Settings
@@ -75,6 +76,7 @@
 | **Backend**       | Supabase + Prisma                       | Database, auth, storage             |
 | **Auth**          | Clerk                                   | OAuth, session, and user management |
 | **LLM APIs**      | OpenAI, Anthropic, Vertex, OpenRouter   | AI text generation                  |
+| **Image Gen APIs** | Fal.ai, OpenAI DALL-E, Replicate      | AI image generation                 |
 | **Payments**      | Stripe                                  | Subscription billing                |
 | **Deployment**    | Vercel                                  | Hosting + serverless runtime        |
 | **Notifications** | Sonner                                  | Success/error toasts                |
@@ -131,6 +133,8 @@
 | ----------------------- | -------- | ----------------------------------------------- |
 | `/api/process`          | POST     | Sends text/audio → returns AI-generated outputs |
 | `/api/publish`          | POST     | Publishes post to LinkedIn/Twitter              |
+| `/api/images/generate`  | POST     | Generates AI images from post content           |
+| `/api/images/upload`    | POST     | Uploads images to Supabase Storage              |
 | `/api/voice/transcribe` | POST     | Converts audio to text                          |
 | `/api/keys`             | GET/POST | Manage API key storage                          |
 | `/api/user`             | GET      | Fetch user profile, linked accounts             |

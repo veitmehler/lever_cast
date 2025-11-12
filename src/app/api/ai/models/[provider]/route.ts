@@ -170,6 +170,63 @@ export async function GET(
           break
         }
 
+        // Image generation providers
+        case 'fal': {
+          // Fal.ai models
+          models = [
+            { value: 'fal-ai/flux/schnell', label: 'Flux Schnell (Fast)' },
+            { value: 'fal-ai/flux/dev', label: 'Flux Dev (High Quality)' },
+            { value: 'fal-ai/stable-diffusion-v3', label: 'Stable Diffusion v3' },
+            { value: 'fal-ai/flux-pro', label: 'Flux Pro (Premium)' },
+          ]
+          break
+        }
+
+        case 'openai-dalle': {
+          // OpenAI DALL-E models
+          models = [
+            { value: 'dall-e-3', label: 'DALL-E 3 (Recommended)' },
+            { value: 'dall-e-2', label: 'DALL-E 2' },
+          ]
+          break
+        }
+
+        case 'replicate': {
+          // Replicate models - fetch from API if possible, otherwise use common models
+          try {
+            const response = await fetch('https://api.replicate.com/v1/models', {
+              headers: {
+                'Authorization': `Token ${apiKey}`,
+              },
+            })
+
+            if (response.ok) {
+              const data = await response.json() as { results: Array<{ name: string; description?: string }> }
+              models = data.results
+                .filter(model => 
+                  model.name.includes('stable-diffusion') || 
+                  model.name.includes('flux') ||
+                  model.name.includes('midjourney')
+                )
+                .map(model => ({
+                  value: model.name,
+                  label: model.description || model.name,
+                }))
+                .slice(0, 20) // Limit to top 20
+            } else {
+              throw new Error('API request failed')
+            }
+          } catch {
+            // Fallback to common Replicate models
+            models = [
+              { value: 'stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf', label: 'Stable Diffusion v2.1' },
+              { value: 'black-forest-labs/flux:latest', label: 'Flux (Latest)' },
+              { value: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b', label: 'Stable Diffusion XL' },
+            ]
+          }
+          break
+        }
+
         default:
           return NextResponse.json(
             { error: `Unknown provider: ${provider}` },
@@ -207,6 +264,19 @@ export async function GET(
           { value: 'anthropic/claude-3.5-sonnet', label: 'Anthropic Claude 3.5 Sonnet' },
           { value: 'google/gemini-pro', label: 'Google Gemini Pro' },
           { value: 'meta-llama/llama-3.1-70b-instruct', label: 'Meta Llama 3.1 70B' },
+        ],
+        fal: [
+          { value: 'fal-ai/flux/schnell', label: 'Flux Schnell (Fast)' },
+          { value: 'fal-ai/flux/dev', label: 'Flux Dev (High Quality)' },
+          { value: 'fal-ai/stable-diffusion-v3', label: 'Stable Diffusion v3' },
+        ],
+        'openai-dalle': [
+          { value: 'dall-e-3', label: 'DALL-E 3 (Recommended)' },
+          { value: 'dall-e-2', label: 'DALL-E 2' },
+        ],
+        replicate: [
+          { value: 'stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf', label: 'Stable Diffusion v2.1' },
+          { value: 'black-forest-labs/flux:latest', label: 'Flux (Latest)' },
         ],
       }
 

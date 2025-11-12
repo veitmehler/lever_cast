@@ -65,6 +65,9 @@ export async function GET() {
           sidebarState: 'open',
           defaultProvider: null,
           defaultModel: null,
+          defaultImageProvider: null,
+          defaultImageModel: null,
+          defaultImageStyle: null,
         },
       })
     }
@@ -90,13 +93,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { theme, sidebarState, defaultProvider, defaultModel } = body
+    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle } = body
 
     console.log('Updating settings with:', {
       theme,
       sidebarState,
       defaultProvider,
       defaultModel: defaultModel ? 'present' : 'missing',
+      defaultImageProvider,
+      defaultImageModel: defaultImageModel ? 'present' : 'missing',
+      defaultImageStyle: defaultImageStyle ? 'present' : 'missing',
     })
 
     const user = await getOrCreateUser(clerkId)
@@ -115,6 +121,9 @@ export async function PATCH(request: NextRequest) {
           sidebarState: sidebarState || 'open',
           defaultProvider: defaultProvider || null,
           defaultModel: defaultModel || null,
+          defaultImageProvider: defaultImageProvider || null,
+          defaultImageModel: defaultImageModel || null,
+          defaultImageStyle: defaultImageStyle || null,
         },
       })
     } else {
@@ -126,6 +135,9 @@ export async function PATCH(request: NextRequest) {
         sidebarState?: string
         defaultProvider?: string | null
         defaultModel?: string | null
+        defaultImageProvider?: string | null
+        defaultImageModel?: string | null
+        defaultImageStyle?: string | null
       } = {
         lastLogin: new Date(),
       }
@@ -137,6 +149,15 @@ export async function PATCH(request: NextRequest) {
       }
       if (defaultModel !== undefined) {
         updateData.defaultModel = defaultModel || null
+      }
+      if (defaultImageProvider !== undefined) {
+        updateData.defaultImageProvider = defaultImageProvider || null
+      }
+      if (defaultImageModel !== undefined) {
+        updateData.defaultImageModel = defaultImageModel || null
+      }
+      if (defaultImageStyle !== undefined) {
+        updateData.defaultImageStyle = defaultImageStyle || null
       }
 
       console.log('Update data:', updateData)

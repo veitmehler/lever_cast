@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ImageGenerationModal } from '@/components/ImageGenerationModal'
 
 // TypeScript definitions for Web Speech API
 interface SpeechRecognition extends EventTarget {
@@ -84,6 +85,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
   const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
   const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -307,6 +309,10 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  const handleImageGenerated = (imageUrl: string) => {
+    setSelectedImage(imageUrl)
   }
 
   const toggleRecording = () => {
@@ -618,7 +624,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploadingImage}
           className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          title={isUploadingImage ? 'Uploading image...' : 'Attach image'}
+          title={isUploadingImage ? 'Uploading image...' : 'Upload image'}
         >
           {isUploadingImage ? (
             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -634,6 +640,14 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           className="hidden"
         />
 
+        <button
+          onClick={() => setIsImageGenerationModalOpen(true)}
+          className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center"
+          title="Generate image with AI"
+        >
+          <Sparkles className="w-5 h-5" />
+        </button>
+
         <div className="flex-1" />
 
         <Button
@@ -645,6 +659,14 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           Generate Posts
         </Button>
       </div>
+
+      {/* Image Generation Modal */}
+      <ImageGenerationModal
+        isOpen={isImageGenerationModalOpen}
+        onClose={() => setIsImageGenerationModalOpen(false)}
+        onImageGenerated={handleImageGenerated}
+        postContent={content || 'Generate an image for my post'}
+      />
     </div>
   )
 }

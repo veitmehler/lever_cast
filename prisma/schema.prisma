@@ -29,6 +29,7 @@ model User {
   settings            Settings?
   templates           Template[]
   socialConnections   SocialConnection[]
+  twitterApiRequests  TwitterApiRequest[]
 
   @@map("users")
 }
@@ -43,6 +44,8 @@ model Draft {
   platforms        String    // JSON array: ["linkedin", "twitter"] or "both"
   templateId       String?   // Which template was used
   attachedImage    String?   // Supabase Storage URL (not base64)
+  imageGenerationPrompt String? @db.Text // Store the prompt used for image generation
+  imageGenerationProvider String? // Which provider was used (fal, openai-dalle, replicate)
   status           String    @default("draft") // draft, published
   publishedAt      DateTime? // When the draft was published
   createdAt        DateTime  @default(now())
@@ -112,6 +115,9 @@ model Settings {
   sidebarState String  @default("open")
   defaultProvider String? // openai, anthropic, gemini, openrouter
   defaultModel String? @db.Text // JSON string: {"openai": "gpt-4o-mini", "anthropic": "claude-3-5-sonnet-20241022", ...}
+  defaultImageProvider String? // fal, openai-dalle, replicate
+  defaultImageModel String? @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
+  defaultImageStyle String? @db.Text // Default style instructions for image generation
   lastLogin   DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -163,4 +169,20 @@ model SocialConnection {
   @@unique([userId, platform])
   @@index([userId, isActive])
   @@map("social_connections")
+}
+
+model TwitterApiRequest {
+  id            String   @id @default(cuid())
+  userId        String
+  endpoint      String   // e.g., "POST /2/tweets", "POST /2/media/upload"
+  statusCode    Int?     // HTTP status code (null if request failed before response)
+  success       Boolean  // Whether the request succeeded
+  errorMessage  String?  @db.Text // Error message if failed
+  requestedAt   DateTime @default(now()) // When the request was made
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, requestedAt])
+  @@map("twitter_api_requests")
 }

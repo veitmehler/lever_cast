@@ -130,13 +130,19 @@ export async function uploadImageToTwitter(
     // Download image from Supabase Storage
     const imageBuffer = await downloadImageFromStorage(imageUrl)
     
-    // Upload to Twitter using v1.1 media/upload endpoint
-    // Twitter requires multipart/form-data with the image as binary data
+    // Upload to Twitter using v2 media/upload endpoint
+    // Twitter v2 endpoint supports OAuth 2.0 User Context with media.write scope
+    // Requires media_category parameter: "tweet_image" for images attached to tweets
     const formData = new FormData()
-    const blob = new Blob([imageBuffer])
-    formData.append('media', blob)
+    const blob = new Blob([imageBuffer], { type: 'image/jpeg' }) // Explicitly set content type
+    formData.append('media', blob, 'image.jpg')
+    formData.append('media_category', 'tweet_image') // Required for v2 endpoint
 
-    const uploadResponse = await fetch(`${TWITTER_API_V1_BASE}/media/upload.json`, {
+    console.log(`[Twitter API] Uploading image to ${TWITTER_API_BASE}/media/upload`)
+    console.log(`[Twitter API] Image size: ${imageBuffer.length} bytes`)
+    console.log(`[Twitter API] Media category: tweet_image`)
+    
+    const uploadResponse = await fetch(`${TWITTER_API_BASE}/media/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -145,20 +151,50 @@ export async function uploadImageToTwitter(
       body: formData,
     })
 
+    console.log(`[Twitter API] Upload response status: ${uploadResponse.status} ${uploadResponse.statusText}`)
+    
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text()
+      let errorDetails: any
+      try {
+        errorDetails = JSON.parse(errorText)
+      } catch {
+        errorDetails = { error: errorText }
+      }
+      
       console.error('[Twitter API] Image upload failed:', {
         status: uploadResponse.status,
-        error: errorText,
+        statusText: uploadResponse.statusText,
+        error: errorDetails,
+        headers: Object.fromEntries(uploadResponse.headers.entries()),
       })
-      throw new Error(`Failed to upload image: ${uploadResponse.status} ${uploadResponse.statusText}`)
+      
+      // Provide more specific error messages
+      if (uploadResponse.status === 404) {
+        throw new Error(`Twitter media upload endpoint not found (404). Free tier DOES support image uploads, so this may indicate:
+1. The endpoint URL is incorrect (we're using /2/media/upload)
+2. Your OAuth token doesn't have the 'media.write' scope
+3. Try disconnecting and reconnecting your Twitter account to get a new token with media.write scope`)
+      } else if (uploadResponse.status === 403) {
+        throw new Error(`Twitter rejected media upload (403). Free tier DOES support image uploads, so this usually means:
+1. Your OAuth token doesn't have the 'media.write' scope
+2. Try disconnecting and reconnecting your Twitter account to get a new token with media.write scope
+3. Verify your app has "Read and write" permissions enabled`)
+      } else {
+        throw new Error(`Failed to upload image: ${uploadResponse.status} ${uploadResponse.statusText}. Error: ${errorDetails.error || errorDetails.message || errorText}`)
+      }
     }
 
     const uploadResult = await uploadResponse.json()
-    const mediaId = uploadResult.media_id_string || uploadResult.media_id
+    console.log(`[Twitter API] Upload result:`, uploadResult)
+    
+    // Twitter API v2 returns the media ID as 'id' inside the 'data' object
+    // Format: { data: { id: '...', media_key: '...', ... } }
+    const mediaId = uploadResult.data?.id || uploadResult.id || uploadResult.media_id || uploadResult.media_id_string
     
     if (!mediaId) {
-      throw new Error('Twitter API did not return media ID')
+      console.error('[Twitter API] Upload response missing media ID:', uploadResult)
+      throw new Error('Twitter API did not return media ID. Response: ' + JSON.stringify(uploadResult))
     }
 
     console.log(`[Twitter API] Image uploaded successfully, media_id: ${mediaId}`)
@@ -178,8 +214,95 @@ export async function postToTwitter(
   replyToTweetId?: string,
   imageUrl?: string
 ): Promise<{ success: true; postUrl: string; tweetId: string } | { success: false; error: string }> {
+  let requestId: string | undefined
+  
   try {
     console.log(`[Twitter API] Posting tweet for user ${userId}, replyTo: ${replyToTweetId || 'none'}`)
+    
+    // Check 24-hour rate limit by counting API requests in database
+    // Twitter Free tier: 17 requests per 24 hours
+    // Twitter Basic tier: 100 requests per 24 hours
+    // Rate limit applies to REQUESTS, not successful posts
+    const FREE_TIER_24H_LIMIT = 17
+    const BASIC_TIER_24H_LIMIT = 100
+    
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const requestsLast24Hours = await prisma.twitterApiRequest.count({
+      where: {
+        userId,
+        endpoint: 'POST /2/tweets', // Only count tweet posting requests, not media uploads
+        requestedAt: {
+          gte: twentyFourHoursAgo,
+        },
+      },
+    })
+    
+    console.log(`[Twitter API] POST /2/tweets requests in last 24 hours: ${requestsLast24Hours} (Free limit: ${FREE_TIER_24H_LIMIT}, Basic limit: ${BASIC_TIER_24H_LIMIT})`)
+    
+    // Check against Free tier limit (conservative)
+    if (requestsLast24Hours >= FREE_TIER_24H_LIMIT) {
+      // Find the oldest request in the last 24 hours to calculate when limit resets
+      const oldestRequest = await prisma.twitterApiRequest.findFirst({
+        where: {
+          userId,
+          endpoint: 'POST /2/tweets',
+          requestedAt: {
+            gte: twentyFourHoursAgo,
+          },
+        },
+        orderBy: {
+          requestedAt: 'asc',
+        },
+        select: {
+          requestedAt: true,
+        },
+      })
+      
+      let resetTime: Date | null = null
+      if (oldestRequest?.requestedAt) {
+        resetTime = new Date(oldestRequest.requestedAt.getTime() + 24 * 60 * 60 * 1000)
+      }
+      
+      const hoursUntilReset = resetTime ? (resetTime.getTime() - Date.now()) / (1000 * 60 * 60) : null
+      const minutesUntilReset = resetTime ? Math.ceil((resetTime.getTime() - Date.now()) / 60000) : null
+      
+      let errorMessage = `24-hour rate limit exceeded. You've made ${requestsLast24Hours} POST /2/tweets request(s) in the last 24 hours. `
+      
+      if (resetTime && hoursUntilReset !== null) {
+        const hours = Math.floor(hoursUntilReset)
+        const minutes = Math.floor((hoursUntilReset - hours) * 60)
+        if (hours > 0) {
+          errorMessage += `Rate limit resets in ${hours} hour(s) and ${minutes} minute(s) (at ${resetTime.toISOString()}). `
+        } else if (minutesUntilReset !== null) {
+          errorMessage += `Rate limit resets in ${minutesUntilReset} minute(s) (at ${resetTime.toISOString()}). `
+        }
+      }
+      
+      errorMessage += `Twitter Free tier allows ${FREE_TIER_24H_LIMIT} requests per 24 hours. Basic tier allows ${BASIC_TIER_24H_LIMIT} requests per 24 hours.`
+      
+      console.log(`[Twitter API] 24-hour rate limit check failed:`, {
+        requestsLast24Hours,
+        limit: FREE_TIER_24H_LIMIT,
+        resetTime: resetTime?.toISOString(),
+        hoursUntilReset,
+        minutesUntilReset,
+      })
+      
+      return { success: false, error: errorMessage }
+    }
+    
+    // Log this request attempt BEFORE making the API call
+    // This ensures we count the request even if it fails
+    const requestRecord = await prisma.twitterApiRequest.create({
+      data: {
+        userId,
+        endpoint: 'POST /2/tweets',
+        statusCode: null, // Will be updated after response
+        success: false, // Will be updated after response
+        errorMessage: null,
+      },
+    })
+    requestId = requestRecord.id
     
     // Get Twitter connection
     const connection = await getSocialConnection(userId, 'twitter')
@@ -228,6 +351,30 @@ export async function postToTwitter(
         return { success: false, error: 'Twitter/X access token expired. Please reconnect your account.' }
       }
     }
+    
+    // Verify token has write permissions by checking user info
+    // This helps debug permission issues
+    try {
+      const verifyResponse = await fetch(`${TWITTER_API_BASE}/users/me?user.fields=id,username`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      })
+      
+      if (!verifyResponse.ok) {
+        const verifyError = await verifyResponse.json().catch(() => ({ detail: 'Unknown error' }))
+        console.error(`[Twitter API] Token verification failed:`, {
+          status: verifyResponse.status,
+          error: verifyError,
+        })
+      } else {
+        const verifyData = await verifyResponse.json()
+        console.log(`[Twitter API] Token verified, user:`, verifyData.data?.username || 'unknown')
+      }
+    } catch (error) {
+      console.warn(`[Twitter API] Could not verify token:`, error)
+    }
+    
     // Upload image if provided
     let mediaId: string | undefined
     if (imageUrl) {
@@ -264,14 +411,26 @@ export async function postToTwitter(
     // Post to Twitter/X
     console.log(`[Twitter API] Making POST request to ${TWITTER_API_BASE}/tweets`)
     console.log(`[Twitter API] Request body:`, JSON.stringify(tweetData, null, 2))
+    console.log(`[Twitter API] Using access token (first 20 chars): ${accessToken.substring(0, 20)}...`)
     
-    const postResponse = await fetch(`${TWITTER_API_BASE}/tweets`, {
+    let postResponse = await fetch(`${TWITTER_API_BASE}/tweets`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Levercast/1.0',
       },
       body: JSON.stringify(tweetData),
+    })
+    
+    // Log response headers for debugging
+    const responseHeaders = Object.fromEntries(postResponse.headers.entries())
+    console.log(`[Twitter API] Response headers:`, {
+      'x-access-level': responseHeaders['x-access-level'],
+      'x-rate-limit-remaining': responseHeaders['x-rate-limit-remaining'],
+      'x-rate-limit-limit': responseHeaders['x-rate-limit-limit'],
+      'www-authenticate': responseHeaders['www-authenticate'],
     })
 
     console.log(`[Twitter API] Response status: ${postResponse.status} ${postResponse.statusText}`)
@@ -285,8 +444,36 @@ export async function postToTwitter(
       console.log(`[Twitter API] Rate limit info:`, {
         remaining: rateLimitRemaining,
         limit: rateLimitLimit,
-        reset: rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toISOString() : null,
+        resetEpoch: rateLimitReset,
+        reset: rateLimitReset ? new Date(parseInt(rateLimitReset, 10) * 1000).toISOString() : null,
       })
+    }
+
+    // If posting with media fails with 403, try posting without media
+    // Free tier might not support tweets with media attachments
+    if (!postResponse.ok && postResponse.status === 403 && mediaId) {
+      console.log(`[Twitter API] Posting with media failed (403), trying text-only post...`)
+      const textOnlyData = {
+        text: content,
+        ...(replyToTweetId ? { reply: { in_reply_to_tweet_id: replyToTweetId } } : {}),
+      }
+      
+      postResponse = await fetch(`${TWITTER_API_BASE}/tweets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'Levercast/1.0',
+        },
+        body: JSON.stringify(textOnlyData),
+      })
+      
+      console.log(`[Twitter API] Text-only post response status: ${postResponse.status} ${postResponse.statusText}`)
+      
+      if (postResponse.ok) {
+        console.log(`[Twitter API] Text-only post succeeded (Free tier may not support tweets with media)`)
+      }
     }
 
     if (!postResponse.ok) {
@@ -310,70 +497,135 @@ export async function postToTwitter(
       // Provide more helpful error messages
       let errorMessage = error.detail || error.title || error.message
       
+      // Handle 403 Forbidden - permissions issue
+      if (postResponse.status === 403) {
+        // Check if it's a duplicate content issue
+        if (errorMessage?.toLowerCase().includes('duplicate') || errorMessage?.toLowerCase().includes('already')) {
+          errorMessage = `Twitter rejected this post because it appears to be duplicate content. Please modify the content slightly and try again.`
+        } else {
+          // Check if Twitter API v2 requires elevated access
+          errorMessage = `Twitter API returned 403 Forbidden: "${errorMessage}". 
+
+**Diagnosis**: Your token shows 'read-write' permissions, but tweet posting is still blocked.
+
+Possible causes:
+1. **Free tier limitation**: Free tier may not support posting tweets WITH media attachments (even though both work separately)
+2. Your Twitter account may have restrictions or be in read-only mode
+3. Twitter's Free tier might have undocumented restrictions on POST /2/tweets
+
+**What we tried**:
+- ✅ Image upload works (media.write scope confirmed)
+- ✅ Token has read-write permissions (x-access-level header confirmed)
+- ❌ Tweet posting fails (403 Forbidden)
+
+**To fix this**:
+1. **Try posting without an image** - Free tier might only support text-only tweets
+2. **Upgrade to Basic tier** ($100/month) for full write access including media attachments
+3. Check your Twitter account status (not suspended/restricted)
+4. Contact Twitter Developer Support if Free tier should support this`
+        }
+        return { success: false, error: errorMessage }
+      }
+      
       // Handle rate limiting separately
       if (postResponse.status === 429) {
         // Extract reset time from headers
-        const rateLimitReset = postResponse.headers.get('x-rate-limit-reset')
+        const rateLimitResetRaw = postResponse.headers.get('x-rate-limit-reset')
         const rateLimitRemaining = postResponse.headers.get('x-rate-limit-remaining')
         const rateLimitLimit = postResponse.headers.get('x-rate-limit-limit')
-        const resetTime = rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000) : null
-        const minutesUntilReset = resetTime ? Math.ceil((resetTime.getTime() - Date.now()) / 60000) : null
+        const resetTime = rateLimitResetRaw ? new Date(parseInt(rateLimitResetRaw, 10) * 1000) : null
+        const secondsUntilReset = resetTime ? Math.max(0, Math.round((resetTime.getTime() - Date.now()) / 1000)) : null
+        const minutesUntilReset = secondsUntilReset !== null ? Math.ceil(secondsUntilReset / 60) : null
+        const hoursUntilReset = secondsUntilReset !== null ? secondsUntilReset / 3600 : null
+        const remaining = rateLimitRemaining ? parseInt(rateLimitRemaining, 10) : null
         
-        // Determine which rate limit window based on remaining count and reset time
-        const hoursUntilReset = resetTime ? (resetTime.getTime() - Date.now()) / (1000 * 60 * 60) : null
-        const remaining = rateLimitRemaining ? parseInt(rateLimitRemaining) : null
+        // Also check our database for 24-hour limit (count REQUESTS, not posts)
+        const FREE_TIER_24H_LIMIT = 17
+        const BASIC_TIER_24H_LIMIT = 100
         
-        // Better detection: Use remaining count to identify which limit is hit
-        // 24-hour limit (Free plan): 17 tweets max, so remaining will be 0-17
-        // 24-hour limit (Basic plan): 100 tweets max, so remaining will be 0-100
-        // 15-minute limit: Usually 100 tweets, so remaining will be 0-100
-        // 3-hour limit: Usually 300 tweets, so remaining will be 0-300
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const requestsLast24Hours = await prisma.twitterApiRequest.count({
+          where: {
+            userId,
+            endpoint: 'POST /2/tweets',
+            requestedAt: {
+              gte: twentyFourHoursAgo,
+            },
+          },
+        })
+        
+        // Find oldest request in last 24h to calculate 24h reset time
+        const oldestRequest = await prisma.twitterApiRequest.findFirst({
+          where: {
+            userId,
+            endpoint: 'POST /2/tweets',
+            requestedAt: {
+              gte: twentyFourHoursAgo,
+            },
+          },
+          orderBy: {
+            requestedAt: 'asc',
+          },
+          select: {
+            requestedAt: true,
+          },
+        })
+        
+        const db24hResetTime = oldestRequest?.requestedAt 
+          ? new Date(oldestRequest.requestedAt.getTime() + 24 * 60 * 60 * 1000)
+          : null
+        const db24hHoursUntilReset = db24hResetTime 
+          ? (db24hResetTime.getTime() - Date.now()) / (1000 * 60 * 60)
+          : null
+        
         let is24HourLimit = false
         let is15MinLimit = false
         let is3HourLimit = false
         
-        if (remaining !== null) {
-          // If remaining is very high (like 1079998), it's likely the 3-hour window limit
-          // But if we're getting 429, we've hit SOME limit, so check reset time
-          if (remaining > 1000) {
-            // High remaining but 429 error suggests a different limit window
-            // Check reset time to determine
-            if (hoursUntilReset !== null && hoursUntilReset >= 20) {
-              is24HourLimit = true // 24-hour limit resets in 20+ hours
-            } else if (hoursUntilReset !== null && hoursUntilReset >= 1 && hoursUntilReset < 4) {
-              is3HourLimit = true // 3-hour limit resets in 1-4 hours
-            }
-          }
-          // If remaining is 0-17, it's likely the 24-hour Free plan limit
-          else if (remaining <= 17) {
-            is24HourLimit = true
-          }
-          // If remaining is 0-100 and reset is in 20+ hours, it's likely the 24-hour Basic plan limit
-          else if (remaining <= 100 && hoursUntilReset !== null && hoursUntilReset >= 20) {
-            is24HourLimit = true
-          }
-          // If reset is very soon (< 1 hour) and remaining is low, it's likely the 15-minute limit
-          else if (hoursUntilReset !== null && hoursUntilReset < 1 && remaining <= 100) {
+        // Check database first - if we've hit 24h limit, that's likely the issue
+        if (requestsLast24Hours >= FREE_TIER_24H_LIMIT) {
+          is24HourLimit = true
+        } else if (secondsUntilReset !== null) {
+          // Otherwise, use header reset time to determine window
+          const within = (targetSeconds: number) => secondsUntilReset <= targetSeconds + 60 // add one-minute buffer
+          
+          if (within(15 * 60)) {
             is15MinLimit = true
-          }
-          // If reset is in 1-4 hours, it's likely the 3-hour limit
-          else if (hoursUntilReset !== null && hoursUntilReset >= 1 && hoursUntilReset < 4) {
+          } else if (within(3 * 60 * 60)) {
             is3HourLimit = true
+          } else if (within(24 * 60 * 60)) {
+            is24HourLimit = true
           }
-          // Default: if reset is soon but remaining is high, assume 24-hour limit
-          else if (hoursUntilReset !== null && hoursUntilReset < 24) {
+        }
+        
+        if (!is15MinLimit && !is3HourLimit && !is24HourLimit && remaining !== null) {
+          if (remaining <= 17) {
+            is24HourLimit = true
+          } else if (remaining <= 100 && (minutesUntilReset !== null && minutesUntilReset <= 15)) {
+            is15MinLimit = true
+          } else if (remaining <= 300 && (hoursUntilReset !== null && hoursUntilReset <= 4)) {
+            is3HourLimit = true
+          } else if (remaining <= 100 && (hoursUntilReset !== null && hoursUntilReset >= 20)) {
             is24HourLimit = true
           }
         }
         
         if (minutesUntilReset !== null) {
           if (is24HourLimit) {
-            const hours = Math.floor(hoursUntilReset || 0)
-            const minutes = Math.floor(((hoursUntilReset || 0) - hours) * 60)
+            // Use database reset time if available (more accurate for 24h limit)
+            const resetTimeToUse = db24hResetTime || resetTime
+            const hoursToUse = db24hHoursUntilReset !== null ? db24hHoursUntilReset : hoursUntilReset
+            const minutesToUse = hoursToUse !== null 
+              ? Math.ceil((hoursToUse - Math.floor(hoursToUse)) * 60)
+              : minutesUntilReset
+            
+            const hours = hoursToUse !== null ? Math.floor(hoursToUse) : 0
+            const minutes = minutesToUse !== null ? minutesToUse : minutesUntilReset || 0
+            
             if (hours > 0) {
-              errorMessage = `Rate limit exceeded (24-hour window). Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 17 tweets per 24 hours (Free plan) or 100 tweets per 24 hours (Basic plan).`
+              errorMessage = `Rate limit exceeded (24-hour window). You've made ${requestsLast24Hours} POST /2/tweets request(s) in the last 24 hours. Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTimeToUse?.toISOString()}. Twitter allows ${FREE_TIER_24H_LIMIT} requests per 24 hours (Free plan) or ${BASIC_TIER_24H_LIMIT} requests per 24 hours (Basic plan).`
             } else {
-              errorMessage = `Rate limit exceeded (24-hour window). Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 17 tweets per 24 hours (Free plan) or 100 tweets per 24 hours (Basic plan).`
+              errorMessage = `Rate limit exceeded (24-hour window). You've made ${requestsLast24Hours} POST /2/tweets request(s) in the last 24 hours. Please wait ${minutes} minute(s) before trying again. Rate limit resets at ${resetTimeToUse?.toISOString()}. Twitter allows ${FREE_TIER_24H_LIMIT} requests per 24 hours (Free plan) or ${BASIC_TIER_24H_LIMIT} requests per 24 hours (Basic plan).`
             }
           } else if (is3HourLimit) {
             const hours = Math.floor(hoursUntilReset || 0)
@@ -385,18 +637,24 @@ export async function postToTwitter(
             errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}.`
           }
         } else {
-          errorMessage = `Rate limit exceeded. Twitter API rate limits: 100 tweets per 15 minutes (Pro), 100 tweets per 24 hours (Basic), or 17 tweets per 24 hours (Free). Please wait before trying again.`
+          errorMessage = `Rate limit exceeded. Twitter API rate limits: 100 tweets per 15 minutes (Pro), ${BASIC_TIER_24H_LIMIT} tweets per 24 hours (Basic), or ${FREE_TIER_24H_LIMIT} tweets per 24 hours (Free). Please wait before trying again.`
         }
         
         console.log(`[Twitter API] Rate limit details:`, {
           remaining: rateLimitRemaining,
           limit: rateLimitLimit,
+          resetEpoch: rateLimitResetRaw,
           reset: resetTime?.toISOString(),
+          secondsUntilReset,
           minutesUntilReset,
           hoursUntilReset,
           is15MinLimit,
           is3HourLimit,
           is24HourLimit,
+          // Database-based 24h tracking (REQUESTS, not posts)
+          requestsLast24Hours,
+          db24hResetTime: db24hResetTime?.toISOString(),
+          db24hHoursUntilReset,
         })
       } else if (postResponse.status === 401) {
         // If we get 401, try refreshing token once more (in case token expired between check and request)
@@ -480,6 +738,18 @@ export async function postToTwitter(
         }
       }
       
+      // Update request record with error
+      await prisma.twitterApiRequest.update({
+        where: { id: requestId },
+        data: {
+          statusCode: postResponse.status,
+          success: false,
+          errorMessage: errorMessage || `Twitter API error: ${postResponse.status} ${postResponse.statusText}`,
+        },
+      }).catch(err => {
+        console.error('[Twitter API] Failed to update request record:', err)
+      })
+      
       return { 
         success: false, 
         error: errorMessage || `Twitter API error: ${postResponse.status} ${postResponse.statusText}` 
@@ -488,6 +758,15 @@ export async function postToTwitter(
 
     const result: TwitterPostResponse = await postResponse.json()
     const tweetId = result.data.id
+    
+    // Update request record with success
+    await prisma.twitterApiRequest.update({
+      where: { id: requestId },
+      data: {
+        statusCode: postResponse.status,
+        success: true,
+      },
+    })
     
     // Construct the Twitter URL
     const username = connection.platformUsername || 'twitter'
@@ -500,6 +779,20 @@ export async function postToTwitter(
     }
   } catch (error) {
     console.error('Error posting to Twitter:', error)
+    
+    // Update request record if it exists (might not exist if error occurred before creating it)
+    if (typeof requestId !== 'undefined') {
+      await prisma.twitterApiRequest.update({
+        where: { id: requestId },
+        data: {
+          success: false,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        },
+      }).catch(err => {
+        console.error('[Twitter API] Failed to update request record in catch:', err)
+      })
+    }
+    
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -731,4 +1024,5 @@ export async function getTwitterAnalytics(
     return null
   }
 }
+
 

@@ -3,6 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { encrypt, decrypt } from '@/lib/encryption'
 import { generateOAuthState } from '@/lib/oauth'
+import { createHash } from 'crypto'
 
 // Valid platform names
 const VALID_PLATFORMS = ['linkedin', 'twitter']
@@ -84,7 +85,7 @@ export async function POST(
     }
 
     // Generate OAuth state token
-    const state = generateOAuthState(clerkId, platform)
+    const { state, codeVerifier } = generateOAuthState(clerkId, platform)
 
     let redirectUrl: string
 
@@ -121,14 +122,20 @@ export async function POST(
       }
 
       // Twitter OAuth 2.0 authorization URL
+      const codeChallenge = createHash('sha256')
+        .update(codeVerifier)
+        .digest('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '')
       const params = new URLSearchParams({
         response_type: 'code',
         client_id: TWITTER_CLIENT_ID,
         redirect_uri: TWITTER_REDIRECT_URI,
         state,
-        scope: 'tweet.read tweet.write users.read offline.access', // Required scopes for posting
-        code_challenge: state, // Simplified PKCE (in production, use proper PKCE)
-        code_challenge_method: 'plain',
+        scope: 'tweet.read tweet.write users.read offline.access media.write', // Required scopes for posting and media uploads
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
       })
 
       redirectUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`
@@ -139,10 +146,32 @@ export async function POST(
       )
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       redirectUrl,
       platform,
     })
+
+    try {
+      const cookieName = `oauth_state_${platform}`
+      const cookieData: { state: string; codeVerifier?: string } = { state }
+      if (platform === 'twitter' && codeVerifier) {
+        cookieData.codeVerifier = codeVerifier
+      }
+
+      response.cookies.set({
+        name: cookieName,
+        value: JSON.stringify(cookieData),
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 10 * 60, // 10 minutes
+        path: '/',
+      })
+    } catch (cookieError) {
+      console.warn('Failed to set OAuth state cookie:', cookieError)
+    }
+
+    return response
   } catch (error) {
     console.error('Error initiating OAuth flow:', error)
     return NextResponse.json(

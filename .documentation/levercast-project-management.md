@@ -250,6 +250,7 @@
 - ✅ Add comprehensive error logging for debugging
 - ✅ Update dashboard and post detail pages to use real publishing APIs
 - ✅ Remove mock publishing functionality
+- ✅ Added dual LinkedIn app support with `appType` handling so personal and company connections can coexist
 
 ### Bulk Actions & Voice Input (COMPLETED)
 - ✅ Implement bulk selection on /posts page with checkbox and Shift+Click range selection
@@ -588,6 +589,7 @@
 - ⚠️ Clerk "Development Mode" warning (normal in dev, will disappear in production)
 - ⚠️ Voice input requires Chrome or Edge browser (Web Speech API not supported in Safari/Firefox)
 - ⚠️ LinkedIn analytics unavailable - LinkedIn has restricted access to r_member_social permission and is not accepting new requests. Users are directed to check analytics on LinkedIn directly.
+- ⚠️ LinkedIn Community Management API access request pending review; company page posting blocked until LinkedIn grants `w_organization_social` + `r_organization_admin` scopes
 
 ### To Address Before Production
 - ⚠️ Remove all mock data and simulations
@@ -748,6 +750,12 @@
 ---
 
 ## Change Log
+
+### November 2025 (Latest - LinkedIn Company Page Support & Prisma Migration)
+- Added `appType` handling end-to-end so LinkedIn personal and company OAuth flows can coexist
+- Applied manual SQL migration `20250105160000_add_app_type_to_social_connections` and ran full Prisma deploy/db push
+- Updated LinkedIn company OAuth scopes to request `w_organization_social`, `r_organization_social`, and `r_organization_admin`
+- Awaiting LinkedIn approval for Community Management API access request to enable company page page listing/posting
 
 ### November 2025 (Latest - Twitter API Rate Limit Tracking Improvements)
 - Implemented comprehensive Twitter API request tracking system
@@ -940,6 +948,7 @@
 4. Test Twitter thread generation and publishing
 5. Verify automated scheduled publishing works correctly
 6. Test token refresh functionality for Twitter/X
+7. Follow up on LinkedIn Community Management approval and re-test company page connection once granted
 
 ### Short Term (Next 2 Weeks)
 1. Set up production environment configuration

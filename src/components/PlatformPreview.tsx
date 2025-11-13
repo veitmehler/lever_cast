@@ -7,14 +7,14 @@ import { cn } from '@/lib/utils'
 import { ScheduleModal } from './ScheduleModal'
 
 interface PlatformPreviewProps {
-  platform: 'linkedin' | 'twitter'
+  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
   content: string | string[] // Support both single post and thread
   image?: string
   onRegenerate: () => void | Promise<void>
   onPublish: (content: string | string[]) => void
   onSchedule?: (content: string | string[], scheduledAt: Date) => Promise<void>
   onReschedule?: (postId: string, scheduledAt: Date) => Promise<void>
-  onContentChange?: (platform: 'linkedin' | 'twitter', newContent: string | string[]) => void
+  onContentChange?: (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', newContent: string | string[]) => void
   userName?: string
   userInitials?: string
   isPublished?: boolean
@@ -29,6 +29,10 @@ interface PlatformPreviewProps {
 const CHAR_LIMITS = {
   linkedin: 3000,
   twitter: 280,
+  facebook: 2000,
+  instagram: 2000,
+  telegram: 2000,
+  threads: 500,
 }
 
 export function PlatformPreview({
@@ -122,6 +126,26 @@ export function PlatformPreview({
       name: 'Twitter',
       icon: '𝕏',
     },
+    facebook: {
+      bg: '#1877F2',
+      name: 'Facebook',
+      icon: 'f',
+    },
+    instagram: {
+      bg: '#E4405F', // Instagram pink
+      name: 'Instagram',
+      icon: '📷',
+    },
+    telegram: {
+      bg: '#0088cc',
+      name: 'Telegram',
+      icon: '✈',
+    },
+    threads: {
+      bg: '#000000',
+      name: 'Threads',
+      icon: '@',
+    },
   }
 
   const config = platformColors[platform]
@@ -150,7 +174,12 @@ export function PlatformPreview({
       {/* Platform Header */}
       <div
         className="px-4 py-3 flex items-center justify-between"
-        style={{ backgroundColor: config.bg }}
+        style={platform === 'instagram' 
+          ? { background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }
+          : platform === 'threads'
+          ? { backgroundColor: '#000000', color: '#ffffff' }
+          : { backgroundColor: config.bg }
+        }
       >
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-white flex items-center justify-center text-sm font-bold">

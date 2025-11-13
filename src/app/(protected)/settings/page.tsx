@@ -17,12 +17,22 @@ type ApiKeyData = {
 type SocialConnection = {
   id: string
   platform: string
+  appType: 'personal' | 'company' | null // For LinkedIn: distinguishes between Personal Profile and Company Pages apps
   platformUserId: string | null
   platformUsername: string | null
+  postTargetType: 'personal' | 'page' | null
+  selectedPageId: string | null
   isActive: boolean
   lastUsed: string | null
   createdAt: string
   updatedAt: string
+}
+
+type SocialPage = {
+  id: string
+  name: string
+  vanityName?: string
+  access_token?: string
 }
 
 export default function SettingsPage() {
@@ -55,8 +65,13 @@ export default function SettingsPage() {
   const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([])
   const [isLoadingConnections, setIsLoadingConnections] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState<Record<string, boolean>>({})
+  const [isConnecting, setIsConnecting] = useState<Record<string, boolean>>({})
   const [editingApiKeys, setEditingApiKeys] = useState<Record<string, boolean>>({})
   const [showImageApiKeys, setShowImageApiKeys] = useState<Record<string, boolean>>({})
+  const [availablePages, setAvailablePages] = useState<Record<string, SocialPage[]>>({})
+  const [isLoadingPages, setIsLoadingPages] = useState<Record<string, boolean>>({})
+  const [postTargetTypes, setPostTargetTypes] = useState<Record<string, 'personal' | 'page'>>({})
+  const [selectedPageIds, setSelectedPageIds] = useState<Record<string, string>>({})
 
   // Image generation settings
   const [imageApiKeys, setImageApiKeys] = useState<Record<string, string>>({
@@ -132,7 +147,7 @@ export default function SettingsPage() {
           
           // Fetch models for providers that have API keys
           Object.keys(masked).forEach(provider => {
-            if (masked[provider]) {
+            if (masked[provider] && !['telegram'].includes(provider)) {
               fetchModelsForProvider(provider)
             }
           })
@@ -144,7 +159,7 @@ export default function SettingsPage() {
           const keys: ApiKeyData[] = await imageKeysResponse.json()
           const masked: Record<string, string> = {}
           keys.forEach(key => {
-            if (['fal', 'openai-dalle', 'replicate'].includes(key.provider)) {
+            if (['fal', 'openai-dalle', 'replicate', 'telegram'].includes(key.provider)) {
               masked[key.provider] = key.maskedKey
             }
           })
@@ -152,7 +167,7 @@ export default function SettingsPage() {
           
           // Fetch models for image providers that have API keys
           Object.keys(masked).forEach(provider => {
-            if (masked[provider]) {
+            if (masked[provider] && !['telegram'].includes(provider)) {
               fetchImageModelsForProvider(provider)
             }
           })
@@ -304,6 +319,65 @@ export default function SettingsPage() {
     }
   }
 
+  // Fetch pages for a platform
+  const fetchPages = async (platform: string): Promise<SocialPage[]> => {
+    if (platform !== 'linkedin' && platform !== 'facebook') return []
+    
+    try {
+      setIsLoadingPages(prev => ({ ...prev, [platform]: true }))
+      const response = await fetch(`/api/social/${platform}/pages`)
+      if (response.ok) {
+        const data = await response.json()
+        const pages = data.pages || []
+        setAvailablePages(prev => ({ ...prev, [platform]: pages }))
+        return pages
+      } else {
+        console.error(`Failed to fetch ${platform} pages:`, response.status)
+        setAvailablePages(prev => ({ ...prev, [platform]: [] }))
+        return []
+      }
+    } catch (error) {
+      console.error(`Error fetching ${platform} pages:`, error)
+      setAvailablePages(prev => ({ ...prev, [platform]: [] }))
+      return []
+    } finally {
+      setIsLoadingPages(prev => ({ ...prev, [platform]: false }))
+    }
+  }
+
+  // Update post target settings
+  const updatePostTargetSettings = async (platform: string, postTargetType: 'personal' | 'page', selectedPageId?: string) => {
+    try {
+      const response = await fetch(`/api/social/${platform}/settings`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          postTargetType,
+          selectedPageId: postTargetType === 'page' ? selectedPageId : null,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update local state
+        setSocialConnections(prev => prev.map(c => 
+          c.platform === platform && c.isActive
+            ? { ...c, postTargetType: data.connection.postTargetType, selectedPageId: data.connection.selectedPageId }
+            : c
+        ))
+        toast.success(`${platform === 'linkedin' ? 'LinkedIn' : 'Facebook'} posting target updated`)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to update settings')
+      }
+    } catch (error) {
+      console.error(`Error updating ${platform} settings:`, error)
+      toast.error('Failed to update settings')
+    }
+  }
+
   // Fetch social connections on mount
   const fetchConnections = async () => {
     try {
@@ -312,6 +386,24 @@ export default function SettingsPage() {
       if (response.ok) {
         const connections: SocialConnection[] = await response.json()
         setSocialConnections(connections)
+        
+        // Initialize postTargetTypes and selectedPageIds from connections
+        const targetTypes: Record<string, 'personal' | 'page'> = {}
+        const pageIds: Record<string, string> = {}
+        connections.forEach(conn => {
+          if (conn.isActive && (conn.platform === 'linkedin' || conn.platform === 'facebook')) {
+            targetTypes[conn.platform] = conn.postTargetType || 'personal'
+            if (conn.selectedPageId) {
+              pageIds[conn.platform] = conn.selectedPageId
+            }
+            // Fetch pages if connected
+            if (conn.platform === 'linkedin' || conn.platform === 'facebook') {
+              fetchPages(conn.platform)
+            }
+          }
+        })
+        setPostTargetTypes(targetTypes)
+        setSelectedPageIds(pageIds)
       }
     } catch (error) {
       console.error('Error fetching social connections:', error)
@@ -341,11 +433,34 @@ export default function SettingsPage() {
         'token_exchange_failed': 'Failed to exchange authorization code. Please try again.',
         'profile_fetch_failed': 'Failed to fetch profile. Please try again.',
         'unauthorized_scope_error': 'LinkedIn app needs "Share on LinkedIn" product approval. See instructions below.',
+        'w_organization_social_not_approved': 'LinkedIn Company Pages are not available. You can still connect and post to your personal profile.',
+        'rate_limit': 'Twitter rate limit reached. Please wait 15 minutes before trying again.',
       }
-      const errorMsg = errorMessages[error] || `Connection failed: ${error}`
-      toast.error(errorMsg, {
-        duration: 10000, // Show longer for important errors
-      })
+      
+      // Check if error message contains rate limit indicators
+      const decodedError = decodeURIComponent(error)
+      const isRateLimit = decodedError.toLowerCase().includes('rate') || 
+                         decodedError.toLowerCase().includes('429') ||
+                         decodedError.toLowerCase().includes('too many requests')
+      
+      // Get custom message from URL if available
+      const messageParam = searchParams.get('message')
+      const customMessage = messageParam ? decodeURIComponent(messageParam) : null
+      
+      const errorMsg = customMessage || (isRateLimit 
+        ? 'Twitter rate limit reached. Please wait 15 minutes before trying to connect again.'
+        : errorMessages[error] || `Connection failed: ${decodedError}`)
+      
+      // Show warning for w_organization_social (not a blocking error)
+      if (error === 'w_organization_social_not_approved') {
+        toast.warning(errorMsg, {
+          duration: 10000,
+        })
+      } else {
+        toast.error(errorMsg, {
+          duration: 15000, // Show longer for important errors
+        })
+      }
       
       // Show detailed message for scope errors
       if (error === 'unauthorized_scope_error') {
@@ -951,14 +1066,41 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {['linkedin', 'twitter'].map((platform) => {
-                const connection = socialConnections.find(c => c.platform === platform && c.isActive)
+              {['linkedin', 'twitter', 'facebook', 'instagram', 'threads'].map((platform) => {
+                // For LinkedIn, check for both personal and company connections
+                // For other platforms, find the single connection
+                let connection: typeof socialConnections[0] | undefined
+                if (platform === 'linkedin') {
+                  // Prefer company connection if available, otherwise personal
+                  connection = socialConnections.find(c => 
+                    c.platform === platform && 
+                    c.isActive && 
+                    (c.appType === 'company' || c.appType === 'personal')
+                  )
+                } else {
+                  connection = socialConnections.find(c => c.platform === platform && c.isActive)
+                }
                 const isConnected = !!connection
                 const isDisconnectingPlatform = isDisconnecting[platform] || false
 
-                const handleConnect = async () => {
+                const handleConnect = async (target: 'personal' | 'company' = 'personal') => {
+                  // For LinkedIn, create a unique key for personal vs company
+                  const connectionKey = platform === 'linkedin' ? `${platform}-${target}` : platform
+                  
+                  // Prevent multiple rapid clicks
+                  if (isConnecting[connectionKey] || isConnecting[platform]) {
+                    return
+                  }
+
                   try {
-                    const response = await fetch(`/api/social/${platform}`, {
+                    // Set connecting state for both the specific key and platform (for backward compatibility)
+                    setIsConnecting(prev => ({ ...prev, [connectionKey]: true, [platform]: true }))
+                    
+                    // For LinkedIn, pass target parameter to select the correct app
+                    const url = platform === 'linkedin' && target === 'company'
+                      ? `/api/social/${platform}?target=company`
+                      : `/api/social/${platform}`
+                    const response = await fetch(url, {
                       method: 'POST',
                     })
                     const data = await response.json()
@@ -969,15 +1111,27 @@ export default function SettingsPage() {
                         window.location.href = data.redirectUrl
                       } else {
                         toast.error('OAuth flow not configured. Please check server logs.')
+                        setIsConnecting(prev => ({ ...prev, [connectionKey]: false, [platform]: false }))
                       }
                     } else {
                       // Show the actual error from the API
                       console.error(`OAuth error for ${platform}:`, data)
-                      toast.error(data.error || `Failed to connect ${platform}. Please check that OAuth credentials are configured.`)
+                      const errorMsg = data.error || `Failed to connect ${platform}. Please check that OAuth credentials are configured.`
+                      
+                      // Check for rate limit errors
+                      if (errorMsg.toLowerCase().includes('rate') || errorMsg.toLowerCase().includes('429')) {
+                        toast.error('Twitter rate limit reached. Please wait 15 minutes before trying again.', {
+                          duration: 15000,
+                        })
+                      } else {
+                        toast.error(errorMsg)
+                      }
+                      setIsConnecting(prev => ({ ...prev, [connectionKey]: false, [platform]: false }))
                     }
                   } catch (error) {
                     console.error('Error connecting platform:', error)
                     toast.error(`Failed to connect ${platform}. Check console for details.`)
+                    setIsConnecting(prev => ({ ...prev, [connectionKey]: false, [platform]: false }))
                   }
                 }
 
@@ -1006,51 +1160,387 @@ export default function SettingsPage() {
                   }
                 }
 
+                const platformConfig = {
+                  linkedin: { bg: '#0A66C2', icon: 'in', name: 'LinkedIn' },
+                  twitter: { bg: '#1DA1F2', icon: '𝕏', name: 'Twitter / X' },
+                  facebook: { bg: '#1877F2', icon: 'f', name: 'Facebook' },
+                  instagram: { bg: '#E4405F', icon: '📷', name: 'Instagram' },
+                  threads: { bg: '#000000', icon: '🧵', name: 'Threads' },
+                }[platform]
+
+                const showPageSelector = isConnected && (platform === 'linkedin' || platform === 'facebook')
+                const currentPostTargetType = postTargetTypes[platform] || connection?.postTargetType || 'personal'
+                const currentSelectedPageId = selectedPageIds[platform] || connection?.selectedPageId || ''
+                const pages = availablePages[platform] || []
+                const isLoadingPagesForPlatform = isLoadingPages[platform] || false
+
                 return (
-                  <div key={platform} className="flex items-center justify-between p-4 rounded-lg border border-border">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
-                        platform === 'linkedin' ? 'bg-[#0A66C2]' : 'bg-[#1DA1F2]'
-                      }`}>
-                        {platform === 'linkedin' ? 'in' : '𝕏'}
-                      </div>
-                      <div>
-                        <div className="font-medium text-card-foreground capitalize">
-                          {platform === 'twitter' ? 'Twitter / X' : platform}
+                  <div key={platform} className="space-y-3">
+                    <div className="flex items-center justify-between p-4 rounded-lg border border-border">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold`}
+                          style={platform === 'instagram' || platform === 'threads'
+                            ? { background: platform === 'instagram' 
+                                ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                                : 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)' }
+                            : { backgroundColor: platformConfig.bg }
+                          }>
+                          {platformConfig.icon}
                         </div>
-                        {isConnected ? (
-                          <div className="text-xs text-primary">
-                            Connected{connection.platformUsername ? ` as ${connection.platformUsername}` : ''}
-                            {connection.lastUsed && (
-                              <span className="text-muted-foreground ml-1">
-                                • Last used {new Date(connection.lastUsed).toLocaleDateString()}
-                              </span>
+                        <div>
+                          <div className="font-medium text-card-foreground">
+                            {platformConfig.name}
+                          </div>
+                          {isConnected ? (
+                            <div className="text-xs text-primary">
+                              Connected{connection.platformUsername ? ` as ${connection.platformUsername}` : ''}
+                              {connection.lastUsed && (
+                                <span className="text-muted-foreground ml-1">
+                                  • Last used {new Date(connection.lastUsed).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">Not connected</div>
+                          )}
+                        </div>
+                      </div>
+                      {platform === 'linkedin' && !isConnected ? (
+                        // Show two buttons for LinkedIn: Personal Profile and Company Page
+                        <div className="flex gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleConnect('personal')}
+                            disabled={isConnecting[`${platform}-personal`] || isConnecting[platform]}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            {isConnecting[`${platform}-personal`] || isConnecting[platform] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              'Personal Profile'
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConnect('company')}
+                            disabled={isConnecting[`${platform}-company`] || isConnecting[platform]}
+                          >
+                            {isConnecting[`${platform}-company`] || isConnecting[platform] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              'Company Page'
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant={isConnected ? 'outline' : 'default'}
+                          size="sm"
+                          onClick={isConnected ? handleDisconnect : () => handleConnect()}
+                          disabled={isDisconnectingPlatform || isConnecting[platform]}
+                          className={isConnected ? '' : 'bg-primary text-primary-foreground hover:bg-primary/90'}
+                        >
+                          {isDisconnectingPlatform ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              Disconnecting...
+                            </>
+                          ) : isConnecting[platform] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            isConnected ? 'Disconnect' : 'Connect'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {/* Page/Profile Selector for LinkedIn and Facebook */}
+                    {showPageSelector && (
+                      <div className="ml-14 space-y-2 p-3 rounded-lg border border-border bg-muted/30">
+                        <div className="text-sm font-medium text-card-foreground mb-2">Post Target</div>
+                        <div className="flex gap-2 mb-2">
+                          <Button
+                            variant={currentPostTargetType === 'personal' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => {
+                              setPostTargetTypes(prev => ({ ...prev, [platform]: 'personal' }))
+                              updatePostTargetSettings(platform, 'personal')
+                            }}
+                            className={currentPostTargetType === 'personal' ? 'bg-primary text-primary-foreground' : ''}
+                          >
+                            Personal Profile
+                          </Button>
+                          <Button
+                            variant={currentPostTargetType === 'page' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={async () => {
+                              setPostTargetTypes(prev => ({ ...prev, [platform]: 'page' }))
+                              
+                              // Fetch pages if not already loaded
+                              let pagesToUse = pages
+                              if (!isLoadingPagesForPlatform && pages.length === 0) {
+                                console.log(`[Settings] Fetching pages for ${platform}...`)
+                                pagesToUse = await fetchPages(platform)
+                              }
+                              
+                              // Auto-select first page if pages are available and none selected
+                              if (pagesToUse.length > 0) {
+                                const pageIdToUse = currentSelectedPageId || pagesToUse[0].id
+                                setSelectedPageIds(prev => ({ ...prev, [platform]: pageIdToUse }))
+                                updatePostTargetSettings(platform, 'page', pageIdToUse)
+                              } else {
+                                // No pages found, just set target type
+                                updatePostTargetSettings(platform, 'page')
+                              }
+                            }}
+                            className={currentPostTargetType === 'page' ? 'bg-primary text-primary-foreground' : ''}
+                          >
+                            Business Page
+                          </Button>
+                        </div>
+                        
+                        {currentPostTargetType === 'page' && (
+                          <div className="space-y-2">
+                            {isLoadingPagesForPlatform ? (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Loading pages...
+                              </div>
+                            ) : pages.length === 0 ? (
+                              <div className="text-sm text-muted-foreground space-y-1">
+                                <div>No pages found.</div>
+                                {platform === 'linkedin' ? (
+                                  <div className="text-xs">
+                                    LinkedIn Company Pages require the &quot;Community Management API&quot; product approval (MDP was deprecated April 2024). This requires a separate LinkedIn app. You can still post to your personal profile.
+                                  </div>
+                                ) : (
+                                  <div className="text-xs">
+                                    Make sure you have admin access to at least one Facebook Page.
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <select
+                                value={currentSelectedPageId}
+                                onChange={(e) => {
+                                  const pageId = e.target.value
+                                  setSelectedPageIds(prev => ({ ...prev, [platform]: pageId }))
+                                  updatePostTargetSettings(platform, 'page', pageId)
+                                }}
+                                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="">Select a page...</option>
+                                {pages.map((page) => (
+                                  <option key={page.id} value={page.id}>
+                                    {page.name}
+                                  </option>
+                                ))}
+                              </select>
                             )}
                           </div>
-                        ) : (
-                          <div className="text-xs text-muted-foreground">Not connected</div>
                         )}
                       </div>
-                    </div>
-                    <Button
-                      variant={isConnected ? 'outline' : 'default'}
-                      size="sm"
-                      onClick={isConnected ? handleDisconnect : handleConnect}
-                      disabled={isDisconnectingPlatform}
-                      className={isConnected ? '' : 'bg-primary text-primary-foreground hover:bg-primary/90'}
-                    >
-                      {isDisconnectingPlatform ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                          Disconnecting...
-                        </>
-                      ) : (
-                        isConnected ? 'Disconnect' : 'Connect'
-                      )}
-                    </Button>
+                    )}
                   </div>
                 )
               })}
+              
+              {/* Telegram - Uses API Key instead of OAuth */}
+              {(() => {
+                const telegramKey = maskedKeys['telegram'] || imageMaskedKeys['telegram']
+                const hasTelegramKey = !!telegramKey
+                const isEditingTelegram = editingApiKeys['telegram'] || editingImageApiKeys['telegram'] || false
+                const telegramInputValue = apiKeys['telegram'] || imageApiKeys['telegram'] || ''
+                const telegramDisplayValue = telegramInputValue || (hasTelegramKey && !isEditingTelegram ? telegramKey : '')
+                
+                const handleSaveTelegramKey = async () => {
+                  const apiKey = telegramInputValue?.trim()
+                  if (!apiKey) {
+                    toast.error('Please enter a Telegram bot token')
+                    return
+                  }
+
+                  try {
+                    setIsSaving(true)
+                    const response = await fetch('/api/api-keys', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ provider: 'telegram', apiKey }),
+                    })
+
+                    if (response.ok) {
+                      const result: ApiKeyData = await response.json()
+                      setMaskedKeys(prev => ({ ...prev, telegram: result.maskedKey }))
+                      setImageMaskedKeys(prev => ({ ...prev, telegram: result.maskedKey }))
+                      setApiKeys(prev => ({ ...prev, telegram: '' }))
+                      setImageApiKeys(prev => ({ ...prev, telegram: '' }))
+                      setEditingApiKeys(prev => ({ ...prev, telegram: false }))
+                      setEditingImageApiKeys(prev => ({ ...prev, telegram: false }))
+                      toast.success('Telegram bot token saved successfully')
+                    } else {
+                      const error = await response.json()
+                      toast.error(error.error || 'Failed to save Telegram bot token')
+                    }
+                  } catch (error) {
+                    console.error('Error saving Telegram bot token:', error)
+                    toast.error('Failed to save Telegram bot token')
+                  } finally {
+                    setIsSaving(false)
+                  }
+                }
+
+                const handleRemoveTelegramKey = async () => {
+                  if (!confirm('Are you sure you want to remove your Telegram bot token?')) {
+                    return
+                  }
+
+                  try {
+                    setIsDisconnecting(prev => ({ ...prev, telegram: true }))
+                    const response = await fetch('/api/api-keys', {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ provider: 'telegram' }),
+                    })
+                    if (response.ok) {
+                      setMaskedKeys(prev => {
+                        const updated = { ...prev }
+                        delete updated.telegram
+                        return updated
+                      })
+                      setImageMaskedKeys(prev => {
+                        const updated = { ...prev }
+                        delete updated.telegram
+                        return updated
+                      })
+                      toast.success('Telegram bot token removed successfully')
+                    } else {
+                      const error = await response.json()
+                      toast.error(error.error || 'Failed to remove Telegram bot token')
+                    }
+                  } catch (error) {
+                    console.error('Error removing Telegram bot token:', error)
+                    toast.error('Failed to remove Telegram bot token')
+                  } finally {
+                    setIsDisconnecting(prev => ({ ...prev, telegram: false }))
+                  }
+                }
+
+                return (
+                  <div key="telegram" className="flex items-center justify-between p-4 rounded-lg border border-border">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold bg-[#0088cc]">
+                        📱
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-card-foreground mb-2">
+                          Telegram
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showApiKeys['telegram'] && (telegramInputValue || isEditingTelegram) ? 'text' : 'password'}
+                            value={isEditingTelegram ? telegramInputValue : telegramDisplayValue}
+                            onChange={(e) => {
+                              setApiKeys(prev => ({ ...prev, telegram: e.target.value }))
+                              setImageApiKeys(prev => ({ ...prev, telegram: e.target.value }))
+                              if (!isEditingTelegram && hasTelegramKey) {
+                                setEditingApiKeys(prev => ({ ...prev, telegram: true }))
+                                setEditingImageApiKeys(prev => ({ ...prev, telegram: true }))
+                              }
+                            }}
+                            placeholder={hasTelegramKey && !isEditingTelegram ? telegramKey : 'Enter your Telegram bot token'}
+                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                          />
+                          {(telegramInputValue || isEditingTelegram) && (
+                            <button
+                              onClick={() => {
+                                setShowApiKeys(prev => ({ ...prev, telegram: !prev.telegram }))
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showApiKeys['telegram'] ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {hasTelegramKey && !isEditingTelegram && !telegramInputValue
+                            ? 'Bot token saved'
+                            : 'Get your bot token from @BotFather on Telegram'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      {(telegramInputValue || isEditingTelegram) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!telegramInputValue || isSaving}
+                          onClick={() => {
+                            handleSaveTelegramKey()
+                            setEditingApiKeys(prev => ({ ...prev, telegram: false }))
+                            setEditingImageApiKeys(prev => ({ ...prev, telegram: false }))
+                          }}
+                          className="px-3"
+                        >
+                          {isSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
+                      {hasTelegramKey && !isEditingTelegram && !telegramInputValue && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingApiKeys(prev => ({ ...prev, telegram: true }))
+                              setEditingImageApiKeys(prev => ({ ...prev, telegram: true }))
+                              setApiKeys(prev => ({ ...prev, telegram: '' }))
+                              setImageApiKeys(prev => ({ ...prev, telegram: '' }))
+                            }}
+                            className="px-3"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRemoveTelegramKey}
+                            disabled={isDisconnecting['telegram']}
+                            className="px-3"
+                          >
+                            {isDisconnecting['telegram'] ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Remove'
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>

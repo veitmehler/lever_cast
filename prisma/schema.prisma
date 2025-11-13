@@ -15,75 +15,79 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  clerkId    String   @unique
-  name       String?
-  email      String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  name      String?
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  drafts              Draft[]
-  posts               Post[]
-  apiKeys             ApiKey[]
-  settings            Settings?
-  templates           Template[]
-  socialConnections   SocialConnection[]
-  twitterApiRequests  TwitterApiRequest[]
+  drafts             Draft[]
+  posts              Post[]
+  apiKeys            ApiKey[]
+  settings           Settings?
+  templates          Template[]
+  socialConnections  SocialConnection[]
+  twitterApiRequests TwitterApiRequest[]
 
   @@map("users")
 }
 
 model Draft {
-  id               String    @id @default(cuid())
-  userId           String
-  title            String    // Short title/preview
-  contentRaw       String    @db.Text // User's original idea
-  linkedinContent  String?   @db.Text // AI-generated LinkedIn post
-  twitterContent   String?   @db.Text // AI-generated Twitter post
-  platforms        String    // JSON array: ["linkedin", "twitter"] or "both"
-  templateId       String?   // Which template was used
-  attachedImage    String?   // Supabase Storage URL (not base64)
-  imageGenerationPrompt String? @db.Text // Store the prompt used for image generation
+  id                      String    @id @default(cuid())
+  userId                  String
+  title                   String // Short title/preview
+  contentRaw              String    @db.Text // User's original idea
+  linkedinContent         String?   @db.Text // AI-generated LinkedIn post
+  twitterContent          String?   @db.Text // AI-generated Twitter post
+  facebookContent         String?   @db.Text // AI-generated Facebook post
+  instagramContent        String?   @db.Text // AI-generated Instagram post
+  telegramContent         String?   @db.Text // AI-generated Telegram post
+  threadsContent          String?   @db.Text // AI-generated Threads post
+  platforms               String // JSON array: ["linkedin", "twitter", "facebook", etc.] or "both"
+  templateId              String? // Which template was used
+  attachedImage           String? // Supabase Storage URL (not base64)
+  imageGenerationPrompt   String?   @db.Text // Store the prompt used for image generation
   imageGenerationProvider String? // Which provider was used (fal, openai-dalle, replicate)
-  status           String    @default("draft") // draft, published
-  publishedAt      DateTime? // When the draft was published
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  status                  String    @default("draft") // draft, published
+  publishedAt             DateTime? // When the draft was published
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Relations
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts            Post[]    // A draft can result in multiple posts (one per platform)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[] // A draft can result in multiple posts (one per platform)
 
   @@index([userId, status])
   @@map("drafts")
 }
 
 model Post {
-  id          String    @id @default(cuid())
-  userId      String
-  draftId     String?   // Link back to the draft this was published from
-  parentPostId String?  // For Twitter threads: link to the parent post (summary)
-  threadOrder Int?      // For Twitter threads: 0 = summary, 1+ = replies (order within thread)
-  platform    String    // "linkedin" or "twitter"
-  content     String    @db.Text // The actual content that was published
-  publishedAt DateTime? // When the post was actually published (nullable for scheduled posts)
-  scheduledAt DateTime? // When the post is scheduled to be published
-  postUrl     String?   // URL to the published post (if available from API)
-  tweetId     String?   // Twitter/X tweet ID (for replies and verification)
-  imageUrl    String?   // URL of image published with this post (Supabase Storage URL)
-  status      String    @default("published") // published, scheduled, failed, deleted
-  errorMsg    String?   // If publishing failed, store error
+  id                    String    @id @default(cuid())
+  userId                String
+  draftId               String? // Link back to the draft this was published from
+  parentPostId          String? // For Twitter threads: link to the parent post (summary)
+  threadOrder           Int? // For Twitter threads: 0 = summary, 1+ = replies (order within thread)
+  platform              String // "linkedin" | "twitter" | "facebook" | "instagram" | "telegram" | "threads"
+  content               String    @db.Text // The actual content that was published
+  publishedAt           DateTime? // When the post was actually published (nullable for scheduled posts)
+  scheduledAt           DateTime? // When the post is scheduled to be published
+  postUrl               String? // URL to the published post (if available from API)
+  tweetId               String? // Twitter/X tweet ID (for replies and verification)
+  imageUrl              String? // URL of image published with this post (Supabase Storage URL)
+  status                String    @default("published") // published, scheduled, failed, deleted
+  errorMsg              String? // If publishing failed, store error
   analyticsLastSyncedAt DateTime? // When analytics were last fetched
-  analyticsData Json?   // Store analytics as JSON (platform-specific structure)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  analyticsData         Json? // Store analytics as JSON (platform-specific structure)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Relations
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  draft       Draft?    @relation(fields: [draftId], references: [id], onDelete: SetNull)
-  parentPost  Post?     @relation("PostReplies", fields: [parentPostId], references: [id], onDelete: Cascade)
-  replies     Post[]    @relation("PostReplies")
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draft      Draft? @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  parentPost Post?  @relation("PostReplies", fields: [parentPostId], references: [id], onDelete: Cascade)
+  replies    Post[] @relation("PostReplies")
 
   @@index([userId, platform, publishedAt])
   @@index([draftId])
@@ -95,35 +99,35 @@ model Post {
 }
 
 model ApiKey {
-  id          String   @id @default(cuid())
-  userId      String
-  provider    String   // openai, anthropic, etc.
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String // openai, anthropic, etc.
   encryptedKey String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("api_keys")
 }
 
 model Settings {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  theme       String   @default("light")
-  sidebarState String  @default("open")
-  defaultProvider String? // openai, anthropic, gemini, openrouter
-  defaultModel String? @db.Text // JSON string: {"openai": "gpt-4o-mini", "anthropic": "claude-3-5-sonnet-20241022", ...}
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  theme                String   @default("light")
+  sidebarState         String   @default("open")
+  defaultProvider      String? // openai, anthropic, gemini, openrouter
+  defaultModel         String?  @db.Text // JSON string: {"openai": "gpt-4o-mini", "anthropic": "claude-3-5-sonnet-20241022", ...}
   defaultImageProvider String? // fal, openai-dalle, replicate
-  defaultImageModel String? @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
-  defaultImageStyle String? @db.Text // Default style instructions for image generation
-  lastLogin   DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  defaultImageModel    String?  @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
+  defaultImageStyle    String?  @db.Text // Default style instructions for image generation
+  lastLogin            DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("settings")
 }
@@ -132,16 +136,20 @@ model Template {
   id                String   @id @default(cuid())
   userId            String
   name              String
-  tone              String   // professional, casual, inspirational, question-based, storytelling
+  tone              String // professional, casual, inspirational, question-based, storytelling
   description       String
   linkedinTemplate  String   @db.Text
   twitterTemplate   String   @db.Text
+  facebookTemplate  String?  @db.Text
+  instagramTemplate String?  @db.Text
+  telegramTemplate  String?  @db.Text
+  threadsTemplate   String?  @db.Text
   isDefault         Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   // Relations
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Ensure only one default template per user
   @@index([userId, isDefault])
@@ -149,39 +157,44 @@ model Template {
 }
 
 model SocialConnection {
-  id            String   @id @default(cuid())
-  userId        String
-  platform      String   // "linkedin" or "twitter"
-  accessToken   String   @db.Text // OAuth access token (encrypted)
-  refreshToken  String?  @db.Text // OAuth refresh token (encrypted, if applicable)
-  tokenExpiry   DateTime? // When the access token expires
-  platformUserId String? // The user's ID on the social platform
+  id               String    @id @default(cuid())
+  userId           String
+  platform         String // "linkedin" | "twitter" | "facebook" | "instagram" | "threads" (Note: Telegram uses ApiKey, not OAuth)
+  appType          String? // "personal" | "company" - for LinkedIn to distinguish between Personal Profile and Company Pages apps (null for other platforms)
+  accessToken      String    @db.Text // OAuth access token (encrypted)
+  refreshToken     String?   @db.Text // OAuth refresh token (encrypted, if applicable)
+  tokenExpiry      DateTime? // When the access token expires
+  platformUserId   String? // The user's ID on the social platform
   platformUsername String? // The user's username/handle
-  isActive      Boolean  @default(true) // Can be disabled without deleting
-  lastUsed      DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  postTargetType   String? // "personal" | "page" - for LinkedIn and Facebook
+  selectedPageId   String? // The selected page ID (for LinkedIn Company Pages or Facebook Pages)
+  isActive         Boolean   @default(true) // Can be disabled without deleting
+  lastUsed         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // One connection per platform per user
-  @@unique([userId, platform])
+  // One connection per platform per user (for LinkedIn, one per appType: 'personal' or 'company')
+  // For other platforms, appType is null, so only one connection per platform
+  @@unique([userId, platform, appType])
   @@index([userId, isActive])
+  @@index([userId, platform, appType])
   @@map("social_connections")
 }
 
 model TwitterApiRequest {
-  id            String   @id @default(cuid())
-  userId        String
-  endpoint      String   // e.g., "POST /2/tweets", "POST /2/media/upload"
-  statusCode    Int?     // HTTP status code (null if request failed before response)
-  success       Boolean  // Whether the request succeeded
-  errorMessage  String?  @db.Text // Error message if failed
-  requestedAt   DateTime @default(now()) // When the request was made
+  id           String   @id @default(cuid())
+  userId       String
+  endpoint     String // e.g., "POST /2/tweets", "POST /2/media/upload"
+  statusCode   Int? // HTTP status code (null if request failed before response)
+  success      Boolean // Whether the request succeeded
+  errorMessage String?  @db.Text // Error message if failed
+  requestedAt  DateTime @default(now()) // When the request was made
 
   // Relations
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, requestedAt])
   @@map("twitter_api_requests")

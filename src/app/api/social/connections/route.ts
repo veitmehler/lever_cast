@@ -52,24 +52,63 @@ export async function GET() {
     const user = await getOrCreateUser(clerkId)
 
     // Get all social connections for this user
-    const connections = await prisma.socialConnection.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        platform: true,
-        platformUserId: true,
-        platformUsername: true,
-        isActive: true,
-        lastUsed: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    // Note: appType field may not exist until migration is applied
+    try {
+      const connections = await prisma.socialConnection.findMany({
+        where: { userId: user.id },
+        select: {
+          id: true,
+          platform: true,
+          appType: true, // Include appType to distinguish LinkedIn personal vs company
+          platformUserId: true,
+          platformUsername: true,
+          isActive: true,
+          lastUsed: true,
+          createdAt: true,
+          updatedAt: true,
+          postTargetType: true,
+          selectedPageId: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      })
 
-    return NextResponse.json(connections)
+      return NextResponse.json(connections)
+    } catch (dbError: any) {
+      // If appType column doesn't exist yet (migration not applied), query without it
+      if (dbError.message?.includes('appType') || dbError.message?.includes('column') || dbError.code === 'P2001') {
+        console.warn('[Social Connections API] appType column not found, querying without it (migration may not be applied yet)')
+        const connections = await prisma.socialConnection.findMany({
+          where: { userId: user.id },
+          select: {
+            id: true,
+            platform: true,
+            // appType: true, // Skip appType until migration is applied
+            platformUserId: true,
+            platformUsername: true,
+            isActive: true,
+            lastUsed: true,
+            createdAt: true,
+            updatedAt: true,
+            postTargetType: true,
+            selectedPageId: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        })
+
+        // Add null appType for backward compatibility
+        const connectionsWithAppType = connections.map(conn => ({
+          ...conn,
+          appType: conn.platform === 'linkedin' ? 'personal' : null,
+        }))
+
+        return NextResponse.json(connectionsWithAppType)
+      }
+      throw dbError // Re-throw if it's a different error
+    }
   } catch (error) {
     console.error('Error fetching social connections:', error)
     return NextResponse.json(

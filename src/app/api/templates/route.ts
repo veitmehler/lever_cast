@@ -88,7 +88,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, tone, description, linkedinTemplate, twitterTemplate, isDefault } = body
+    const { 
+      name, 
+      tone, 
+      description, 
+      linkedinTemplate, 
+      twitterTemplate, 
+      facebookTemplate,
+      instagramTemplate,
+      telegramTemplate,
+      threadsTemplate,
+      isDefault 
+    } = body
 
     // Validation
     if (!name || !tone || !description || !linkedinTemplate || !twitterTemplate) {
@@ -153,6 +164,10 @@ export async function POST(request: NextRequest) {
         description,
         linkedinTemplate,
         twitterTemplate,
+        facebookTemplate: facebookTemplate || null,
+        instagramTemplate: instagramTemplate || null,
+        telegramTemplate: telegramTemplate || null,
+        threadsTemplate: threadsTemplate || null,
         isDefault: isDefault || false,
       },
     })

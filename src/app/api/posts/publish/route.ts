@@ -3,6 +3,10 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { postToLinkedIn } from '@/lib/linkedinApi'
 import { postToTwitter, postTwitterThread } from '@/lib/twitterApi'
+import { postToFacebook } from '@/lib/facebookApi'
+import { postToInstagram } from '@/lib/instagramApi'
+import { postToTelegram } from '@/lib/telegramApi'
+import { postToThreads } from '@/lib/threadsApi'
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -55,12 +59,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { platform, content, imageUrl } = body
+    const { platform, content, imageUrl, chatId } = body // chatId for Telegram
 
     console.log(`[Publish API] Received publish request:`, {
       platform,
       contentLength: Array.isArray(content) ? content.length : content?.length,
       imageUrl: imageUrl || 'none',
+      chatId: chatId || 'none',
     })
 
     if (!platform || !content) {
@@ -98,6 +103,50 @@ export async function POST(request: NextRequest) {
           publishResult = tweetResult
         }
       }
+    } else if (platform === 'facebook') {
+      const contentStr = Array.isArray(content) ? content[0] : content
+      console.log(`[Publish API] Publishing to Facebook with imageUrl: ${imageUrl || 'none'}`)
+      const facebookResult = await postToFacebook(user.id, contentStr, imageUrl)
+      if (facebookResult.success) {
+        publishResult = { success: true, postUrl: facebookResult.postUrl, postId: facebookResult.postId }
+      } else {
+        publishResult = facebookResult
+      }
+    } else if (platform === 'instagram') {
+      const contentStr = Array.isArray(content) ? content[0] : content
+      console.log(`[Publish API] Publishing to Instagram with imageUrl: ${imageUrl || 'none'}`)
+      if (!imageUrl) {
+        publishResult = { success: false, error: 'Instagram requires an image. Please attach an image to your post.' }
+      } else {
+        const instagramResult = await postToInstagram(user.id, contentStr, imageUrl)
+        if (instagramResult.success) {
+          publishResult = { success: true, postUrl: instagramResult.postUrl, postId: instagramResult.postId }
+        } else {
+          publishResult = instagramResult
+        }
+      }
+    } else if (platform === 'telegram') {
+      const contentStr = Array.isArray(content) ? content[0] : content
+      console.log(`[Publish API] Publishing to Telegram with chatId: ${chatId || 'none'}, imageUrl: ${imageUrl || 'none'}`)
+      if (!chatId) {
+        publishResult = { success: false, error: 'Telegram chat/channel ID is required. Please specify the chat ID or channel username (e.g., "@channelname").' }
+      } else {
+        const telegramResult = await postToTelegram(user.id, contentStr, chatId, imageUrl)
+        if (telegramResult.success) {
+          publishResult = { success: true, postUrl: `https://t.me/${chatId.replace('@', '')}/${telegramResult.messageId}`, postId: telegramResult.messageId.toString() }
+        } else {
+          publishResult = telegramResult
+        }
+      }
+    } else if (platform === 'threads') {
+      const contentStr = Array.isArray(content) ? content[0] : content
+      console.log(`[Publish API] Publishing to Threads with imageUrl: ${imageUrl || 'none'}`)
+      const threadsResult = await postToThreads(user.id, contentStr, imageUrl)
+      if (threadsResult.success) {
+        publishResult = { success: true, postUrl: threadsResult.postUrl, postId: threadsResult.postId }
+      } else {
+        publishResult = threadsResult
+      }
     } else {
       return NextResponse.json(
         { error: `Unsupported platform: ${platform}` },
@@ -119,7 +168,7 @@ export async function POST(request: NextRequest) {
       tweetId: 'tweetId' in publishResult ? publishResult.tweetId : undefined,
       tweetIds: 'tweetIds' in publishResult ? publishResult.tweetIds : undefined,
       imageUrl: imageUrl || undefined,
-      message: `Post successfully published to ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter/X'}!`,
+      message: `Post successfully published to ${platform === 'linkedin' ? 'LinkedIn' : platform === 'facebook' ? 'Facebook' : platform === 'instagram' ? 'Instagram' : platform === 'telegram' ? 'Telegram' : platform === 'threads' ? 'Threads' : 'Twitter/X'}!`,
     })
   } catch (error) {
     console.error('Error publishing post:', error)

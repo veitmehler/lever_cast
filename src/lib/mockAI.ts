@@ -3,6 +3,10 @@
 export interface GeneratedContent {
   linkedin?: string
   twitter?: string | string[]
+  facebook?: string
+  instagram?: string
+  telegram?: string
+  threads?: string
 }
 
 // Template interface matching database schema
@@ -154,7 +158,7 @@ function applyTemplate(template: string, idea: string): string {
 
 export async function generateContent(
   rawIdea: string,
-  platform: 'linkedin' | 'twitter' | 'both',
+  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both',
   templateId?: string,
   twitterFormat?: 'single' | 'thread'
 ): Promise<GeneratedContent> {
@@ -174,7 +178,7 @@ export async function generateContent(
 
   if (response.ok) {
     const data = await response.json()
-    if (data.content && (data.content.linkedin || data.content.twitter)) {
+    if (data.content && (data.content.linkedin || data.content.twitter || data.content.facebook || data.content.instagram || data.content.telegram || data.content.threads)) {
       // Parse twitter content if it's a JSON string (thread)
       let twitterContent = data.content.twitter
       if (twitterContent && typeof twitterContent === 'string') {
@@ -191,6 +195,10 @@ export async function generateContent(
       return {
         linkedin: data.content.linkedin,
         twitter: twitterContent,
+        facebook: data.content.facebook,
+        instagram: data.content.instagram,
+        telegram: data.content.telegram,
+        threads: data.content.threads,
       }
     }
   }

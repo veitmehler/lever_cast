@@ -46,12 +46,58 @@ Key insights:
 
 What do you think?`
   )
+  const [facebookTemplate, setFacebookTemplate] = useState(
+    template?.facebookTemplate || `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? I'd love to hear your thoughts in the comments below!
+
+#Business #Professional #Leadership`
+  )
+  const [instagramTemplate, setInstagramTemplate] = useState(
+    template?.instagramTemplate || `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? Share your thoughts below! 👇
+
+#Business #Professional #Leadership #Motivation`
+  )
+  const [telegramTemplate, setTelegramTemplate] = useState(
+    template?.telegramTemplate || `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? Share your thoughts below!
+
+#Business #Professional #Leadership`
+  )
+  const [threadsTemplate, setThreadsTemplate] = useState(
+    template?.threadsTemplate || `🚀 {idea}
+
+Key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience?`
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!name.trim() || !description.trim() || !linkedinTemplate.trim() || !twitterTemplate.trim()) {
-      alert('Please fill in all fields')
+      alert('Please fill in all required fields (Name, Description, LinkedIn, Twitter)')
       return
     }
 
@@ -61,6 +107,10 @@ What do you think?`
       description: description.trim(),
       linkedinTemplate: linkedinTemplate.trim(),
       twitterTemplate: twitterTemplate.trim(),
+      facebookTemplate: facebookTemplate.trim() || null,
+      instagramTemplate: instagramTemplate.trim() || null,
+      telegramTemplate: telegramTemplate.trim() || null,
+      threadsTemplate: threadsTemplate.trim() || null,
       isDefault: template?.isDefault || false,
     })
   }
@@ -180,6 +230,87 @@ What do you think?`
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Character count: {twitterTemplate.length} / 280 (base template)
+              </p>
+            </div>
+
+            {/* Facebook Template */}
+            <div>
+              <label htmlFor="facebook" className="text-sm font-medium text-card-foreground mb-2 block flex items-center gap-2">
+                <div className="w-6 h-6 rounded bg-[#1877F2] flex items-center justify-center text-white text-xs font-bold">
+                  f
+                </div>
+                Facebook Template (Optional)
+              </label>
+              <textarea
+                id="facebook"
+                value={facebookTemplate}
+                onChange={(e) => setFacebookTemplate(e.target.value)}
+                placeholder="Use {idea}, {point1}, {point2}, {point3} as placeholders"
+                className="w-full min-h-[150px] rounded-lg border border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Character count: {facebookTemplate.length} / 2,000
+              </p>
+            </div>
+
+            {/* Instagram Template */}
+            <div>
+              <label htmlFor="instagram" className="text-sm font-medium text-card-foreground mb-2 block flex items-center gap-2">
+                <div className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}>
+                  📷
+                </div>
+                Instagram Template (Optional)
+              </label>
+              <textarea
+                id="instagram"
+                value={instagramTemplate}
+                onChange={(e) => setInstagramTemplate(e.target.value)}
+                placeholder="Use {idea}, {point1}, {point2}, {point3} as placeholders"
+                className="w-full min-h-[150px] rounded-lg border border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Character count: {instagramTemplate.length} / 2,000
+              </p>
+            </div>
+
+            {/* Telegram Template */}
+            <div>
+              <label htmlFor="telegram" className="text-sm font-medium text-card-foreground mb-2 block flex items-center gap-2">
+                <div className="w-6 h-6 rounded bg-[#0088cc] flex items-center justify-center text-white text-xs font-bold">
+                  📱
+                </div>
+                Telegram Template (Optional)
+              </label>
+              <textarea
+                id="telegram"
+                value={telegramTemplate}
+                onChange={(e) => setTelegramTemplate(e.target.value)}
+                placeholder="Use {idea}, {point1}, {point2}, {point3} as placeholders"
+                className="w-full min-h-[150px] rounded-lg border border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Character count: {telegramTemplate.length} / 2,000
+              </p>
+            </div>
+
+            {/* Threads Template */}
+            <div>
+              <label htmlFor="threads" className="text-sm font-medium text-card-foreground mb-2 block flex items-center gap-2">
+                <div className="w-6 h-6 rounded bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-bold">
+                  🧵
+                </div>
+                Threads Template (Optional)
+              </label>
+              <textarea
+                id="threads"
+                value={threadsTemplate}
+                onChange={(e) => setThreadsTemplate(e.target.value)}
+                placeholder="Use {idea}, {point1}, {point2}, {point3} as placeholders"
+                className="w-full min-h-[150px] rounded-lg border border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Character count: {threadsTemplate.length} / 500
               </p>
             </div>
 

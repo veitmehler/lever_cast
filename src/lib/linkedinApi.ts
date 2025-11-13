@@ -57,15 +57,16 @@ interface LinkedInAssetUploadResponse {
  */
 export async function uploadImageToLinkedIn(
   userId: string,
-  imageUrl: string
+  imageUrl: string,
+  appType?: 'personal' | 'company' // Specify which LinkedIn app to use
 ): Promise<{ assetUrn: string; mediaArtifactUrn: string }> {
   try {
-    console.log(`[LinkedIn API] Uploading image for user ${userId}`)
+    console.log(`[LinkedIn API] Uploading image for user ${userId}, appType: ${appType || 'personal'}`)
     
-    // Get LinkedIn connection
-    const connection = await getSocialConnection(userId, 'linkedin')
+    // Get LinkedIn connection (default to personal if not specified)
+    const connection = await getSocialConnection(userId, 'linkedin', appType || 'personal')
     if (!connection) {
-      throw new Error('LinkedIn account not connected')
+      throw new Error(`LinkedIn ${appType || 'personal'} account not connected`)
     }
 
     // Check if token needs refresh
@@ -73,7 +74,7 @@ export async function uploadImageToLinkedIn(
       throw new Error('LinkedIn access token expired. Please reconnect your account.')
     }
 
-    // Get user's LinkedIn URN (person ID)
+    // Get user's LinkedIn URN (person ID) - needed for image upload owner
     const profileResponse = await fetch(`${LINKEDIN_API_BASE}/userinfo`, {
       headers: {
         'Authorization': `Bearer ${connection.accessToken}`,
@@ -256,11 +257,36 @@ export async function postToLinkedIn(
   imageUrl?: string
 ): Promise<{ success: true; postUrl: string } | { success: false; error: string }> {
   try {
-    // Get LinkedIn connection
-    const connection = await getSocialConnection(userId, 'linkedin')
+    // Determine which LinkedIn connection to use based on postTargetType
+    // First, try to get the connection that matches the post target
+    // For Company Pages, we need the company app connection
+    // For Personal Profile, we need the personal app connection
+    
+    // Try to get company connection first (for Company Pages)
+    let connection = await getSocialConnection(userId, 'linkedin', 'company')
+    let isCompanyPost = false
+    
+    if (connection && connection.postTargetType === 'page' && connection.selectedPageId) {
+      // Using company connection for Company Page post
+      isCompanyPost = true
+    } else {
+      // Try personal connection
+      connection = await getSocialConnection(userId, 'linkedin', 'personal')
+      if (!connection) {
+        // Fallback: try to get any LinkedIn connection
+        connection = await getSocialConnection(userId, 'linkedin', 'company') || 
+                     await getSocialConnection(userId, 'linkedin', 'personal')
+      }
+    }
+    
     if (!connection) {
       return { success: false, error: 'LinkedIn account not connected' }
     }
+    
+    // Determine if this is a company post based on connection and settings
+    isCompanyPost = connection.postTargetType === 'page' && 
+                    connection.selectedPageId !== null &&
+                    connection.appType === 'company'
 
     // Check if token needs refresh
     if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
@@ -281,7 +307,18 @@ export async function postToLinkedIn(
     }
 
     const profile = await profileResponse.json()
-    const personUrn = `urn:li:person:${profile.sub}` // LinkedIn uses 'sub' as the person ID
+    
+    // Determine author URN based on postTargetType
+    let authorUrn: string
+    if (connection.postTargetType === 'page' && connection.selectedPageId) {
+      // Post to Company Page
+      authorUrn = `urn:li:organization:${connection.selectedPageId}`
+      console.log(`[LinkedIn API] Posting to Company Page: ${authorUrn}`)
+    } else {
+      // Post to personal profile (default)
+      authorUrn = `urn:li:person:${profile.sub}` // LinkedIn uses 'sub' as the person ID
+      console.log(`[LinkedIn API] Posting to personal profile: ${authorUrn}`)
+    }
 
     // Upload image if provided
     let assetUrn: string | undefined
@@ -327,7 +364,7 @@ export async function postToLinkedIn(
         'com.linkedin.ugc.MemberNetworkVisibility': string
       }
     } = {
-      author: personUrn,
+      author: authorUrn,
       lifecycleState: 'PUBLISHED',
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
@@ -395,7 +432,7 @@ export async function postToLinkedIn(
       console.log(`[LinkedIn API] Posting with image (using asset URN):`)
       console.log(`[LinkedIn API]   - Asset URN: ${assetUrn}`)
       console.log(`[LinkedIn API]   - MediaArtifact URN: ${mediaArtifactUrn || 'none'}`)
-      console.log(`[LinkedIn API]   - Person URN (owner): ${personUrn}`)
+      console.log(`[LinkedIn API]   - Author URN: ${authorUrn}`)
       console.log(`[LinkedIn API]   - Media structure:`, JSON.stringify(postData.specificContent['com.linkedin.ugc.ShareContent'].media, null, 2))
     } else {
       console.log(`[LinkedIn API] Posting text-only post (no image)`)
@@ -535,7 +572,8 @@ export async function refreshLinkedInToken(
  */
 export async function getLinkedInAnalytics(
   userId: string,
-  postId: string
+  postId: string,
+  appType?: 'personal' | 'company' // Specify which LinkedIn app to use
 ): Promise<{
   impressions?: number
   clicks?: number
@@ -544,12 +582,12 @@ export async function getLinkedInAnalytics(
   shares?: number
 } | null> {
   try {
-    console.log(`[LinkedIn API] Fetching analytics for post ${postId}`)
+    console.log(`[LinkedIn API] Fetching analytics for post ${postId}, appType: ${appType || 'personal'}`)
     
-    // Get LinkedIn connection
-    const connection = await getSocialConnection(userId, 'linkedin')
+    // Get LinkedIn connection (default to personal if not specified)
+    const connection = await getSocialConnection(userId, 'linkedin', appType || 'personal')
     if (!connection) {
-      console.error(`[LinkedIn API] No connection found for user ${userId}`)
+      console.error(`[LinkedIn API] No ${appType || 'personal'} connection found for user ${userId}`)
       return null
     }
 

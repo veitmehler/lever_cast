@@ -94,17 +94,17 @@ function cleanGeneratedContent(content: string): string {
   
   // Remove common headers and analysis sections
   const patternsToRemove = [
-    /^#\s*TARGET\s*AUDIENCE\s*ANALYSIS:.*?---/is,
-    /^#\s*TARGET\s*AUDIENCE\s*ANALYSIS:.*?(?=\n#|\n\n|$)/is,
+    /^#\s*TARGET\s*AUDIENCE\s*ANALYSIS:[\s\S]*?---/i,
+    /^#\s*TARGET\s*AUDIENCE\s*ANALYSIS:[\s\S]*?(?=\n#|\n\n|$)/i,
     /^#\s*LINKEDIN\s*POST:?\s*/i,
     /^#\s*TWITTER\s*POST:?\s*/i,
     /^#\s*X\s*POST:?\s*/i,
     /^LINKEDIN\s*POST:?\s*/i,
     /^TWITTER\s*POST:?\s*/i,
     /^X\s*POST:?\s*/i,
-    /^---.*?---/s,
-    /^#\s*PRIMARY\s*AUDIENCE:.*?---/is,
-    /^#\s*SECONDARY\s*AUDIENCE:.*?---/is,
+    /^---[\s\S]*?---/,
+    /^#\s*PRIMARY\s*AUDIENCE:[\s\S]*?---/i,
+    /^#\s*SECONDARY\s*AUDIENCE:[\s\S]*?---/i,
   ]
   
   for (const pattern of patternsToRemove) {
@@ -259,16 +259,15 @@ First you will receive your context, then you will receive your task.`
   const genModel = genAI.getGenerativeModel({ 
     model,
     systemInstruction: systemMessage,
-  })
-  
-  const fullPrompt = `${systemMessage}\n\n${prompt}`
-  
-  const result = await genModel.generateContent(fullPrompt, {
     generationConfig: {
       maxOutputTokens: maxTokens,
       temperature: 0.7,
     },
   })
+  
+  const fullPrompt = `${systemMessage}\n\n${prompt}`
+  
+  const result = await genModel.generateContent(fullPrompt)
 
   const response = await result.response
   return response.text()
@@ -371,7 +370,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Get template if provided
-    let template: { linkedinTemplate: string | null; twitterTemplate: string | null } | null = null
+    let template: { 
+      linkedinTemplate: string | null
+      twitterTemplate: string | null
+      facebookTemplate: string | null
+      instagramTemplate: string | null
+      telegramTemplate: string | null
+      threadsTemplate: string | null
+    } | null = null
     if (templateId) {
       template = await prisma.template.findFirst({
         where: {
@@ -389,8 +395,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine which platform content to generate
-    const platformsToGenerate: ('linkedin' | 'twitter')[] = 
-      platform === 'both' ? ['linkedin', 'twitter'] : [platform]
+    const platformsToGenerate: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = 
+      platform === 'both' ? ['linkedin', 'twitter'] : [platform as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads']
 
     const result: Record<string, string> = {}
 
@@ -436,10 +442,22 @@ export async function POST(request: NextRequest) {
       // For threads, skip templates; for single posts, use templates
       const templateText = isTwitterThread 
         ? null 
-        : (plat === 'linkedin' ? template?.linkedinTemplate : template?.twitterTemplate)
+        : (plat === 'linkedin' 
+            ? template?.linkedinTemplate 
+            : plat === 'facebook'
+            ? template?.facebookTemplate || null
+            : plat === 'instagram'
+            ? template?.instagramTemplate || null
+            : plat === 'telegram'
+            ? template?.telegramTemplate || null
+            : plat === 'threads'
+            ? template?.threadsTemplate || null
+            : template?.twitterTemplate)
       
-      const maxTokens = plat === 'linkedin' 
+      const maxTokens = plat === 'linkedin' || plat === 'facebook' || plat === 'instagram' || plat === 'telegram'
         ? 1000 
+        : plat === 'threads'
+        ? 300 // Threads has 500 char limit, so fewer tokens
         : (isTwitterThread ? 2000 : 200) // More tokens for threads
       
       // Build prompt using the new structure
@@ -474,7 +492,13 @@ export async function POST(request: NextRequest) {
         prompt += `CRITICAL: Return ONLY a valid JSON array. Do NOT include any markdown code fences (\`\`\`), headers, explanations, or other text. Return ONLY the JSON array.`
       } else {
         // SINGLE POST MODE PROMPT
-        prompt += `3. Your task now is to create a ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'} post based on the RAW IDEA.\n\n`
+        const platformName = plat === 'linkedin' ? 'LinkedIn' 
+          : plat === 'facebook' ? 'Facebook' 
+          : plat === 'instagram' ? 'Instagram'
+          : plat === 'telegram' ? 'Telegram'
+          : plat === 'threads' ? 'Threads'
+          : 'Twitter/X'
+        prompt += `3. Your task now is to create a ${platformName} post based on the RAW IDEA.\n\n`
         
         if (templateText) {
           prompt += `4. You will create the post following the TEMPLATE STRUCTURE.\n\n`
@@ -485,11 +509,15 @@ export async function POST(request: NextRequest) {
         
         if (plat === 'twitter') {
           prompt += `IMPORTANT: Keep the post under 280 characters.\n\n`
+        } else if (plat === 'threads') {
+          prompt += `IMPORTANT: Keep the post under 500 characters. Make it concise and engaging for Threads.\n\n`
+        } else if (plat === 'facebook' || plat === 'instagram' || plat === 'telegram') {
+          prompt += `IMPORTANT: Keep the post under 2,000 characters. Make it engaging and suitable for ${platformName}'s audience.\n\n`
         } else {
           prompt += `Keep it professional and engaging, suitable for LinkedIn.\n\n`
         }
         
-        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", or any other headers. Return ONLY the actual post text that would be published on ${plat === 'linkedin' ? 'LinkedIn' : 'Twitter/X'}.`
+        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", "# FACEBOOK POST:", "# INSTAGRAM POST:", "# TELEGRAM POST:", "# THREADS POST:", or any other headers. Return ONLY the actual post text that would be published on ${platformName}.`
       }
 
       try {
@@ -632,9 +660,13 @@ export async function POST(request: NextRequest) {
           // SINGLE POST MODE: Store as plain string
           generatedContent = cleanGeneratedContent(generatedContent)
           
-          // For Twitter, ensure it's under 280 characters
+          // Enforce character limits
           if (plat === 'twitter' && generatedContent.length > 280) {
             generatedContent = generatedContent.substring(0, 277) + '...'
+          } else if (plat === 'threads' && generatedContent.length > 500) {
+            generatedContent = generatedContent.substring(0, 497) + '...'
+          } else if ((plat === 'facebook' || plat === 'instagram' || plat === 'telegram') && generatedContent.length > 2000) {
+            generatedContent = generatedContent.substring(0, 1997) + '...'
           }
 
           result[plat] = generatedContent || rawIdea

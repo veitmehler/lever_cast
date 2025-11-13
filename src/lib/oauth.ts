@@ -7,6 +7,7 @@ type OAuthStateData = {
   platform: string
   expiresAt: Date
   codeVerifier?: string
+  target?: 'personal' | 'company' // For LinkedIn: personal profile vs company page
 }
 
 const oauthStateStore = new Map<string, OAuthStateData>()
@@ -24,7 +25,11 @@ setInterval(() => {
 /**
  * Generate a secure OAuth state token
  */
-export function generateOAuthState(clerkId: string, platform: string): { state: string; codeVerifier: string } {
+export function generateOAuthState(
+  clerkId: string, 
+  platform: string, 
+  target?: 'personal' | 'company'
+): { state: string; codeVerifier: string } {
   const state = randomBytes(32).toString('hex')
   const codeVerifier = randomBytes(32).toString('base64url')
 
@@ -33,6 +38,7 @@ export function generateOAuthState(clerkId: string, platform: string): { state: 
     platform,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000), // Expires in 10 minutes
     codeVerifier,
+    target,
   })
   return { state, codeVerifier }
 }
@@ -44,7 +50,7 @@ export function verifyOAuthState(
   state: string,
   clerkId: string,
   platform: string
-): { valid: true; codeVerifier?: string } | { valid: false } {
+): { valid: true; codeVerifier?: string; target?: 'personal' | 'company' } | { valid: false } {
   const stored = oauthStateStore.get(state)
   if (!stored) {
     return { valid: false }
@@ -62,7 +68,8 @@ export function verifyOAuthState(
   }
 
   // Consume the state (one-time use)
+  const target = stored.target
   oauthStateStore.delete(state)
-  return { valid: true, codeVerifier: stored.codeVerifier }
+  return { valid: true, codeVerifier: stored.codeVerifier, target }
 }
 

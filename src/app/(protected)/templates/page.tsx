@@ -15,6 +15,10 @@ export type Template = {
   description: string
   linkedinTemplate: string
   twitterTemplate: string
+  facebookTemplate?: string | null
+  instagramTemplate?: string | null
+  telegramTemplate?: string | null
+  threadsTemplate?: string | null
   isDefault: boolean
   createdAt: string
   updatedAt: string
@@ -53,6 +57,19 @@ export default function TemplatesPage() {
     }
   }
 
+  // Refresh a single template
+  const refreshTemplate = async (templateId: string): Promise<Template | null> => {
+    try {
+      const response = await fetch(`/api/templates/${templateId}`)
+      if (response.ok) {
+        return await response.json()
+      }
+    } catch (error) {
+      console.error('Error refreshing template:', error)
+    }
+    return null
+  }
+
   // Seed default templates
   const seedTemplates = async () => {
     try {
@@ -69,8 +86,29 @@ export default function TemplatesPage() {
     }
   }
 
+  // Update existing templates with new platform fields
+  const updateTemplatesWithPlatforms = async () => {
+    try {
+      const response = await fetch('/api/templates/update-platforms', {
+        method: 'POST',
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.updated > 0) {
+          await fetchTemplates()
+          toast.success(`Updated ${data.updated} template(s) with new platform fields`)
+        }
+      }
+    } catch (error) {
+      console.error('Error updating templates:', error)
+    }
+  }
+
   useEffect(() => {
     fetchTemplates()
+    // Update existing templates with new platform fields on mount
+    updateTemplatesWithPlatforms()
   }, [])
 
   const handleDelete = async (id: string) => {
@@ -114,9 +152,22 @@ export default function TemplatesPage() {
     }
   }
 
-  const handleView = (template: Template) => {
-    setSelectedTemplate(template)
+  const handleView = async (template: Template) => {
     setIsViewing(true)
+    // Fetch fresh template data to ensure we have all platform fields
+    try {
+      const freshTemplate = await refreshTemplate(template.id)
+      if (freshTemplate) {
+        setSelectedTemplate(freshTemplate)
+      } else {
+        // Fallback to template from state if fetch fails
+        setSelectedTemplate(template)
+      }
+    } catch (error) {
+      console.error('Error fetching template:', error)
+      // Fallback to template from state if fetch fails
+      setSelectedTemplate(template)
+    }
   }
 
   const handleEdit = (template: Template) => {
@@ -308,34 +359,107 @@ export default function TemplatesPage() {
             {/* Template Content */}
             <div className="space-y-6">
               {/* LinkedIn Template */}
-              <div>
-                <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded bg-[#0A66C2] flex items-center justify-center text-white text-xs font-bold">
-                    in
+              {selectedTemplate.linkedinTemplate && selectedTemplate.linkedinTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-[#0A66C2] flex items-center justify-center text-white text-xs font-bold">
+                      in
+                    </div>
+                    LinkedIn Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.linkedinTemplate}
+                    </pre>
                   </div>
-                  LinkedIn Template
-                </h3>
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
-                    {selectedTemplate.linkedinTemplate}
-                  </pre>
                 </div>
-              </div>
+              )}
 
               {/* Twitter Template */}
-              <div>
-                <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded bg-[#1DA1F2] flex items-center justify-center text-white text-xs font-bold">
-                    𝕏
+              {selectedTemplate.twitterTemplate && selectedTemplate.twitterTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-[#1DA1F2] flex items-center justify-center text-white text-xs font-bold">
+                      𝕏
+                    </div>
+                    Twitter Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.twitterTemplate}
+                    </pre>
                   </div>
-                  Twitter Template
-                </h3>
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
-                    {selectedTemplate.twitterTemplate}
-                  </pre>
                 </div>
-              </div>
+              )}
+
+              {/* Facebook Template */}
+              {selectedTemplate.facebookTemplate && selectedTemplate.facebookTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-[#1877F2] flex items-center justify-center text-white text-xs font-bold">
+                      f
+                    </div>
+                    Facebook Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.facebookTemplate}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Instagram Template */}
+              {selectedTemplate.instagramTemplate && selectedTemplate.instagramTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
+                      style={{ background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}>
+                      📷
+                    </div>
+                    Instagram Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.instagramTemplate}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Telegram Template */}
+              {selectedTemplate.telegramTemplate && selectedTemplate.telegramTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-[#0088cc] flex items-center justify-center text-white text-xs font-bold">
+                      📱
+                    </div>
+                    Telegram Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.telegramTemplate}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Threads Template */}
+              {selectedTemplate.threadsTemplate && selectedTemplate.threadsTemplate.trim() && (
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground mb-2 flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-bold">
+                      🧵
+                    </div>
+                    Threads Template
+                  </h3>
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans">
+                      {selectedTemplate.threadsTemplate}
+                    </pre>
+                  </div>
+                </div>
+              )}
 
               {/* Template Variables Info */}
               <div className="rounded-lg border border-border bg-primary/10 p-4">

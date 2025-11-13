@@ -6,7 +6,13 @@ import { generateOAuthState } from '@/lib/oauth'
 import { createHash } from 'crypto'
 
 // Valid platform names
-const VALID_PLATFORMS = ['linkedin', 'twitter']
+const VALID_PLATFORMS = ['linkedin', 'twitter', 'facebook', 'instagram', 'threads']
+
+type OAuthStateCookieData = {
+  state: string
+  codeVerifier?: string
+  target?: 'personal' | 'company'
+}
 
 // OAuth configuration
 const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID
@@ -14,10 +20,33 @@ const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET
 const LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
 
+// LinkedIn Company Pages App (separate app for Community Management API)
+const LINKEDIN_COMPANY_CLIENT_ID = process.env.LINKEDIN_COMPANY_CLIENT_ID
+const LINKEDIN_COMPANY_CLIENT_SECRET = process.env.LINKEDIN_COMPANY_CLIENT_SECRET
+// Note: Company callback uses same path as personal (target is stored in OAuth state, not query param)
+// LinkedIn doesn't preserve query parameters in callback URLs, so we use OAuth state to track target
+const LINKEDIN_COMPANY_REDIRECT_URI = process.env.LINKEDIN_COMPANY_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
+
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID
 const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET
 const TWITTER_REDIRECT_URI = process.env.TWITTER_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/twitter/callback`
+
+const FACEBOOK_CLIENT_ID = process.env.FACEBOOK_CLIENT_ID
+const FACEBOOK_CLIENT_SECRET = process.env.FACEBOOK_CLIENT_SECRET
+const FACEBOOK_REDIRECT_URI = process.env.FACEBOOK_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/facebook/callback`
+
+const INSTAGRAM_CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID // Instagram uses Facebook OAuth
+const INSTAGRAM_CLIENT_SECRET = process.env.INSTAGRAM_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET
+const INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/instagram/callback`
+
+const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID // Threads uses Facebook OAuth
+const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET
+const THREADS_REDIRECT_URI = process.env.THREADS_REDIRECT_URI || 
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/threads/callback`
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -84,66 +113,168 @@ export async function POST(
       )
     }
 
-    // Generate OAuth state token
-    const { state, codeVerifier } = generateOAuthState(clerkId, platform)
-
+    // Generate OAuth state token and determine redirect URL
     let redirectUrl: string
+    let state: string
+    let codeVerifier: string
+    let stateTarget: 'personal' | 'company' | undefined
 
     if (platform === 'linkedin') {
-      if (!LINKEDIN_CLIENT_ID) {
+      // Check if this is for Company Pages (passed as query parameter)
+      const requestUrl = new URL(request.url)
+      const target = requestUrl.searchParams.get('target') // 'company' or 'personal' (default)
+      const isCompanyPage = target === 'company'
+      const targetType: 'personal' | 'company' = isCompanyPage ? 'company' : 'personal'
+      stateTarget = targetType
+      
+      console.log(`[LinkedIn OAuth] Initiating OAuth flow`, {
+        target,
+        isCompanyPage,
+        targetType,
+        clerkId,
+      })
+      
+      // Generate OAuth state token with target type stored in state
+      const stateData = generateOAuthState(clerkId, platform, targetType)
+      state = stateData.state
+      codeVerifier = stateData.codeVerifier
+      
+      console.log(`[LinkedIn OAuth] Generated state token`, {
+        state: state.substring(0, 16) + '...',
+        targetType,
+      })
+      
+      // Select appropriate app credentials
+      const clientId = isCompanyPage ? LINKEDIN_COMPANY_CLIENT_ID : LINKEDIN_CLIENT_ID
+      const redirectUri = isCompanyPage ? LINKEDIN_COMPANY_REDIRECT_URI : LINKEDIN_REDIRECT_URI
+      
+      if (!clientId) {
+        const appType = isCompanyPage ? 'Company Pages' : 'Personal Profile'
         return NextResponse.json(
-          { error: 'LinkedIn OAuth not configured. Please set LINKEDIN_CLIENT_ID environment variable.' },
+          { error: `LinkedIn ${appType} OAuth not configured. Please set LINKEDIN${isCompanyPage ? '_COMPANY' : ''}_CLIENT_ID environment variable.` },
           { status: 500 }
         )
       }
 
       // LinkedIn OAuth 2.0 authorization URL
-      // Note: 
-      // - w_member_social scope requires "Share on LinkedIn" product approval (for posting)
-      // - r_member_social scope is required for reading posts and analytics, BUT:
-      //   LinkedIn has currently restricted access to r_member_social and is not accepting new requests
-      //   See: https://stackoverflow.com/questions/79774322/r-member-social-scope-permission-in-linkedin-api
-      //   Analytics will not be available until LinkedIn reopens access to this permission
+      // Note:
+      // - Personal Profiles: still rely on w_member_social ("Share on LinkedIn" product)
+      // - Company Pages: require Community Management API approval and LinkedIn expects w_organization_social +
+      //   r_organization_social + r_organization_admin to cover posting, analytics, and admin lookups
       const params = new URLSearchParams({
         response_type: 'code',
-        client_id: LINKEDIN_CLIENT_ID,
-        redirect_uri: LINKEDIN_REDIRECT_URI,
+        client_id: clientId,
+        redirect_uri: redirectUri,
         state,
-        scope: 'openid profile email w_member_social', // r_member_social not available - LinkedIn has restricted access
+        // Request appropriate scopes based on target
+        scope: isCompanyPage 
+          ? 'openid profile email w_organization_social r_organization_social r_organization_admin'  // Company Pages
+          : 'openid profile email w_member_social',       // Personal Profiles
       })
 
       redirectUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`
-    } else if (platform === 'twitter') {
-      if (!TWITTER_CLIENT_ID) {
+    } else {
+      // Generate OAuth state token for other platforms
+      const stateData = generateOAuthState(clerkId, platform)
+      state = stateData.state
+      codeVerifier = stateData.codeVerifier
+
+      if (platform === 'twitter') {
+        if (!TWITTER_CLIENT_ID) {
+          return NextResponse.json(
+            { error: 'Twitter/X OAuth not configured. Please set TWITTER_CLIENT_ID environment variable.' },
+            { status: 500 }
+          )
+        }
+
+        // Twitter OAuth 2.0 authorization URL
+        const codeChallenge = createHash('sha256')
+          .update(codeVerifier)
+          .digest('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: TWITTER_CLIENT_ID,
+          redirect_uri: TWITTER_REDIRECT_URI,
+          state,
+          scope: 'tweet.read tweet.write users.read offline.access media.write', // Required scopes for posting and media uploads
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        })
+
+        redirectUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`
+      } else if (platform === 'facebook') {
+        if (!FACEBOOK_CLIENT_ID) {
+          return NextResponse.json(
+            { error: 'Facebook OAuth not configured. Please set FACEBOOK_CLIENT_ID environment variable.' },
+            { status: 500 }
+          )
+        }
+
+        // Facebook OAuth 2.0 authorization URL
+        // Scopes for "Manage everything on your Page" use case:
+        // - public_profile: Required for Facebook Login
+        // - business_management: Required for Page management use case
+        // - pages_show_list: Required to list user's Pages
+        // - pages_manage_posts: Required to post to Pages
+        // - pages_read_engagement: Required for Page analytics
+        // Note: The "Manage everything on your Page" use case must be added to your app
+        // Note: These permissions may require App Review for production use
+        const params = new URLSearchParams({
+          client_id: FACEBOOK_CLIENT_ID,
+          redirect_uri: FACEBOOK_REDIRECT_URI,
+          state,
+          scope: 'public_profile,business_management,pages_show_list,pages_manage_posts,pages_read_engagement',
+          response_type: 'code',
+        })
+
+        redirectUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
+      } else if (platform === 'instagram') {
+        if (!INSTAGRAM_CLIENT_ID) {
+          return NextResponse.json(
+            { error: 'Instagram OAuth not configured. Please set INSTAGRAM_CLIENT_ID or FACEBOOK_CLIENT_ID environment variable.' },
+            { status: 500 }
+          )
+        }
+
+        // Instagram OAuth 2.0 authorization URL (uses Facebook OAuth)
+        // Scopes: instagram_basic, pages_show_list, pages_read_engagement (for Instagram Business Account)
+        const params = new URLSearchParams({
+          client_id: INSTAGRAM_CLIENT_ID,
+          redirect_uri: INSTAGRAM_REDIRECT_URI,
+          state,
+          scope: 'instagram_basic,pages_show_list,pages_read_engagement',
+          response_type: 'code',
+        })
+
+        redirectUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
+      } else if (platform === 'threads') {
+        if (!THREADS_CLIENT_ID) {
+          return NextResponse.json(
+            { error: 'Threads OAuth not configured. Please set THREADS_CLIENT_ID or FACEBOOK_CLIENT_ID environment variable.' },
+            { status: 500 }
+          )
+        }
+
+        // Threads OAuth 2.0 authorization URL (uses Facebook OAuth)
+        // Scopes: threads_basic, threads_content_publish (for Threads posting)
+        const params = new URLSearchParams({
+          client_id: THREADS_CLIENT_ID,
+          redirect_uri: THREADS_REDIRECT_URI,
+          state,
+          scope: 'threads_basic,threads_content_publish,pages_show_list',
+          response_type: 'code',
+        })
+
+        redirectUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
+      } else {
         return NextResponse.json(
-          { error: 'Twitter/X OAuth not configured. Please set TWITTER_CLIENT_ID environment variable.' },
-          { status: 500 }
+          { error: `Unsupported platform: ${platform}` },
+          { status: 400 }
         )
       }
-
-      // Twitter OAuth 2.0 authorization URL
-      const codeChallenge = createHash('sha256')
-        .update(codeVerifier)
-        .digest('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
-      const params = new URLSearchParams({
-        response_type: 'code',
-        client_id: TWITTER_CLIENT_ID,
-        redirect_uri: TWITTER_REDIRECT_URI,
-        state,
-        scope: 'tweet.read tweet.write users.read offline.access media.write', // Required scopes for posting and media uploads
-        code_challenge: codeChallenge,
-        code_challenge_method: 'S256',
-      })
-
-      redirectUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`
-    } else {
-      return NextResponse.json(
-        { error: `Unsupported platform: ${platform}` },
-        { status: 400 }
-      )
     }
 
     const response = NextResponse.json({
@@ -153,9 +284,12 @@ export async function POST(
 
     try {
       const cookieName = `oauth_state_${platform}`
-      const cookieData: { state: string; codeVerifier?: string } = { state }
+      const cookieData: OAuthStateCookieData = { state }
       if (platform === 'twitter' && codeVerifier) {
         cookieData.codeVerifier = codeVerifier
+      }
+      if (stateTarget) {
+        cookieData.target = stateTarget
       }
 
       response.cookies.set({
@@ -205,26 +339,65 @@ export async function DELETE(
 
     const user = await getOrCreateUser(clerkId)
 
-    // Find and delete the connection
-    const connection = await prisma.socialConnection.findUnique({
-      where: {
-        userId_platform: {
+    // Find and delete the connection(s)
+    // For LinkedIn, delete both personal and company connections
+    // For other platforms, delete the single connection
+    if (platform === 'linkedin') {
+      // Delete all LinkedIn connections (both personal and company)
+      const deleted = await prisma.socialConnection.deleteMany({
+        where: {
           userId: user.id,
           platform,
         },
-      },
-    })
+      })
+      
+      if (deleted.count === 0) {
+        return NextResponse.json(
+          { error: 'Connection not found' },
+          { status: 404 }
+        )
+      }
+    } else {
+      // For other platforms, delete the single connection (appType is null)
+      // Handle case where unique constraint doesn't exist yet (before migration)
+      let connection = null
+      try {
+        connection = await (prisma.socialConnection.findUnique as any)({
+          where: {
+            userId_platform_appType: {
+              userId: user.id,
+              platform,
+              appType: null,
+            },
+          },
+        })
+      } catch (error: any) {
+        // If unique constraint doesn't exist yet, use findFirst
+        if (error.message?.includes('userId_platform_appType') || 
+            error.message?.includes('Unknown argument') ||
+            error.code === 'P2009') {
+          connection = await prisma.socialConnection.findFirst({
+            where: {
+              userId: user.id,
+              platform,
+            },
+          })
+        } else {
+          throw error
+        }
+      }
 
-    if (!connection) {
-      return NextResponse.json(
-        { error: 'Connection not found' },
-        { status: 404 }
-      )
+      if (!connection) {
+        return NextResponse.json(
+          { error: 'Connection not found' },
+          { status: 404 }
+        )
+      }
+
+      await prisma.socialConnection.delete({
+        where: { id: connection.id },
+      })
     }
-
-    await prisma.socialConnection.delete({
-      where: { id: connection.id },
-    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

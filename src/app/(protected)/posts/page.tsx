@@ -17,6 +17,10 @@ type Draft = {
   contentRaw: string
   linkedinContent: string | null
   twitterContent: string | null
+  facebookContent: string | null
+  instagramContent: string | null
+  telegramContent: string | null
+  threadsContent: string | null
   platforms: string
   templateId: string | null
   attachedImage: string | null
@@ -185,19 +189,35 @@ export default function PostsPage() {
         const draft = await draftResponse.json()
 
         // Determine platforms to publish
-        const platforms: ('linkedin' | 'twitter')[] = []
+        const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
         if (draft.platforms === 'both') {
           platforms.push('linkedin', 'twitter')
         } else if (draft.platforms === 'linkedin') {
           platforms.push('linkedin')
         } else if (draft.platforms === 'twitter') {
           platforms.push('twitter')
+        } else if (draft.platforms === 'facebook') {
+          platforms.push('facebook')
+        } else if (draft.platforms === 'instagram') {
+          platforms.push('instagram')
+        } else if (draft.platforms === 'telegram') {
+          platforms.push('telegram')
+        } else if (draft.platforms === 'threads') {
+          platforms.push('threads')
         }
 
         // Publish to each platform
         const platformPromises = platforms.map(async (platform) => {
           const content = platform === 'linkedin' 
             ? draft.linkedinContent 
+            : platform === 'facebook'
+            ? draft.facebookContent
+            : platform === 'instagram'
+            ? draft.instagramContent
+            : platform === 'telegram'
+            ? draft.telegramContent
+            : platform === 'threads'
+            ? draft.threadsContent
             : draft.twitterContent
 
           if (!content) {
@@ -291,19 +311,35 @@ export default function PostsPage() {
         const draft = await draftResponse.json()
 
         // Determine platforms to schedule
-        const platforms: ('linkedin' | 'twitter')[] = []
+        const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
         if (draft.platforms === 'both') {
           platforms.push('linkedin', 'twitter')
         } else if (draft.platforms === 'linkedin') {
           platforms.push('linkedin')
         } else if (draft.platforms === 'twitter') {
           platforms.push('twitter')
+        } else if (draft.platforms === 'facebook') {
+          platforms.push('facebook')
+        } else if (draft.platforms === 'instagram') {
+          platforms.push('instagram')
+        } else if (draft.platforms === 'telegram') {
+          platforms.push('telegram')
+        } else if (draft.platforms === 'threads') {
+          platforms.push('threads')
         }
 
         // Schedule to each platform
         const platformPromises = platforms.map(async (platform) => {
           const content = platform === 'linkedin' 
             ? draft.linkedinContent 
+            : platform === 'facebook'
+            ? draft.facebookContent
+            : platform === 'instagram'
+            ? draft.instagramContent
+            : platform === 'telegram'
+            ? draft.telegramContent
+            : platform === 'threads'
+            ? draft.threadsContent
             : draft.twitterContent
 
           if (!content) {

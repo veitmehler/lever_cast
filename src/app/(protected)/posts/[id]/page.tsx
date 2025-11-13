@@ -20,6 +20,10 @@ type Draft = {
   contentRaw: string
   linkedinContent: string | null
   twitterContent: string | string[] | null // Support both single and thread
+  facebookContent: string | null
+  instagramContent: string | null
+  telegramContent: string | null
+  threadsContent: string | null
   platforms: string
   templateId: string | null
   attachedImage: string | null
@@ -50,9 +54,13 @@ export default function PostDetailPage({
   const { id } = use(params)
   const [post, setPost] = useState<Draft | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isRegenerating, setIsRegenerating] = useState<Record<'linkedin' | 'twitter', boolean>>({
+  const [isRegenerating, setIsRegenerating] = useState<Record<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', boolean>>({
     linkedin: false,
     twitter: false,
+    facebook: false,
+    instagram: false,
+    telegram: false,
+    threads: false,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
@@ -123,13 +131,19 @@ export default function PostDetailPage({
     }
   }
 
-  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string | string[]) => {
+  const handleContentChange = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', newContent: string | string[]) => {
     // Update local state
     setPost((prev) => {
       if (!prev) return null
+      const contentField = platform === 'linkedin' ? 'linkedinContent' 
+        : platform === 'facebook' ? 'facebookContent'
+        : platform === 'instagram' ? 'instagramContent'
+        : platform === 'telegram' ? 'telegramContent'
+        : platform === 'threads' ? 'threadsContent'
+        : 'twitterContent'
       return {
         ...prev,
-        [platform === 'linkedin' ? 'linkedinContent' : 'twitterContent']: newContent,
+        [contentField]: newContent,
       }
     })
 
@@ -138,6 +152,14 @@ export default function PostDetailPage({
       const updateData: Record<string, string> = {}
       if (platform === 'linkedin') {
         updateData.linkedinContent = newContent as string
+      } else if (platform === 'facebook') {
+        updateData.facebookContent = newContent as string
+      } else if (platform === 'instagram') {
+        updateData.instagramContent = newContent as string
+      } else if (platform === 'telegram') {
+        updateData.telegramContent = newContent as string
+      } else if (platform === 'threads') {
+        updateData.threadsContent = newContent as string
       } else {
         // Stringify if array, otherwise use as string
         updateData.twitterContent = Array.isArray(newContent) 
@@ -165,7 +187,7 @@ export default function PostDetailPage({
     }
   }
 
-  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string | string[], scheduledAt: Date) => {
+  const handleSchedule = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', content: string | string[], scheduledAt: Date) => {
     try {
       // Create scheduled post(s)
       // For threads, schedule summary first, then replies
@@ -276,7 +298,7 @@ export default function PostDetailPage({
     }
   }
 
-  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string | string[]) => {
+  const handlePublish = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', content: string | string[]) => {
     try {
       // Check if already published (only check summary posts, not replies)
       const isPublished = post?.posts?.some(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
@@ -426,35 +448,35 @@ export default function PostDetailPage({
     }
   }
 
-  const isPlatformPublished = (platform: 'linkedin' | 'twitter') => {
+  const isPlatformPublished = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only check summary posts (not replies)
     return post?.posts?.some(p => p.platform === platform && p.status === 'published' && !p.parentPostId) || false
   }
 
-  const isPlatformScheduled = (platform: 'linkedin' | 'twitter') => {
+  const isPlatformScheduled = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only check summary posts (not replies)
     return post?.posts?.some(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId) || false
   }
 
-  const getPublishedDate = (platform: 'linkedin' | 'twitter') => {
+  const getPublishedDate = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only get summary posts (not replies)
     const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
     return publishedPost?.publishedAt ? new Date(publishedPost.publishedAt) : null
   }
 
-  const getScheduledDate = (platform: 'linkedin' | 'twitter') => {
+  const getScheduledDate = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only get summary posts (not replies)
     const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId)
     return scheduledPost?.scheduledAt ? new Date(scheduledPost.scheduledAt) : null
   }
 
-  const getScheduledPostId = (platform: 'linkedin' | 'twitter') => {
+  const getScheduledPostId = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only get summary posts (not replies)
     const scheduledPost = post?.posts?.find(p => p.platform === platform && p.status === 'scheduled' && !p.parentPostId)
     return scheduledPost?.id || null
   }
 
-  const getPublishedPostAnalytics = (platform: 'linkedin' | 'twitter') => {
+  const getPublishedPostAnalytics = (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     // Only get summary posts (not replies)
     const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
     return {
@@ -464,7 +486,7 @@ export default function PostDetailPage({
     }
   }
 
-  const handleRefreshAnalytics = async (platform: 'linkedin' | 'twitter') => {
+  const handleRefreshAnalytics = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     try {
       // Get the published post ID for this platform
       const publishedPost = post?.posts?.find(p => p.platform === platform && p.status === 'published' && !p.parentPostId)
@@ -553,7 +575,7 @@ export default function PostDetailPage({
     }
   }
 
-  const handleRegenerate = async (platform: 'linkedin' | 'twitter') => {
+  const handleRegenerate = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     if (!post || !post.contentRaw) {
       toast.error('Cannot regenerate: missing original idea')
       return
@@ -584,7 +606,12 @@ export default function PostDetailPage({
         twitterFormat
       )
 
-      const newContent = platform === 'linkedin' ? result.linkedin : result.twitter
+      const newContent = platform === 'linkedin' ? result.linkedin 
+        : platform === 'facebook' ? result.facebook
+        : platform === 'instagram' ? result.instagram
+        : platform === 'telegram' ? result.telegram
+        : platform === 'threads' ? result.threads
+        : result.twitter
 
       if (!newContent) {
         throw new Error('Failed to generate new content')
@@ -594,6 +621,14 @@ export default function PostDetailPage({
       const updateData: Record<string, string> = {}
       if (platform === 'linkedin') {
         updateData.linkedinContent = newContent as string
+      } else if (platform === 'facebook') {
+        updateData.facebookContent = newContent as string
+      } else if (platform === 'instagram') {
+        updateData.instagramContent = newContent as string
+      } else if (platform === 'telegram') {
+        updateData.telegramContent = newContent as string
+      } else if (platform === 'threads') {
+        updateData.threadsContent = newContent as string
       } else {
         // Stringify if array, otherwise use as string
         updateData.twitterContent = Array.isArray(newContent) 
@@ -620,7 +655,13 @@ export default function PostDetailPage({
         setPost(updatedDraft)
       }
 
-      toast.success(`${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} post regenerated!`, {
+      const platformName = platform === 'linkedin' ? 'LinkedIn' 
+        : platform === 'facebook' ? 'Facebook'
+        : platform === 'instagram' ? 'Instagram'
+        : platform === 'telegram' ? 'Telegram'
+        : platform === 'threads' ? 'Threads'
+        : 'Twitter'
+      toast.success(`${platformName} post regenerated!`, {
         description: 'Review the new version and decide which one you prefer',
       })
     } catch (error) {
@@ -893,7 +934,7 @@ export default function PostDetailPage({
         </div>
 
         {/* Original Idea - Only show for drafts and scheduled posts, not published */}
-        {!(isPlatformPublished('linkedin') || isPlatformPublished('twitter')) && (
+        {!(isPlatformPublished('linkedin') || isPlatformPublished('twitter') || isPlatformPublished('facebook') || isPlatformPublished('instagram') || isPlatformPublished('telegram') || isPlatformPublished('threads')) && (
           <div className="rounded-lg border border-border bg-card p-6 mb-6">
             <h3 className="text-sm font-semibold text-card-foreground mb-2">Original Idea</h3>
             <p className="text-muted-foreground mb-4">{post.contentRaw}</p>
@@ -967,7 +1008,7 @@ export default function PostDetailPage({
       />
 
       {/* Generated Content Preview */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {post.linkedinContent && (
           <div className="space-y-4">
             <PlatformPreview
@@ -1028,6 +1069,94 @@ export default function PostDetailPage({
                 onRefresh={() => handleRefreshAnalytics('twitter')}
               />
             )}
+          </div>
+        )}
+        {post.facebookContent && (
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="facebook"
+              content={post.facebookContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('facebook')}
+              onPublish={(editedContent) => handlePublish('facebook', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('facebook', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('facebook')}
+              publishedDate={getPublishedDate('facebook')}
+              isScheduled={isPlatformScheduled('facebook')}
+              scheduledDate={getScheduledDate('facebook')}
+              scheduledPostId={getScheduledPostId('facebook')}
+              isRegenerating={isRegenerating.facebook}
+            />
+          </div>
+        )}
+        {post.instagramContent && (
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="instagram"
+              content={post.instagramContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('instagram')}
+              onPublish={(editedContent) => handlePublish('instagram', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('instagram', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('instagram')}
+              publishedDate={getPublishedDate('instagram')}
+              isScheduled={isPlatformScheduled('instagram')}
+              scheduledDate={getScheduledDate('instagram')}
+              scheduledPostId={getScheduledPostId('instagram')}
+              isRegenerating={isRegenerating.instagram}
+            />
+          </div>
+        )}
+        {post.telegramContent && (
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="telegram"
+              content={post.telegramContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('telegram')}
+              onPublish={(editedContent) => handlePublish('telegram', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('telegram', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('telegram')}
+              publishedDate={getPublishedDate('telegram')}
+              isScheduled={isPlatformScheduled('telegram')}
+              scheduledDate={getScheduledDate('telegram')}
+              scheduledPostId={getScheduledPostId('telegram')}
+              isRegenerating={isRegenerating.telegram}
+            />
+          </div>
+        )}
+        {post.threadsContent && (
+          <div className="space-y-4">
+            <PlatformPreview
+              platform="threads"
+              content={post.threadsContent}
+              userName={userName}
+              userInitials={userInitials}
+              image={post.attachedImage || undefined}
+              onRegenerate={() => handleRegenerate('threads')}
+              onPublish={(editedContent) => handlePublish('threads', editedContent)}
+              onSchedule={(editedContent, scheduledAt) => handleSchedule('threads', editedContent, scheduledAt)}
+              onReschedule={(postId, scheduledAt) => handleReschedule(postId, scheduledAt)}
+              onContentChange={handleContentChange}
+              isPublished={isPlatformPublished('threads')}
+              publishedDate={getPublishedDate('threads')}
+              isScheduled={isPlatformScheduled('threads')}
+              scheduledDate={getScheduledDate('threads')}
+              scheduledPostId={getScheduledPostId('threads')}
+              isRegenerating={isRegenerating.threads}
+            />
           </div>
         )}
       </div>

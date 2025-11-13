@@ -27,6 +27,44 @@ Key insights:
 • {point3}
 
 What do you think?`,
+    facebookTemplate: `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? I'd love to hear your thoughts in the comments below!
+
+#Business #Professional #Leadership`,
+    instagramTemplate: `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? Share your thoughts below! 👇
+
+#Business #Professional #Leadership #Motivation`,
+    telegramTemplate: `🚀 {idea}
+
+Here are my key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience with this? Share your thoughts below!
+
+#Business #Professional #Leadership`,
+    threadsTemplate: `🚀 {idea}
+
+Key takeaways:
+• {point1}
+• {point2}
+• {point3}
+
+What's your experience?`,
   },
   {
     name: 'Casual',
@@ -53,6 +91,52 @@ Quick thoughts:
 - {point3}
 
 Your take? 🤔`,
+    facebookTemplate: `Hey everyone! 👋
+
+{idea}
+
+Here's what I've learned:
+→ {point1}
+→ {point2}
+→ {point3}
+
+Anyone else experience this? Drop a comment below!
+
+#CasualChat #RealTalk`,
+    instagramTemplate: `Hey everyone! 👋
+
+{idea}
+
+Here's what I've learned:
+→ {point1}
+→ {point2}
+→ {point3}
+
+Anyone else experience this? Drop a comment below! 💬
+
+#CasualChat #RealTalk #Community`,
+    telegramTemplate: `Hey everyone! 👋
+
+{idea}
+
+Here's what I've learned:
+→ {point1}
+→ {point2}
+→ {point3}
+
+Anyone else experience this? Drop a comment!
+
+#CasualChat #RealTalk`,
+    threadsTemplate: `Hey everyone! 👋
+
+{idea}
+
+Quick thoughts:
+→ {point1}
+→ {point2}
+→ {point3}
+
+Your take?`,
   },
   {
     name: 'Inspirational',
@@ -75,6 +159,46 @@ Remember:
 → {point1}
 → {point2}
 → {point3}
+
+You've got this! 💪`,
+    facebookTemplate: `✨ {idea}
+
+Remember:
+💡 {point1}
+💪 {point2}
+🎯 {point3}
+
+Keep pushing forward. You've got this! Share this with someone who needs to hear it today.
+
+#Motivation #Inspiration #Growth`,
+    instagramTemplate: `✨ {idea}
+
+Remember:
+💡 {point1}
+💪 {point2}
+🎯 {point3}
+
+Keep pushing forward. You've got this! 💪
+
+Tag someone who needs to hear this today 👇
+
+#Motivation #Inspiration #Growth #Mindset`,
+    telegramTemplate: `✨ {idea}
+
+Remember:
+💡 {point1}
+💪 {point2}
+🎯 {point3}
+
+Keep pushing forward. You've got this!
+
+#Motivation #Inspiration #Growth`,
+    threadsTemplate: `✨ {idea}
+
+Remember:
+💡 {point1}
+💪 {point2}
+🎯 {point3}
 
 You've got this! 💪`,
   },
@@ -101,6 +225,44 @@ Questions:
 • {point3}?
 
 Share your thoughts! 👇`,
+    facebookTemplate: `{idea}
+
+Here's what I'm curious about:
+❓ {point1}
+❓ {point2}
+❓ {point3}
+
+What's your perspective? I'd love to hear your thoughts in the comments below!
+
+#Discussion #Community #YourThoughts`,
+    instagramTemplate: `{idea}
+
+Here's what I'm curious about:
+❓ {point1}
+❓ {point2}
+❓ {point3}
+
+What's your perspective? Drop your thoughts below! 👇
+
+#Discussion #Community #YourThoughts #Engage`,
+    telegramTemplate: `{idea}
+
+Here's what I'm curious about:
+❓ {point1}
+❓ {point2}
+❓ {point3}
+
+What's your perspective? Share your thoughts!
+
+#Discussion #Community #YourThoughts`,
+    threadsTemplate: `{idea}
+
+Questions:
+❓ {point1}
+❓ {point2}
+❓ {point3}
+
+Your thoughts?`,
   },
   {
     name: 'Storytelling',
@@ -125,6 +287,44 @@ What I learned:
 3. {point3}
 
 What's your story? 📖`,
+    facebookTemplate: `Let me tell you about {idea}
+
+The journey taught me:
+📖 {point1}
+📖 {point2}
+📖 {point3}
+
+Have you experienced something similar? I'd love to hear your story in the comments!
+
+#Story #Journey #Experience`,
+    instagramTemplate: `Let me tell you about {idea}
+
+The journey taught me:
+📖 {point1}
+📖 {point2}
+📖 {point3}
+
+Have you experienced something similar? Share your story below! 👇
+
+#Story #Journey #Experience #LifeLessons`,
+    telegramTemplate: `Let me tell you about {idea}
+
+The journey taught me:
+📖 {point1}
+📖 {point2}
+📖 {point3}
+
+Have you experienced something similar? Share your story!
+
+#Story #Journey #Experience`,
+    threadsTemplate: `Story time: {idea}
+
+What I learned:
+📖 {point1}
+📖 {point2}
+📖 {point3}
+
+What's your story?`,
   },
 ]
 

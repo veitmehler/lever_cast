@@ -93,7 +93,18 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, tone, description, linkedinTemplate, twitterTemplate, isDefault } = body
+    const { 
+      name, 
+      tone, 
+      description, 
+      linkedinTemplate, 
+      twitterTemplate, 
+      facebookTemplate,
+      instagramTemplate,
+      telegramTemplate,
+      threadsTemplate,
+      isDefault 
+    } = body
 
     const user = await getOrCreateUser(clerkId)
 
@@ -131,6 +142,10 @@ export async function PATCH(
         ...(description !== undefined && { description }),
         ...(linkedinTemplate !== undefined && { linkedinTemplate }),
         ...(twitterTemplate !== undefined && { twitterTemplate }),
+        ...(facebookTemplate !== undefined && { facebookTemplate }),
+        ...(instagramTemplate !== undefined && { instagramTemplate }),
+        ...(telegramTemplate !== undefined && { telegramTemplate }),
+        ...(threadsTemplate !== undefined && { threadsTemplate }),
         ...(isDefault !== undefined && { isDefault }),
       },
     })

@@ -65,6 +65,10 @@ type Template = {
   description: string
   linkedinTemplate: string
   twitterTemplate: string
+  facebookTemplate?: string | null
+  instagramTemplate?: string | null
+  telegramTemplate?: string | null
+  threadsTemplate?: string | null
   isDefault: boolean
   createdAt: string
   updatedAt: string
@@ -73,7 +77,7 @@ type Template = {
 interface IdeaCaptureProps {
   onGenerate: (
     content: string, 
-    platform: 'linkedin' | 'twitter' | 'both', 
+    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both', 
     templateId?: string, 
     image?: string,
     twitterFormat?: 'single' | 'thread'
@@ -86,14 +90,49 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
-  const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
+  const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both'>('both')
   const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
+  const [availablePlatforms, setAvailablePlatforms] = useState<Set<string>>(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'both']))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [recognitionError, setRecognitionError] = useState<string | null>(null)
+
+  // Fetch available platforms (social connections + Telegram API key)
+  const fetchAvailablePlatforms = async () => {
+    try {
+      const platforms = new Set<string>(['both']) // Always show "Select All"
+      
+      // Fetch social connections
+      const connectionsResponse = await fetch('/api/social/connections')
+      if (connectionsResponse.ok) {
+        const connections = await connectionsResponse.json()
+        connections.forEach((conn: { platform: string; isActive: boolean }) => {
+          if (conn.isActive) {
+            platforms.add(conn.platform)
+          }
+        })
+      }
+      
+      // Check for Telegram API key
+      const apiKeysResponse = await fetch('/api/api-keys')
+      if (apiKeysResponse.ok) {
+        const apiKeys = await apiKeysResponse.json()
+        const hasTelegramKey = apiKeys.some((key: { provider: string }) => key.provider === 'telegram')
+        if (hasTelegramKey) {
+          platforms.add('telegram')
+        }
+      }
+      
+      setAvailablePlatforms(platforms)
+    } catch (error) {
+      console.error('Error fetching available platforms:', error)
+      // On error, show all platforms as fallback
+      setAvailablePlatforms(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'both']))
+    }
+  }
 
   // Fetch templates from API
   const fetchTemplates = async () => {
@@ -160,6 +199,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
 
   useEffect(() => {
     fetchTemplates()
+    fetchAvailablePlatforms()
     // Default to "none" - no template selected
     setSelectedTemplate('none')
 
@@ -439,9 +479,9 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
       )}
 
       {/* Template & Platform Selection */}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {/* Template Selection */}
-        <div>
+      <div className="mt-4 flex gap-4">
+        {/* Template Selection - 1/3 width */}
+        <div className="w-1/3">
           <label className="text-sm font-medium text-card-foreground mb-2 block">
             Content Template
           </label>
@@ -467,42 +507,96 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           )}
         </div>
 
-        {/* Platform Selection */}
-        <div>
+        {/* Platform Selection - 2/3 width */}
+        <div className="w-2/3">
           <label className="text-sm font-medium text-card-foreground mb-2 block">
             Target Platform
           </label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPlatform('linkedin')}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                platform === 'linkedin'
-                  ? 'bg-[#0A66C2] text-white'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              LinkedIn
-            </button>
-            <button
-              onClick={() => setPlatform('twitter')}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                platform === 'twitter'
-                  ? 'bg-[#1DA1F2] text-white'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              Twitter
-            </button>
-            <button
-              onClick={() => setPlatform('both')}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                platform === 'both'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              Both
-            </button>
+          <div className="flex gap-2 flex-wrap">
+            {availablePlatforms.has('linkedin') && (
+              <button
+                onClick={() => setPlatform('linkedin')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'linkedin'
+                    ? 'bg-[#0A66C2] text-white'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                LinkedIn
+              </button>
+            )}
+            {availablePlatforms.has('twitter') && (
+              <button
+                onClick={() => setPlatform('twitter')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'twitter'
+                    ? 'bg-[#1DA1F2] text-white'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Twitter
+              </button>
+            )}
+            {availablePlatforms.has('facebook') && (
+              <button
+                onClick={() => setPlatform('facebook')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'facebook'
+                    ? 'bg-[#1877F2] text-white'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Facebook
+              </button>
+            )}
+            {availablePlatforms.has('instagram') && (
+              <button
+                onClick={() => setPlatform('instagram')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'instagram'
+                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Instagram
+              </button>
+            )}
+            {availablePlatforms.has('telegram') && (
+              <button
+                onClick={() => setPlatform('telegram')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'telegram'
+                    ? 'bg-[#0088cc] text-white'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Telegram
+              </button>
+            )}
+            {availablePlatforms.has('threads') && (
+              <button
+                onClick={() => setPlatform('threads')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'threads'
+                    ? 'bg-black text-white dark:bg-white dark:text-black'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Threads
+              </button>
+            )}
+            {availablePlatforms.has('both') && (
+              <button
+                onClick={() => setPlatform('both')}
+                className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  platform === 'both'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                Select All
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -562,7 +656,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             </span>
           </div>
           
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {/* LinkedIn Preview */}
             {(platform === 'linkedin' || platform === 'both') && (
               <div>
@@ -592,6 +686,74 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
                 <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
                   <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
                     {templates.find(t => t.id === selectedTemplate)?.twitterTemplate}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Facebook Preview */}
+            {platform === 'facebook' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-[#1877F2] flex items-center justify-center text-white text-[10px] font-bold">
+                    f
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Facebook Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.facebookTemplate || 'No Facebook template available'}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Instagram Preview */}
+            {platform === 'instagram' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center text-white text-[10px] font-bold">
+                    📷
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Instagram Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.instagramTemplate || 'No Instagram template available'}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Telegram Preview */}
+            {platform === 'telegram' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-[#0088cc] flex items-center justify-center text-white text-[10px] font-bold">
+                    ✈
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Telegram Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.telegramTemplate || 'No Telegram template available'}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Threads Preview */}
+            {platform === 'threads' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 rounded bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-[10px] font-bold">
+                    @
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Threads Format</span>
+                </div>
+                <div className="rounded border border-border bg-background p-3 max-h-32 overflow-y-auto">
+                  <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {templates.find(t => t.id === selectedTemplate)?.threadsTemplate || 'No Threads template available'}
                   </pre>
                 </div>
               </div>

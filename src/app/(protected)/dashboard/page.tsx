@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
-  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'both'>('both')
+  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both'>('both')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
@@ -36,7 +36,7 @@ export default function DashboardPage() {
 
   const handleGenerate = async (
     content: string,
-    platform: 'linkedin' | 'twitter' | 'both',
+    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both',
     templateId?: string,
     image?: string,
     twitterFormat?: 'single' | 'thread'
@@ -94,6 +94,10 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent.twitter || null),
+            facebookContent: generatedContent.facebook || null,
+            instagramContent: generatedContent.instagram || null,
+            telegramContent: generatedContent.telegram || null,
+            threadsContent: generatedContent.threads || null,
             platforms: selectedPlatform,
             attachedImage: attachedImage || null,
           }),
@@ -120,6 +124,10 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent.twitter || null),
+            facebookContent: generatedContent.facebook || null,
+            instagramContent: generatedContent.instagram || null,
+            telegramContent: generatedContent.telegram || null,
+            threadsContent: generatedContent.threads || null,
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -145,7 +153,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleRegenerate = async (platform: 'linkedin' | 'twitter') => {
+  const handleRegenerate = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     if (!rawIdea) return
 
     setIsGenerating(true)
@@ -166,7 +174,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleContentChange = async (platform: 'linkedin' | 'twitter', newContent: string | string[]) => {
+  const handleContentChange = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', newContent: string | string[]) => {
     // Update local state immediately
     setGeneratedContent((prev) => ({
       ...prev,
@@ -179,6 +187,14 @@ export default function DashboardPage() {
         const updateData: Record<string, string> = {}
         if (platform === 'linkedin') {
           updateData.linkedinContent = newContent as string
+        } else if (platform === 'facebook') {
+          updateData.facebookContent = newContent as string
+        } else if (platform === 'instagram') {
+          updateData.instagramContent = newContent as string
+        } else if (platform === 'telegram') {
+          updateData.telegramContent = newContent as string
+        } else if (platform === 'threads') {
+          updateData.threadsContent = newContent as string
         } else {
           // Stringify if array, otherwise use as string
           updateData.twitterContent = Array.isArray(newContent) 
@@ -210,7 +226,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleSchedule = async (platform: 'linkedin' | 'twitter', content: string | string[], scheduledAt: Date) => {
+  const handleSchedule = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', content: string | string[], scheduledAt: Date) => {
     try {
       // First, save draft if not already saved
       let draftId = currentDraftId
@@ -229,6 +245,10 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent?.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent?.twitter || null),
+            facebookContent: generatedContent?.facebook || null,
+            instagramContent: generatedContent?.instagram || null,
+            telegramContent: generatedContent?.telegram || null,
+            threadsContent: generatedContent?.threads || null,
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -248,6 +268,14 @@ export default function DashboardPage() {
         const updateData: Record<string, string> = {}
         if (platform === 'linkedin' && generatedContent?.linkedin) {
           updateData.linkedinContent = generatedContent.linkedin
+        } else if (platform === 'facebook' && generatedContent?.facebook) {
+          updateData.facebookContent = generatedContent.facebook
+        } else if (platform === 'instagram' && generatedContent?.instagram) {
+          updateData.instagramContent = generatedContent.instagram
+        } else if (platform === 'telegram' && generatedContent?.telegram) {
+          updateData.telegramContent = generatedContent.telegram
+        } else if (platform === 'threads' && generatedContent?.threads) {
+          updateData.threadsContent = generatedContent.threads
         } else if (platform === 'twitter' && generatedContent?.twitter) {
           updateData.twitterContent = Array.isArray(generatedContent.twitter) 
             ? JSON.stringify(generatedContent.twitter) 
@@ -362,7 +390,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handlePublish = async (platform: 'linkedin' | 'twitter', content: string | string[]) => {
+  const handlePublish = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', content: string | string[]) => {
     try {
       // First, save draft if not already saved (use current edited content)
       let draftId = currentDraftId
@@ -381,6 +409,10 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent?.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent?.twitter || null),
+            facebookContent: generatedContent?.facebook || null,
+            instagramContent: generatedContent?.instagram || null,
+            telegramContent: generatedContent?.telegram || null,
+            threadsContent: generatedContent?.threads || null,
             platforms: selectedPlatform,
             status: 'draft',
             attachedImage: attachedImage || null,
@@ -404,6 +436,14 @@ export default function DashboardPage() {
         const updateData: Record<string, string> = {}
         if (platform === 'linkedin' && generatedContent?.linkedin) {
           updateData.linkedinContent = generatedContent.linkedin
+        } else if (platform === 'facebook' && generatedContent?.facebook) {
+          updateData.facebookContent = generatedContent.facebook
+        } else if (platform === 'instagram' && generatedContent?.instagram) {
+          updateData.instagramContent = generatedContent.instagram
+        } else if (platform === 'telegram' && generatedContent?.telegram) {
+          updateData.telegramContent = generatedContent.telegram
+        } else if (platform === 'threads' && generatedContent?.threads) {
+          updateData.threadsContent = generatedContent.threads
         } else if (platform === 'twitter' && generatedContent?.twitter) {
           updateData.twitterContent = Array.isArray(generatedContent.twitter) 
             ? JSON.stringify(generatedContent.twitter) 
@@ -602,6 +642,22 @@ export default function DashboardPage() {
         publishPromises.push(handlePublish('linkedin', generatedContent.linkedin))
       }
 
+      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'both')) {
+        publishPromises.push(handlePublish('facebook', generatedContent.facebook))
+      }
+
+      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'both')) {
+        publishPromises.push(handlePublish('instagram', generatedContent.instagram))
+      }
+
+      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'both')) {
+        publishPromises.push(handlePublish('telegram', generatedContent.telegram))
+      }
+
+      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'both')) {
+        publishPromises.push(handlePublish('threads', generatedContent.threads))
+      }
+
       if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
         const twitterContent = Array.isArray(generatedContent.twitter) 
           ? generatedContent.twitter 
@@ -637,6 +693,22 @@ export default function DashboardPage() {
 
       if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'both')) {
         schedulePromises.push(handleSchedule('linkedin', generatedContent.linkedin, scheduledDate))
+      }
+
+      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'both')) {
+        schedulePromises.push(handleSchedule('facebook', generatedContent.facebook, scheduledDate))
+      }
+
+      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'both')) {
+        schedulePromises.push(handleSchedule('instagram', generatedContent.instagram, scheduledDate))
+      }
+
+      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'both')) {
+        schedulePromises.push(handleSchedule('telegram', generatedContent.telegram, scheduledDate))
+      }
+
+      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'both')) {
+        schedulePromises.push(handleSchedule('threads', generatedContent.threads, scheduledDate))
       }
 
       if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
@@ -740,7 +812,7 @@ export default function DashboardPage() {
               </Button>
             </div>
           </div>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {generatedContent.linkedin && (
               <PlatformPreview
                 platform="linkedin"
@@ -751,6 +823,62 @@ export default function DashboardPage() {
                 onRegenerate={() => handleRegenerate('linkedin')}
                 onPublish={(editedContent) => handlePublish('linkedin', editedContent)}
                 onSchedule={(editedContent, scheduledAt) => handleSchedule('linkedin', editedContent, scheduledAt)}
+                onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
+              />
+            )}
+            {generatedContent.facebook && (
+              <PlatformPreview
+                platform="facebook"
+                content={generatedContent.facebook}
+                image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
+                onRegenerate={() => handleRegenerate('facebook')}
+                onPublish={(editedContent) => handlePublish('facebook', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('facebook', editedContent, scheduledAt)}
+                onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
+              />
+            )}
+            {generatedContent.instagram && (
+              <PlatformPreview
+                platform="instagram"
+                content={generatedContent.instagram}
+                image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
+                onRegenerate={() => handleRegenerate('instagram')}
+                onPublish={(editedContent) => handlePublish('instagram', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('instagram', editedContent, scheduledAt)}
+                onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
+              />
+            )}
+            {generatedContent.telegram && (
+              <PlatformPreview
+                platform="telegram"
+                content={generatedContent.telegram}
+                image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
+                onRegenerate={() => handleRegenerate('telegram')}
+                onPublish={(editedContent) => handlePublish('telegram', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('telegram', editedContent, scheduledAt)}
+                onContentChange={handleContentChange}
+                isRegenerating={isGenerating}
+              />
+            )}
+            {generatedContent.threads && (
+              <PlatformPreview
+                platform="threads"
+                content={generatedContent.threads}
+                image={attachedImage}
+                userName={userName}
+                userInitials={userInitials}
+                onRegenerate={() => handleRegenerate('threads')}
+                onPublish={(editedContent) => handlePublish('threads', editedContent)}
+                onSchedule={(editedContent, scheduledAt) => handleSchedule('threads', editedContent, scheduledAt)}
                 onContentChange={handleContentChange}
                 isRegenerating={isGenerating}
               />

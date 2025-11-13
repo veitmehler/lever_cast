@@ -11,7 +11,7 @@ interface ScheduleModalProps {
   isOpen: boolean
   onClose: () => void
   onSchedule: (scheduledAt: Date) => Promise<void>
-  platform: 'linkedin' | 'twitter'
+  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
   content: string
   initialDate?: Date | null
   isReschedule?: boolean

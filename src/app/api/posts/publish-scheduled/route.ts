@@ -227,6 +227,33 @@ export async function GET(request: Request) {
           publishResult = result.success
             ? { success: true, message: 'Published to LinkedIn', postUrl: result.postUrl }
             : { success: false, message: result.error, error: result.error }
+        } else if (post.platform === 'facebook') {
+          const { postToFacebook } = await import('@/lib/facebookApi')
+          const result = await postToFacebook(post.user.id, post.content, imageUrl || undefined)
+          publishResult = result.success
+            ? { success: true, message: 'Published to Facebook', postUrl: result.postUrl }
+            : { success: false, message: result.error, error: result.error }
+        } else if (post.platform === 'instagram') {
+          const { postToInstagram } = await import('@/lib/instagramApi')
+          if (!imageUrl) {
+            publishResult = { success: false, message: 'Instagram requires an image', error: 'Instagram requires an image' }
+          } else {
+            const result = await postToInstagram(post.user.id, post.content, imageUrl)
+            publishResult = result.success
+              ? { success: true, message: 'Published to Instagram', postUrl: result.postUrl }
+              : { success: false, message: result.error, error: result.error }
+          }
+        } else if (post.platform === 'telegram') {
+          const { postToTelegram } = await import('@/lib/telegramApi')
+          // Note: Telegram requires chatId - this should be stored in Post model or retrieved from connection
+          // For now, we'll need to handle this - storing chatId in Post model would be ideal
+          publishResult = { success: false, message: 'Telegram chat ID required', error: 'Telegram chat ID is required for scheduled posts. Please publish manually.' }
+        } else if (post.platform === 'threads') {
+          const { postToThreads } = await import('@/lib/threadsApi')
+          const result = await postToThreads(post.user.id, post.content, imageUrl || undefined)
+          publishResult = result.success
+            ? { success: true, message: 'Published to Threads', postUrl: result.postUrl }
+            : { success: false, message: result.error, error: result.error }
         } else if (post.platform === 'twitter') {
           const { postToTwitter } = await import('@/lib/twitterApi')
           

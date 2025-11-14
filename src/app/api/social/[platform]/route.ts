@@ -240,12 +240,17 @@ export async function POST(
         }
 
         // Instagram OAuth 2.0 authorization URL (uses Facebook OAuth)
-        // Scopes: instagram_basic, pages_show_list, pages_read_engagement (for Instagram Business Account)
+        // Scopes for Instagram Business Account posting:
+        // - pages_show_list: Required to list Facebook Pages connected to Instagram Business Accounts
+        // - pages_read_engagement: Required for reading engagement metrics
+        // - instagram_basic: Required dependency for instagram_content_publish (per Facebook permissions docs)
+        // - instagram_content_publish: Required for publishing content to Instagram
+        // - business_management: Required for managing business accounts
         const params = new URLSearchParams({
           client_id: INSTAGRAM_CLIENT_ID,
           redirect_uri: INSTAGRAM_REDIRECT_URI,
           state,
-          scope: 'instagram_basic,pages_show_list,pages_read_engagement',
+          scope: 'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management',
           response_type: 'code',
         })
 

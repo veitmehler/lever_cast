@@ -231,13 +231,21 @@
 - ✅ Implement proper error handling for API failures
 
 ### Social Media OAuth & Publishing (COMPLETED)
-- ✅ Implement LinkedIn OAuth 2.0 flow with PKCE
+- ✅ Implement LinkedIn OAuth 2.0 flow with PKCE (Personal Profiles)
+- ✅ Implement LinkedIn OAuth 2.0 flow with PKCE (Company Pages - separate app)
 - ✅ Implement Twitter/X OAuth 2.0 flow with PKCE
+- ✅ Implement Facebook OAuth 2.0 flow (Meta Graph API v24.0)
+- ✅ Implement Instagram OAuth 2.0 flow (Meta Graph API v24.0)
+- ✅ Implement Threads OAuth 2.0 flow (Meta Graph API v24.0)
 - ✅ Create OAuth state management system (generateOAuthState, verifyOAuthState)
 - ✅ Build OAuth callback handlers (/api/social/[platform]/callback)
 - ✅ Store encrypted OAuth tokens in SocialConnection model
-- ✅ Create LinkedIn API integration (postToLinkedIn)
+- ✅ Create LinkedIn API integration (postToLinkedIn) - Personal & Company Pages
 - ✅ Create Twitter/X API integration (postToTwitter)
+- ✅ Create Facebook API integration (postToFacebook)
+- ✅ Create Instagram API integration (postToInstagram)
+- ✅ Create Threads API integration (postToThreads)
+- ✅ Create Telegram Bot API integration (postToTelegram - uses ApiKey, not OAuth)
 - ✅ Implement unified publishing endpoint (/api/posts/publish)
 - ✅ Add social connection status display in Settings page
 - ✅ Handle OAuth callback success/error messages
@@ -251,6 +259,10 @@
 - ✅ Update dashboard and post detail pages to use real publishing APIs
 - ✅ Remove mock publishing functionality
 - ✅ Added dual LinkedIn app support with `appType` handling so personal and company connections can coexist
+- ✅ Added LinkedIn Company Pages page fetching API (/api/social/[platform]/pages)
+- ✅ Added Facebook Pages page fetching API (/api/social/[platform]/pages)
+- ✅ Added post target selection (Personal Profile vs Business Page) for LinkedIn and Facebook
+- ✅ Created comprehensive developer guide documenting all API integrations, scopes, permissions, and verification requirements
 
 ### Bulk Actions & Voice Input (COMPLETED)
 - ✅ Implement bulk selection on /posts page with checkbox and Shift+Click range selection
@@ -456,11 +468,38 @@
 - ✅ Create supabase-storage-setup.md
 - ✅ Create find-supabase-env-vars.md
 - ✅ Create check-image-storage-type.md
+- ✅ Create setup guides for Twitter/X, LinkedIn, and Facebook/Instagram
+- ✅ Create comprehensive developer guide for all social media API integrations (developer-guide-social-media-apis.md)
 - ✅ Update DESIGN_MODE.md with complete status
 
 ---
 
 ## Pending Tasks (Prioritized)
+
+### Platform Authorizations & Verifications (BLOCKING)
+- ⏳ **LinkedIn Community Management API Approval** (BLOCKING Company Pages)
+  - Status: Application submitted, awaiting LinkedIn review
+  - Required: Business verification + use case submission
+  - Timeline: Can take several weeks
+  - Impact: Company Page posting and page fetching blocked until approval
+  - Action: Monitor LinkedIn Developer Portal for approval status
+  
+- ⏳ **Meta Tech Provider Status** (BLOCKING Instagram)
+  - Status: Need to complete "Become a Tech Provider" process
+  - Required: Click "Become a Tech Provider" on Meta App Dashboard
+  - Impact: Instagram API access blocked until Tech Provider status granted
+  
+- ⏳ **Meta Business Verification** (BLOCKING Instagram)
+  - Status: Need to complete business verification
+  - Required: Submit business documents in App Settings → Business Verification
+  - Timeline: Can take days/weeks
+  - Impact: Instagram Advanced Access approval blocked until business verification complete
+  
+- ⏳ **Instagram Advanced Access Approval** (BLOCKING Instagram)
+  - Status: Cannot request until Tech Provider + Business Verification complete
+  - Required: App Review → Permissions and Features → Request Advanced Access for `instagram_content_publish`
+  - Timeline: Can take days/weeks after prerequisites met
+  - Impact: Instagram posting blocked until Advanced Access granted
 
 ### Testing & Quality Assurance
 - 📋 Comprehensive user testing of entire flow
@@ -589,7 +628,9 @@
 - ⚠️ Clerk "Development Mode" warning (normal in dev, will disappear in production)
 - ⚠️ Voice input requires Chrome or Edge browser (Web Speech API not supported in Safari/Firefox)
 - ⚠️ LinkedIn analytics unavailable - LinkedIn has restricted access to r_member_social permission and is not accepting new requests. Users are directed to check analytics on LinkedIn directly.
-- ⚠️ LinkedIn Community Management API access request pending review; company page posting blocked until LinkedIn grants `w_organization_social` + `r_organization_admin` scopes
+- ⚠️ **LinkedIn Community Management API** - Access request pending review (business verification + use case submission required). Company page posting blocked until LinkedIn grants `w_organization_social` + `r_organization_admin` scopes. Timeline: Several weeks.
+- ⚠️ **Instagram API** - Requires Tech Provider status + Business Verification + Advanced Access approval. Cannot request Advanced Access until Tech Provider and Business Verification are complete. Timeline: Days/weeks for each step.
+- ⚠️ **Facebook Pages** - May require App Review for `pages_manage_posts` permission in production mode
 
 ### To Address Before Production
 - ⚠️ Remove all mock data and simulations
@@ -751,7 +792,33 @@
 
 ## Change Log
 
-### November 2025 (Latest - LinkedIn Company Page Support & Prisma Migration)
+### January 2025 (Latest - Multi-Platform Support & Developer Guide)
+- Implemented Facebook, Instagram, Threads, and Telegram API integrations
+  - Added Facebook Graph API v24.0 integration for Page posting
+  - Added Instagram Graph API v24.0 integration (requires Tech Provider + Business Verification + Advanced Access)
+  - Added Threads Meta Graph API v24.0 integration
+  - Added Telegram Bot API integration (uses ApiKey model, not OAuth)
+- Enhanced LinkedIn dual-app architecture
+  - Added LinkedIn Company Pages page fetching API (/api/social/[platform]/pages)
+  - Corrected endpoint from `/organizationAcls` to `/organizationalEntityAcls`
+  - Corrected projection field from `organization` to `organizationalTarget`
+  - Added post target selection UI (Personal Profile vs Business Page)
+- Added Facebook Pages support
+  - Implemented Facebook Pages fetching API (/api/social/[platform]/pages)
+  - Added post target selection UI (Personal Profile vs Business Page)
+  - Note: Facebook requires posting to Pages, not personal profiles
+- Created comprehensive developer guide
+  - Documented all social media API integrations, scopes, permissions, and requirements
+  - Documented verification requirements (LinkedIn business verification, Meta Tech Provider + Business Verification)
+  - Documented OAuth flows, rate limits, content limits, and troubleshooting for all platforms
+  - Created setup guides for Twitter/X, LinkedIn, and Facebook/Instagram
+- Updated OAuth scopes and error handling
+  - Fixed Instagram scopes to include `instagram_basic` (required dependency for `instagram_content_publish`)
+  - Added `pages_read_user_content` dependency discovery
+  - Enhanced error messages to guide users through verification processes
+- **Status**: Multi-platform support implemented, awaiting platform authorizations ⏳
+
+### November 2025 (Earlier - LinkedIn Company Page Support & Prisma Migration)
 - Added `appType` handling end-to-end so LinkedIn personal and company OAuth flows can coexist
 - Applied manual SQL migration `20250105160000_add_app_type_to_social_connections` and ran full Prisma deploy/db push
 - Updated LinkedIn company OAuth scopes to request `w_organization_social`, `r_organization_social`, and `r_organization_admin`
@@ -943,12 +1010,17 @@
 
 ### Immediate (This Week)
 1. ✅ Test Supabase Storage image upload and display
-2. Test AI generation with all providers (OpenAI, Anthropic, Gemini, OpenRouter)
-3. Verify social media publishing works end-to-end (LinkedIn and Twitter/X)
-4. Test Twitter thread generation and publishing
-5. Verify automated scheduled publishing works correctly
-6. Test token refresh functionality for Twitter/X
-7. Follow up on LinkedIn Community Management approval and re-test company page connection once granted
+2. ✅ Test AI generation with all providers (OpenAI, Anthropic, Gemini, OpenRouter)
+3. ✅ Verify social media publishing works end-to-end (LinkedIn Personal, Twitter/X, Facebook)
+4. ✅ Test Twitter thread generation and publishing
+5. ✅ Verify automated scheduled publishing works correctly
+6. ✅ Test token refresh functionality for Twitter/X
+7. ⏳ **Monitor LinkedIn Community Management API approval status** - Re-test company page connection once granted
+8. ⏳ **Complete Meta Tech Provider process** - Click "Become a Tech Provider" on Meta App Dashboard
+9. ⏳ **Complete Meta Business Verification** - Submit business documents in App Settings → Business Verification
+10. ⏳ **Request Instagram Advanced Access** - After Tech Provider + Business Verification complete, request Advanced Access for `instagram_content_publish`
+11. ⏳ Test Instagram posting once all verifications are complete
+12. ⏳ Test Threads posting once Instagram is verified
 
 ### Short Term (Next 2 Weeks)
 1. Set up production environment configuration
@@ -966,7 +1038,8 @@
 
 ---
 
-**Last Updated**: November 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai, OpenAI DALL-E, Replicate), Social Media Publishing, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete (LinkedIn analytics unavailable due to LinkedIn API restrictions)  
-**Next Milestone**: Production Deployment & User Testing
+**Last Updated**: January 2025  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete  
+**Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access  
+**Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

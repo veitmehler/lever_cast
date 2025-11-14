@@ -257,7 +257,7 @@ export async function postToInstagram(
       if (publishResponse.status === 403) {
         return {
           success: false,
-          error: 'Permission denied. Please ensure the app has "instagram_basic" and "pages_show_list" permissions.',
+          error: 'Permission denied. Please ensure the app has "instagram_basic", "instagram_content_publish", "pages_show_list", "pages_read_engagement", and "business_management" permissions. Note: instagram_basic is required as a dependency for instagram_content_publish.',
         }
       }
 

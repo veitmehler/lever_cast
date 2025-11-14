@@ -397,7 +397,10 @@
 - ✅ Upload generated images to Supabase Storage
 - ✅ Store image generation metadata (prompt, provider) in Draft model
 - ✅ Fix Fal.ai API integration to use correct client library and response structure
-- ✅ **Status**: AI image generation fully functional ✅
+- ✅ Remove non-existent Stable Diffusion v3 model from Fal.ai list (was causing 404 errors)
+- ✅ Add 9 additional Fal.ai models (Stable Diffusion v3.5 Large, Imagen 4 Preview, ByteDance SeedDream v3, Bagel, Sana v1.5, RunDiffusion Photo Flux, Stable Diffusion v3 Medium, Stable Cascade)
+- ✅ Remove Stable Diffusion v1.5 from Fal.ai models (low quality)
+- ✅ **Status**: AI image generation fully functional with 12 Fal.ai models available ✅
 
 ### Analytics Tracking & Sync (COMPLETED)
 - ✅ Add analytics tracking fields to Post model
@@ -559,6 +562,23 @@
 - 🔮 AI-generated custom templates
 - 🔮 A/B testing for template performance
 - 🔮 Template analytics and usage stats
+
+### Multi-Platform Draft Support (COMPLETED)
+- ✅ Fixed multi-platform draft saving issue - Facebook, Instagram, Telegram, Threads content now properly saved
+- ✅ Updated POST /api/drafts route to extract and save all platform content fields (facebookContent, instagramContent, telegramContent, threadsContent)
+- ✅ Fixed draft display on /posts page to show all selected platforms correctly
+- ✅ Updated draft detail page to display preview cards for all selected platforms
+- ✅ Added platform parsing helper function to handle JSON array format for multi-select platforms
+- ✅ Updated platform display logic to parse and show multiple platforms (e.g., "LINKEDIN, FACEBOOK")
+- ✅ **Status**: Multi-platform draft saving and display fully functional ✅
+
+### Content Formatting & Cleaning (COMPLETED)
+- ✅ Enhanced whitespace cleaning function to preserve bullet point and list formatting
+- ✅ Updated cleanText function to detect list items (✅, •, -, *, numbered lists)
+- ✅ Preserve single newlines between list items while cleaning whitespace within items
+- ✅ Maintain paragraph breaks (double newlines) for regular content
+- ✅ Normalize Unicode characters and remove zero-width spaces
+- ✅ **Status**: Content formatting preserved while cleaning AI-generated artifacts ✅
 
 ### Content Features
 - 🔮 Recent ideas history (quick access to last 10)
@@ -792,7 +812,26 @@
 
 ## Change Log
 
-### January 2025 (Latest - Multi-Platform Support & Developer Guide)
+### January 2025 (Latest - Multi-Platform Draft Support, Content Formatting & Fal.ai Models)
+- Fixed multi-platform draft saving bug
+  - Updated POST /api/drafts route to extract and save all platform content fields (facebookContent, instagramContent, telegramContent, threadsContent)
+  - Previously only linkedinContent and twitterContent were being saved, causing Facebook and other platform content to be lost
+  - Fixed draft display on /posts overview and detail pages to show all selected platforms correctly
+  - Added platform parsing helper function to handle JSON array format for multi-select platforms
+  - Updated platform display logic to parse and show multiple platforms (e.g., "LINKEDIN, FACEBOOK")
+- Enhanced content formatting preservation
+  - Updated cleanText function to preserve bullet point and list formatting
+  - Detects list items (✅, •, -, *, numbered lists) and preserves single newlines between items
+  - Maintains paragraph breaks (double newlines) for regular content
+  - Normalizes Unicode characters and removes zero-width spaces while preserving formatting
+- Updated Fal.ai model list
+  - Removed non-existent Stable Diffusion v3 model (was causing 404 errors)
+  - Added 9 additional Fal.ai models: Stable Diffusion v3.5 Large, Imagen 4 Preview, ByteDance SeedDream v3, Bagel, Sana v1.5, RunDiffusion Photo Flux, Stable Diffusion v3 Medium, Stable Cascade
+  - Removed Stable Diffusion v1.5 (low quality)
+  - Now supports 12 Fal.ai models total
+- **Status**: Multi-platform drafts, content formatting, and Fal.ai models updated ✅
+
+### January 2025 (Earlier - Multi-Platform Support & Developer Guide)
 - Implemented Facebook, Instagram, Threads, and Telegram API integrations
   - Added Facebook Graph API v24.0 integration for Page posting
   - Added Instagram Graph API v24.0 integration (requires Tech Provider + Business Verification + Advanced Access)
@@ -1039,7 +1078,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete  
 **Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

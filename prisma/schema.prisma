@@ -45,7 +45,7 @@ model Draft {
   instagramContent        String?   @db.Text // AI-generated Instagram post
   telegramContent         String?   @db.Text // AI-generated Telegram post
   threadsContent          String?   @db.Text // AI-generated Threads post
-  platforms               String // JSON array: ["linkedin", "twitter", "facebook", etc.] or "both"
+  platforms               String // JSON array: ["linkedin", "twitter", "facebook", etc.] or "all" (or "both" for backward compatibility)
   templateId              String? // Which template was used
   attachedImage           String? // Supabase Storage URL (not base64)
   imageGenerationPrompt   String?   @db.Text // Store the prompt used for image generation

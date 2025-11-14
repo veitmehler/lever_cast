@@ -68,6 +68,7 @@ export async function GET() {
           defaultImageProvider: null,
           defaultImageModel: null,
           defaultImageStyle: null,
+          writingStyle: null,
         },
       })
     }
@@ -93,7 +94,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle } = body
+    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, writingStyle } = body
 
     console.log('Updating settings with:', {
       theme,
@@ -103,6 +104,7 @@ export async function PATCH(request: NextRequest) {
       defaultImageProvider,
       defaultImageModel: defaultImageModel ? 'present' : 'missing',
       defaultImageStyle: defaultImageStyle ? 'present' : 'missing',
+      writingStyle: writingStyle ? 'present' : 'missing',
     })
 
     const user = await getOrCreateUser(clerkId)
@@ -124,6 +126,7 @@ export async function PATCH(request: NextRequest) {
           defaultImageProvider: defaultImageProvider || null,
           defaultImageModel: defaultImageModel || null,
           defaultImageStyle: defaultImageStyle || null,
+          writingStyle: writingStyle || null,
         },
       })
     } else {
@@ -138,6 +141,7 @@ export async function PATCH(request: NextRequest) {
         defaultImageProvider?: string | null
         defaultImageModel?: string | null
         defaultImageStyle?: string | null
+        writingStyle?: string | null
       } = {
         lastLogin: new Date(),
       }
@@ -158,6 +162,9 @@ export async function PATCH(request: NextRequest) {
       }
       if (defaultImageStyle !== undefined) {
         updateData.defaultImageStyle = defaultImageStyle || null
+      }
+      if (writingStyle !== undefined) {
+        updateData.writingStyle = writingStyle || null
       }
 
       console.log('Update data:', updateData)

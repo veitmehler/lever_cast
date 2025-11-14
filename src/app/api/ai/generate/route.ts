@@ -185,10 +185,10 @@ function applyTemplate(template: string, idea: string): string {
 }
 
 // Generate content using OpenAI
-async function generateWithOpenAI(apiKey: string, prompt: string, maxTokens: number, model: string = 'gpt-4o-mini'): Promise<string> {
+async function generateWithOpenAI(apiKey: string, prompt: string, maxTokens: number, model: string = 'gpt-4o-mini', writingStyle?: string | null): Promise<string> {
   const openai = new OpenAI({ apiKey })
   
-  const systemMessage = `# ROLE:
+  let systemMessage = `# ROLE:
 
 You are a world-class social media content creator. You create highly engaging, authentic posts that have the greatest chance of going viral.
 
@@ -197,6 +197,10 @@ You analyze the topic and write them in a way that resonates with the perfect ta
 You are the world's best at what you do.
 
 First you will receive your context, then you will receive your task.`
+
+  if (writingStyle && writingStyle.trim()) {
+    systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
+  }
   
   const response = await openai.chat.completions.create({
     model,
@@ -218,10 +222,10 @@ First you will receive your context, then you will receive your task.`
 }
 
 // Generate content using Anthropic Claude
-async function generateWithAnthropic(apiKey: string, prompt: string, maxTokens: number, model: string = 'claude-3-5-sonnet-20241022'): Promise<string> {
+async function generateWithAnthropic(apiKey: string, prompt: string, maxTokens: number, model: string = 'claude-3-5-sonnet-20241022', writingStyle?: string | null): Promise<string> {
   const anthropic = new Anthropic({ apiKey })
   
-  const systemMessage = `# ROLE:
+  let systemMessage = `# ROLE:
 
 You are a world-class social media content creator. You create highly engaging, authentic posts that have the greatest chance of going viral.
 
@@ -230,6 +234,10 @@ You analyze the topic and write them in a way that resonates with the perfect ta
 You are the world's best at what you do.
 
 First you will receive your context, then you will receive your task.`
+
+  if (writingStyle && writingStyle.trim()) {
+    systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
+  }
   
   const response = await anthropic.messages.create({
     model,
@@ -248,10 +256,10 @@ First you will receive your context, then you will receive your task.`
 }
 
 // Generate content using Google Gemini
-async function generateWithGemini(apiKey: string, prompt: string, maxTokens: number, model: string = 'gemini-pro'): Promise<string> {
+async function generateWithGemini(apiKey: string, prompt: string, maxTokens: number, model: string = 'gemini-pro', writingStyle?: string | null): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey)
   
-  const systemMessage = `# ROLE:
+  let systemMessage = `# ROLE:
 
 You are a world-class social media content creator. You create highly engaging, authentic posts that have the greatest chance of going viral.
 
@@ -260,6 +268,10 @@ You analyze the topic and write them in a way that resonates with the perfect ta
 You are the world's best at what you do.
 
 First you will receive your context, then you will receive your task.`
+
+  if (writingStyle && writingStyle.trim()) {
+    systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
+  }
   
   const genModel = genAI.getGenerativeModel({ 
     model,
@@ -279,8 +291,8 @@ First you will receive your context, then you will receive your task.`
 }
 
 // Generate content using OpenRouter (supports multiple models)
-async function generateWithOpenRouter(apiKey: string, prompt: string, maxTokens: number, model: string = 'openai/gpt-4o-mini'): Promise<string> {
-  const systemMessage = `# ROLE:
+async function generateWithOpenRouter(apiKey: string, prompt: string, maxTokens: number, model: string = 'openai/gpt-4o-mini', writingStyle?: string | null): Promise<string> {
+  let systemMessage = `# ROLE:
 
 You are a world-class social media content creator. You create highly engaging, authentic posts that have the greatest chance of going viral.
 
@@ -289,6 +301,10 @@ You analyze the topic and write them in a way that resonates with the perfect ta
 You are the world's best at what you do.
 
 First you will receive your context, then you will receive your task.`
+
+  if (writingStyle && writingStyle.trim()) {
+    systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
+  }
   
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -360,6 +376,7 @@ export async function POST(request: NextRequest) {
           sidebarState: 'open',
           defaultProvider: null,
           defaultModel: null,
+          writingStyle: null,
         },
       })
     }
@@ -581,18 +598,21 @@ export async function POST(request: NextRequest) {
       try {
         let generatedContent = ''
 
+        // Get writing style from settings
+        const writingStyle = settings.writingStyle || null
+
         switch (selectedProvider) {
           case 'openai':
-            generatedContent = await generateWithOpenAI(apiKey, prompt, maxTokens, selectedModel || 'gpt-4o-mini')
+            generatedContent = await generateWithOpenAI(apiKey, prompt, maxTokens, selectedModel || 'gpt-4o-mini', writingStyle)
             break
           case 'anthropic':
-            generatedContent = await generateWithAnthropic(apiKey, prompt, maxTokens, selectedModel || 'claude-3-5-sonnet-20241022')
+            generatedContent = await generateWithAnthropic(apiKey, prompt, maxTokens, selectedModel || 'claude-3-5-sonnet-20241022', writingStyle)
             break
           case 'gemini':
-            generatedContent = await generateWithGemini(apiKey, prompt, maxTokens, selectedModel || 'gemini-pro')
+            generatedContent = await generateWithGemini(apiKey, prompt, maxTokens, selectedModel || 'gemini-pro', writingStyle)
             break
           case 'openrouter':
-            generatedContent = await generateWithOpenRouter(apiKey, prompt, maxTokens, selectedModel || 'openai/gpt-4o-mini')
+            generatedContent = await generateWithOpenRouter(apiKey, prompt, maxTokens, selectedModel || 'openai/gpt-4o-mini', writingStyle)
             break
           default:
             throw new Error(`Unsupported provider: ${selectedProvider}`)

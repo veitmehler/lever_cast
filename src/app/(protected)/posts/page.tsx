@@ -253,6 +253,25 @@ export default function PostsPage() {
             }
           }
 
+          // For Telegram, get chatId from settings
+          let telegramChatId: string | undefined = undefined
+          if (platform === 'telegram') {
+            try {
+              const settingsResponse = await fetch('/api/settings')
+              if (settingsResponse.ok) {
+                const settings = await settingsResponse.json()
+                telegramChatId = settings.telegramChatId || undefined
+              }
+            } catch (error) {
+              console.error('Error fetching settings for Telegram chatId:', error)
+            }
+            
+            // Skip if no chatId configured (can't prompt in bulk publish)
+            if (!telegramChatId) {
+              return { platform, success: false, error: 'Telegram channel ID not configured. Please set it in Settings.' }
+            }
+          }
+
           const publishResponse = await fetch('/api/posts/publish', {
             method: 'POST',
             headers: {
@@ -263,6 +282,7 @@ export default function PostsPage() {
               content: twitterContent,
               draftId: draft.id,
               imageUrl: draft.attachedImage || undefined,
+              chatId: telegramChatId, // For Telegram
             }),
           })
 

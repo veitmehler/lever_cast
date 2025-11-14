@@ -31,7 +31,7 @@ const CHAR_LIMITS = {
   twitter: 280,
   facebook: 2000,
   instagram: 2000,
-  telegram: 2000,
+  telegram: 1000,
   threads: 500,
 }
 

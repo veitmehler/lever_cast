@@ -307,6 +307,30 @@ export default function PostDetailPage({
         return
       }
 
+      // For Telegram, get chatId from settings or prompt user
+      let telegramChatId: string | undefined = undefined
+      if (platform === 'telegram') {
+        try {
+          const settingsResponse = await fetch('/api/settings')
+          if (settingsResponse.ok) {
+            const settings = await settingsResponse.json()
+            telegramChatId = settings.telegramChatId || undefined
+          }
+        } catch (error) {
+          console.error('Error fetching settings for Telegram chatId:', error)
+        }
+        
+        // If no chatId in settings, prompt user
+        if (!telegramChatId) {
+          const userInput = prompt('Enter Telegram Channel ID:\n\nUse @channelname for public channels (e.g., @mychannel)\nor numeric ID for private channels (e.g., -1001234567890)\n\nYour bot must be an admin of this channel.')
+          if (!userInput || !userInput.trim()) {
+            toast.error('Telegram channel ID is required to publish')
+            return
+          }
+          telegramChatId = userInput.trim()
+        }
+      }
+
       // Publish to social media via API
       const publishResponse = await fetch('/api/posts/publish', {
         method: 'POST',
@@ -318,6 +342,7 @@ export default function PostDetailPage({
           content: Array.isArray(content) ? content : content,
           draftId: id,
           imageUrl: post?.attachedImage || undefined,
+          chatId: telegramChatId, // For Telegram
         }),
       })
 

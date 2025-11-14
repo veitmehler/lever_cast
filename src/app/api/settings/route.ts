@@ -69,6 +69,7 @@ export async function GET() {
           defaultImageModel: null,
           defaultImageStyle: null,
           writingStyle: null,
+          telegramChatId: null,
         },
       })
     }
@@ -94,7 +95,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, writingStyle } = body
+    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, writingStyle, telegramChatId } = body
 
     console.log('Updating settings with:', {
       theme,
@@ -105,6 +106,7 @@ export async function PATCH(request: NextRequest) {
       defaultImageModel: defaultImageModel ? 'present' : 'missing',
       defaultImageStyle: defaultImageStyle ? 'present' : 'missing',
       writingStyle: writingStyle ? 'present' : 'missing',
+      telegramChatId: telegramChatId ? 'present' : 'missing',
     })
 
     const user = await getOrCreateUser(clerkId)
@@ -127,6 +129,7 @@ export async function PATCH(request: NextRequest) {
           defaultImageModel: defaultImageModel || null,
           defaultImageStyle: defaultImageStyle || null,
           writingStyle: writingStyle || null,
+          telegramChatId: telegramChatId || null,
         },
       })
     } else {
@@ -142,6 +145,7 @@ export async function PATCH(request: NextRequest) {
         defaultImageModel?: string | null
         defaultImageStyle?: string | null
         writingStyle?: string | null
+        telegramChatId?: string | null
       } = {
         lastLogin: new Date(),
       }
@@ -165,6 +169,9 @@ export async function PATCH(request: NextRequest) {
       }
       if (writingStyle !== undefined) {
         updateData.writingStyle = writingStyle || null
+      }
+      if (telegramChatId !== undefined) {
+        updateData.telegramChatId = telegramChatId || null
       }
 
       console.log('Update data:', updateData)

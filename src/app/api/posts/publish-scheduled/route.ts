@@ -245,9 +245,25 @@ export async function GET(request: Request) {
           }
         } else if (post.platform === 'telegram') {
           const { postToTelegram } = await import('@/lib/telegramApi')
-          // Note: Telegram requires chatId - this should be stored in Post model or retrieved from connection
-          // For now, we'll need to handle this - storing chatId in Post model would be ideal
-          publishResult = { success: false, message: 'Telegram chat ID required', error: 'Telegram chat ID is required for scheduled posts. Please publish manually.' }
+          // Get Telegram chatId from user settings
+          let telegramChatId: string | undefined = undefined
+          try {
+            const settings = await prisma.settings.findUnique({
+              where: { userId: post.user.id },
+            })
+            telegramChatId = settings?.telegramChatId || undefined
+          } catch (error) {
+            console.error('[Scheduled Publish] Error fetching Telegram chatId from settings:', error)
+          }
+          
+          if (!telegramChatId) {
+            publishResult = { success: false, message: 'Telegram chat ID required', error: 'Telegram channel ID not configured in Settings. Please set it in Settings or publish manually.' }
+          } else {
+            const result = await postToTelegram(post.user.id, post.content, telegramChatId, imageUrl || undefined)
+            publishResult = result.success
+              ? { success: true, message: 'Published to Telegram', postUrl: `https://t.me/${telegramChatId.replace('@', '')}/${result.messageId}` }
+              : { success: false, message: result.error, error: result.error }
+          }
         } else if (post.platform === 'threads') {
           const { postToThreads } = await import('@/lib/threadsApi')
           const result = await postToThreads(post.user.id, post.content, imageUrl || undefined)

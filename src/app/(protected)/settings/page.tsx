@@ -102,6 +102,10 @@ export default function SettingsPage() {
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false)
   const [showStyleAnalysisModal, setShowStyleAnalysisModal] = useState(false)
   const [sampleText, setSampleText] = useState('')
+  
+  // Telegram channel settings
+  const [telegramChatId, setTelegramChatId] = useState('')
+  const [isSavingTelegramChatId, setIsSavingTelegramChatId] = useState(false)
 
   // Fetch settings and API keys on mount
   useEffect(() => {
@@ -142,6 +146,9 @@ export default function SettingsPage() {
           }
           if (settings.writingStyle) {
             setWritingStyle(settings.writingStyle)
+          }
+          if (settings.telegramChatId) {
+            setTelegramChatId(settings.telegramChatId)
           }
         }
 
@@ -1701,6 +1708,62 @@ export default function SettingsPage() {
                             ? 'Bot token saved'
                             : 'Get your bot token from @BotFather on Telegram'}
                         </p>
+                        {hasTelegramKey && (
+                          <div className="mt-3">
+                            <label className="text-xs font-medium text-card-foreground mb-1 block">
+                              Default Telegram Channel ID
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={telegramChatId}
+                                onChange={(e) => setTelegramChatId(e.target.value)}
+                                placeholder="@channelname or -1001234567890"
+                                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isSavingTelegramChatId}
+                                onClick={async () => {
+                                  try {
+                                    setIsSavingTelegramChatId(true)
+                                    const response = await fetch('/api/settings', {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        telegramChatId: telegramChatId || null,
+                                      }),
+                                    })
+                                    if (response.ok) {
+                                      toast.success('Telegram channel ID saved successfully')
+                                    } else {
+                                      const error = await response.json()
+                                      toast.error(error.error || 'Failed to save Telegram channel ID')
+                                    }
+                                  } catch (error) {
+                                    console.error('Error saving Telegram channel ID:', error)
+                                    toast.error('Failed to save Telegram channel ID')
+                                  } finally {
+                                    setIsSavingTelegramChatId(false)
+                                  }
+                                }}
+                                className="px-3"
+                              >
+                                {isSavingTelegramChatId ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Channel username (e.g., @mychannel) or numeric ID (e.g., -1001234567890). Your bot must be an admin of this channel.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2 ml-4">

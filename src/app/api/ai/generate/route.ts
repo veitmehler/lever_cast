@@ -586,7 +586,9 @@ export async function POST(request: NextRequest) {
           prompt += `IMPORTANT: Keep the post under 280 characters.\n\n`
         } else if (plat === 'threads') {
           prompt += `IMPORTANT: Keep the post under 500 characters. Make it concise and engaging for Threads.\n\n`
-        } else if (plat === 'facebook' || plat === 'instagram' || plat === 'telegram') {
+        } else if (plat === 'telegram') {
+          prompt += `IMPORTANT: Keep the post under 1,000 characters. Make it concise and engaging for Telegram.\n\n`
+        } else if (plat === 'facebook' || plat === 'instagram') {
           prompt += `IMPORTANT: Keep the post under 2,000 characters. Make it engaging and suitable for ${platformName}'s audience.\n\n`
         } else {
           prompt += `Keep it professional and engaging, suitable for LinkedIn.\n\n`
@@ -747,7 +749,9 @@ export async function POST(request: NextRequest) {
             generatedContent = generatedContent.substring(0, 277) + '...'
           } else if (plat === 'threads' && generatedContent.length > 500) {
             generatedContent = generatedContent.substring(0, 497) + '...'
-          } else if ((plat === 'facebook' || plat === 'instagram' || plat === 'telegram') && generatedContent.length > 2000) {
+          } else if (plat === 'telegram' && generatedContent.length > 1000) {
+            generatedContent = generatedContent.substring(0, 997) + '...'
+          } else if ((plat === 'facebook' || plat === 'instagram') && generatedContent.length > 2000) {
             generatedContent = generatedContent.substring(0, 1997) + '...'
           }
 

@@ -246,6 +246,7 @@
 - ✅ Create Instagram API integration (postToInstagram)
 - ✅ Create Threads API integration (postToThreads)
 - ✅ Create Telegram Bot API integration (postToTelegram - uses ApiKey, not OAuth)
+- ✅ Add Telegram channel selection feature (telegramChatId stored in Settings)
 - ✅ Implement unified publishing endpoint (/api/posts/publish)
 - ✅ Add social connection status display in Settings page
 - ✅ Handle OAuth callback success/error messages
@@ -414,6 +415,21 @@
 - ✅ Load writing style from settings and display in Settings page
 - ✅ Update Settings API route to handle writingStyle field in GET and PATCH requests
 - ✅ **Status**: Writing style feature fully functional - users can define their voice and it's automatically applied to all AI-generated posts ✅
+
+### Telegram Channel Selection & Character Limit (COMPLETED)
+- ✅ Add telegramChatId field to Settings model in Prisma schema
+- ✅ Update Settings API route to handle telegramChatId in GET and PATCH requests
+- ✅ Add Telegram Channel ID input field in Settings page (visible after bot token is saved)
+- ✅ Update publishing flow to fetch telegramChatId from settings automatically
+- ✅ Add prompt fallback for Telegram publishing when channel ID not configured
+- ✅ Update bulk publish to use default channel ID from settings
+- ✅ Update scheduled publish route to fetch telegramChatId from settings
+- ✅ Fix Telegram character limit from 2,000 to 1,000 characters
+  - Updated validation in telegramApi.ts
+  - Updated character limit display in PlatformPreview component
+  - Updated AI prompt instruction to generate posts under 1,000 characters
+  - Updated character limit enforcement in AI generation route
+- ✅ **Status**: Telegram channel selection and 1,000 character limit fully functional ✅
 
 ### Analytics Tracking & Sync (COMPLETED)
 - ✅ Add analytics tracking fields to Post model
@@ -825,7 +841,23 @@
 
 ## Change Log
 
-### January 2025 (Latest - Writing Style Feature)
+### January 2025 (Latest - Telegram Channel Selection & Character Limit)
+- Implemented Telegram channel selection feature
+  - Added telegramChatId field to Settings model in Prisma schema
+  - Created UI in Settings page to configure default Telegram channel ID
+  - Channel ID can be entered as username (e.g., @mychannel) or numeric ID (e.g., -1001234567890)
+  - Publishing flow automatically uses default channel ID from settings
+  - Added prompt fallback when channel ID not configured (for manual publishing)
+  - Bulk publish and scheduled posts use default channel ID from settings
+- Fixed Telegram character limit
+  - Updated character limit from 2,000 to 1,000 characters (correct Telegram limit)
+  - Updated validation in Telegram API to enforce 1,000 character limit
+  - Updated PlatformPreview component to display correct 1,000 character limit
+  - Updated AI generation prompt to instruct AI to keep posts under 1,000 characters
+  - Updated character limit enforcement in AI generation route to truncate at 1,000 characters
+- **Status**: Telegram channel selection and character limit fully functional ✅
+
+### January 2025 (Earlier - Writing Style Feature)
 - Implemented comprehensive writing style feature
   - Added writingStyle field to Settings model in Prisma schema
   - Created Writing Style section on Settings page with textarea for manual description
@@ -1112,7 +1144,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature Complete  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit Complete  
 **Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

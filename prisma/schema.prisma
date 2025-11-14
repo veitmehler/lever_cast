@@ -123,6 +123,7 @@ model Settings {
   defaultImageModel    String?  @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
   defaultImageStyle    String?  @db.Text // Default style instructions for image generation
   writingStyle         String?  @db.Text // Writing style description for AI-generated posts
+  telegramChatId       String? // Default Telegram channel/chat ID (e.g., "@channelname" or numeric ID)
   lastLogin            DateTime @default(now())
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

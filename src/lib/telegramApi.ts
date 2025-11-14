@@ -120,10 +120,10 @@ export async function postToTelegram(
     console.log(`[Telegram API] Posting to Telegram for user ${userId}, chat: ${chatId}`)
     
     // Validate content length
-    if (content.length > 2000) {
+    if (content.length > 1000) {
       return {
         success: false,
-        error: `Content exceeds Telegram's 2,000 character limit. Current length: ${content.length}`,
+        error: `Content exceeds Telegram's 1,000 character limit. Current length: ${content.length}`,
       }
     }
 

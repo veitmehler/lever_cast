@@ -145,10 +145,12 @@ export default function SettingsPage() {
           })
           setMaskedKeys(masked)
           
-          // Fetch models for providers that have API keys
+          // Fetch models for LLM providers that have API keys
+          const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
           Object.keys(masked).forEach(provider => {
-            if (masked[provider] && !['telegram'].includes(provider)) {
-              fetchModelsForProvider(provider)
+            if (masked[provider] && llmProviders.includes(provider)) {
+              console.log(`Found API key for ${provider}, fetching models...`)
+              fetchModelsForProvider(provider, true) // Pass true since we know it has a key
             }
           })
         }
@@ -290,27 +292,42 @@ export default function SettingsPage() {
   }
 
   // Function to fetch models for a provider
-  const fetchModelsForProvider = async (provider: string) => {
-    if (!maskedKeys[provider]) return // No API key, can't fetch models
+  const fetchModelsForProvider = async (provider: string, hasApiKey?: boolean) => {
+    // Check if provider has API key (either from parameter or state)
+    const hasKey = hasApiKey !== undefined ? hasApiKey : !!maskedKeys[provider]
+    if (!hasKey) {
+      console.log(`Skipping model fetch for ${provider}: No API key`)
+      return // No API key, can't fetch models
+    }
     
+    console.log(`Fetching models for ${provider}...`)
     setIsLoadingModels(prev => ({ ...prev, [provider]: true }))
     try {
       const response = await fetch(`/api/ai/models/${provider}`)
       if (response.ok) {
         const data = await response.json()
+        console.log(`Models fetched for ${provider}:`, data.models?.length || 0)
         if (data.models && data.models.length > 0) {
           setProviderModels(prev => ({
             ...prev,
             [provider]: data.models,
           }))
           // Set default model if not already set
-          if (!selectedModels[provider] && data.models[0]) {
-            setSelectedModels(prev => ({
-              ...prev,
-              [provider]: data.models[0].value,
-            }))
-          }
+          setSelectedModels(prev => {
+            if (!prev[provider] && data.models[0]) {
+              return {
+                ...prev,
+                [provider]: data.models[0].value,
+              }
+            }
+            return prev
+          })
+        } else {
+          console.warn(`No models returned for ${provider}`)
         }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error(`Failed to fetch models for ${provider}:`, response.status, errorData)
       }
     } catch (error) {
       console.error(`Error fetching models for ${provider}:`, error)
@@ -510,7 +527,7 @@ export default function SettingsPage() {
         setApiKeys(prev => ({ ...prev, [provider]: '' })) // Clear input
         setEditingApiKeys(prev => ({ ...prev, [provider]: false }))
         // Fetch models for this provider
-        fetchModelsForProvider(provider)
+        fetchModelsForProvider(provider, true) // Pass true since we just saved the key
         toast.success(`${provider} API key saved successfully`)
       } else {
         const error = await response.json()
@@ -566,10 +583,11 @@ export default function SettingsPage() {
           openrouter: ''
         })
         setEditingApiKeys({})
-        // Fetch models for all providers that have keys
+        // Fetch models for all LLM providers that have keys
+        const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
         Object.keys(masked).forEach(provider => {
-          if (masked[provider]) {
-            fetchModelsForProvider(provider)
+          if (masked[provider] && llmProviders.includes(provider)) {
+            fetchModelsForProvider(provider, true) // Pass true since we know it has a key
           }
         })
         toast.success('All API keys saved successfully')
@@ -689,7 +707,7 @@ export default function SettingsPage() {
 
             {/* Model Selection for each provider */}
             <div className="space-y-3">
-              {Object.keys(providerModels).map((provider) => {
+              {['openai', 'anthropic', 'gemini', 'openrouter'].map((provider) => {
                 const hasApiKey = !!maskedKeys[provider]
                 const models = providerModels[provider] || []
                 const isLoadingModel = isLoadingModels[provider]
@@ -710,7 +728,7 @@ export default function SettingsPage() {
                     <select
                       value={selectedModels[provider] || models[0]?.value || ''}
                       onChange={(e) => setSelectedModels(prev => ({ ...prev, [provider]: e.target.value }))}
-                      disabled={models.length === 0}
+                      disabled={models.length === 0 || isLoadingModel}
                       className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {models.length > 0 ? (

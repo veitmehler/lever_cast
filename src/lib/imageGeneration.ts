@@ -35,9 +35,11 @@ First you will receive your context, then you will receive your task.`
 
 ${postContent}
 
-## SPECIAL INSTRUCTIONS:
+${styleInstructions && styleInstructions.trim() ? `## STYLE INSTRUCTIONS (MANDATORY - MUST BE INCLUDED):
 
-${styleInstructions || 'None provided'}
+${styleInstructions.trim()}
+
+IMPORTANT: These style instructions MUST be prominently incorporated into your final prompt. Do not ignore them.` : ''}
 
 ## AI PROVIDER:
 
@@ -53,7 +55,7 @@ ${imageModel}
 
 2. Your task now is to write a perfect image generation prompt for AI PROVIDER using the AI MODEL for the CONTENT IDEA TO GENERATE AN IMAGE PROMPT FOR.
 
-3. Ensure to include the SPECIAL INSTRUCTIONS in your final prompt.
+${styleInstructions && styleInstructions.trim() ? `3. CRITICAL: You MUST incorporate the STYLE INSTRUCTIONS above into your final prompt. These are mandatory requirements that must be reflected in the generated image.` : '3. Create a compelling visual description that captures the essence of the content idea.'}
 
 # OUTPUT FORMAT:
 
@@ -171,9 +173,10 @@ export function generateSimpleImagePrompt(
     prompt = prompt.substring(0, 200) + '...'
   }
   
-  // Add style instructions if provided
+  // Add style instructions if provided - prepend them for better emphasis
   if (styleInstructions && styleInstructions.trim()) {
-    prompt = `${prompt}, ${styleInstructions.trim()}`
+    // Prepend style instructions to ensure they're prioritized
+    prompt = `${styleInstructions.trim()}, ${prompt}`
   }
   
   return prompt

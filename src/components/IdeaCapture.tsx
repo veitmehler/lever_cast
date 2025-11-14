@@ -77,25 +77,27 @@ type Template = {
 interface IdeaCaptureProps {
   onGenerate: (
     content: string, 
-    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both', 
+    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[], 
     templateId?: string, 
     image?: string,
     twitterFormat?: 'single' | 'thread'
   ) => void
+  onImageAttached?: (imageUrl: string) => void // Callback when image is attached after posts are generated
 }
 
-export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
+export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
   const [content, setContent] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
-  const [platform, setPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both'>('both')
+  // Use Set to track multiple selected platforms
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'>>(new Set())
   const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
-  const [availablePlatforms, setAvailablePlatforms] = useState<Set<string>>(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'both']))
+  const [availablePlatforms, setAvailablePlatforms] = useState<Set<string>>(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'all']))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [recognitionError, setRecognitionError] = useState<string | null>(null)
@@ -103,7 +105,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   // Fetch available platforms (social connections + Telegram API key)
   const fetchAvailablePlatforms = async () => {
     try {
-      const platforms = new Set<string>(['both']) // Always show "Select All"
+      const platforms = new Set<string>(['all']) // Always show "Select All"
       
       // Fetch social connections
       const connectionsResponse = await fetch('/api/social/connections')
@@ -130,7 +132,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
     } catch (error) {
       console.error('Error fetching available platforms:', error)
       // On error, show all platforms as fallback
-      setAvailablePlatforms(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'both']))
+      setAvailablePlatforms(new Set(['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads', 'all']))
     }
   }
 
@@ -332,6 +334,11 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
       
       // Store the Supabase Storage URL instead of base64
       setSelectedImage(result.url)
+      
+      // Notify parent component if callback is provided (for attaching image after posts are generated)
+      if (onImageAttached) {
+        onImageAttached(result.url)
+      }
     } catch (error) {
       console.error('Error uploading image:', error)
       alert(error instanceof Error ? error.message : 'Failed to upload image')
@@ -353,6 +360,11 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
 
   const handleImageGenerated = (imageUrl: string) => {
     setSelectedImage(imageUrl)
+    
+    // Notify parent component if callback is provided (for attaching image after posts are generated)
+    if (onImageAttached) {
+      onImageAttached(imageUrl)
+    }
   }
 
   const toggleRecording = () => {
@@ -386,14 +398,32 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
   }
 
   const handleGenerate = () => {
-    if (content.trim()) {
+    if (content.trim() && selectedPlatforms.size > 0) {
       // Pass undefined if "none" is selected, otherwise pass the template ID
       const templateId = selectedTemplate === 'none' ? undefined : selectedTemplate
+      
+      // Convert Set to array for passing to onGenerate
+      // If all available platforms are selected, pass 'all', otherwise pass array
+      const allAvailable: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+      if (availablePlatforms.has('linkedin')) allAvailable.push('linkedin')
+      if (availablePlatforms.has('twitter')) allAvailable.push('twitter')
+      if (availablePlatforms.has('facebook')) allAvailable.push('facebook')
+      if (availablePlatforms.has('instagram')) allAvailable.push('instagram')
+      if (availablePlatforms.has('telegram')) allAvailable.push('telegram')
+      if (availablePlatforms.has('threads')) allAvailable.push('threads')
+      
+      const allSelected = allAvailable.length > 0 && allAvailable.every(p => selectedPlatforms.has(p))
+      const platformParam: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = 
+        allSelected ? 'all' : Array.from(selectedPlatforms)
+      
       // Pass twitterFormat when Twitter is selected
-      const twitterFormatParam = (platform === 'twitter' || platform === 'both') 
+      const twitterFormatParam = selectedPlatforms.has('twitter') 
         ? twitterFormat 
         : undefined
-      onGenerate(content, platform, templateId, selectedImage || undefined, twitterFormatParam)
+      onGenerate(content, platformParam, templateId, selectedImage || undefined, twitterFormatParam)
+    } else if (content.trim() && selectedPlatforms.size === 0) {
+      // Show error if no platforms selected
+      alert('Please select at least one platform')
     }
   }
 
@@ -510,86 +540,182 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
         {/* Platform Selection - 2/3 width */}
         <div className="w-2/3">
           <label className="text-sm font-medium text-card-foreground mb-2 block">
-            Target Platform
+            Target Platform {selectedPlatforms.size > 0 && `(${selectedPlatforms.size} selected)`}
           </label>
           <div className="flex gap-2 flex-wrap">
             {availablePlatforms.has('linkedin') && (
               <button
-                onClick={() => setPlatform('linkedin')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('linkedin')) {
+                      next.delete('linkedin')
+                    } else {
+                      next.add('linkedin')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'linkedin'
+                  selectedPlatforms.has('linkedin')
                     ? 'bg-[#0A66C2] text-white'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                LinkedIn
+                LinkedIn {selectedPlatforms.has('linkedin') && '✓'}
               </button>
             )}
             {availablePlatforms.has('twitter') && (
               <button
-                onClick={() => setPlatform('twitter')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('twitter')) {
+                      next.delete('twitter')
+                    } else {
+                      next.add('twitter')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'twitter'
+                  selectedPlatforms.has('twitter')
                     ? 'bg-[#1DA1F2] text-white'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Twitter
+                Twitter {selectedPlatforms.has('twitter') && '✓'}
               </button>
             )}
             {availablePlatforms.has('facebook') && (
               <button
-                onClick={() => setPlatform('facebook')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('facebook')) {
+                      next.delete('facebook')
+                    } else {
+                      next.add('facebook')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'facebook'
+                  selectedPlatforms.has('facebook')
                     ? 'bg-[#1877F2] text-white'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Facebook
+                Facebook {selectedPlatforms.has('facebook') && '✓'}
               </button>
             )}
             {availablePlatforms.has('instagram') && (
               <button
-                onClick={() => setPlatform('instagram')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('instagram')) {
+                      next.delete('instagram')
+                    } else {
+                      next.add('instagram')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'instagram'
+                  selectedPlatforms.has('instagram')
                     ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Instagram
+                Instagram {selectedPlatforms.has('instagram') && '✓'}
               </button>
             )}
             {availablePlatforms.has('telegram') && (
               <button
-                onClick={() => setPlatform('telegram')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('telegram')) {
+                      next.delete('telegram')
+                    } else {
+                      next.add('telegram')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'telegram'
+                  selectedPlatforms.has('telegram')
                     ? 'bg-[#0088cc] text-white'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Telegram
+                Telegram {selectedPlatforms.has('telegram') && '✓'}
               </button>
             )}
             {availablePlatforms.has('threads') && (
               <button
-                onClick={() => setPlatform('threads')}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatforms(prev => {
+                    const next = new Set(prev)
+                    if (next.has('threads')) {
+                      next.delete('threads')
+                    } else {
+                      next.add('threads')
+                    }
+                    return next
+                  })
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'threads'
+                  selectedPlatforms.has('threads')
                     ? 'bg-black text-white dark:bg-white dark:text-black'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Threads
+                Threads {selectedPlatforms.has('threads') && '✓'}
               </button>
             )}
-            {availablePlatforms.has('both') && (
+            {availablePlatforms.has('all') && (
               <button
-                onClick={() => setPlatform('both')}
+                type="button"
+                onClick={() => {
+                  // Get all available platforms (excluding 'all')
+                  const allAvailable: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+                  if (availablePlatforms.has('linkedin')) allAvailable.push('linkedin')
+                  if (availablePlatforms.has('twitter')) allAvailable.push('twitter')
+                  if (availablePlatforms.has('facebook')) allAvailable.push('facebook')
+                  if (availablePlatforms.has('instagram')) allAvailable.push('instagram')
+                  if (availablePlatforms.has('telegram')) allAvailable.push('telegram')
+                  if (availablePlatforms.has('threads')) allAvailable.push('threads')
+                  
+                  // Check if all are selected
+                  const allSelected = allAvailable.every(p => selectedPlatforms.has(p))
+                  
+                  if (allSelected) {
+                    // Deselect all
+                    setSelectedPlatforms(new Set())
+                  } else {
+                    // Select all
+                    setSelectedPlatforms(new Set(allAvailable))
+                  }
+                }}
                 className={`flex-1 min-w-[100px] px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  platform === 'both'
+                  (() => {
+                    const allAvailable: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+                    if (availablePlatforms.has('linkedin')) allAvailable.push('linkedin')
+                    if (availablePlatforms.has('twitter')) allAvailable.push('twitter')
+                    if (availablePlatforms.has('facebook')) allAvailable.push('facebook')
+                    if (availablePlatforms.has('instagram')) allAvailable.push('instagram')
+                    if (availablePlatforms.has('telegram')) allAvailable.push('telegram')
+                    if (availablePlatforms.has('threads')) allAvailable.push('threads')
+                    return allAvailable.every(p => selectedPlatforms.has(p))
+                  })()
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
@@ -602,7 +728,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
       </div>
 
       {/* Twitter Format Selection */}
-      {(platform === 'twitter' || platform === 'both') && (
+      {selectedPlatforms.has('twitter') && (
         <div className="mt-4">
           <label className="text-sm font-medium text-card-foreground mb-2 block">
             Twitter Format
@@ -658,7 +784,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
           
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {/* LinkedIn Preview */}
-            {(platform === 'linkedin' || platform === 'both') && (
+            {selectedPlatforms.has('linkedin') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-[#0A66C2] flex items-center justify-center text-white text-[10px] font-bold">
@@ -675,7 +801,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             )}
 
             {/* Twitter Preview */}
-            {(platform === 'twitter' || platform === 'both') && (
+            {selectedPlatforms.has('twitter') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-[#1DA1F2] flex items-center justify-center text-white text-[10px] font-bold">
@@ -692,7 +818,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             )}
 
             {/* Facebook Preview */}
-            {platform === 'facebook' && (
+            {selectedPlatforms.has('facebook') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-[#1877F2] flex items-center justify-center text-white text-[10px] font-bold">
@@ -709,7 +835,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             )}
 
             {/* Instagram Preview */}
-            {platform === 'instagram' && (
+            {selectedPlatforms.has('instagram') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center text-white text-[10px] font-bold">
@@ -726,7 +852,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             )}
 
             {/* Telegram Preview */}
-            {platform === 'telegram' && (
+            {selectedPlatforms.has('telegram') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-[#0088cc] flex items-center justify-center text-white text-[10px] font-bold">
@@ -743,7 +869,7 @@ export function IdeaCapture({ onGenerate }: IdeaCaptureProps) {
             )}
 
             {/* Threads Preview */}
-            {platform === 'threads' && (
+            {selectedPlatforms.has('threads') && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-[10px] font-bold">

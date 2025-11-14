@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
-  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both'>('both')
+  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all'>('all')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
@@ -34,22 +34,32 @@ export default function DashboardPage() {
       ? user.firstName.slice(0, 2).toUpperCase()
       : 'U'
 
+  const [actualSelectedPlatforms, setActualSelectedPlatforms] = useState<('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] | 'all'>([])
+
   const handleGenerate = async (
     content: string,
-    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both',
+    platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[],
     templateId?: string,
     image?: string,
     twitterFormat?: 'single' | 'thread'
   ) => {
     setIsGenerating(true)
     setRawIdea(content)
-    setSelectedPlatform(platform)
+    // Store the actual selected platforms
+    const platformsArray = Array.isArray(platform) ? platform : (platform === 'all' ? 'all' : [platform])
+    setActualSelectedPlatforms(platformsArray)
+    // Convert array to 'all' if all platforms are selected, otherwise keep as is
+    const platformForState = Array.isArray(platform) 
+      ? (platform.length === 6 ? 'all' : platform[0] || 'all') // If all 6 platforms, treat as 'all'
+      : platform
+    setSelectedPlatform(platformForState as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all')
     setSelectedTemplateId(templateId)
     setGeneratedContent(null)
     setCurrentDraftId(null)
     setAttachedImage(image)
 
     try {
+      // Pass platform as-is (can be array, 'all', or single platform)
       const result = await generateContent(content, platform, templateId, twitterFormat)
       setGeneratedContent(result)
       toast.success('Posts generated successfully!')
@@ -80,6 +90,30 @@ export default function DashboardPage() {
     try {
       const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
       
+      // Debug: Log generated content to see what's available
+      console.log('Generated content keys:', Object.keys(generatedContent))
+      console.log('Facebook content exists:', !!generatedContent.facebook)
+      console.log('LinkedIn content exists:', !!generatedContent.linkedin)
+      
+      // Determine platforms from generatedContent if actualSelectedPlatforms is not set
+      const platformsToSave = (() => {
+        if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
+          return JSON.stringify(actualSelectedPlatforms)
+        } else if (actualSelectedPlatforms === 'all') {
+          return 'all'
+        } else {
+          // Derive from generatedContent
+          const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+          if (generatedContent.linkedin) platforms.push('linkedin')
+          if (generatedContent.twitter) platforms.push('twitter')
+          if (generatedContent.facebook) platforms.push('facebook')
+          if (generatedContent.instagram) platforms.push('instagram')
+          if (generatedContent.telegram) platforms.push('telegram')
+          if (generatedContent.threads) platforms.push('threads')
+          return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
+        }
+      })()
+      
       // If draft already exists, update it instead of creating a new one
       if (currentDraftId) {
         const response = await fetch(`/api/drafts/${currentDraftId}`, {
@@ -94,11 +128,11 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent.twitter || null),
-            facebookContent: generatedContent.facebook || null,
+            facebookContent: generatedContent.facebook ?? null,
             instagramContent: generatedContent.instagram || null,
             telegramContent: generatedContent.telegram || null,
             threadsContent: generatedContent.threads || null,
-            platforms: selectedPlatform,
+            platforms: platformsToSave,
             attachedImage: attachedImage || null,
           }),
         })
@@ -124,11 +158,11 @@ export default function DashboardPage() {
             twitterContent: Array.isArray(generatedContent.twitter) 
               ? JSON.stringify(generatedContent.twitter) 
               : (generatedContent.twitter || null),
-            facebookContent: generatedContent.facebook || null,
+            facebookContent: generatedContent.facebook ?? null,
             instagramContent: generatedContent.instagram || null,
             telegramContent: generatedContent.telegram || null,
             threadsContent: generatedContent.threads || null,
-            platforms: selectedPlatform,
+            platforms: platformsToSave,
             status: 'draft',
             attachedImage: attachedImage || null,
           }),
@@ -233,6 +267,26 @@ export default function DashboardPage() {
       if (!draftId && rawIdea) {
         const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
         
+        // Determine platforms from generatedContent if actualSelectedPlatforms is not set
+        const platformsToSave = (() => {
+          if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
+            return JSON.stringify(actualSelectedPlatforms)
+          } else if (actualSelectedPlatforms === 'all') {
+            return 'all'
+          } else if (generatedContent) {
+            // Derive from generatedContent
+            const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+            if (generatedContent.linkedin) platforms.push('linkedin')
+            if (generatedContent.twitter) platforms.push('twitter')
+            if (generatedContent.facebook) platforms.push('facebook')
+            if (generatedContent.instagram) platforms.push('instagram')
+            if (generatedContent.telegram) platforms.push('telegram')
+            if (generatedContent.threads) platforms.push('threads')
+            return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
+          }
+          return 'all' // Fallback
+        })()
+        
         const draftResponse = await fetch('/api/drafts', {
           method: 'POST',
           headers: {
@@ -249,7 +303,7 @@ export default function DashboardPage() {
             instagramContent: generatedContent?.instagram || null,
             telegramContent: generatedContent?.telegram || null,
             threadsContent: generatedContent?.threads || null,
-            platforms: selectedPlatform,
+            platforms: platformsToSave,
             status: 'draft',
             attachedImage: attachedImage || null,
           }),
@@ -397,6 +451,26 @@ export default function DashboardPage() {
       if (!draftId && rawIdea) {
         const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
         
+        // Determine platforms from generatedContent if actualSelectedPlatforms is not set
+        const platformsToSave = (() => {
+          if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
+            return JSON.stringify(actualSelectedPlatforms)
+          } else if (actualSelectedPlatforms === 'all') {
+            return 'all'
+          } else if (generatedContent) {
+            // Derive from generatedContent
+            const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+            if (generatedContent.linkedin) platforms.push('linkedin')
+            if (generatedContent.twitter) platforms.push('twitter')
+            if (generatedContent.facebook) platforms.push('facebook')
+            if (generatedContent.instagram) platforms.push('instagram')
+            if (generatedContent.telegram) platforms.push('telegram')
+            if (generatedContent.threads) platforms.push('threads')
+            return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
+          }
+          return 'all' // Fallback
+        })()
+        
         const draftResponse = await fetch('/api/drafts', {
           method: 'POST',
           headers: {
@@ -413,7 +487,7 @@ export default function DashboardPage() {
             instagramContent: generatedContent?.instagram || null,
             telegramContent: generatedContent?.telegram || null,
             threadsContent: generatedContent?.threads || null,
-            platforms: selectedPlatform,
+            platforms: platformsToSave,
             status: 'draft',
             attachedImage: attachedImage || null,
           }),
@@ -638,27 +712,27 @@ export default function DashboardPage() {
     try {
       const publishPromises: Promise<void>[] = []
 
-      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'both')) {
+      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'all')) {
         publishPromises.push(handlePublish('linkedin', generatedContent.linkedin))
       }
 
-      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'both')) {
+      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'all')) {
         publishPromises.push(handlePublish('facebook', generatedContent.facebook))
       }
 
-      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'both')) {
+      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'all')) {
         publishPromises.push(handlePublish('instagram', generatedContent.instagram))
       }
 
-      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'both')) {
+      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'all')) {
         publishPromises.push(handlePublish('telegram', generatedContent.telegram))
       }
 
-      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'both')) {
+      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'all')) {
         publishPromises.push(handlePublish('threads', generatedContent.threads))
       }
 
-      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
+      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'all')) {
         const twitterContent = Array.isArray(generatedContent.twitter) 
           ? generatedContent.twitter 
           : generatedContent.twitter
@@ -691,27 +765,27 @@ export default function DashboardPage() {
     try {
       const schedulePromises: Promise<void>[] = []
 
-      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'both')) {
+      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'all')) {
         schedulePromises.push(handleSchedule('linkedin', generatedContent.linkedin, scheduledDate))
       }
 
-      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'both')) {
+      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'all')) {
         schedulePromises.push(handleSchedule('facebook', generatedContent.facebook, scheduledDate))
       }
 
-      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'both')) {
+      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'all')) {
         schedulePromises.push(handleSchedule('instagram', generatedContent.instagram, scheduledDate))
       }
 
-      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'both')) {
+      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'all')) {
         schedulePromises.push(handleSchedule('telegram', generatedContent.telegram, scheduledDate))
       }
 
-      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'both')) {
+      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'all')) {
         schedulePromises.push(handleSchedule('threads', generatedContent.threads, scheduledDate))
       }
 
-      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'both')) {
+      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'all')) {
         const twitterContent = Array.isArray(generatedContent.twitter) 
           ? generatedContent.twitter 
           : generatedContent.twitter
@@ -747,7 +821,39 @@ export default function DashboardPage() {
 
       {/* Idea Capture Widget */}
       <div className="mb-8">
-        <IdeaCapture onGenerate={handleGenerate} />
+        <IdeaCapture 
+          onGenerate={handleGenerate} 
+          onImageAttached={async (imageUrl: string) => {
+            // Update local state immediately for preview
+            setAttachedImage(imageUrl)
+            
+            // If draft exists, update it with the image
+            if (currentDraftId) {
+              try {
+                const response = await fetch(`/api/drafts/${currentDraftId}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    attachedImage: imageUrl,
+                  }),
+                })
+                
+                if (response.ok) {
+                  toast.success('Image attached to draft!', { duration: 2000 })
+                } else {
+                  console.error('Failed to update draft with image')
+                }
+              } catch (error) {
+                console.error('Error updating draft with image:', error)
+              }
+            } else {
+              // If no draft exists yet, the image will be saved when draft is created
+              toast.info('Image will be attached when you save or publish', { duration: 2000 })
+            }
+          }}
+        />
       </div>
 
       {/* Loading State */}
@@ -905,9 +1011,9 @@ export default function DashboardPage() {
               isOpen={showBulkScheduleModal}
               onClose={() => setShowBulkScheduleModal(false)}
               onSchedule={handleBulkScheduleAll}
-              platform={selectedPlatform === 'both' ? 'linkedin' : selectedPlatform}
+              platform={selectedPlatform === 'all' ? 'linkedin' : selectedPlatform}
               content={
-                selectedPlatform === 'both' 
+                selectedPlatform === 'all' 
                   ? `${generatedContent.linkedin || ''}\n\n${Array.isArray(generatedContent.twitter) ? generatedContent.twitter.join('\n\n') : generatedContent.twitter || ''}`
                   : selectedPlatform === 'linkedin'
                     ? generatedContent.linkedin || ''

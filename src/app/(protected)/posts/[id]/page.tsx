@@ -486,6 +486,28 @@ export default function PostDetailPage({
     }
   }
 
+  // Helper function to parse platforms from draft.platforms field
+  const getSelectedPlatforms = (): ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] => {
+    if (!post) return []
+    
+    let parsedPlatforms: string | string[] | null = null
+    try {
+      parsedPlatforms = JSON.parse(post.platforms)
+    } catch {
+      parsedPlatforms = post.platforms
+    }
+    
+    if (parsedPlatforms === 'all' || parsedPlatforms === 'both') {
+      return ['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads']
+    } else if (Array.isArray(parsedPlatforms)) {
+      return parsedPlatforms.filter(p => 
+        ['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads'].includes(p)
+      ) as ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[]
+    } else {
+      return [parsedPlatforms as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads']
+    }
+  }
+
   const handleRefreshAnalytics = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads') => {
     try {
       // Get the published post ID for this platform
@@ -902,7 +924,20 @@ export default function PostDetailPage({
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">{post.title}</h1>
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="uppercase font-medium">{post.platforms}</span>
+              <span className="uppercase font-medium">
+                {(() => {
+                  // Try to parse as JSON array first (for multi-select)
+                  try {
+                    const parsed = JSON.parse(post.platforms)
+                    if (Array.isArray(parsed)) {
+                      return parsed.join(', ')
+                    }
+                  } catch {
+                    // Not JSON, treat as string
+                  }
+                  return post.platforms
+                })()}
+              </span>
               <span>•</span>
               <span>{new Date(post.createdAt).toLocaleDateString('en-US', {
                 month: 'long',
@@ -1009,7 +1044,7 @@ export default function PostDetailPage({
 
       {/* Generated Content Preview */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {post.linkedinContent && (
+        {getSelectedPlatforms().includes('linkedin') && post.linkedinContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="linkedin"
@@ -1040,7 +1075,7 @@ export default function PostDetailPage({
             )}
           </div>
         )}
-        {post.twitterContent && (
+        {getSelectedPlatforms().includes('twitter') && post.twitterContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="twitter"
@@ -1071,7 +1106,7 @@ export default function PostDetailPage({
             )}
           </div>
         )}
-        {post.facebookContent && (
+        {getSelectedPlatforms().includes('facebook') && post.facebookContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="facebook"
@@ -1093,7 +1128,7 @@ export default function PostDetailPage({
             />
           </div>
         )}
-        {post.instagramContent && (
+        {getSelectedPlatforms().includes('instagram') && post.instagramContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="instagram"
@@ -1115,7 +1150,7 @@ export default function PostDetailPage({
             />
           </div>
         )}
-        {post.telegramContent && (
+        {getSelectedPlatforms().includes('telegram') && post.telegramContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="telegram"
@@ -1137,7 +1172,7 @@ export default function PostDetailPage({
             />
           </div>
         )}
-        {post.threadsContent && (
+        {getSelectedPlatforms().includes('threads') && post.threadsContent && (
           <div className="space-y-4">
             <PlatformPreview
               platform="threads"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
+import { cleanText } from '@/lib/utils'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -63,8 +64,11 @@ async function getUserApiKeys(userId: string) {
 }
 
 function cleanSingleTweet(tweet: string): string {
+  // First, clean Unicode whitespace
+  let cleaned = cleanText(tweet)
+  
   // Remove headers, "=>", etc. from individual tweet
-  let cleaned = tweet.replace(/^=>\s*/, '').replace(/^#\s*.*?:\s*/i, '').trim()
+  cleaned = cleaned.replace(/^=>\s*/, '').replace(/^#\s*.*?:\s*/i, '').trim()
   
   // Remove JSON code fences
   cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/g, '').replace(/```\s*$/g, '')
@@ -80,7 +84,7 @@ function cleanSingleTweet(tweet: string): string {
   // Remove any remaining patterns like "2/7 2/" at the start
   cleaned = cleaned.replace(/^\d+\/\d+\s+\d+\/\s*/, '').trim()
   
-  // Clean up multiple spaces
+  // Clean up multiple spaces (should already be done by cleanText, but keep for safety)
   cleaned = cleaned.replace(/\s+/g, ' ').trim()
   
   return cleaned.trim()
@@ -90,7 +94,8 @@ function cleanSingleTweet(tweet: string): string {
 function cleanGeneratedContent(content: string): string {
   if (!content) return ''
   
-  let cleaned = content.trim()
+  // First, clean Unicode whitespace
+  let cleaned = cleanText(content)
   
   // Remove common headers and analysis sections
   const patternsToRemove = [
@@ -395,8 +400,61 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine which platform content to generate
-    const platformsToGenerate: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = 
-      platform === 'both' ? ['linkedin', 'twitter'] : [platform as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads']
+    let platformsToGenerate: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+    
+    // Helper function to get all available platforms
+    const getAllAvailablePlatforms = async (): Promise<('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[]> => {
+      const availablePlatforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+      
+      // Get all active social connections
+      const connections = await prisma.socialConnection.findMany({
+        where: {
+          userId: user.id,
+          isActive: true,
+        },
+        select: {
+          platform: true,
+        },
+      })
+      
+      // Add platforms from connections
+      connections.forEach(conn => {
+        const plat = conn.platform as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'threads'
+        if (['linkedin', 'twitter', 'facebook', 'instagram', 'threads'].includes(plat) && !availablePlatforms.includes(plat)) {
+          availablePlatforms.push(plat)
+        }
+      })
+      
+      // Check for Telegram API key
+      const telegramKey = await prisma.apiKey.findFirst({
+        where: {
+          userId: user.id,
+          provider: 'telegram',
+        },
+      })
+      
+      if (telegramKey) {
+        availablePlatforms.push('telegram')
+      }
+      
+      return availablePlatforms.length > 0 ? availablePlatforms : ['linkedin', 'twitter'] // Fallback to LinkedIn and Twitter if no connections
+    }
+    
+    if (platform === 'all') {
+      // When "all" is selected, generate for ALL available platforms
+      platformsToGenerate = await getAllAvailablePlatforms()
+    } else if (platform === 'both') {
+      // Backward compatibility: handle old 'both' value (treat as 'all')
+      platformsToGenerate = await getAllAvailablePlatforms()
+    } else if (Array.isArray(platform)) {
+      // When an array of platforms is provided, use those platforms
+      platformsToGenerate = platform.filter(p => 
+        ['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads'].includes(p)
+      ) as ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[]
+    } else {
+      // Single platform
+      platformsToGenerate = [platform as 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads']
+    }
 
     const result: Record<string, string> = {}
 
@@ -539,6 +597,10 @@ export async function POST(request: NextRequest) {
           default:
             throw new Error(`Unsupported provider: ${selectedProvider}`)
         }
+
+        // Clean Unicode whitespace immediately after receiving AI response
+        // This prevents weird Unicode whitespace characters that could give away AI-generated content
+        generatedContent = cleanText(generatedContent)
 
         if (isTwitterThread) {
           // THREAD MODE: Parse as JSON array

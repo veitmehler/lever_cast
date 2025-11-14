@@ -235,12 +235,23 @@ export async function POST(request: Request) {
         })
 
         const publishedPlatforms = publishedPosts.map(p => p.platform)
-        const draftPlatforms = draft.platforms === 'both' 
-          ? ['linkedin', 'twitter'] 
-          : [draft.platforms]
+        
+        // Get all posts (scheduled + published) for this draft to determine which platforms were generated
+        const allDraftPosts = await prisma.post.findMany({
+          where: {
+            draftId,
+            parentPostId: null, // Only count summary posts
+          },
+          select: {
+            platform: true,
+          },
+        })
+        
+        // Get unique platforms that have posts for this draft
+        const draftPlatforms = [...new Set(allDraftPosts.map(p => p.platform))]
 
         // Check if all platforms for this draft are published
-        const allPublished = draftPlatforms.every(platform => 
+        const allPublished = draftPlatforms.length > 0 && draftPlatforms.every(platform => 
           publishedPlatforms.includes(platform)
         )
 

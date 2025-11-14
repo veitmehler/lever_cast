@@ -172,12 +172,22 @@ export async function GET(
 
         // Image generation providers
         case 'fal': {
-          // Fal.ai models
+          // Fal.ai models - Fal.ai has 600+ models, but these are the most popular for image generation
+          // Fal.ai doesn't provide a public API to list models, so we maintain a curated list
+          // You can explore more models at https://fal.ai/explore
           models = [
             { value: 'fal-ai/flux/schnell', label: 'Flux Schnell (Fast)' },
             { value: 'fal-ai/flux/dev', label: 'Flux Dev (High Quality)' },
-            { value: 'fal-ai/stable-diffusion-v3', label: 'Stable Diffusion v3' },
             { value: 'fal-ai/flux-pro', label: 'Flux Pro (Premium)' },
+            { value: 'fal-ai/flux/dev-lite', label: 'Flux Dev Lite' },
+            { value: 'fal-ai/stable-diffusion-v35-large', label: 'Stable Diffusion v3.5 Large' },
+            { value: 'fal-ai/imagen4/preview/fast', label: 'Imagen 4 Preview (Fast)' },
+            { value: 'fal-ai/bytedance/seedream/v3/text-to-image', label: 'ByteDance SeedDream v3' },
+            { value: 'fal-ai/bagel', label: 'Bagel' },
+            { value: 'fal-ai/sana/v1.5/4.8b', label: 'Sana v1.5 (4.8B)' },
+            { value: 'rundiffusion-fal/rundiffusion-photo-flux', label: 'RunDiffusion Photo Flux' },
+            { value: 'fal-ai/stable-diffusion-v3-medium', label: 'Stable Diffusion v3 Medium' },
+            { value: 'fal-ai/stable-cascade', label: 'Stable Cascade' },
           ]
           break
         }
@@ -268,7 +278,17 @@ export async function GET(
         fal: [
           { value: 'fal-ai/flux/schnell', label: 'Flux Schnell (Fast)' },
           { value: 'fal-ai/flux/dev', label: 'Flux Dev (High Quality)' },
-          { value: 'fal-ai/stable-diffusion-v3', label: 'Stable Diffusion v3' },
+          { value: 'fal-ai/flux-pro', label: 'Flux Pro (Premium)' },
+          { value: 'fal-ai/flux/dev-lite', label: 'Flux Dev Lite' },
+          { value: 'fal-ai/stable-diffusion-v35-large', label: 'Stable Diffusion v3.5 Large' },
+          { value: 'fal-ai/imagen4/preview/fast', label: 'Imagen 4 Preview (Fast)' },
+          { value: 'fal-ai/bytedance/seedream/v3/text-to-image', label: 'ByteDance SeedDream v3' },
+          { value: 'fal-ai/bagel', label: 'Bagel' },
+          { value: 'fal-ai/sana/v1.5/4.8b', label: 'Sana v1.5 (4.8B)' },
+          { value: 'rundiffusion-fal/rundiffusion-photo-flux', label: 'RunDiffusion Photo Flux' },
+          { value: 'fal-ai/stable-diffusion-v3-medium', label: 'Stable Diffusion v3 Medium' },
+          { value: 'fal-ai/stable-cascade', label: 'Stable Cascade' },
+          { value: 'fal-ai/stable-diffusion-v15', label: 'Stable Diffusion v1.5' },
         ],
         'openai-dalle': [
           { value: 'dall-e-3', label: 'DALL-E 3 (Recommended)' },

@@ -190,19 +190,35 @@ export default function PostsPage() {
 
         // Determine platforms to publish
         const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-        if (draft.platforms === 'both') {
-          platforms.push('linkedin', 'twitter')
-        } else if (draft.platforms === 'linkedin') {
+        
+        // Try to parse as JSON array first (for multi-select)
+        let parsedPlatforms: string | string[] | null = null
+        try {
+          parsedPlatforms = JSON.parse(draft.platforms)
+        } catch {
+          // Not JSON, treat as string
+          parsedPlatforms = draft.platforms
+        }
+        
+        if (parsedPlatforms === 'all' || parsedPlatforms === 'both') {
+          // 'all' means all available platforms, 'both' is backward compatibility
+          platforms.push('linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads')
+        } else if (Array.isArray(parsedPlatforms)) {
+          // Multi-select: array of platforms
+          platforms.push(...(parsedPlatforms.filter(p => 
+            ['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads'].includes(p)
+          ) as ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[]))
+        } else if (parsedPlatforms === 'linkedin') {
           platforms.push('linkedin')
-        } else if (draft.platforms === 'twitter') {
+        } else if (parsedPlatforms === 'twitter') {
           platforms.push('twitter')
-        } else if (draft.platforms === 'facebook') {
+        } else if (parsedPlatforms === 'facebook') {
           platforms.push('facebook')
-        } else if (draft.platforms === 'instagram') {
+        } else if (parsedPlatforms === 'instagram') {
           platforms.push('instagram')
-        } else if (draft.platforms === 'telegram') {
+        } else if (parsedPlatforms === 'telegram') {
           platforms.push('telegram')
-        } else if (draft.platforms === 'threads') {
+        } else if (parsedPlatforms === 'threads') {
           platforms.push('threads')
         }
 
@@ -312,19 +328,35 @@ export default function PostsPage() {
 
         // Determine platforms to schedule
         const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-        if (draft.platforms === 'both') {
-          platforms.push('linkedin', 'twitter')
-        } else if (draft.platforms === 'linkedin') {
+        
+        // Try to parse as JSON array first (for multi-select)
+        let parsedPlatforms: string | string[] | null = null
+        try {
+          parsedPlatforms = JSON.parse(draft.platforms)
+        } catch {
+          // Not JSON, treat as string
+          parsedPlatforms = draft.platforms
+        }
+        
+        if (parsedPlatforms === 'all' || parsedPlatforms === 'both') {
+          // 'all' means all available platforms, 'both' is backward compatibility
+          platforms.push('linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads')
+        } else if (Array.isArray(parsedPlatforms)) {
+          // Multi-select: array of platforms
+          platforms.push(...(parsedPlatforms.filter(p => 
+            ['linkedin', 'twitter', 'facebook', 'instagram', 'telegram', 'threads'].includes(p)
+          ) as ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[]))
+        } else if (parsedPlatforms === 'linkedin') {
           platforms.push('linkedin')
-        } else if (draft.platforms === 'twitter') {
+        } else if (parsedPlatforms === 'twitter') {
           platforms.push('twitter')
-        } else if (draft.platforms === 'facebook') {
+        } else if (parsedPlatforms === 'facebook') {
           platforms.push('facebook')
-        } else if (draft.platforms === 'instagram') {
+        } else if (parsedPlatforms === 'instagram') {
           platforms.push('instagram')
-        } else if (draft.platforms === 'telegram') {
+        } else if (parsedPlatforms === 'telegram') {
           platforms.push('telegram')
-        } else if (draft.platforms === 'threads') {
+        } else if (parsedPlatforms === 'threads') {
           platforms.push('threads')
         }
 
@@ -699,7 +731,18 @@ export default function PostsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <FileText className="w-5 h-5 text-primary" />
                     <span className="text-xs font-medium text-muted-foreground uppercase">
-                      {draft.platforms}
+                      {(() => {
+                        // Try to parse as JSON array first (for multi-select)
+                        try {
+                          const parsed = JSON.parse(draft.platforms)
+                          if (Array.isArray(parsed)) {
+                            return parsed.join(', ')
+                          }
+                        } catch {
+                          // Not JSON, treat as string
+                        }
+                        return draft.platforms
+                      })()}
                     </span>
                     {publishedPosts.length > 0 && (
                       <div className="flex gap-1">

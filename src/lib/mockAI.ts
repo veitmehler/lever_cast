@@ -158,7 +158,7 @@ function applyTemplate(template: string, idea: string): string {
 
 export async function generateContent(
   rawIdea: string,
-  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'both',
+  platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[],
   templateId?: string,
   twitterFormat?: 'single' | 'thread'
 ): Promise<GeneratedContent> {

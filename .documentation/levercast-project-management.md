@@ -402,6 +402,19 @@
 - ✅ Remove Stable Diffusion v1.5 from Fal.ai models (low quality)
 - ✅ **Status**: AI image generation fully functional with 12 Fal.ai models available ✅
 
+### Writing Style Feature (COMPLETED)
+- ✅ Add writingStyle field to Settings model in Prisma schema
+- ✅ Create Writing Style section on Settings page with textarea for manual description
+- ✅ Create modal popup for analyzing sample text (500+ words minimum)
+- ✅ Create API route (/api/ai/analyze-writing-style) for AI-powered style analysis
+- ✅ Implement comprehensive style analysis prompt covering tone, diction, sentence structure, punctuation, rhetorical devices, perspective, target audience, and core purpose
+- ✅ Update AI generation functions to accept writingStyle parameter
+- ✅ Integrate writing style into system prompts under "# WRITING STYLE:" heading for all AI providers (OpenAI, Anthropic, Gemini, OpenRouter)
+- ✅ Add save/update functionality for writing style in settings
+- ✅ Load writing style from settings and display in Settings page
+- ✅ Update Settings API route to handle writingStyle field in GET and PATCH requests
+- ✅ **Status**: Writing style feature fully functional - users can define their voice and it's automatically applied to all AI-generated posts ✅
+
 ### Analytics Tracking & Sync (COMPLETED)
 - ✅ Add analytics tracking fields to Post model
   - Add imageUrl field to store published image URLs
@@ -812,7 +825,28 @@
 
 ## Change Log
 
-### January 2025 (Latest - Multi-Platform Draft Support, Content Formatting & Fal.ai Models)
+### January 2025 (Latest - Writing Style Feature)
+- Implemented comprehensive writing style feature
+  - Added writingStyle field to Settings model in Prisma schema
+  - Created Writing Style section on Settings page with textarea for manual description
+  - Built modal popup for analyzing sample text (requires 500+ words)
+  - Created API route (/api/ai/analyze-writing-style) for AI-powered style analysis
+  - Implemented comprehensive style analysis prompt covering 8 key components:
+    - Tone & Mood (formal, casual, witty, professional, etc.)
+    - Diction & Vocabulary (simple, technical, jargon-heavy, conversational, etc.)
+    - Sentence Structure (long/short, varied, active/passive voice)
+    - Punctuation & Formatting (em dashes, semicolons, bullet points, etc.)
+    - Rhetorical Devices (metaphors, analogies, rhetorical questions, storytelling, etc.)
+    - Perspective (first/second/third person)
+    - Target Audience & Assumed Knowledge
+    - Core Purpose (inform, persuade, entertain, instruct, inspire)
+  - Updated all AI generation functions (OpenAI, Anthropic, Gemini, OpenRouter) to include writing style in system prompts under "# WRITING STYLE:" heading
+  - Writing style is automatically applied to all AI-generated posts when defined
+  - Users can manually write style description or use AI analysis from sample text
+  - Writing style is editable and persists in database
+- **Status**: Writing style feature fully functional - users can define their voice and it's automatically applied to all AI-generated posts ✅
+
+### January 2025 (Earlier - Multi-Platform Draft Support, Content Formatting & Fal.ai Models)
 - Fixed multi-platform draft saving bug
   - Updated POST /api/drafts route to extract and save all platform content fields (facebookContent, instagramContent, telegramContent, threadsContent)
   - Previously only linkedinContent and twitterContent were being saved, causing Facebook and other platform content to be lost
@@ -1078,7 +1112,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking Complete  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature Complete  
 **Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

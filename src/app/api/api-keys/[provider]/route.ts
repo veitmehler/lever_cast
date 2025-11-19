@@ -46,7 +46,7 @@ async function getOrCreateUser(clerkId: string) {
 // GET /api/api-keys/[provider] - Get specific provider key (masked)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
     const authResult = await auth()
@@ -56,7 +56,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { provider } = params
+    const { provider } = await params
 
     if (!VALID_PROVIDERS.includes(provider)) {
       return NextResponse.json(
@@ -101,7 +101,7 @@ export async function GET(
 // DELETE /api/api-keys/[provider] - Remove API key
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
     const authResult = await auth()
@@ -111,7 +111,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { provider } = params
+    const { provider } = await params
 
     if (!VALID_PROVIDERS.includes(provider)) {
       return NextResponse.json(

@@ -773,7 +773,7 @@ export default function DashboardPage() {
         if (selectedPlatform === 'all') {
           return PLATFORM_ORDER
         }
-        return selectedPlatform ? [selectedPlatform].filter((p): p is PlatformKey => p !== 'all') : []
+        return selectedPlatform ? [selectedPlatform as PlatformKey] : []
       }
 
       const requestedPlatforms = normalizeSelectedPlatforms()

@@ -6,6 +6,8 @@
  * using Node.js crypto module with a secure key management system.
  */
 
+// ENCRYPTION_KEY is reserved for future use when upgrading to proper encryption
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production'
 
 /**

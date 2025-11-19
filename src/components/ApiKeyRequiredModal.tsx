@@ -1,10 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import { X, Settings, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 
 interface ApiKeyRequiredModalProps {
   isOpen: boolean

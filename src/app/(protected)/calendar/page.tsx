@@ -22,10 +22,11 @@ type Post = {
 export default function CalendarPage() {
   const [postsByDate, setPostsByDate] = useState<Record<string, Post[]>>({})
   const [isLoading, setIsLoading] = useState(true)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [currentMonth] = useState(new Date())
 
   useEffect(() => {
     fetchCalendarPosts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth])
 
   const fetchCalendarPosts = async () => {

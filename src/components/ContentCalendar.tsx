@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Calendar from 'react-calendar'
 import 'react-calendar/dist/Calendar.css'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from 'date-fns'
-import { cn } from '@/lib/utils'
+import { format, isSameDay, isToday } from 'date-fns'
 import { CalendarDayView } from './CalendarDayView'
 
 type Post = {

@@ -208,17 +208,31 @@ export async function GET(
     let tokenExpiry: Date | null = null
     let platformUserId: string
     let platformUsername: string
-let tokenData: any = null // Store token data for later use (especially for LinkedIn appType determination)
+interface TokenData {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  token_type?: string
+  [key: string]: unknown
+}
+
+interface PrismaError extends Error {
+  code?: string
+  message: string
+}
+
+let tokenData: TokenData | null = null // Store token data for later use (especially for LinkedIn appType determination)
 let isCompanyCallback: boolean = false // For LinkedIn: track if this is a company callback
 let appTypeColumnAvailable: boolean | null = null // Track if social_connections.appType column exists (null = unknown)
 
-function isAppTypeColumnError(error: any) {
-  const message = error?.message || ''
+function isAppTypeColumnError(error: unknown): boolean {
+  const prismaError = error as PrismaError
+  const message = prismaError?.message || ''
   return (
     message.includes('Unknown argument `appType`') ||
     message.includes('no such column: appType') ||
     message.includes('column "appType" of relation "social_connections" does not exist') ||
-    error?.code === 'P2001'
+    prismaError?.code === 'P2001'
   )
 }
 
@@ -502,7 +516,17 @@ function isAppTypeColumnError(error: any) {
       const pagesData = await pagesResponse.json()
       const pages = pagesData.data || []
       
-      console.log('[Instagram OAuth] Found pages:', pages.map((p: any) => ({ 
+      interface FacebookPage {
+        id: string
+        name: string
+        access_token?: string
+        instagram_business_account?: {
+          id: string
+          username?: string
+        }
+      }
+
+      console.log('[Instagram OAuth] Found pages:', pages.map((p: FacebookPage) => ({ 
         id: p.id, 
         name: p.name,
         has_instagram: !!p.instagram_business_account,
@@ -510,7 +534,7 @@ function isAppTypeColumnError(error: any) {
       })))
       
       // Try to find page with Instagram account from initial fetch
-      let pageWithInstagram = pages.find((p: any) => p.instagram_business_account)
+      let pageWithInstagram = pages.find((p: FacebookPage) => p.instagram_business_account)
       let pageAccessToken: string | null = null
       
       // If not found in initial fetch, check each page individually with Page access token
@@ -558,8 +582,8 @@ function isAppTypeColumnError(error: any) {
               )
             
             if (igAccountsResponse.ok) {
-              const igAccountsData = await igAccountsResponse.json()
-              const pageWithIg = igAccountsData.data?.find((p: any) => p.id === page.id && p.instagram_business_account)
+              const igAccountsData = await igAccountsResponse.json() as { data?: FacebookPage[] }
+              const pageWithIg = igAccountsData.data?.find((p: FacebookPage) => p.id === page.id && p.instagram_business_account)
               if (pageWithIg) {
                 console.log(`[Instagram OAuth] Found Instagram account via /me/accounts with Page token for page ${page.id}`)
                 pageWithInstagram = pageWithIg
@@ -580,15 +604,27 @@ function isAppTypeColumnError(error: any) {
         `https://graph.facebook.com/v24.0/debug_token?input_token=${userAccessToken}&access_token=${INSTAGRAM_CLIENT_ID}|${INSTAGRAM_CLIENT_SECRET}`
       )
       
+      interface GranularScope {
+        scope: string
+        target_ids?: string[]
+      }
+
+      interface DebugTokenData {
+        data?: {
+          granular_scopes?: GranularScope[]
+          scopes?: string[]
+        }
+      }
+
       let instagramAccountId: string | null = null
-      let debugData: any = null
+      let debugData: DebugTokenData | null = null
       
       if (debugTokenResponse.ok) {
-        debugData = await debugTokenResponse.json()
+        debugData = await debugTokenResponse.json() as DebugTokenData
         const granularScopes = debugData.data?.granular_scopes || []
         
         // Find instagram_content_publish granular scope to get Instagram account ID
-        const instagramScope = granularScopes.find((scope: any) => scope.scope === 'instagram_content_publish')
+        const instagramScope = granularScopes.find((scope: GranularScope) => scope.scope === 'instagram_content_publish')
         if (instagramScope?.target_ids && instagramScope.target_ids.length > 0) {
           instagramAccountId = instagramScope.target_ids[0]
           console.log('[Instagram OAuth] Found Instagram account ID from granular scopes:', instagramAccountId)
@@ -601,12 +637,18 @@ function isAppTypeColumnError(error: any) {
       if (instagramAccountId && !pageWithInstagram?.instagram_business_account && pages.length > 0) {
         console.log('[Instagram OAuth] Using Instagram account ID from granular scopes directly')
         
+        interface InstagramAccountDetails {
+          id: string
+          username?: string
+          account_type?: string
+        }
+
         // Use the first page's access token (should work for Instagram API)
         const firstPage = pages[0]
         if (firstPage.access_token) {
           // Try to get Instagram account details using the Page token
           // If this fails, we'll still create the connection with the ID we have
-          let igAccountDetails: any = {
+          let igAccountDetails: InstagramAccountDetails = {
             id: instagramAccountId,
             username: 'Instagram User', // Default, will be updated when we can query it
             account_type: 'BUSINESS',
@@ -653,7 +695,7 @@ function isAppTypeColumnError(error: any) {
       }
       
       if (!pageWithInstagram?.instagram_business_account || !pageAccessToken) {
-        console.error('[Instagram OAuth] No Instagram account found on any page. Checked pages:', pages.map((p: any) => ({ id: p.id, name: p.name })))
+        console.error('[Instagram OAuth] No Instagram account found on any page. Checked pages:', pages.map((p: FacebookPage) => ({ id: p.id, name: p.name })))
         
         // Check if user token has instagram_content_publish permission
         if (debugData) {
@@ -712,10 +754,21 @@ function isAppTypeColumnError(error: any) {
         page_name: pageWithInstagram.name,
       })
       
+      interface InstagramFetchParams {
+        userId: string
+        instagramAccountId: string
+        pageAccessToken: string
+        userAccessToken: string
+      }
+
+      interface RequestWithInstagramParams extends Request {
+        __instagramFetchParams?: InstagramFetchParams
+      }
+
       // Store parameters for background username fetch (if username is still default)
       // Store on request object so it's available after connection is saved
       if (!platformUsername || platformUsername === 'Instagram User') {
-        (request as any).__instagramFetchParams = {
+        (request as RequestWithInstagramParams).__instagramFetchParams = {
           userId: user.id,
           instagramAccountId: platformUserId,
           pageAccessToken: pageAccessToken,
@@ -766,6 +819,11 @@ function isAppTypeColumnError(error: any) {
         ? new Date(Date.now() + tokenData.expires_in * 1000)
         : null
 
+      interface ThreadsAccount {
+        id: string
+        username?: string
+      }
+
       // Fetch Threads account details using /me endpoint
       const threadsAccountResponse = await fetch(
         `https://graph.threads.net/v1.0/me?access_token=${accessToken}&fields=id,username`
@@ -780,7 +838,7 @@ function isAppTypeColumnError(error: any) {
         return redirectWithCleanup('/settings?error=profile_fetch_failed')
       }
 
-      const threadsAccount = await threadsAccountResponse.json()
+      const threadsAccount = await threadsAccountResponse.json() as ThreadsAccount
       platformUserId = threadsAccount.id
       platformUsername = threadsAccount.username || 'Threads User'
       
@@ -818,7 +876,7 @@ function isAppTypeColumnError(error: any) {
     // Handle case where unique constraint doesn't exist yet (before migration)
     let existingConnection = null
     try {
-      existingConnection = await (prisma.socialConnection.findUnique as any)({
+      existingConnection = await prisma.socialConnection.findUnique({
         where: {
           userId_platform_appType: {
             userId: user.id,
@@ -828,15 +886,16 @@ function isAppTypeColumnError(error: any) {
         },
       })
       appTypeColumnAvailable = true
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const prismaError = error as PrismaError
       // If unique constraint doesn't exist yet, use findFirst
-      if (error.message?.includes('userId_platform_appType') || 
-          error.message?.includes('Unknown argument') ||
-          error.code === 'P2009') {
+      if (prismaError.message?.includes('userId_platform_appType') || 
+          prismaError.message?.includes('Unknown argument') ||
+          prismaError.code === 'P2009') {
         // Don't include appType in where clause - column doesn't exist yet
         // After migration, appType will be handled by the unique constraint above
         appTypeColumnAvailable = false
-        const whereClause: any = {
+        const whereClause: { userId: string; platform: string; appType?: string | null } = {
           userId: user.id,
           platform,
         }
@@ -885,6 +944,7 @@ function isAppTypeColumnError(error: any) {
       try {
         let createdConnection
         if (appTypeColumnAvailable === false) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { appType: _appType, ...legacyData } = createData
           createdConnection = await prisma.socialConnection.create({
             data: legacyData,
@@ -896,10 +956,11 @@ function isAppTypeColumnError(error: any) {
           appTypeColumnAvailable = true
         }
         savedConnectionId = createdConnection.id
-      } catch (createError: any) {
+      } catch (createError: unknown) {
         if (isAppTypeColumnError(createError)) {
           console.warn('[LinkedIn OAuth] appType column not available, creating connection without appType (migration not applied yet)')
           appTypeColumnAvailable = false
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { appType: _appType, ...legacyData } = createData
           const createdConnection = await prisma.socialConnection.create({
             data: legacyData,
@@ -913,7 +974,7 @@ function isAppTypeColumnError(error: any) {
     
     // For Instagram, fetch the actual username in the background if we don't have it yet
     if (platform === 'instagram' && savedConnectionId && (!platformUsername || platformUsername === 'Instagram User')) {
-      const fetchParams = (request as any).__instagramFetchParams
+      const fetchParams = (request as RequestWithInstagramParams).__instagramFetchParams
       if (fetchParams) {
         // Fire and forget - fetch username asynchronously without blocking the redirect
         // Use user token from fetchParams (we have it from OAuth), or from refreshToken if stored

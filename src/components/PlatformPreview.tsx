@@ -485,7 +485,7 @@ export function PlatformPreview({
                   await onReschedule(scheduledPostId, scheduledAt)
                   setShowScheduleModal(false)
                   setIsRescheduling(false)
-                } catch (error) {
+                } catch {
                   // Error handled by parent
                   setIsRescheduling(false)
                 }

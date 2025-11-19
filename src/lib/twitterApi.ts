@@ -9,6 +9,8 @@ import { prisma } from './prisma'
 import { downloadImageFromStorage } from './supabase'
 
 const TWITTER_API_BASE = 'https://api.twitter.com/2'
+// TWITTER_API_V1_BASE is reserved for future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TWITTER_API_V1_BASE = 'https://api.twitter.com/1.1'
 
 interface TwitterPostResponse {
@@ -165,11 +167,20 @@ export async function uploadImageToTwitter(
 
     console.log(`[Twitter API] Upload response status: ${uploadResponse.status} ${uploadResponse.statusText}`)
     
+    interface TwitterError {
+      errors?: Array<{
+        message?: string
+        code?: number
+      }>
+      error?: string
+      [key: string]: unknown
+    }
+
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text()
-      let errorDetails: any
+      let errorDetails: TwitterError
       try {
-        errorDetails = JSON.parse(errorText)
+        errorDetails = JSON.parse(errorText) as TwitterError
       } catch {
         errorDetails = { error: errorText }
       }

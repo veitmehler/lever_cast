@@ -98,7 +98,8 @@ export default function PostsPage() {
     return summaryPosts.some(post => post.status === 'scheduled')
   })
 
-  // Handle checkbox selection
+  // Handle checkbox selection (currently unused but kept for future bulk actions)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSelectDraft = (draftId: string, index: number, event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()

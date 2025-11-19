@@ -8,7 +8,7 @@ import { getSocialConnection } from './socialConnections'
 import { downloadImageFromStorage } from './supabase'
 import { prisma } from './prisma'
 import { decrypt } from './encryption'
-import { fetchInstagramUsername, refreshInstagramUsername } from './instagramUsername'
+import { fetchInstagramUsername } from './instagramUsername'
 
 const INSTAGRAM_API_BASE = 'https://graph.facebook.com/v24.0'
 
@@ -58,7 +58,7 @@ async function getInstagramAccount(userId: string): Promise<InstagramAccount> {
         if (!userAccessToken || userAccessToken.trim().length === 0) {
           userAccessToken = null
         }
-      } catch (err) {
+      } catch {
         console.warn('[Instagram API] Could not decrypt user token from refreshToken field')
         userAccessToken = null
       }
@@ -189,9 +189,19 @@ async function createMediaContainer(
     const pagesData = await pagesResponse.json()
     const pages = pagesData.data || []
     
+    interface FacebookPage {
+      id: string
+      name: string
+      access_token?: string
+      instagram_business_account?: {
+        id: string
+        username?: string
+      }
+    }
+
     // Find the page with the Instagram account
     // Meta's API doesn't always return instagram_business_account field, even with correct permissions
-    let page = pages.find((p: any) => {
+    let page = pages.find((p: FacebookPage) => {
       const igAccount = p.instagram_business_account
       return igAccount && igAccount.id === igAccountId
     })
@@ -206,7 +216,7 @@ async function createMediaContainer(
       console.warn('[Instagram API] Meta API did not return instagram_business_account field, using first available page as fallback', {
         igAccountId,
         pagesFound: pages.length,
-        pages: pages.map((p: any) => ({ id: p.id, name: p.name, hasIG: !!p.instagram_business_account })),
+        pages: pages.map((p: FacebookPage) => ({ id: p.id, name: p.name, hasIG: !!p.instagram_business_account })),
       })
       
       if (pages.length > 0) {
@@ -259,11 +269,21 @@ async function createMediaContainer(
       }
     )
 
+    interface InstagramError {
+      error?: {
+        message?: string
+        code?: number
+        error_subcode?: number
+      }
+      message?: string
+      [key: string]: unknown
+    }
+
     if (!containerResponse.ok) {
       const errorText = await containerResponse.text()
-      let errorData: any
+      let errorData: InstagramError
       try {
-        errorData = JSON.parse(errorText)
+        errorData = JSON.parse(errorText) as InstagramError
       } catch {
         errorData = { error: { message: errorText } }
       }
@@ -397,11 +417,20 @@ export async function postToInstagram(
       }
     )
 
+    interface InstagramPublishError {
+      error?: {
+        message?: string
+        code?: number
+      }
+      message?: string
+      [key: string]: unknown
+    }
+
     if (!publishResponse.ok) {
       const errorText = await publishResponse.text()
-      let error: any
+      let error: InstagramPublishError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as InstagramPublishError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }
@@ -436,8 +465,7 @@ export async function postToInstagram(
     const postId = publishResult.id
     
     // Construct post URL (Instagram posts don't have direct URLs, but we can link to the account)
-    const postUrl = `https://www.instagram.com/p/${postId}/` // Note: This format may not work, Instagram uses shortcodes
-    // Alternative: Link to account profile
+    // Note: Instagram uses shortcodes, not IDs, so we link to account profile
     const accountUrl = `https://www.instagram.com/${igAccount.username}/`
 
     console.log(`[Instagram API] Post successful: ${accountUrl}`)

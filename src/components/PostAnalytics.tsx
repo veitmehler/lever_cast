@@ -46,11 +46,18 @@ export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRef
         method: 'POST',
       })
       
+      interface SyncAnalyticsResult {
+        success?: boolean
+        error?: string
+        message?: string
+        [key: string]: unknown
+      }
+
       // Parse JSON response (even for error responses)
-      let result: any = {}
+      let result: SyncAnalyticsResult = {}
       try {
-        result = await response.json()
-      } catch (e) {
+        result = await response.json() as SyncAnalyticsResult
+      } catch {
         // If JSON parsing fails, use the status text
         result = { message: response.statusText || 'Unknown error' }
       }

@@ -30,8 +30,11 @@ export function ImageGenerationModal({
   const [availableModels, setAvailableModels] = useState<Array<{ value: string; label: string }>>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false)
+  // defaultImageProvider and defaultImageStyle are reserved for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [defaultImageProvider, setDefaultImageProvider] = useState<string | null>(null)
   const [defaultImageModel, setDefaultImageModel] = useState<Record<string, string>>({})
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [defaultImageStyle, setDefaultImageStyle] = useState('')
 
   // Load settings on mount
@@ -40,6 +43,7 @@ export function ImageGenerationModal({
       loadSettings()
       generateInitialPrompt() // This is now async but we don't need to await it
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, postContent])
 
   // Load models when provider changes
@@ -47,6 +51,7 @@ export function ImageGenerationModal({
     if (isOpen && provider) {
       loadModels()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, provider])
 
   // Set default model when models are loaded
@@ -59,6 +64,7 @@ export function ImageGenerationModal({
         setModel(availableModels[0].value)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableModels, provider, defaultImageModel])
 
   const loadSettings = async () => {
@@ -147,7 +153,7 @@ export function ImageGenerationModal({
         }
         setPrompt(simplePrompt)
       }
-    } catch (error) {
+    } catch {
       // Fallback to simple prompt on error
       console.log('[Image Modal] Could not generate LLM prompt, using simple prompt')
       let simplePrompt = postContent.trim()
@@ -218,6 +224,8 @@ export function ImageGenerationModal({
     }
   }
 
+  // handleRegenerate is reserved for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRegenerate = () => {
     setGeneratedImageUrl(null)
     handleGenerate()

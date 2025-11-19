@@ -72,7 +72,7 @@ export async function uploadImageToStorage(
   }
 
   // Upload to Supabase Storage
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('post-images')
     .upload(filePath, fileBuffer, {
       contentType,

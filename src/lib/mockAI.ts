@@ -23,32 +23,8 @@ interface Template {
   updatedAt: string
 }
 
-// Fetch template from API
-async function getTemplate(id: string): Promise<Template | null> {
-  try {
-    const response = await fetch(`/api/templates/${id}`)
-    if (!response.ok) return null
-    return await response.json()
-  } catch (error) {
-    console.error('Error fetching template:', error)
-    return null
-  }
-}
-
-// Fetch default template from API
-async function getDefaultTemplate(): Promise<Template | null> {
-  try {
-    const response = await fetch('/api/templates')
-    if (!response.ok) return null
-    const templates: Template[] = await response.json()
-    return templates.find(t => t.isDefault) || templates[0] || null
-  } catch (error) {
-    console.error('Error fetching templates:', error)
-    return null
-  }
-}
-
-// Mock templates for different content types
+// Mock templates for different content types (reserved for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const linkedInTemplates = [
   (idea: string) => `🚀 ${idea}
 
@@ -86,6 +62,7 @@ What principles guide your work? Share below! 👇
 #Business #Productivity #Success`,
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const twitterTemplates = [
   (idea: string) => `${idea}
 
@@ -141,7 +118,8 @@ function extractKeyPoints(idea: string): { point1: string; point2: string; point
   }
 }
 
-// Apply template with variable substitution
+// Apply template with variable substitution (reserved for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function applyTemplate(template: string, idea: string): string {
   if (!template) {
     return idea // Fallback to raw idea if template is undefined

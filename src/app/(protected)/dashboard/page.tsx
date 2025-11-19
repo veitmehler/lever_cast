@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
@@ -10,6 +10,9 @@ import { ApiKeyRequiredModal } from '@/components/ApiKeyRequiredModal'
 import { Loader2, Save, Send, Calendar } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+
+type PlatformKey = 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
+const PLATFORM_ORDER: PlatformKey[] = ['linkedin', 'facebook', 'instagram', 'twitter', 'threads', 'telegram']
 
 export default function DashboardPage() {
   const { user } = useUser()
@@ -34,7 +37,7 @@ export default function DashboardPage() {
       ? user.firstName.slice(0, 2).toUpperCase()
       : 'U'
 
-  const [actualSelectedPlatforms, setActualSelectedPlatforms] = useState<('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] | 'all'>([])
+  const [actualSelectedPlatforms, setActualSelectedPlatforms] = useState<PlatformKey[] | 'all'>([])
 
   const handleGenerate = async (
     content: string,
@@ -738,39 +741,92 @@ export default function DashboardPage() {
 
     setIsBulkPublishing(true)
     try {
-      const publishPromises: Promise<void>[] = []
-
-      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'all')) {
-        publishPromises.push(handlePublish('linkedin', generatedContent.linkedin))
+      const hasContentForPlatform = (platform: PlatformKey): boolean => {
+        switch (platform) {
+          case 'linkedin':
+            return !!generatedContent.linkedin
+          case 'facebook':
+            return !!generatedContent.facebook
+          case 'instagram':
+            return !!generatedContent.instagram
+          case 'telegram':
+            return !!generatedContent.telegram
+          case 'threads':
+            return !!generatedContent.threads
+          case 'twitter':
+            if (!generatedContent.twitter) return false
+            return Array.isArray(generatedContent.twitter)
+              ? generatedContent.twitter.length > 0
+              : generatedContent.twitter.trim().length > 0
+          default:
+            return false
+        }
       }
 
-      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'all')) {
-        publishPromises.push(handlePublish('facebook', generatedContent.facebook))
+      const normalizeSelectedPlatforms = (): PlatformKey[] => {
+        if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
+          return actualSelectedPlatforms
+        }
+        if (actualSelectedPlatforms === 'all') {
+          return PLATFORM_ORDER
+        }
+        if (selectedPlatform === 'all') {
+          return PLATFORM_ORDER
+        }
+        return selectedPlatform ? [selectedPlatform].filter((p): p is PlatformKey => p !== 'all') : []
       }
 
-      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'all')) {
-        publishPromises.push(handlePublish('instagram', generatedContent.instagram))
-      }
+      const requestedPlatforms = normalizeSelectedPlatforms()
+      const fallbackPlatforms = PLATFORM_ORDER.filter(hasContentForPlatform)
 
-      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'all')) {
-        publishPromises.push(handlePublish('telegram', generatedContent.telegram))
-      }
+      const platformsToPublish = (requestedPlatforms.length > 0 ? requestedPlatforms : fallbackPlatforms)
+        .filter((platform, index, arr) => arr.indexOf(platform) === index)
+        .filter(hasContentForPlatform)
 
-      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'all')) {
-        publishPromises.push(handlePublish('threads', generatedContent.threads))
-      }
-
-      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'all')) {
-        const twitterContent = Array.isArray(generatedContent.twitter) 
-          ? generatedContent.twitter 
-          : generatedContent.twitter
-        publishPromises.push(handlePublish('twitter', twitterContent))
-      }
-
-      if (publishPromises.length === 0) {
-        toast.error('No platforms selected to publish')
+      if (platformsToPublish.length === 0) {
+        toast.error('No platforms have generated content to publish')
         return
       }
+
+      const publishPromises: Promise<void>[] = []
+
+      platformsToPublish.forEach((platform) => {
+        switch (platform) {
+          case 'linkedin':
+            if (generatedContent.linkedin) {
+              publishPromises.push(handlePublish('linkedin', generatedContent.linkedin))
+            }
+            break
+          case 'facebook':
+            if (generatedContent.facebook) {
+              publishPromises.push(handlePublish('facebook', generatedContent.facebook))
+            }
+            break
+          case 'instagram':
+            if (generatedContent.instagram) {
+              publishPromises.push(handlePublish('instagram', generatedContent.instagram))
+            }
+            break
+          case 'telegram':
+            if (generatedContent.telegram) {
+              publishPromises.push(handlePublish('telegram', generatedContent.telegram))
+            }
+            break
+          case 'threads':
+            if (generatedContent.threads) {
+              publishPromises.push(handlePublish('threads', generatedContent.threads))
+            }
+            break
+          case 'twitter':
+            if (generatedContent.twitter) {
+              const twitterContent = Array.isArray(generatedContent.twitter) 
+                ? generatedContent.twitter 
+                : generatedContent.twitter
+              publishPromises.push(handlePublish('twitter', twitterContent))
+            }
+            break
+        }
+      })
 
       await Promise.all(publishPromises)
       toast.success('All posts published successfully!')

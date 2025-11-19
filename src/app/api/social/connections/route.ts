@@ -75,9 +75,14 @@ export async function GET() {
       })
 
       return NextResponse.json(connections)
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
+      interface PrismaError extends Error {
+        code?: string
+        message: string
+      }
+      const prismaError = dbError as PrismaError
       // If appType column doesn't exist yet (migration not applied), query without it
-      if (dbError.message?.includes('appType') || dbError.message?.includes('column') || dbError.code === 'P2001') {
+      if (prismaError.message?.includes('appType') || prismaError.message?.includes('column') || prismaError.code === 'P2001') {
         console.warn('[Social Connections API] appType column not found, querying without it (migration may not be applied yet)')
         const connections = await prisma.socialConnection.findMany({
           where: { userId: user.id },

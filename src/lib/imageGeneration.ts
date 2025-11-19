@@ -259,11 +259,18 @@ export async function generateWithFalAI(
 
     // Download the image
     return downloadImageFromUrl(imageUrl)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Fal.ai API] Error:', error)
     
+    interface FalError {
+      message?: string
+      detail?: string
+      error?: string
+    }
+
+    const falError = error as FalError
     // Extract error message
-    const errorMessage = error?.message || error?.detail || error?.error || String(error)
+    const errorMessage = falError?.message || falError?.detail || falError?.error || String(error)
     throw new Error(`Fal.ai API error: ${errorMessage}`)
   }
 }

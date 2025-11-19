@@ -47,9 +47,22 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
+    interface AnalyticsData {
+      impressions?: number
+      views?: number
+      likes?: number
+      retweets?: number
+      replies?: number
+      quoteTweets?: number
+      clicks?: number
+      comments?: number
+      shares?: number
+      [key: string]: unknown
+    }
+
     console.log(`[Sync Analytics] Syncing analytics for post ${post.id} (${post.platform})`)
 
-    let analytics: any = null
+    let analytics: AnalyticsData | null = null
 
     if (post.platform === 'twitter' && post.tweetId) {
       // Fetch Twitter analytics

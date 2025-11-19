@@ -109,6 +109,7 @@ export default function TemplatesPage() {
     fetchTemplates()
     // Update existing templates with new platform fields on mount
     updateTemplatesWithPlatforms()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleDelete = async (id: string) => {

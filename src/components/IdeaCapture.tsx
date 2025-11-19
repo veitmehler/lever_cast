@@ -13,10 +13,10 @@ interface SpeechRecognition extends EventTarget {
   start(): void
   stop(): void
   abort(): void
-  onstart: ((this: SpeechRecognition, ev: Event) => any) | null
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null
-  onend: ((this: SpeechRecognition, ev: Event) => any) | null
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null
 }
 
 interface SpeechRecognitionEvent extends Event {
@@ -204,10 +204,15 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
     fetchAvailablePlatforms()
     // Default to "none" - no template selected
     setSelectedTemplate('none')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     // Initialize Speech Recognition API
     if (typeof window !== 'undefined') {
-      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      interface WindowWithSpeechRecognition extends Window {
+        SpeechRecognition?: new () => SpeechRecognition
+        webkitSpeechRecognition?: new () => SpeechRecognition
+      }
+      const SpeechRecognitionConstructor = (window as WindowWithSpeechRecognition).SpeechRecognition || (window as WindowWithSpeechRecognition).webkitSpeechRecognition
       
       if (SpeechRecognitionConstructor) {
         const recognition = new SpeechRecognitionConstructor() as SpeechRecognition
@@ -289,7 +294,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
-        } catch (e) {
+        } catch {
           // Ignore errors during cleanup
         }
       }

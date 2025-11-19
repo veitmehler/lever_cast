@@ -6,7 +6,6 @@
 
 import { getSocialConnection } from './socialConnections'
 import { downloadImageFromStorage } from './supabase'
-import { prisma } from './prisma'
 import { decrypt } from './encryption'
 
 // Threads API uses its own domain: graph.threads.net (not graph.facebook.com)
@@ -100,12 +99,9 @@ async function createThreadsContainer(
     
     // If image provided, download and upload it
     if (imageUrl) {
-      console.log('[Threads API] Downloading image from storage')
-      const imageBuffer = await downloadImageFromStorage(imageUrl)
-      
-      // Upload image to a temporary location or use image_url directly
-      // Threads API accepts image_url parameter
-      // For now, we'll use the Supabase Storage URL directly
+      console.log('[Threads API] Using image URL from storage')
+      // Threads API accepts image_url parameter directly
+      // We use the Supabase Storage URL directly
       containerData.media_type = 'IMAGE'
       containerData.image_url = imageUrl // Threads API accepts direct image URLs
     } else {
@@ -124,11 +120,20 @@ async function createThreadsContainer(
       }
     )
 
+    interface ThreadsError {
+      error?: {
+        message?: string
+        code?: number
+      }
+      message?: string
+      [key: string]: unknown
+    }
+
     if (!containerResponse.ok) {
       const errorText = await containerResponse.text()
-      let error: any
+      let error: ThreadsError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as ThreadsError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }
@@ -210,11 +215,20 @@ export async function postToThreads(
       }
     )
 
+    interface ThreadsPublishError {
+      error?: {
+        message?: string
+        code?: number
+      }
+      message?: string
+      [key: string]: unknown
+    }
+
     if (!postResponse.ok) {
       const errorText = await postResponse.text()
-      let error: any
+      let error: ThreadsPublishError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as ThreadsPublishError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }

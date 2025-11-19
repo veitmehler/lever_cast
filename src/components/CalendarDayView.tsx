@@ -2,7 +2,6 @@
 
 import { FileText } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 
 type Post = {
   id: string
@@ -19,12 +18,15 @@ type Post = {
 }
 
 interface CalendarDayViewProps {
+  // date and onPostClick are reserved for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   date: Date
   posts: Post[]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onPostClick?: (post: Post) => void
 }
 
-export function CalendarDayView({ date, posts, onPostClick }: CalendarDayViewProps) {
+export function CalendarDayView({ posts }: CalendarDayViewProps) {
   const publishedPosts = posts.filter(p => p.status === 'published')
   const scheduledPosts = posts.filter(p => p.status === 'scheduled')
 

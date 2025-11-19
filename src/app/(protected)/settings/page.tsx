@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
@@ -70,7 +70,10 @@ export default function SettingsPage() {
   const [showImageApiKeys, setShowImageApiKeys] = useState<Record<string, boolean>>({})
   const [availablePages, setAvailablePages] = useState<Record<string, SocialPage[]>>({})
   const [isLoadingPages, setIsLoadingPages] = useState<Record<string, boolean>>({})
+  const [rateLimitUntil, setRateLimitUntil] = useState<Record<string, number | null>>({})
   const [postTargetTypes, setPostTargetTypes] = useState<Record<string, 'personal' | 'page'>>({})
+  // Track which platforms have already had their pages fetched to prevent duplicate calls
+  const pagesFetchedRef = useRef<Set<string>>(new Set())
   const [selectedPageIds, setSelectedPageIds] = useState<Record<string, string>>({})
   const [isRefreshingUsername, setIsRefreshingUsername] = useState<Record<string, boolean>>({})
 
@@ -125,7 +128,7 @@ export default function SettingsPage() {
             try {
               const models = JSON.parse(settings.defaultModel)
               setSelectedModels(prev => ({ ...prev, ...models }))
-            } catch (e) {
+            } catch {
               // If not JSON, ignore
             }
           }
@@ -138,7 +141,7 @@ export default function SettingsPage() {
             try {
               const models = JSON.parse(settings.defaultImageModel)
               setSelectedImageModels(prev => ({ ...prev, ...models }))
-            } catch (e) {
+            } catch {
               // If not JSON, ignore
             }
           }
@@ -200,6 +203,7 @@ export default function SettingsPage() {
     }
 
     fetchSettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Function to fetch image models for a provider
@@ -419,31 +423,135 @@ export default function SettingsPage() {
     }
   }
 
+  // Track loading state with ref to avoid dependency issues
+  const isLoadingPagesRef = useRef<Set<string>>(new Set())
+  // Store pages in ref so we can access latest value without dependency issues
+  const availablePagesRef = useRef<Record<string, SocialPage[]>>({})
+  // Track rate limit cooldowns (platform -> timestamp when we can retry)
+  const rateLimitCooldownRef = useRef<Record<string, number>>({})
+  
+  // Update ref whenever state changes
+  useEffect(() => {
+    availablePagesRef.current = availablePages
+  }, [availablePages])
+  
   // Fetch pages for a platform
-  const fetchPages = async (platform: string): Promise<SocialPage[]> => {
+  // Using useCallback with empty deps and refs to break dependency cycle
+  const fetchPages = useCallback(async (platform: string, forceRefresh = false): Promise<SocialPage[]> => {
     if (platform !== 'linkedin' && platform !== 'facebook') return []
     
+    // Prevent duplicate calls: if already loading (unless force refresh)
+    if (!forceRefresh && isLoadingPagesRef.current.has(platform)) {
+      // Return current pages from ref (always up-to-date)
+      return availablePagesRef.current[platform] || []
+    }
+    
+    // Check rate limit cooldown
+    const cooldownEnd = rateLimitCooldownRef.current[platform]
+    if (!forceRefresh && cooldownEnd && Date.now() < cooldownEnd) {
+      console.log(`[Settings] Rate limit cooldown active for ${platform}, skipping fetch`)
+      return availablePagesRef.current[platform] || []
+    }
+    
+    // Only skip if already fetched AND we have pages (not if fetch failed)
+    if (!forceRefresh && pagesFetchedRef.current.has(platform)) {
+      const cachedPages = availablePagesRef.current[platform] || []
+      // If we have cached pages, return them
+      if (cachedPages.length > 0) {
+        return cachedPages
+      }
+      // If cached pages are empty but not due to rate limit, allow retry
+      // (Rate limit cooldown check above will prevent immediate retry)
+    }
+    
     try {
+      isLoadingPagesRef.current.add(platform)
       setIsLoadingPages(prev => ({ ...prev, [platform]: true }))
       const response = await fetch(`/api/social/${platform}/pages`)
       if (response.ok) {
-        const data = await response.json()
+        const data = await response.json() as { pages: SocialPage[]; rateLimit?: boolean }
         const pages = data.pages || []
+        
+        // If rate limit, set cooldown (5 minutes)
+        if (data.rateLimit) {
+          console.warn(`[Settings] Rate limit detected for ${platform}, setting 5-minute cooldown`)
+          const cooldownEndTime = Date.now() + 5 * 60 * 1000 // 5 minutes
+          rateLimitCooldownRef.current[platform] = cooldownEndTime
+          setRateLimitUntil(prev => ({ ...prev, [platform]: cooldownEndTime }))
+          // Still mark as fetched to prevent immediate retries
+          pagesFetchedRef.current.add(platform)
+        } else {
+          // Clear cooldown if we got a successful response
+          delete rateLimitCooldownRef.current[platform]
+          setRateLimitUntil(prev => {
+            if (!prev[platform]) return prev
+            const { [platform]: _removed, ...rest } = prev
+            return rest
+          })
+          // Mark as fetched if API call succeeded (even if pages array is empty)
+          pagesFetchedRef.current.add(platform)
+        }
+        
         setAvailablePages(prev => ({ ...prev, [platform]: pages }))
+        // Update ref immediately
+        availablePagesRef.current[platform] = pages
         return pages
       } else {
-        console.error(`Failed to fetch ${platform} pages:`, response.status)
+        let errorData: { error?: string; rateLimit?: boolean; retryAfterMs?: number } | null = null
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = null
+        }
+
+        const isRateLimitError = response.status === 429 || errorData?.rateLimit
+        const retryAfterMs = errorData?.retryAfterMs || 5 * 60 * 1000
+
+        if (isRateLimitError) {
+          console.warn(`[Settings] ${platform} pages rate limited. Pausing new requests for ${(retryAfterMs / 60000).toFixed(1)} minutes.`)
+          const cooldownEndTime = Date.now() + retryAfterMs
+          rateLimitCooldownRef.current[platform] = cooldownEndTime
+          setRateLimitUntil(prev => ({ ...prev, [platform]: cooldownEndTime }))
+          pagesFetchedRef.current.add(platform) // Prevent immediate retries
+          toast.warning('Facebook API rate limit reached. Please wait a few minutes before trying again.', {
+            duration: 12000,
+          })
+        } else {
+          // Ensure cooldown cleared so future retries are allowed
+          delete rateLimitCooldownRef.current[platform]
+          setRateLimitUntil(prev => {
+            if (!prev[platform]) return prev
+            const { [platform]: _removed, ...rest } = prev
+            return rest
+          })
+          pagesFetchedRef.current.delete(platform)
+          const errorMessage = errorData?.error || `Failed to fetch ${platform} pages (${response.status})`
+          toast.error(errorMessage)
+        }
+
         setAvailablePages(prev => ({ ...prev, [platform]: [] }))
+        availablePagesRef.current[platform] = []
         return []
       }
     } catch (error) {
       console.error(`Error fetching ${platform} pages:`, error)
       setAvailablePages(prev => ({ ...prev, [platform]: [] }))
+      availablePagesRef.current[platform] = []
+      delete rateLimitCooldownRef.current[platform]
+      setRateLimitUntil(prev => {
+        if (!prev[platform]) return prev
+        const { [platform]: _removed, ...rest } = prev
+        return rest
+      })
+      // Don't mark as fetched if there was an error, so we can retry
+      pagesFetchedRef.current.delete(platform)
       return []
     } finally {
+      isLoadingPagesRef.current.delete(platform)
       setIsLoadingPages(prev => ({ ...prev, [platform]: false }))
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - use refs to access latest state without causing re-renders
 
   // Update post target settings
   const updatePostTargetSettings = async (platform: string, postTargetType: 'personal' | 'page', selectedPageId?: string) => {
@@ -479,7 +587,8 @@ export default function SettingsPage() {
   }
 
   // Fetch social connections on mount
-  const fetchConnections = async () => {
+  // Using useCallback with empty deps - fetchPages is stable (empty deps), so we can call it directly
+  const fetchConnections = useCallback(async () => {
     try {
       setIsLoadingConnections(true)
       const response = await fetch('/api/social/connections')
@@ -496,9 +605,12 @@ export default function SettingsPage() {
             if (conn.selectedPageId) {
               pageIds[conn.platform] = conn.selectedPageId
             }
-            // Fetch pages if connected
+            // Fetch pages if connected - fetchPages has internal guards to prevent duplicates
             if (conn.platform === 'linkedin' || conn.platform === 'facebook') {
-              fetchPages(conn.platform)
+              // Call fetchPages directly - it's stable (empty deps) and has internal deduplication
+              fetchPages(conn.platform, false).catch(err => {
+                console.error(`Error fetching pages for ${conn.platform}:`, err)
+              })
             }
           }
         })
@@ -510,7 +622,8 @@ export default function SettingsPage() {
     } finally {
       setIsLoadingConnections(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - fetchPages is stable (empty deps), so we can call it directly without dependency
 
   // Check for OAuth callback messages in URL
   useEffect(() => {
@@ -584,7 +697,8 @@ export default function SettingsPage() {
   // Fetch social connections on mount
   useEffect(() => {
     fetchConnections()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - fetchConnections is stable (empty deps), so it won't change
 
   const toggleApiKeyVisibility = (provider: string) => {
     setShowApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
@@ -1400,6 +1514,9 @@ export default function SettingsPage() {
                 const currentSelectedPageId = selectedPageIds[platform] || connection?.selectedPageId || ''
                 const pages = availablePages[platform] || []
                 const isLoadingPagesForPlatform = isLoadingPages[platform] || false
+                const rateLimitEndTime = rateLimitUntil[platform] || null
+                const rateLimitRemainingMs = rateLimitEndTime ? Math.max(rateLimitEndTime - Date.now(), 0) : 0
+                const rateLimitActive = rateLimitRemainingMs > 0
 
                 return (
                   <div key={platform} className="space-y-3">
@@ -1565,11 +1682,11 @@ export default function SettingsPage() {
                             onClick={async () => {
                               setPostTargetTypes(prev => ({ ...prev, [platform]: 'page' }))
                               
-                              // Fetch pages if not already loaded
+                              // Fetch pages if not already loaded (force refresh if user explicitly clicks)
                               let pagesToUse = pages
                               if (!isLoadingPagesForPlatform && pages.length === 0) {
                                 console.log(`[Settings] Fetching pages for ${platform}...`)
-                                pagesToUse = await fetchPages(platform)
+                                pagesToUse = await fetchPages(platform, true) // Force refresh when user clicks
                               }
                               
                               // Auto-select first page if pages are available and none selected
@@ -1596,17 +1713,46 @@ export default function SettingsPage() {
                                 Loading pages...
                               </div>
                             ) : pages.length === 0 ? (
-                              <div className="text-sm text-muted-foreground space-y-1">
+                              <div className="text-sm text-muted-foreground space-y-2">
                                 <div>No pages found.</div>
                                 {platform === 'linkedin' ? (
                                   <div className="text-xs">
                                     LinkedIn Company Pages require the &quot;Community Management API&quot; product approval (MDP was deprecated April 2024). This requires a separate LinkedIn app. You can still post to your personal profile.
                                   </div>
                                 ) : (
-                                  <div className="text-xs">
-                                    Make sure you have admin access to at least one Facebook Page.
+                                  <div className="text-xs space-y-1">
+                                    <div>Make sure you have admin access to at least one Facebook Page.</div>
+                                    {currentSelectedPageId && (
+                                      <div className="text-card-foreground">
+                                        Saved Page ID: <code>{currentSelectedPageId}</code> (stored in the database and still used for publishing).
+                                      </div>
+                                    )}
+                                    {rateLimitActive && (
+                                      <div className="text-amber-600">
+                                        Facebook API rate limit is active. Retry in approximately {Math.max(1, Math.ceil(rateLimitRemainingMs / 60000))} minute(s), or click &quot;Retry page fetch&quot; below once it clears.
+                                      </div>
+                                    )}
                                   </div>
                                 )}
+                                <div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isLoadingPagesForPlatform}
+                                    onClick={async () => {
+                                      await fetchPages(platform, true)
+                                    }}
+                                  >
+                                    {isLoadingPagesForPlatform ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                        Retrying...
+                                      </>
+                                    ) : (
+                                      'Retry page fetch'
+                                    )}
+                                  </Button>
+                                </div>
                               </div>
                             ) : (
                               <select

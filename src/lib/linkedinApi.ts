@@ -112,11 +112,17 @@ export async function uploadImageToLinkedIn(
       }
     )
 
+    interface LinkedInError {
+      message?: string
+      serviceErrorCode?: number
+      [key: string]: unknown
+    }
+
     if (!registerResponse.ok) {
       const errorText = await registerResponse.text()
-      let error: any
+      let error: LinkedInError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as LinkedInError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }
@@ -264,11 +270,9 @@ export async function postToLinkedIn(
     
     // Try to get company connection first (for Company Pages)
     let connection = await getSocialConnection(userId, 'linkedin', 'company')
-    let isCompanyPost = false
     
     if (connection && connection.postTargetType === 'page' && connection.selectedPageId) {
       // Using company connection for Company Page post
-      isCompanyPost = true
     } else {
       // Try personal connection
       connection = await getSocialConnection(userId, 'linkedin', 'personal')
@@ -284,8 +288,8 @@ export async function postToLinkedIn(
     }
     
     // Determine if this is a company post based on connection and settings
-    isCompanyPost = connection.postTargetType === 'page' && 
-                    connection.selectedPageId !== null &&
+    const isCompanyPost = connection.postTargetType === 'page' && 
+                          connection.selectedPageId !== null &&
                     connection.appType === 'company'
 
     // Check if token needs refresh
@@ -451,11 +455,17 @@ export async function postToLinkedIn(
       body: JSON.stringify(postData),
     })
 
+    interface LinkedInPostError {
+      message?: string
+      serviceErrorCode?: number
+      [key: string]: unknown
+    }
+
     if (!postResponse.ok) {
       const errorText = await postResponse.text()
-      let error: any
+      let error: LinkedInPostError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as LinkedInPostError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }
@@ -613,11 +623,17 @@ export async function getLinkedInAnalytics(
       }
     )
 
+    interface LinkedInAnalyticsError {
+      message?: string
+      serviceErrorCode?: number
+      [key: string]: unknown
+    }
+
     if (!response.ok) {
       const errorText = await response.text()
-      let errorData: any = {}
+      let errorData: LinkedInAnalyticsError = {}
       try {
-        errorData = JSON.parse(errorText)
+        errorData = JSON.parse(errorText) as LinkedInAnalyticsError
       } catch {
         errorData = { message: errorText }
       }

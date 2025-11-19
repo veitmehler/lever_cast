@@ -3,7 +3,10 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
 import OpenAI from 'openai'
+// Anthropic and GoogleGenerativeAI are reserved for future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Anthropic from '@anthropic-ai/sdk'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Helper function to get or create user

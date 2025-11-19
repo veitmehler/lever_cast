@@ -5,7 +5,6 @@
 
 import { getSocialConnection } from './socialConnections'
 import { downloadImageFromStorage } from './supabase'
-import { prisma } from './prisma'
 import { decrypt } from './encryption'
 
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v24.0'
@@ -89,11 +88,20 @@ async function getFacebookPages(userId: string): Promise<FacebookPage[]> {
     `${FACEBOOK_API_BASE}/me/accounts?access_token=${accessToken}&fields=id,name,access_token`
   )
 
+  interface FacebookError {
+    error?: {
+      message?: string
+      code?: number
+    }
+    message?: string
+    [key: string]: unknown
+  }
+
   if (!pagesResponse.ok) {
     const errorText = await pagesResponse.text()
-    let errorData: any
+    let errorData: FacebookError
     try {
-      errorData = JSON.parse(errorText)
+      errorData = JSON.parse(errorText) as FacebookError
     } catch {
       errorData = { error: { message: errorText } }
     }
@@ -267,11 +275,20 @@ export async function postToFacebook(
       }
     )
 
+    interface FacebookPostError {
+      error?: {
+        message?: string
+        code?: number
+      }
+      message?: string
+      [key: string]: unknown
+    }
+
     if (!postResponse.ok) {
       const errorText = await postResponse.text()
-      let error: any
+      let error: FacebookPostError
       try {
-        error = JSON.parse(errorText)
+        error = JSON.parse(errorText) as FacebookPostError
       } catch {
         error = { message: errorText || 'Unknown error' }
       }

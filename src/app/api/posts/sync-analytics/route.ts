@@ -84,9 +84,22 @@ export async function GET(request: Request) {
     // Process each post
     for (const post of postsToSync) {
       try {
+        interface AnalyticsData {
+          impressions?: number
+          views?: number
+          likes?: number
+          retweets?: number
+          replies?: number
+          quoteTweets?: number
+          clicks?: number
+          comments?: number
+          shares?: number
+          [key: string]: unknown
+        }
+
         console.log(`[Sync Analytics] Syncing analytics for post ${post.id} (${post.platform})`)
         
-        let analytics: any = null
+        let analytics: AnalyticsData | null = null
 
         if (post.platform === 'twitter' && post.tweetId) {
           // Fetch Twitter analytics

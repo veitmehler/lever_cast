@@ -145,7 +145,7 @@ export async function refreshInstagramUsername(connectionId: string): Promise<st
     if (connection.refreshToken) {
       try {
         userToken = decrypt(connection.refreshToken)
-      } catch (err) {
+      } catch {
         console.warn('[Instagram Username Refresh] Could not decrypt user token from refreshToken field')
       }
     }

@@ -61,11 +61,24 @@ export async function GET(
       } else {
         connection = await getSocialConnection(user.id, platform)
       }
-    } catch (error: any) {
-      console.error(`[Pages API] Error fetching ${platform} connection:`, error)
+    } catch (error: unknown) {
+      interface PrismaError extends Error {
+        code?: string
+        message: string
+      }
+
+      interface SocialConnectionWithAppType {
+        appType: string | null
+        accessToken: string
+        refreshToken: string | null
+        [key: string]: unknown
+      }
+
+      const prismaError = error as PrismaError
+      console.error(`[Pages API] Error fetching ${platform} connection:`, prismaError)
       // If it's a constraint error, try without appType filtering
-      if (error.message?.includes('userId_platform_appType') || 
-          error.message?.includes('Unknown argument')) {
+      if (prismaError.message?.includes('userId_platform_appType') || 
+          prismaError.message?.includes('Unknown argument')) {
         // Fallback: try to get any connection for this platform
         const connections = await prisma.socialConnection.findMany({
           where: {
@@ -79,10 +92,10 @@ export async function GET(
           const conn = connections[0]
           connection = {
             ...conn,
-            appType: platform === 'linkedin' ? ((conn as any).appType || 'personal') : null,
+            appType: platform === 'linkedin' ? ((conn as SocialConnectionWithAppType).appType || 'personal') : null,
             accessToken: decrypt(conn.accessToken),
             refreshToken: conn.refreshToken ? decrypt(conn.refreshToken) : null,
-          } as any
+          } as SocialConnectionWithAppType & { accessToken: string; refreshToken: string | null }
         }
       } else {
         throw error
@@ -149,11 +162,17 @@ export async function GET(
         }
       )
 
+      interface LinkedInError {
+        code?: string
+        message?: string
+        [key: string]: unknown
+      }
+
       if (!orgsResponse.ok) {
         const errorText = await orgsResponse.text()
-        let errorData: any = {}
+        let errorData: LinkedInError = {}
         try {
-          errorData = JSON.parse(errorText)
+          errorData = JSON.parse(errorText) as LinkedInError
         } catch {
           errorData = { message: errorText }
         }
@@ -194,8 +213,20 @@ export async function GET(
         )
       }
 
-      const orgsData = await orgsResponse.json()
-      const pages = (orgsData.elements || []).map((element: any) => {
+      interface LinkedInOrgElement {
+        organizationalTarget: {
+          id: string
+          name?: string
+          vanityName?: string
+        }
+      }
+
+      interface LinkedInOrgsResponse {
+        elements?: LinkedInOrgElement[]
+      }
+
+      const orgsData = await orgsResponse.json() as LinkedInOrgsResponse
+      const pages = (orgsData.elements || []).map((element: LinkedInOrgElement) => {
         // LinkedIn API returns organizationalTarget (not organization) per API docs
         const org = element.organizationalTarget
         return {
@@ -215,11 +246,20 @@ export async function GET(
         `${FACEBOOK_API_BASE}/me/accounts?access_token=${accessToken}&fields=id,name,access_token`
       )
 
+      interface FacebookError {
+        error?: {
+          message?: string
+          code?: number
+        }
+        message?: string
+        [key: string]: unknown
+      }
+
       if (!pagesResponse.ok) {
         const errorText = await pagesResponse.text()
-        let errorData: any = {}
+        let errorData: FacebookError = {}
         try {
-          errorData = JSON.parse(errorText)
+          errorData = JSON.parse(errorText) as FacebookError
         } catch {
           errorData = { message: errorText }
         }
@@ -234,12 +274,35 @@ export async function GET(
         // Log the full error for debugging
         console.error('[Facebook Pages API] Full error response:', errorText)
         
-        // If permission denied or token invalid, return empty array instead of error
-        // This allows the UI to still work even if user doesn't have pages
+        // Check if this is a rate limit error (code 4, is_transient: true)
+        const isRateLimit = errorData.error?.code === 4 && 
+                           (errorData.error as { is_transient?: boolean }).is_transient === true
+        
+        // If permission denied, token invalid, or rate limited, bubble the error up to the client
         if (pagesResponse.status === 400 || pagesResponse.status === 401 || pagesResponse.status === 403) {
-          console.warn('[Facebook Pages API] Permission issue or no pages available, returning empty array')
-          console.warn('[Facebook Pages API] Error details:', errorData)
-          return NextResponse.json({ pages: [] })
+          const errorMessage = errorData.error?.message || errorData.message || pagesResponse.statusText
+          
+          if (isRateLimit) {
+            console.warn('[Facebook Pages API] Rate limit reached, returning error to client')
+            return NextResponse.json(
+              {
+                error: 'Facebook API rate limit reached. Please wait a few minutes and try again.',
+                rateLimit: true,
+                retryAfterMs: 5 * 60 * 1000,
+                details: errorMessage,
+              },
+              { status: 429 }
+            )
+          }
+
+          console.warn('[Facebook Pages API] Permission issue or no pages available:', errorMessage)
+          return NextResponse.json(
+            {
+              error: errorMessage || 'Facebook API permissions issue. Please reconnect your Facebook account.',
+              code: errorData.error?.code,
+            },
+            { status: pagesResponse.status }
+          )
         }
         
         return NextResponse.json(
@@ -254,10 +317,34 @@ export async function GET(
       // Handle case where API returns an error object instead of data array
       if (pagesData.error) {
         console.error('[Facebook Pages API] API returned error:', pagesData.error)
-        return NextResponse.json({ pages: [] })
+        const isRateLimit = pagesData.error.code === 4 && pagesData.error.is_transient === true
+        if (isRateLimit) {
+          return NextResponse.json(
+            {
+              error: 'Facebook API rate limit reached. Please wait a few minutes and try again.',
+              rateLimit: true,
+              retryAfterMs: 5 * 60 * 1000,
+              details: pagesData.error.message,
+            },
+            { status: 429 }
+          )
+        }
+        return NextResponse.json(
+          {
+            error: pagesData.error.message || 'Failed to fetch Facebook pages.',
+            code: pagesData.error.code,
+          },
+          { status: 400 }
+        )
       }
       
-      const pages = (pagesData.data || []).map((page: any) => ({
+      interface FacebookPage {
+        id: string
+        name: string
+        access_token?: string
+      }
+
+      const pages = (pagesData.data || []).map((page: FacebookPage) => ({
         id: page.id,
         name: page.name,
         access_token: page.access_token, // Page access token needed for posting

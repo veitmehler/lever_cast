@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import { encrypt, decrypt } from '@/lib/encryption'
 import { generateOAuthState } from '@/lib/oauth'
 import { createHash } from 'crypto'
 
@@ -16,38 +15,37 @@ type OAuthStateCookieData = {
 
 // OAuth configuration
 const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID
-const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET
+// LINKEDIN_CLIENT_SECRET is used in callback route
 const LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
 
 // LinkedIn Company Pages App (separate app for Community Management API)
 const LINKEDIN_COMPANY_CLIENT_ID = process.env.LINKEDIN_COMPANY_CLIENT_ID
-const LINKEDIN_COMPANY_CLIENT_SECRET = process.env.LINKEDIN_COMPANY_CLIENT_SECRET
+// LINKEDIN_COMPANY_CLIENT_SECRET is used in callback route
 // Note: Company callback uses same path as personal (target is stored in OAuth state, not query param)
 // LinkedIn doesn't preserve query parameters in callback URLs, so we use OAuth state to track target
 const LINKEDIN_COMPANY_REDIRECT_URI = process.env.LINKEDIN_COMPANY_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/linkedin/callback`
 
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID
-const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET
+// TWITTER_CLIENT_SECRET is used in callback route
 const TWITTER_REDIRECT_URI = process.env.TWITTER_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/twitter/callback`
 
 const FACEBOOK_CLIENT_ID = process.env.FACEBOOK_CLIENT_ID
-const FACEBOOK_CLIENT_SECRET = process.env.FACEBOOK_CLIENT_SECRET
+// FACEBOOK_CLIENT_SECRET is used in callback route
 const FACEBOOK_REDIRECT_URI = process.env.FACEBOOK_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/facebook/callback`
 
 const INSTAGRAM_CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID // Instagram uses Facebook OAuth
-const INSTAGRAM_CLIENT_SECRET = process.env.INSTAGRAM_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET
+// INSTAGRAM_CLIENT_SECRET is used in callback route
 const INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/instagram/callback`
 
 // Threads requires its own Client ID and Secret (separate from Facebook)
 // Threads OAuth uses threads.net domain and requires a Threads-specific app
 // IMPORTANT: Threads OAuth REQUIRES HTTPS - cannot use HTTP even for localhost
-const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID
-const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET
+// THREADS_CLIENT_ID and THREADS_CLIENT_SECRET are used in callback route
 // For local development, you must use an HTTPS URL (e.g., ngrok: https://your-domain.ngrok.io)
 // Or set THREADS_REDIRECT_URI environment variable with your HTTPS URL
 const getThreadsRedirectUri = () => {
@@ -419,11 +417,16 @@ export async function DELETE(
         )
       }
     } else {
+      interface PrismaError extends Error {
+        code?: string
+        message: string
+      }
+
       // For other platforms, delete the single connection (appType is null)
       // Handle case where unique constraint doesn't exist yet (before migration)
       let connection = null
       try {
-        connection = await (prisma.socialConnection.findUnique as any)({
+        connection = await prisma.socialConnection.findUnique({
           where: {
             userId_platform_appType: {
               userId: user.id,
@@ -432,11 +435,12 @@ export async function DELETE(
             },
           },
         })
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const prismaError = error as PrismaError
         // If unique constraint doesn't exist yet, use findFirst
-        if (error.message?.includes('userId_platform_appType') || 
-            error.message?.includes('Unknown argument') ||
-            error.code === 'P2009') {
+        if (prismaError.message?.includes('userId_platform_appType') || 
+            prismaError.message?.includes('Unknown argument') ||
+            prismaError.code === 'P2009') {
           connection = await prisma.socialConnection.findFirst({
             where: {
               userId: user.id,

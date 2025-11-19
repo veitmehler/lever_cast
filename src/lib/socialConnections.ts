@@ -37,9 +37,19 @@ export async function getSocialConnection(
   // Fall back to findFirst if the constraint doesn't exist yet (before migration)
   let connection = null
   
+  interface PrismaError extends Error {
+    code?: string
+    message: string
+  }
+
+  interface SocialConnectionWithAppType {
+    appType?: string | null
+    [key: string]: unknown
+  }
+
   try {
     // Try using the new unique constraint (works after migration)
-    connection = await (prisma.socialConnection.findUnique as any)({
+    connection = await prisma.socialConnection.findUnique({
       where: {
         userId_platform_appType: {
           userId,
@@ -48,16 +58,17 @@ export async function getSocialConnection(
         },
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const prismaError = error as PrismaError
     // If the unique constraint doesn't exist yet (migration not applied), use findFirst
-    if (error.message?.includes('userId_platform_appType') || 
-        error.message?.includes('Unknown argument') ||
-        error.code === 'P2009') {
+    if (prismaError.message?.includes('userId_platform_appType') || 
+        prismaError.message?.includes('Unknown argument') ||
+        prismaError.code === 'P2009') {
       console.warn(`[getSocialConnection] Unique constraint not found, using findFirst (migration may not be applied yet)`)
       
       // Build where clause - don't include appType since column doesn't exist yet
       // After migration, appType will be handled by the unique constraint above
-      const whereClause: any = {
+      const whereClause = {
         userId,
         platform,
         isActive: true,
@@ -85,7 +96,7 @@ export async function getSocialConnection(
   // Get appType from connection if it exists, otherwise default based on platform
   let finalAppType: 'personal' | 'company' | null = null
   if (platform === 'linkedin') {
-    finalAppType = (connection as any).appType || connectionAppType || 'personal'
+    finalAppType = (connection as SocialConnectionWithAppType).appType as 'personal' | 'company' | null || connectionAppType || 'personal'
   }
 
   return {

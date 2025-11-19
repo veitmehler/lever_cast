@@ -57,6 +57,13 @@ export async function GET(request: Request) {
       }))
     )
     
+    // Debug: Check for posts by platform (any status)
+    const postsByPlatformDebug = allPastScheduled.reduce((acc, post) => {
+      acc[post.platform] = (acc[post.platform] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    console.log(`[Publish Scheduled] Debug: Posts by platform (any status):`, postsByPlatformDebug)
+    
     // Also check specifically for summary posts
     const summaryPosts = await prisma.post.findMany({
       where: {
@@ -153,6 +160,13 @@ export async function GET(request: Request) {
       parentPostId: p.parentPostId,
       scheduledAt: p.scheduledAt?.toISOString(),
     })))
+    
+    // Debug: Group by platform to see what we have
+    const postsByPlatform = scheduledPosts.reduce((acc, post) => {
+      acc[post.platform] = (acc[post.platform] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    console.log(`[Publish Scheduled] Posts by platform:`, postsByPlatform)
     if (scheduledPosts.length === 0) {
       return NextResponse.json({ 
         message: 'No scheduled posts due for publishing',
@@ -215,8 +229,15 @@ export async function GET(request: Request) {
           }
         }
 
-        // Get imageUrl from draft if available
-        const imageUrl = post.draft?.attachedImage || null
+        // Get imageUrl from post first (stored when scheduling), then fallback to draft
+        // Instagram requires imageUrl to be stored on the post itself, not just in the draft
+        const imageUrl = post.imageUrl || post.draft?.attachedImage || null
+        
+        console.log(`[Publish Scheduled] Post ${post.id} (${post.platform}) imageUrl:`, {
+          fromPost: post.imageUrl || 'none',
+          fromDraft: post.draft?.attachedImage || 'none',
+          final: imageUrl || 'none',
+        })
 
         // Publish to platform using real APIs
         let publishResult: { success: boolean; message: string; postUrl?: string; tweetId?: string; error?: string }

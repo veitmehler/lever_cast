@@ -312,10 +312,24 @@ public_profile,business_management,pages_show_list,pages_manage_posts,pages_read
 
 ### App Setup Requirements
 
-1. **Meta App Dashboard**
+1. **Meta App Dashboard - Use Case Setup**
+   
+   **Recommended Setup Order:**
+   
    - Create app at https://developers.facebook.com/apps/
-   - Add **"Manage everything on your Page"** use case
-   - Customize use case to include required permissions
+   - **Option 1:** Start with **"Access to Threads API"** Use Case (if you need Threads)
+     - Then add **"Manage messaging and content on Instagram"** Use Case
+     - Then add **"Manage everything on your Page"** Use Case
+   - **Option 2:** Start with **"Manage everything on your Page"** Use Case (if you only need Facebook Pages)
+     - Then add **"Manage messaging and content on Instagram"** Use Case (if you need Instagram)
+     - Then add **"Access to Threads API"** Use Case (if you need Threads)
+   
+   **Customizing Use Cases:**
+   - Go to each Use Case → **Customize**
+   - Add required permissions using the search bar or "Add permission or feature" button
+   - **Important:** Some permissions may require making an API call first to "discover" them
+     - If a permission doesn't appear in the list, try making an API call with that permission
+     - This will trigger Meta to show the permission in the use case customization
    - Set redirect URL: `{YOUR_DOMAIN}/api/social/facebook/callback`
    - Add app domain (Settings → Basic)
 
@@ -381,16 +395,16 @@ Instagram uses Meta Graph API v24.0 (same as Facebook). Instagram Business Accou
 ### Required Scopes
 
 ```
-pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management
+pages_show_list,pages_read_engagement,instagram_content_publish,instagram_basic,business_management
 ```
 
 - **`pages_show_list`**: List Facebook Pages linked to Instagram accounts
 - **`pages_read_engagement`**: Read engagement metrics
-- **`instagram_basic`**: **Required dependency** for `instagram_content_publish` (per Facebook docs)
-- **`instagram_content_publish`**: Publish content to Instagram (requires Advanced Access)
+- **`instagram_content_publish`**: Publish content to Instagram (requires Advanced Access) - **Instagram Graph API**
+- **`instagram_basic`**: Read profile metadata of Business accounts - **Instagram Graph API**
 - **`business_management`**: Manage business accounts
 
-**Important:** `instagram_basic` is **NOT deprecated** - it's a required dependency for `instagram_content_publish`.
+**Important:** `instagram_basic` is part of the **Instagram Graph API** and is designed to read profile metadata of Business accounts. It is **compatible** with `instagram_content_publish` and both can be requested together. The deprecated Basic Display API uses `user_profile` and `user_media` scopes, which are different.
 
 ### OAuth Flow
 
@@ -408,13 +422,25 @@ pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,
 
 ### App Setup Requirements
 
-1. **Meta App Dashboard**
+1. **Meta App Dashboard - Use Case Setup**
+   
+   **Recommended Setup Order:**
+   
    - Create app at https://developers.facebook.com/apps/
-   - Add **"Manage everything on your Page"** use case
-   - Customize use case to add Instagram permissions:
-     - `instagram_basic`
-     - `instagram_content_publish`
-     - `pages_read_user_content` (implicit dependency for "Content" task)
+   - **Option 1:** Start with **"Access to Threads API"** Use Case (if you need Threads)
+     - Then add **"Manage messaging and content on Instagram"** Use Case
+     - Then add **"Manage everything on your Page"** Use Case
+   - **Option 2:** Start with **"Manage messaging and content on Instagram"** Use Case (if you only need Instagram)
+     - Then add **"Manage everything on your Page"** Use Case (if you need Facebook Pages)
+     - Then add **"Access to Threads API"** Use Case (if you need Threads)
+   
+   **Customizing Use Cases:**
+   - Go to each Use Case → **Customize**
+   - Add required permissions using the search bar or "Add permission or feature" button
+   - **Important:** Some permissions may require making an API call first to "discover" them
+     - If a permission doesn't appear in the list, try making an API call with that permission
+     - This will trigger Meta to show the permission in the use case customization
+   - **Note:** `instagram_basic` is part of Instagram Graph API and is compatible with `instagram_content_publish`. It helps with reading profile metadata of Business accounts.
    - **VERIFICATION REQUIRED:**
      - **Become a Tech Provider** (required for business features)
        - Click "Become a Tech Provider" on the main dashboard
@@ -485,19 +511,21 @@ pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,
 
 **Issue:** `Invalid Scopes: instagram_basic, instagram_content_publish`  
 **Solution:** 
-1. **Become a Tech Provider** (if not already done)
-2. **Complete Business Verification** (required for Instagram API access)
+1. **Ensure `instagram_basic` is included** - it's part of Instagram Graph API and helps with reading profile metadata. It's compatible with `instagram_content_publish`.
+2. **Add "Instagram Graph API" product** (not "Instagram Basic Display API")
+   - Go to Products → Add Product → Instagram Graph API
+3. **Become a Tech Provider** (if not already done)
+4. **Complete Business Verification** (required for Instagram API access)
    - Go to App Settings → Business Verification
    - Submit required business documents
    - Wait for Meta approval (can take days/weeks)
-3. Ensure Instagram product is added (via use case customization)
-4. Request Advanced Access for `instagram_content_publish` in App Review
+5. Request Advanced Access for `instagram_content_publish` in App Review
    - Note: Advanced Access may be blocked until business verification is complete
-5. Wait for Meta approval (can take days/weeks)
-6. Disconnect and reconnect Instagram after approval
+6. Wait for Meta approval (can take days/weeks)
+7. Disconnect and reconnect Instagram after approval
 
 **Issue:** `403 Permission denied`  
-**Solution:** Ensure all scopes are approved: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `business_management`.
+**Solution:** Ensure all scopes are approved: `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `business_management`. Make sure you're using Instagram Graph API (not Basic Display API) and have the correct product added.
 
 **Issue:** No Instagram account found  
 **Solution:** 
@@ -513,65 +541,158 @@ pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,
 ## Threads API
 
 ### Overview
-Threads uses Meta Graph API v24.0 (similar to Instagram). Threads accounts are linked to Instagram Business Accounts.
+Threads uses its **own separate OAuth gateway and API domain** (not facebook.com). Threads has its own dedicated endpoints at `threads.net` for OAuth and `graph.threads.net` for API calls. Threads accounts are linked to Instagram Business Accounts.
 
 ### Required Scopes
 
 ```
-threads_basic,threads_content_publish,pages_show_list
+threads_basic,threads_content_publish
 ```
 
-- **`threads_basic`**: Basic Threads access
-- **`threads_content_publish`**: Publish content to Threads
-- **`pages_show_list`**: List Pages (for Instagram account lookup)
+- **`threads_basic`**: Required to know who the user is
+- **`threads_content_publish`**: Required to post content to Threads
+
+**Note:** Threads uses its own scopes, separate from Instagram Graph API scopes.
 
 ### OAuth Flow
 
-**Authorization URL:** `https://www.facebook.com/v24.0/dialog/oauth`
+**Authorization URL:** `https://threads.net/oauth/authorize` ⚠️ **NOT facebook.com**
 
-**Token Exchange:** `https://graph.facebook.com/v24.0/oauth/access_token`
+**Token Exchange:** `https://graph.threads.net/oauth/access_token` ⚠️ **NOT graph.facebook.com**
 
-**API Base:** `https://graph.facebook.com/v24.0`
+**API Base:** `https://graph.threads.net/v1.0` ⚠️ **NOT graph.facebook.com**
 
 ### API Endpoints
 
-- **Get Threads Account:** `GET /me/accounts?fields=instagram_business_account`
-- **Post to Threads:** `POST /{threadsAccountId}/threads`
+- **Get Threads Account:** `GET /me?fields=id,username` (uses user access token directly)
+- **Create Media Container:** `POST /me/threads` (Step 1: Create container)
+- **Publish Container:** `POST /me/threads_publish` (Step 2: Publish container)
 
 ### App Setup Requirements
 
-1. **Meta App Dashboard**
+1. **Meta App Dashboard - Use Case Setup**
+   
+   **IMPORTANT:** Start with the **"Access to Threads API"** Use Case first:
+   
    - Create app at https://developers.facebook.com/apps/
-   - Add Threads permissions (similar to Instagram)
-   - Set redirect URL: `{YOUR_DOMAIN}/api/social/threads/callback`
+   - **Step 1:** Add **"Access to Threads API"** Use Case
+     - This is the primary use case for Threads integration
+     - Go to Use Cases → Add Use Case → "Access to Threads API"
+   - **Step 2:** Add additional use cases for full functionality:
+     - **"Manage messaging and content on Instagram"** (for Instagram permissions)
+     - **"Manage everything on your Page"** (for Facebook Page permissions)
+   - **Step 3:** Customize each use case to add required permissions
+     - Some permissions may require making an API call first to "discover" them
+     - If a permission doesn't appear, try making an API call with that permission to trigger it
 
-2. **Environment Variables**
+2. **Threads OAuth Configuration**
+   
+   **CRITICAL:** Threads OAuth **REQUIRES HTTPS** - cannot use HTTP even for localhost.
+   
+   **For Local Development:**
+   - Use ngrok or similar tool to create HTTPS tunnel
+   - Install ngrok: `brew install ngrok/ngrok/ngrok` (macOS) or download from https://ngrok.com/download
+   - Sign up for free ngrok account at https://ngrok.com/signup
+   - Authenticate: `ngrok config add-authtoken YOUR_AUTHTOKEN`
+   - Start tunnel: `ngrok http 3000` (in separate terminal)
+   - Copy HTTPS URL (e.g., `https://abc123-def456.ngrok-free.app`)
+   
+   **Callback URL Configuration:**
+   
+   You must add the callback URL in **3 places**:
+   
+   - Go to **Use Case → Access to Threads API → Customize → Settings**
+   - Add your HTTPS callback URL to:
+     1. **Redirect Callback URLs**
+     2. **Uninstall Callback URL**
+     3. **Delete Callback URL**
+   
+   All three must use the same HTTPS URL: `https://your-domain.ngrok.io/api/social/threads/callback`
+
+3. **Threads Test User Setup**
+   
+   **IMPORTANT:** Threads requires a separate Test User setup:
+   
+   - Go to **Use Case → Access to Threads API → Customize → Settings**
+   - Add yourself (or test user) as a Test User
+   - **Accept the invitation in the Threads mobile app:**
+     1. Open Threads mobile app (iOS or Android) with the account you added as a tester
+     2. Go to: **Profile → Menu (≡) → Account → Website Permissions → Invites**
+     3. You should see your Meta app name with an **"Accept"** button
+     4. Tap **Accept**
+   - **Note:** Without accepting the invitation in the mobile app, you'll get "The user has not accepted the invite to test the app" error (error code 1349245)
+
+4. **Environment Variables**
    ```env
-   THREADS_CLIENT_ID=your_facebook_app_id  # Can use FACEBOOK_CLIENT_ID
-   THREADS_CLIENT_SECRET=your_facebook_app_secret  # Can use FACEBOOK_CLIENT_SECRET
-   THREADS_REDIRECT_URI=https://yourdomain.com/api/social/threads/callback
+   THREADS_CLIENT_ID=your_threads_app_id  # Separate from Facebook app
+   THREADS_CLIENT_SECRET=your_threads_app_secret  # Separate from Facebook app
+   THREADS_REDIRECT_URI=https://your-domain.ngrok.io/api/social/threads/callback  # Must be HTTPS
    ```
+   
+   **Important:** Threads requires its own Client ID and Secret (separate from Facebook app). You cannot use Facebook Client ID for Threads.
 
 ### Content Limits
 
 - **Post length:** 500 characters
 - **Image support:** Optional
-- **Image requirements:** Similar to Instagram
+- **Image requirements:**
+  - Max size: Similar to Instagram
+  - Formats: JPG, PNG
+  - Aspect ratio: Similar to Instagram
 
 ### Platform-Specific Nuances
 
-1. **Threads Account Lookup:**
-   - Threads accounts are linked to Instagram Business Accounts
-   - Use Instagram account ID for Threads posting
+1. **Separate OAuth Gateway:**
+   - Threads uses `threads.net/oauth/authorize` (NOT `facebook.com`)
+   - Threads uses `graph.threads.net` for API calls (NOT `graph.facebook.com`)
+   - Threads has its own Client ID/Secret (separate from Facebook app)
 
-2. **Posting:**
-   - Text-only: `POST /{threadsAccountId}/threads` with `text` field
-   - With image: Include `media_id` in payload
+2. **Two-Step Publishing Process:**
+   - **Step 1:** Create media container using `POST /me/threads`
+     - For text-only: `{ text: "...", media_type: "TEXT" }`
+     - For image: `{ text: "...", media_type: "IMAGE", image_url: "..." }`
+   - **Step 2:** Publish container using `POST /me/threads_publish`
+     - `{ creation_id: containerId }`
+   - Returns post ID and URL: `https://www.threads.net/@username/post/{postId}`
+
+3. **User Access Token:**
+   - Threads API uses the user access token directly (not Page token)
+   - No need to exchange for Page token like Instagram
+   - Token is stored in `accessToken` field (not `refreshToken`)
+
+4. **HTTPS Requirement:**
+   - Threads OAuth **requires HTTPS** even for localhost
+   - Use ngrok or similar tool for local development
+   - Production must use HTTPS domain
+
+5. **Test User Acceptance:**
+   - Test users must accept invitation in Threads mobile app
+   - Cannot accept via web browser
+   - Must use iOS or Android Threads app
 
 ### Common Issues
 
+**Issue:** `Authorization Failed: No app ID was sent with the request` (error code 4476002)  
+**Solution:** Ensure `THREADS_CLIENT_ID` is set correctly. Threads requires its own Client ID (cannot use Facebook Client ID).
+
+**Issue:** `Insecure Login Blocked: You can't get an access token or login to this app from an insecure page` (error code 1349187)  
+**Solution:** Threads OAuth requires HTTPS. Use ngrok for local development or ensure production uses HTTPS.
+
+**Issue:** `The user has not accepted the invite to test the app` (error code 1349245)  
+**Solution:** 
+1. Add user as Test User in Use Case → Access to Threads API → Customize → Settings
+2. Open Threads mobile app with that account
+3. Go to Profile → Menu (≡) → Account → Website Permissions → Invites
+4. Tap "Accept" for your Meta app
+
+**Issue:** `redirect_uri does not match`  
+**Solution:** Ensure callback URL is added in all 3 places:
+- Redirect Callback URLs
+- Uninstall Callback URL  
+- Delete Callback URL
+
 **Issue:** Threads account not found  
-**Solution:** Ensure Instagram Business Account is linked and accessible.
+**Solution:** Ensure Instagram Business Account is linked and accessible. Threads accounts are linked to Instagram Business Accounts.
 
 ---
 

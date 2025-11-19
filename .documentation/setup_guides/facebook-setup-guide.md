@@ -61,8 +61,8 @@ If you don't see product cards, check the **left sidebar menu**:
 
 4. **Instagram (optional)**
    - If your Instagram Business account is linked to that Facebook Page, the same connection works for Instagram publishing.
-   - When connecting Instagram, you'll be asked to grant: `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`, and `business_management` permissions.
-   - Note: `instagram_basic` is required as a dependency for `instagram_content_publish` per Facebook's permissions documentation.
+   - When connecting Instagram, you'll be asked to grant: `pages_show_list`, `pages_read_engagement`, `instagram_content_publish`, and `business_management` permissions.
+   - Note: We use Instagram Graph API (for publishing), not Instagram Basic Display API (read-only). Do not mix scopes from both APIs.
    - Set the post target accordingly in Levercast settings.
 
 ## Troubleshooting
@@ -75,17 +75,16 @@ If you don't see product cards, check the **left sidebar menu**:
 
 ### Instagram-Specific Issues
 - **"Invalid Scopes: instagram_content_publish" error:** This means the Instagram product is not properly configured. Ensure:
-  1. The **Instagram > API setup with Facebook login** product is added to your Facebook app
-     - Go to Meta App Dashboard → Your App
-     - **Scroll down on the main dashboard page** (not the sidebar) to find product cards
-     - Look for the "Instagram" product card and click "Set up"
-     - Select "API setup with Facebook login" (not "API setup with Instagram login")
+  1. The **Instagram Graph API** product is added to your Facebook app (NOT "Instagram Basic Display API")
+     - Go to Meta App Dashboard → Your App → Products
+     - Add "Instagram Graph API" product
+     - Do NOT add "Instagram Basic Display API" (that's a different, read-only API)
   2. Your Instagram account is a Business or Creator account
   3. Your Instagram account is linked to a Facebook Page
   4. The app has completed App Review for `instagram_content_publish` permission (if required)
   5. You disconnect and reconnect Instagram in Levercast to get the correct scopes
 
-- **Note:** `instagram_basic` is NOT deprecated - it's a required dependency for `instagram_content_publish` per Facebook's permissions documentation. Both scopes are requested together.
+- **Note:** `instagram_basic` is part of Instagram Graph API and is designed to read profile metadata of Business accounts. It is compatible with `instagram_content_publish` and both can be requested together. The deprecated Basic Display API uses `user_profile` and `user_media` scopes, which are different.
 
 - **Instagram posting fails:** Verify:
   1. **Instagram > API setup with Facebook login** product is added to the app (not just the use case)

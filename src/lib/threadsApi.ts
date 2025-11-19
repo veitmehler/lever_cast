@@ -9,7 +9,8 @@ import { downloadImageFromStorage } from './supabase'
 import { prisma } from './prisma'
 import { decrypt } from './encryption'
 
-const THREADS_API_BASE = 'https://graph.facebook.com/v24.0'
+// Threads API uses its own domain: graph.threads.net (not graph.facebook.com)
+const THREADS_API_BASE = 'https://graph.threads.net/v1.0'
 
 interface ThreadsAccount {
   id: string
@@ -40,121 +41,109 @@ async function getThreadsAccount(userId: string): Promise<ThreadsAccount> {
     throw new Error('Threads access token expired. Please reconnect your account.')
   }
 
+  // Threads API uses user access token directly (no Page token needed)
   const accessToken = decrypt(connection.accessToken)
+  
+  if (!accessToken || accessToken.trim().length === 0) {
+    throw new Error('Threads access token is empty or invalid. Please reconnect your Threads account.')
+  }
+  
+  if (accessToken.length < 20) {
+    throw new Error('Threads access token appears to be corrupted. Please reconnect your Threads account.')
+  }
 
-  // Get user's Threads account
-  // Threads accounts are linked to Instagram Business Accounts
-  const pagesResponse = await fetch(
-    `${THREADS_API_BASE}/me/accounts?access_token=${accessToken}&fields=instagram_business_account`
+  // Get Threads account using /me endpoint
+  const accountResponse = await fetch(
+    `${THREADS_API_BASE}/me?access_token=${accessToken}&fields=id,username`
   )
 
-  if (!pagesResponse.ok) {
-    const errorText = await pagesResponse.text()
-    console.error('[Threads API] Failed to fetch pages:', {
-      status: pagesResponse.status,
+  if (!accountResponse.ok) {
+    const errorText = await accountResponse.text()
+    console.error('[Threads API] Failed to fetch account:', {
+      status: accountResponse.status,
       error: errorText,
     })
-    throw new Error(`Failed to fetch Threads account: ${pagesResponse.status}`)
+    throw new Error(`Failed to fetch Threads account: ${accountResponse.status}`)
   }
 
-  const pagesData = await pagesResponse.json()
-  const pages = pagesData.data || []
+  const accountData = await accountResponse.json()
   
-  // Find page with Instagram Business Account (Threads uses Instagram account)
-  for (const page of pages) {
-    if (page.instagram_business_account) {
-      const igAccountResponse = await fetch(
-        `${THREADS_API_BASE}/${page.instagram_business_account.id}?access_token=${accessToken}&fields=id,username`
-      )
-      
-      if (igAccountResponse.ok) {
-        const igAccount = await igAccountResponse.json()
-        return {
-          id: igAccount.id,
-          username: igAccount.username,
-        }
-      }
-    }
+  // Use stored account info if API doesn't return it
+  return {
+    id: accountData.id || connection.platformUserId || '',
+    username: accountData.username || connection.platformUsername || 'Threads User',
   }
-
-  throw new Error('No Threads account found. Please connect a Threads account linked to an Instagram Business Account.')
 }
 
 /**
- * Upload an image for Threads post
- * @param igAccountId - Instagram Business Account ID (Threads uses Instagram)
- * @param pageAccessToken - Page access token
- * @param imageUrl - Supabase Storage URL of the image
- * @returns Media Container ID
+ * Create a Threads media container
+ * Threads API uses a two-step process: Create container, then publish
+ * @param userId - User ID
+ * @param accessToken - Threads access token
+ * @param imageUrl - Optional Supabase Storage URL of the image
+ * @param text - Post text content
+ * @returns Container creation_id
  */
-async function createThreadsMediaContainer(
-  igAccountId: string,
-  pageAccessToken: string,
-  imageUrl: string,
-  caption: string
+async function createThreadsContainer(
+  userId: string,
+  accessToken: string,
+  imageUrl: string | undefined,
+  text: string
 ): Promise<string> {
   try {
-    console.log(`[Threads API] Creating media container for account ${igAccountId}`)
+    console.log(`[Threads API] Creating Threads container`)
     
-    // Download image from Supabase Storage
-    const imageBuffer = await downloadImageFromStorage(imageUrl)
+    // Prepare container data
+    const containerData: Record<string, string> = {
+      text: text.substring(0, 500), // Threads limit: 500 characters
+    }
     
-    // Upload to Facebook Page (similar to Instagram)
-    const formData = new FormData()
-    const blob = new Blob([new Uint8Array(imageBuffer)])
-    formData.append('source', blob)
-    formData.append('published', 'false')
-
-    const pagesResponse = await fetch(
-      `${THREADS_API_BASE}/me/accounts?access_token=${pageAccessToken}&fields=id,instagram_business_account`
-    )
-    const pagesData = await pagesResponse.json()
-    const page = pagesData.data?.find((p: any) => p.instagram_business_account?.id === igAccountId)?.id
-
-    if (!page) {
-      throw new Error('Could not find Facebook Page linked to Threads account')
+    // If image provided, download and upload it
+    if (imageUrl) {
+      console.log('[Threads API] Downloading image from storage')
+      const imageBuffer = await downloadImageFromStorage(imageUrl)
+      
+      // Upload image to a temporary location or use image_url directly
+      // Threads API accepts image_url parameter
+      // For now, we'll use the Supabase Storage URL directly
+      containerData.media_type = 'IMAGE'
+      containerData.image_url = imageUrl // Threads API accepts direct image URLs
+    } else {
+      containerData.media_type = 'TEXT'
     }
-
-    const uploadResponse = await fetch(
-      `${THREADS_API_BASE}/${page}/photos?access_token=${pageAccessToken}`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    )
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text()
-      throw new Error(`Failed to upload image: ${uploadResponse.status}`)
-    }
-
-    const uploadResult: { id: string } = await uploadResponse.json()
-    const imageId = uploadResult.id
-
-    // Create media container (Threads uses Instagram media API)
+    
+    // Create container using Threads API endpoint
     const containerResponse = await fetch(
-      `${THREADS_API_BASE}/${igAccountId}/media?access_token=${pageAccessToken}`,
+      `${THREADS_API_BASE}/me/threads?access_token=${accessToken}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image_url: `https://graph.facebook.com/v24.0/${imageId}/picture?access_token=${pageAccessToken}`,
-          caption: caption.substring(0, 500), // Threads limit: 500 characters
-        }),
+        body: JSON.stringify(containerData),
       }
     )
 
     if (!containerResponse.ok) {
       const errorText = await containerResponse.text()
-      throw new Error(`Failed to create media container: ${containerResponse.status}`)
+      let error: any
+      try {
+        error = JSON.parse(errorText)
+      } catch {
+        error = { message: errorText || 'Unknown error' }
+      }
+      console.error('[Threads API] Container creation failed:', {
+        status: containerResponse.status,
+        error: error,
+      })
+      throw new Error(`Failed to create container: ${containerResponse.status} ${error.error?.message || error.message || 'Unknown error'}`)
     }
 
     const containerResult: ThreadsMediaResponse = await containerResponse.json()
+    console.log('[Threads API] Container created:', containerResult.id)
     return containerResult.id
   } catch (error) {
-    console.error('[Threads API] Error creating media container:', error)
+    console.error('[Threads API] Error creating container:', error)
     throw error
   }
 }
@@ -186,45 +175,38 @@ export async function postToThreads(
     const threadsAccount = await getThreadsAccount(userId)
     console.log(`[Threads API] Using account: @${threadsAccount.username} (${threadsAccount.id})`)
 
-    // Get page access token
+    // Get Threads access token (user token, not Page token)
     const connection = await getSocialConnection(userId, 'threads')
     if (!connection) {
       throw new Error('Threads account not connected')
     }
-    const pageAccessToken = decrypt(connection.accessToken)
+    const accessToken = decrypt(connection.accessToken)
 
-    let containerId: string | undefined
-
-    // Create media container if image provided
-    if (imageUrl) {
-      try {
-        containerId = await createThreadsMediaContainer(threadsAccount.id, pageAccessToken, imageUrl, content)
-      } catch (error) {
-        console.error('[Threads API] Media container creation failed, continuing with text-only:', error)
-        // Continue with text-only post if image fails
+    // Step 1: Create media container using Threads API
+    console.log('[Threads API] Creating Threads container')
+    let containerId: string
+    try {
+      containerId = await createThreadsContainer(userId, accessToken, imageUrl, content)
+    } catch (error) {
+      console.error('[Threads API] Container creation failed:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create Threads container',
       }
     }
 
-    // Post to Threads
-    // Note: Threads API endpoint may vary - using Instagram API as base
-    // For text-only posts, Threads may require different endpoint
-    const postData: Record<string, string> = {
-      text: content.substring(0, 500),
-    }
-
-    if (containerId) {
-      postData.media_id = containerId
-    }
-
-    // Threads posting endpoint (may need adjustment based on actual API)
+    // Step 2: Publish the container using Threads API
+    console.log('[Threads API] Publishing container:', containerId)
     const postResponse = await fetch(
-      `${THREADS_API_BASE}/${threadsAccount.id}/threads?access_token=${pageAccessToken}`,
+      `${THREADS_API_BASE}/me/threads_publish?access_token=${accessToken}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(postData),
+        body: JSON.stringify({
+          creation_id: containerId,
+        }),
       }
     )
 
@@ -265,10 +247,14 @@ export async function postToThreads(
     const postResult: ThreadsPublishResponse = await postResponse.json()
     const postId = postResult.id
     
-    // Construct post URL (Threads URL format)
+    // Log full response for debugging
+    console.log('[Threads API] Publish response:', JSON.stringify(postResult, null, 2))
+    
+    // Construct Threads post URL
+    // Threads post URLs use the format: https://www.threads.net/@username/post/{postId}
     const postUrl = `https://www.threads.net/@${threadsAccount.username}/post/${postId}`
 
-    console.log(`[Threads API] Post successful: ${postUrl}`)
+    console.log(`[Threads API] Post published successfully: ${postUrl}`)
 
     return {
       success: true,
@@ -283,4 +269,5 @@ export async function postToThreads(
     }
   }
 }
+
 

@@ -431,6 +431,44 @@
   - Updated character limit enforcement in AI generation route
 - ✅ **Status**: Telegram channel selection and 1,000 character limit fully functional ✅
 
+### Threads API Integration Fixes (COMPLETED)
+- ✅ Fixed Threads OAuth flow to use correct endpoints
+  - Updated OAuth authorization URL from `facebook.com` to `threads.net/oauth/authorize`
+  - Updated token exchange endpoint to `graph.threads.net/oauth/access_token`
+  - Removed incorrect Instagram Graph API scopes, using Threads-specific scopes (`threads_basic`, `threads_content_publish`)
+  - Threads uses its own separate OAuth gateway and API domain (not facebook.com)
+- ✅ Fixed Threads API publishing endpoints
+  - Updated API base URL from `graph.facebook.com` to `graph.threads.net/v1.0`
+  - Implemented correct two-step publishing process:
+    - Step 1: Create media container using `POST /me/threads` endpoint
+    - Step 2: Publish container using `POST /me/threads_publish` endpoint
+  - Removed incorrect Instagram Graph API workaround that was posting to Instagram instead of Threads
+  - Updated post URL construction to use correct Threads format: `https://www.threads.net/@username/post/{postId}`
+- ✅ Added HTTPS requirement validation for Threads OAuth
+  - Threads OAuth requires HTTPS (cannot use HTTP even for localhost)
+  - Added validation and helpful error messages for HTTPS redirect URIs
+  - Updated documentation with ngrok setup instructions for local development
+- ✅ **Status**: Threads API integration fully functional with correct endpoints ✅
+
+### Scheduled Posts System Improvements (COMPLETED)
+- ✅ Fixed "Schedule All" button to schedule all platforms
+  - Removed `selectedPlatform` checks that prevented Threads, Instagram, and Telegram from being scheduled
+  - "Schedule All" now schedules all platforms that have generated content, regardless of selectedPlatform state
+  - Added logging to track which platforms are being scheduled
+- ✅ Fixed Instagram scheduled posts image URL retrieval
+  - Updated scheduled posts route to read `imageUrl` from `post.imageUrl` first, then fallback to `post.draft?.attachedImage`
+  - Previously only checked draft, causing "Media ID is not available" errors for scheduled Instagram posts
+  - Added comprehensive logging to debug image URL sources
+- ✅ Added imageUrl parameter to scheduled post creation
+  - Updated `handleSchedule` function to pass `imageUrl` when creating scheduled posts
+  - Ensures images are stored on the post record for scheduled posts
+  - Works for both single posts and Twitter thread summary posts
+- ✅ Enhanced scheduled posts debugging
+  - Added platform grouping logs to show which platforms have scheduled posts
+  - Added detailed logging for image URL retrieval (from post vs draft)
+  - Added post creation logging to track status and scheduledAt values
+- ✅ **Status**: Scheduled posts system fully functional for all platforms (Facebook, Instagram, Threads, Telegram, LinkedIn, Twitter) ✅
+
 ### Analytics Tracking & Sync (COMPLETED)
 - ✅ Add analytics tracking fields to Post model
   - Add imageUrl field to store published image URLs
@@ -841,7 +879,30 @@
 
 ## Change Log
 
-### January 2025 (Latest - Telegram Channel Selection & Character Limit)
+### January 2025 (Latest - Threads API Fixes & Scheduled Posts Improvements)
+- Fixed Threads API integration to use correct endpoints
+  - Updated OAuth flow to use `threads.net/oauth/authorize` (not facebook.com)
+  - Updated token exchange to use `graph.threads.net/oauth/access_token`
+  - Updated API base URL to `graph.threads.net/v1.0` (not graph.facebook.com)
+  - Implemented correct two-step publishing process (create container, then publish)
+  - Fixed post URL construction to use correct Threads format
+  - Added HTTPS requirement validation for Threads OAuth (requires ngrok for local dev)
+- Fixed "Schedule All" button functionality
+  - Removed `selectedPlatform` checks that prevented Threads, Instagram, and Telegram from being scheduled
+  - "Schedule All" now schedules all platforms that have generated content
+  - Added logging to track platform scheduling
+- Fixed Instagram scheduled posts image handling
+  - Updated scheduled posts route to read `imageUrl` from `post.imageUrl` first, then fallback to draft
+  - Previously only checked draft, causing "Media ID is not available" errors
+  - Added imageUrl parameter to scheduled post creation (both single posts and thread summaries)
+  - Added comprehensive logging for debugging image URL sources
+- Enhanced scheduled posts debugging
+  - Added platform grouping logs to show distribution of scheduled posts
+  - Added detailed logging for image URL retrieval
+  - Added post creation logging to track status and scheduledAt values
+- **Status**: Threads API fully functional, scheduled posts work for all platforms ✅
+
+### January 2025 (Earlier - Telegram Channel Selection & Character Limit)
 - Implemented Telegram channel selection feature
   - Added telegramChatId field to Settings model in Prisma schema
   - Created UI in Settings page to configure default Telegram channel ID
@@ -1144,7 +1205,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling, Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit Complete  
-**Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Instagram, Threads, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling (All Platforms), Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit, Threads API Integration Complete  
+**Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access (Instagram posting works but requires verification for production)  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

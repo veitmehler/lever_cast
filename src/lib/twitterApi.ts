@@ -4,7 +4,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { encrypt } from './encryption'
+import { encrypt, decrypt } from './encryption'
 import { prisma } from './prisma'
 import { downloadImageFromStorage } from './supabase'
 
@@ -31,22 +31,28 @@ export async function verifyTweetExists(
       return false
     }
 
-    // Check if token is expired and refresh if needed
+    // Check if token is expired or expiring soon, and refresh proactively
+    // Proactive refresh prevents refresh token expiration (Twitter refresh tokens expire after ~90 days of inactivity)
     let accessToken = connection.accessToken
     
-    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+    // Refresh if expired OR if expiring within 30 minutes (proactive refresh)
+    const shouldRefresh = connection.tokenExpiry && (
+      new Date(connection.tokenExpiry) <= new Date() || // Already expired
+      new Date(connection.tokenExpiry) <= new Date(Date.now() + 30 * 60 * 1000) // Expiring within 30 minutes
+    )
+    
+    if (shouldRefresh) {
       if (connection.refreshToken) {
-        const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
+        // Decrypt refresh token before using it
+        const decryptedRefreshToken = decrypt(connection.refreshToken)
+        const refreshResult = await refreshTwitterToken(userId, decryptedRefreshToken)
         if (refreshResult) {
           accessToken = refreshResult.accessToken
           const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
           
           await prisma.socialConnection.update({
             where: {
-              userId_platform: {
-                userId,
-                platform: 'twitter',
-              },
+              id: connection.id,
             },
             data: {
               accessToken: encrypt(refreshResult.accessToken),
@@ -96,22 +102,28 @@ export async function uploadImageToTwitter(
       throw new Error('Twitter/X account not connected')
     }
 
-    // Check if token is expired and refresh if needed
+    // Check if token is expired or expiring soon, and refresh proactively
+    // Proactive refresh prevents refresh token expiration (Twitter refresh tokens expire after ~90 days of inactivity)
     let accessToken = connection.accessToken
     
-    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+    // Refresh if expired OR if expiring within 30 minutes (proactive refresh)
+    const shouldRefresh = connection.tokenExpiry && (
+      new Date(connection.tokenExpiry) <= new Date() || // Already expired
+      new Date(connection.tokenExpiry) <= new Date(Date.now() + 30 * 60 * 1000) // Expiring within 30 minutes
+    )
+    
+    if (shouldRefresh) {
       if (connection.refreshToken) {
-        const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
+        // Decrypt refresh token before using it
+        const decryptedRefreshToken = decrypt(connection.refreshToken)
+        const refreshResult = await refreshTwitterToken(userId, decryptedRefreshToken)
         if (refreshResult) {
           accessToken = refreshResult.accessToken
           const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
           
           await prisma.socialConnection.update({
             where: {
-              userId_platform: {
-                userId,
-                platform: 'twitter',
-              },
+              id: connection.id,
             },
             data: {
               accessToken: encrypt(refreshResult.accessToken),
@@ -314,25 +326,31 @@ export async function postToTwitter(
     console.log(`[Twitter API] Found connection for user ${userId}, platformUsername: ${connection.platformUsername}`)
     console.log(`[Twitter API] Token expiry: ${connection.tokenExpiry ? connection.tokenExpiry.toISOString() : 'not set'}`)
 
-    // Check if token is expired and try to refresh
+    // Check if token is expired or expiring soon, and refresh proactively
+    // Proactive refresh prevents refresh token expiration (Twitter refresh tokens expire after ~90 days of inactivity)
     let accessToken = connection.accessToken
     
-    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+    // Refresh if expired OR if expiring within 30 minutes (proactive refresh)
+    const shouldRefresh = connection.tokenExpiry && (
+      new Date(connection.tokenExpiry) <= new Date() || // Already expired
+      new Date(connection.tokenExpiry) <= new Date(Date.now() + 30 * 60 * 1000) // Expiring within 30 minutes
+    )
+    
+    if (shouldRefresh) {
       console.log(`[Twitter API] Token expired, checking for refresh token...`)
       if (connection.refreshToken) {
         console.log(`[Twitter API] Attempting to refresh token...`)
+        // Note: getSocialConnection already decrypts tokens, so connection.refreshToken is already decrypted
         const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
         if (refreshResult) {
           accessToken = refreshResult.accessToken
           const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
           
           // Update the connection in the database
+          // Use connection.id instead of compound unique constraint (which may not exist)
           await prisma.socialConnection.update({
             where: {
-              userId_platform: {
-                userId,
-                platform: 'twitter',
-              },
+              id: connection.id,
             },
             data: {
               accessToken: encrypt(refreshResult.accessToken),
@@ -660,16 +678,14 @@ Possible causes:
         // If we get 401, try refreshing token once more (in case token expired between check and request)
         if (connection.refreshToken) {
           console.log(`[Twitter API] Got 401, attempting token refresh...`)
+          // Note: getSocialConnection already decrypts tokens, so connection.refreshToken is already decrypted
           const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
           if (refreshResult) {
             // Update connection and retry with new token
             const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
             await prisma.socialConnection.update({
               where: {
-                userId_platform: {
-                  userId,
-                  platform: 'twitter',
-                },
+                id: connection.id,
               },
               data: {
                 accessToken: encrypt(refreshResult.accessToken),
@@ -906,9 +922,15 @@ export async function refreshTwitterToken(
     const tokenData = await response.json()
     console.log(`[Twitter API] Token refresh successful, expires_in: ${tokenData.expires_in}`)
     
+    // Twitter OAuth 2.0 Token Expiration:
+    // - Access tokens: Expire after 2 hours
+    // - Refresh tokens: Can be refreshed indefinitely as long as they're used regularly
+    //   If a refresh token is not used for ~90 days, it expires
+    //   Each refresh typically returns a new refresh_token, extending validity
+    //   By refreshing proactively (before expiration), we keep refresh tokens alive indefinitely
     return {
       accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token || refreshToken, // Use new refresh token if provided, otherwise keep old one
+      refreshToken: tokenData.refresh_token || refreshToken, // Twitter usually returns new refresh_token - use it to extend validity
       expiresIn: tokenData.expires_in || 7200, // Default to 2 hours if not provided
     }
   } catch (error) {
@@ -944,22 +966,28 @@ export async function getTwitterAnalytics(
       return null
     }
 
-    // Check if token is expired and refresh if needed
+    // Check if token is expired or expiring soon, and refresh proactively
+    // Proactive refresh prevents refresh token expiration (Twitter refresh tokens expire after ~90 days of inactivity)
     let accessToken = connection.accessToken
     
-    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+    // Refresh if expired OR if expiring within 30 minutes (proactive refresh)
+    const shouldRefresh = connection.tokenExpiry && (
+      new Date(connection.tokenExpiry) <= new Date() || // Already expired
+      new Date(connection.tokenExpiry) <= new Date(Date.now() + 30 * 60 * 1000) // Expiring within 30 minutes
+    )
+    
+    if (shouldRefresh) {
       if (connection.refreshToken) {
-        const refreshResult = await refreshTwitterToken(userId, connection.refreshToken)
+        // Decrypt refresh token before using it
+        const decryptedRefreshToken = decrypt(connection.refreshToken)
+        const refreshResult = await refreshTwitterToken(userId, decryptedRefreshToken)
         if (refreshResult) {
           accessToken = refreshResult.accessToken
           const newExpiry = new Date(Date.now() + refreshResult.expiresIn * 1000)
           
           await prisma.socialConnection.update({
             where: {
-              userId_platform: {
-                userId,
-                platform: 'twitter',
-              },
+              id: connection.id,
             },
             data: {
               accessToken: encrypt(refreshResult.accessToken),

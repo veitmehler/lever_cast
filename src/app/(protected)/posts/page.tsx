@@ -471,7 +471,14 @@ export default function PostsPage() {
 
             return { platform, success: true }
           } else {
-            // Single post (LinkedIn or single Twitter post)
+            // Single post (LinkedIn, Facebook, Instagram, Telegram, Threads, or single Twitter post)
+            const postContent = typeof twitterContent === 'string' ? twitterContent : twitterContent[0]
+            console.log(`[Bulk Schedule] Scheduling ${platform} post for draft ${draft.id}`, {
+              platform,
+              contentLength: postContent?.length || 0,
+              scheduledAt: scheduledAt.toISOString(),
+            })
+            
             const scheduleResponse = await fetch('/api/posts', {
               method: 'POST',
               headers: {
@@ -479,18 +486,22 @@ export default function PostsPage() {
               },
               body: JSON.stringify({
                 platform,
-                content: typeof twitterContent === 'string' ? twitterContent : twitterContent[0],
+                content: postContent,
                 draftId: draft.id,
                 scheduledAt: scheduledAt.toISOString(),
                 status: 'scheduled',
+                imageUrl: draft.attachedImage || undefined,
               }),
             })
 
             if (!scheduleResponse.ok) {
               const errorData = await scheduleResponse.json().catch(() => ({ error: 'Unknown error' }))
+              console.error(`[Bulk Schedule] Failed to schedule ${platform} post:`, errorData)
               return { platform, success: false, error: errorData.error || 'Failed to schedule' }
             }
 
+            const scheduledPost = await scheduleResponse.json()
+            console.log(`[Bulk Schedule] Successfully scheduled ${platform} post:`, scheduledPost.id)
             return { platform, success: true }
           }
         })

@@ -26,15 +26,51 @@ export function encrypt(value: string): string {
  * TODO: Upgrade to proper decryption (AES-256-GCM) in production
  */
 export function decrypt(encryptedValue: string): string {
-  if (!encryptedValue) return ''
+  if (!encryptedValue) {
+    console.warn('[Encryption] Attempted to decrypt empty value')
+    return ''
+  }
   
   try {
-    // Simple base64 decoding for now
-    // In production, use: crypto.createDecipheriv('aes-256-gcm', key, iv)
-    const decoded = Buffer.from(encryptedValue, 'base64').toString('utf-8')
-    return decoded
+    // Check if value is already a plain string (not base64 encoded)
+    // This can happen if tokens were stored before encryption was implemented
+    if (typeof encryptedValue !== 'string') {
+      console.error('[Encryption] Value is not a string:', typeof encryptedValue)
+      return ''
+    }
+    
+    // Try to decode as base64
+    // If it fails, assume it's already plain text (backward compatibility)
+    try {
+      const decoded = Buffer.from(encryptedValue, 'base64').toString('utf-8')
+      
+      // Validate that decoded value looks like a token (not binary garbage)
+      // Tokens are typically alphanumeric strings, not binary data
+      if (decoded && decoded.length > 0 && /^[\x20-\x7E]+$/.test(decoded)) {
+        return decoded
+      } else {
+        // Decoded value looks like binary data, might be double-encoded or corrupted
+        console.warn('[Encryption] Decoded value appears to be binary data, trying as plain text')
+        // Return original value if it looks like a valid token
+        if (/^[\x20-\x7E]+$/.test(encryptedValue)) {
+          return encryptedValue
+        }
+        throw new Error('Decoded value is not valid UTF-8 text')
+      }
+    } catch (base64Error) {
+      // If base64 decoding fails, check if it's already plain text
+      if (/^[\x20-\x7E]+$/.test(encryptedValue)) {
+        console.warn('[Encryption] Value is not base64 encoded, returning as plain text')
+        return encryptedValue
+      }
+      throw base64Error
+    }
   } catch (error) {
-    console.error('Error decrypting value:', error)
+    console.error('[Encryption] Error decrypting value:', {
+      error: error instanceof Error ? error.message : String(error),
+      valueLength: encryptedValue.length,
+      valuePreview: encryptedValue.substring(0, 50),
+    })
     return ''
   }
 }

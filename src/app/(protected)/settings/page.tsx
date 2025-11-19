@@ -72,6 +72,7 @@ export default function SettingsPage() {
   const [isLoadingPages, setIsLoadingPages] = useState<Record<string, boolean>>({})
   const [postTargetTypes, setPostTargetTypes] = useState<Record<string, 'personal' | 'page'>>({})
   const [selectedPageIds, setSelectedPageIds] = useState<Record<string, string>>({})
+  const [isRefreshingUsername, setIsRefreshingUsername] = useState<Record<string, boolean>>({})
 
   // Image generation settings
   const [imageApiKeys, setImageApiKeys] = useState<Record<string, string>>({
@@ -534,6 +535,9 @@ export default function SettingsPage() {
         'unauthorized_scope_error': 'LinkedIn app needs "Share on LinkedIn" product approval. See instructions below.',
         'w_organization_social_not_approved': 'LinkedIn Company Pages are not available. You can still connect and post to your personal profile.',
         'rate_limit': 'Twitter rate limit reached. Please wait 15 minutes before trying again.',
+        'no_instagram_account': 'No Instagram Business account found linked to your Facebook Page. Please ensure your Instagram account is a Business or Creator account and is linked to your Facebook Page in Business Manager.',
+        'instagram_permission_required': 'Instagram connection requires App Review. The app needs "instagram_content_publish" permission approved through Meta App Review. Please complete App Review in your Meta App Dashboard before connecting Instagram.',
+        'page_token_missing': 'Failed to get Page access token. Please try reconnecting.',
       }
       
       // Check if error message contains rate limit indicators
@@ -1464,27 +1468,78 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                       ) : (
-                        <Button
-                          variant={isConnected ? 'outline' : 'default'}
-                          size="sm"
-                          onClick={isConnected ? handleDisconnect : () => handleConnect()}
-                          disabled={isDisconnectingPlatform || isConnecting[platform]}
-                          className={isConnected ? '' : 'bg-primary text-primary-foreground hover:bg-primary/90'}
-                        >
-                          {isDisconnectingPlatform ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              Disconnecting...
-                            </>
-                          ) : isConnecting[platform] ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              Connecting...
-                            </>
-                          ) : (
-                            isConnected ? 'Disconnect' : 'Connect'
+                        <div className="flex gap-2">
+                          {isConnected && platform === 'instagram' && (!connection.platformUsername || connection.platformUsername === 'Instagram User') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                if (!connection?.id) return
+                                
+                                setIsRefreshingUsername(prev => ({ ...prev, [platform]: true }))
+                                try {
+                                  const response = await fetch('/api/social/instagram/refresh-username', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      connectionId: connection.id,
+                                    }),
+                                  })
+                                  
+                                  const data = await response.json()
+                                  
+                                  if (data.success && data.username) {
+                                    toast.success(`Username updated to @${data.username}`)
+                                    // Refresh connections to update UI
+                                    await fetchConnections()
+                                  } else {
+                                    // Show warning instead of error - this is a known limitation
+                                    toast.warning(data.error || 'Could not fetch username. It will be fetched automatically when you publish your first Instagram post.')
+                                  }
+                                } catch (error) {
+                                  console.error('Error refreshing Instagram username:', error)
+                                  toast.error('Failed to refresh username')
+                                } finally {
+                                  setIsRefreshingUsername(prev => ({ ...prev, [platform]: false }))
+                                }
+                              }}
+                              disabled={isRefreshingUsername[platform]}
+                              className="text-xs"
+                            >
+                              {isRefreshingUsername[platform] ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  Refreshing...
+                                </>
+                              ) : (
+                                'Refresh Username'
+                              )}
+                            </Button>
                           )}
-                        </Button>
+                          <Button
+                            variant={isConnected ? 'outline' : 'default'}
+                            size="sm"
+                            onClick={isConnected ? handleDisconnect : () => handleConnect()}
+                            disabled={isDisconnectingPlatform || isConnecting[platform]}
+                            className={isConnected ? '' : 'bg-primary text-primary-foreground hover:bg-primary/90'}
+                          >
+                            {isDisconnectingPlatform ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Disconnecting...
+                              </>
+                            ) : isConnecting[platform] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              isConnected ? 'Disconnect' : 'Connect'
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
                     

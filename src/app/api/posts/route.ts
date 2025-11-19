@@ -196,6 +196,15 @@ export async function POST(request: Request) {
     // Create the post
     // Only store imageUrl for summary posts (threadOrder 0 or null)
     const shouldStoreImage = imageUrl && (threadOrder === null || threadOrder === 0)
+    
+    console.log(`[Posts API] Creating post:`, {
+      platform,
+      status: finalStatus,
+      scheduledAt: finalScheduledAt?.toISOString(),
+      isScheduled,
+      draftId: draftId || null,
+    })
+    
     const post = await prisma.post.create({
       data: {
         userId: user.id,
@@ -212,6 +221,13 @@ export async function POST(request: Request) {
         scheduledAt: finalScheduledAt,
         errorMsg: errorMsg || null,
       },
+    })
+    
+    console.log(`[Posts API] Post created successfully:`, {
+      id: post.id,
+      platform: post.platform,
+      status: post.status,
+      scheduledAt: post.scheduledAt?.toISOString(),
     })
 
     // If draftId is provided and status is published, check if all platforms are published

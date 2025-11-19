@@ -364,6 +364,7 @@ export default function DashboardPage() {
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
             threadOrder: 0, // Summary post is always order 0
+            imageUrl: attachedImage || undefined,
           }),
         })
 
@@ -420,6 +421,7 @@ export default function DashboardPage() {
             content,
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
+            imageUrl: attachedImage || undefined,
           }),
         })
 
@@ -791,27 +793,28 @@ export default function DashboardPage() {
     try {
       const schedulePromises: Promise<void>[] = []
 
-      if (generatedContent.linkedin && (selectedPlatform === 'linkedin' || selectedPlatform === 'all')) {
+      // Schedule ALL platforms that have content (ignore selectedPlatform when using "Schedule All")
+      if (generatedContent.linkedin) {
         schedulePromises.push(handleSchedule('linkedin', generatedContent.linkedin, scheduledDate))
       }
 
-      if (generatedContent.facebook && (selectedPlatform === 'facebook' || selectedPlatform === 'all')) {
+      if (generatedContent.facebook) {
         schedulePromises.push(handleSchedule('facebook', generatedContent.facebook, scheduledDate))
       }
 
-      if (generatedContent.instagram && (selectedPlatform === 'instagram' || selectedPlatform === 'all')) {
+      if (generatedContent.instagram) {
         schedulePromises.push(handleSchedule('instagram', generatedContent.instagram, scheduledDate))
       }
 
-      if (generatedContent.telegram && (selectedPlatform === 'telegram' || selectedPlatform === 'all')) {
+      if (generatedContent.telegram) {
         schedulePromises.push(handleSchedule('telegram', generatedContent.telegram, scheduledDate))
       }
 
-      if (generatedContent.threads && (selectedPlatform === 'threads' || selectedPlatform === 'all')) {
+      if (generatedContent.threads) {
         schedulePromises.push(handleSchedule('threads', generatedContent.threads, scheduledDate))
       }
 
-      if (generatedContent.twitter && (selectedPlatform === 'twitter' || selectedPlatform === 'all')) {
+      if (generatedContent.twitter) {
         const twitterContent = Array.isArray(generatedContent.twitter) 
           ? generatedContent.twitter 
           : generatedContent.twitter
@@ -819,7 +822,7 @@ export default function DashboardPage() {
       }
 
       if (schedulePromises.length === 0) {
-        toast.error('No platforms selected to schedule')
+        toast.error('No content available to schedule')
         return
       }
 

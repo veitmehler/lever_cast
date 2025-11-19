@@ -37,20 +37,81 @@ async function getFacebookPages(userId: string): Promise<FacebookPage[]> {
     throw new Error('Facebook access token expired. Please reconnect your account.')
   }
 
-  const accessToken = decrypt(connection.accessToken)
+  let accessToken: string
+  try {
+    accessToken = decrypt(connection.accessToken)
+    
+    // Validate decrypted token
+    if (!accessToken || accessToken.trim().length === 0) {
+      throw new Error('Facebook access token is empty or invalid. Please reconnect your Facebook account.')
+    }
+    
+    // Check if token looks valid (Facebook tokens typically start with certain patterns)
+    if (accessToken.length < 20) {
+      throw new Error('Facebook access token appears to be corrupted. Please reconnect your Facebook account.')
+    }
+    
+    console.log('[Facebook API] Decrypted token preview:', accessToken.substring(0, 20) + '...')
+  } catch (decryptError) {
+    console.error('[Facebook API] Failed to decrypt access token:', decryptError)
+    throw new Error('Facebook access token decryption failed. Please reconnect your Facebook account.')
+  }
 
-  // Get user's pages
+  // Debug token first to verify it's valid (optional check)
+  // Note: We can use the user token itself for debugging, or skip if it fails
+  try {
+    const debugResponse = await fetch(
+      `${FACEBOOK_API_BASE}/debug_token?input_token=${accessToken}&access_token=${accessToken}`
+    )
+    
+    if (debugResponse.ok) {
+      const debugData = await debugResponse.json()
+      console.log('[Facebook API] Token debug info:', {
+        isValid: debugData.data?.is_valid,
+        appId: debugData.data?.app_id,
+        userId: debugData.data?.user_id,
+        expiresAt: debugData.data?.expires_at,
+        scopes: debugData.data?.scopes,
+      })
+      
+      if (!debugData.data?.is_valid) {
+        throw new Error('Facebook access token is invalid. Please reconnect your Facebook account.')
+      }
+    }
+  } catch (debugError) {
+    // Continue even if debug fails - the actual API call will reveal the real issue
+    console.warn('[Facebook API] Token debug check failed, continuing:', debugError)
+  }
+
+  // Get user's pages with specific fields
+  // Note: We need to request 'access_token' field to get Page access tokens
   const pagesResponse = await fetch(
-    `${FACEBOOK_API_BASE}/me/accounts?access_token=${accessToken}`
+    `${FACEBOOK_API_BASE}/me/accounts?access_token=${accessToken}&fields=id,name,access_token`
   )
 
   if (!pagesResponse.ok) {
     const errorText = await pagesResponse.text()
+    let errorData: any
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {
+      errorData = { error: { message: errorText } }
+    }
+    
     console.error('[Facebook API] Failed to fetch pages:', {
       status: pagesResponse.status,
-      error: errorText,
+      error: errorData,
+      accessTokenLength: accessToken.length,
+      accessTokenPreview: accessToken.substring(0, 20) + '...',
+      tokenStartsWithEA: accessToken.startsWith('EA'), // Facebook tokens typically start with 'EA'
     })
-    throw new Error(`Failed to fetch Facebook pages: ${pagesResponse.status}`)
+    
+    // Handle specific OAuth errors
+    if (pagesResponse.status === 401 || errorData.error?.code === 190) {
+      throw new Error('Facebook access token expired or invalid. Please reconnect your Facebook account.')
+    }
+    
+    throw new Error(`Failed to fetch Facebook pages: ${pagesResponse.status} - ${errorData.error?.message || 'Unknown error'}`)
   }
 
   const pagesData = await pagesResponse.json()

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import { encrypt } from '@/lib/encryption'
+import { encrypt, decrypt } from '@/lib/encryption'
 import { verifyOAuthState } from '@/lib/oauth'
+import { fetchInstagramUsername as fetchInstagramUsernameUtil } from '@/lib/instagramUsername'
 
 // Valid platform names
 const VALID_PLATFORMS = ['linkedin', 'twitter', 'facebook', 'instagram', 'threads']
@@ -35,10 +36,22 @@ const INSTAGRAM_CLIENT_SECRET = process.env.INSTAGRAM_CLIENT_SECRET || process.e
 const INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/instagram/callback`
 
-const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID
-const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET
-const THREADS_REDIRECT_URI = process.env.THREADS_REDIRECT_URI || 
-  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/threads/callback`
+// Threads requires its own Client ID and Secret (separate from Facebook)
+// Threads OAuth REQUIRES HTTPS - cannot use HTTP even for localhost
+const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID
+const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET
+// For local development, you must use an HTTPS URL (e.g., ngrok: https://your-domain.ngrok.io)
+const getThreadsRedirectUri = () => {
+  if (process.env.THREADS_REDIRECT_URI) {
+    return process.env.THREADS_REDIRECT_URI
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  if (baseUrl.startsWith('https://')) {
+    return `${baseUrl}/api/social/threads/callback`
+  }
+  return `${baseUrl}/api/social/threads/callback`
+}
+const THREADS_REDIRECT_URI = getThreadsRedirectUri()
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -439,65 +452,304 @@ function isAppTypeColumnError(error: any) {
       }
 
       const tokenData = await tokenResponse.json()
-      console.log('[Instagram OAuth] Token exchange successful', {
+      console.log('[Instagram OAuth] Token exchange successful (user token)', {
         expires_in: tokenData.expires_in,
         token_type: tokenData.token_type,
       })
-      accessToken = tokenData.access_token
-      refreshToken = null
-      tokenExpiry = tokenData.expires_in 
-        ? new Date(Date.now() + tokenData.expires_in * 1000)
-        : null
+      
+      // Exchange short-lived user token for long-lived token (60 days)
+      const shortLivedUserToken = tokenData.access_token
+      const longLivedUserTokenResponse = await fetch(
+        `https://graph.facebook.com/v24.0/oauth/access_token?` +
+        `grant_type=fb_exchange_token&` +
+        `client_id=${INSTAGRAM_CLIENT_ID}&` +
+        `client_secret=${INSTAGRAM_CLIENT_SECRET}&` +
+        `fb_exchange_token=${shortLivedUserToken}`
+      )
 
-      // Fetch Instagram Business Account info
-      // First get pages to find Instagram account
+      let userAccessToken = shortLivedUserToken
+      if (longLivedUserTokenResponse.ok) {
+        const longLivedTokenData = await longLivedUserTokenResponse.json()
+        userAccessToken = longLivedTokenData.access_token
+        const expiresIn = longLivedTokenData.expires_in || 5184000 // Default to 60 days
+        tokenExpiry = new Date(Date.now() + expiresIn * 1000)
+        console.log('[Instagram OAuth] Long-lived user token obtained', {
+          expires_in: expiresIn,
+          expires_at: tokenExpiry.toISOString(),
+        })
+      } else {
+        tokenExpiry = tokenData.expires_in 
+          ? new Date(Date.now() + tokenData.expires_in * 1000)
+          : null
+      }
+
+      // Fetch pages with Instagram Business Account field
+      // Try fetching with user token first to see if instagram_business_account is returned
+      // Note: account_type is not available in nested queries, only id and username
       const pagesResponse = await fetch(
-        `https://graph.facebook.com/v24.0/me/accounts?access_token=${accessToken}&fields=instagram_business_account`
+        `https://graph.facebook.com/v24.0/me/accounts?access_token=${userAccessToken}&fields=id,name,access_token,instagram_business_account{id,username}`
       )
 
       if (!pagesResponse.ok) {
+        const errorText = await pagesResponse.text()
+        console.error('[Instagram OAuth] Failed to fetch pages:', {
+          status: pagesResponse.status,
+          error: errorText,
+        })
         return redirectWithCleanup('/settings?error=profile_fetch_failed')
       }
 
       const pagesData = await pagesResponse.json()
-      const page = pagesData.data?.find((p: any) => p.instagram_business_account)
+      const pages = pagesData.data || []
       
-      if (!page?.instagram_business_account) {
+      console.log('[Instagram OAuth] Found pages:', pages.map((p: any) => ({ 
+        id: p.id, 
+        name: p.name,
+        has_instagram: !!p.instagram_business_account,
+        instagram_id: p.instagram_business_account?.id,
+      })))
+      
+      // Try to find page with Instagram account from initial fetch
+      let pageWithInstagram = pages.find((p: any) => p.instagram_business_account)
+      let pageAccessToken: string | null = null
+      
+      // If not found in initial fetch, check each page individually with Page access token
+      if (!pageWithInstagram) {
+        console.log('[Instagram OAuth] Instagram account not found in initial fetch, checking pages individually...')
+        
+        for (const page of pages) {
+          if (!page.access_token) {
+            console.warn(`[Instagram OAuth] Page ${page.id} has no access token, skipping`)
+            continue
+          }
+          
+          // Try multiple approaches to find Instagram account
+          // Approach 1: Query page directly with Page access token
+          const pageCheckResponse = await fetch(
+            `https://graph.facebook.com/v24.0/${page.id}?access_token=${page.access_token}&fields=id,name,instagram_business_account{id,username}`
+          )
+          
+          if (pageCheckResponse.ok) {
+            const pageInfo = await pageCheckResponse.json()
+            console.log(`[Instagram OAuth] Checking page ${page.id} (${page.name}):`, {
+              has_instagram: !!pageInfo.instagram_business_account,
+              instagram_id: pageInfo.instagram_business_account?.id,
+              instagram_username: pageInfo.instagram_business_account?.username,
+            })
+            
+            if (pageInfo.instagram_business_account) {
+              pageWithInstagram = pageInfo
+              pageAccessToken = page.access_token
+              break
+            }
+          } else {
+            const errorText = await pageCheckResponse.text()
+            console.warn(`[Instagram OAuth] Failed to check page ${page.id}:`, {
+              status: pageCheckResponse.status,
+              error: errorText,
+            })
+          }
+          
+          // Approach 2: Try querying Instagram accounts directly via /me/accounts with Page token
+          // This might work if the Page token has Instagram permissions
+          if (!pageWithInstagram) {
+              const igAccountsResponse = await fetch(
+                `https://graph.facebook.com/v24.0/me/accounts?access_token=${page.access_token}&fields=id,name,instagram_business_account{id,username}`
+              )
+            
+            if (igAccountsResponse.ok) {
+              const igAccountsData = await igAccountsResponse.json()
+              const pageWithIg = igAccountsData.data?.find((p: any) => p.id === page.id && p.instagram_business_account)
+              if (pageWithIg) {
+                console.log(`[Instagram OAuth] Found Instagram account via /me/accounts with Page token for page ${page.id}`)
+                pageWithInstagram = pageWithIg
+                pageAccessToken = page.access_token
+                break
+              }
+            }
+          }
+        }
+      } else {
+        // Found Instagram account in initial fetch, use that page's access token
+        pageAccessToken = pageWithInstagram.access_token
+      }
+      
+      // Check granular scopes to find Instagram account ID directly
+      // Meta's granular scopes grant instagram_content_publish to specific Instagram account IDs
+      const debugTokenResponse = await fetch(
+        `https://graph.facebook.com/v24.0/debug_token?input_token=${userAccessToken}&access_token=${INSTAGRAM_CLIENT_ID}|${INSTAGRAM_CLIENT_SECRET}`
+      )
+      
+      let instagramAccountId: string | null = null
+      let debugData: any = null
+      
+      if (debugTokenResponse.ok) {
+        debugData = await debugTokenResponse.json()
+        const granularScopes = debugData.data?.granular_scopes || []
+        
+        // Find instagram_content_publish granular scope to get Instagram account ID
+        const instagramScope = granularScopes.find((scope: any) => scope.scope === 'instagram_content_publish')
+        if (instagramScope?.target_ids && instagramScope.target_ids.length > 0) {
+          instagramAccountId = instagramScope.target_ids[0]
+          console.log('[Instagram OAuth] Found Instagram account ID from granular scopes:', instagramAccountId)
+        }
+      }
+      
+      // If we found Instagram account ID from granular scopes, use it directly
+      // Meta's granular scopes grant instagram_content_publish to this specific Instagram account
+      // Even if we can't query the account details immediately, we can create the connection
+      if (instagramAccountId && !pageWithInstagram?.instagram_business_account && pages.length > 0) {
+        console.log('[Instagram OAuth] Using Instagram account ID from granular scopes directly')
+        
+        // Use the first page's access token (should work for Instagram API)
+        const firstPage = pages[0]
+        if (firstPage.access_token) {
+          // Try to get Instagram account details using the Page token
+          // If this fails, we'll still create the connection with the ID we have
+          let igAccountDetails: any = {
+            id: instagramAccountId,
+            username: 'Instagram User', // Default, will be updated when we can query it
+            account_type: 'BUSINESS',
+          }
+          
+          // Try multiple ways to get Instagram account details
+          // Method 1: Try querying via Page's instagram_business_account field
+          const pageWithIgResponse = await fetch(
+            `https://graph.facebook.com/v24.0/${firstPage.id}?access_token=${firstPage.access_token}&fields=instagram_business_account{id,username}`
+          )
+          
+          if (pageWithIgResponse.ok) {
+            const pageData = await pageWithIgResponse.json()
+            if (pageData.instagram_business_account && pageData.instagram_business_account.id === instagramAccountId) {
+              igAccountDetails = pageData.instagram_business_account
+              console.log('[Instagram OAuth] Got Instagram account details via Page field:', igAccountDetails)
+            }
+          }
+          
+          // Method 2: Try querying Instagram account directly (might work with Page token)
+          if (igAccountDetails.username === 'Instagram User') {
+            const igDirectResponse = await fetch(
+              `https://graph.facebook.com/v24.0/${instagramAccountId}?access_token=${firstPage.access_token}&fields=id,username,account_type`
+            )
+            
+            if (igDirectResponse.ok) {
+              igAccountDetails = await igDirectResponse.json()
+              console.log('[Instagram OAuth] Got Instagram account details via direct query:', igAccountDetails)
+            } else {
+              console.log('[Instagram OAuth] Cannot query Instagram account details directly, using ID from granular scopes')
+              // We'll use the ID we have - the username can be fetched later when posting
+            }
+          }
+          
+          // Create connection with Instagram account (even if we don't have full details)
+          pageWithInstagram = {
+            id: firstPage.id,
+            name: firstPage.name,
+            instagram_business_account: igAccountDetails,
+          }
+          pageAccessToken = firstPage.access_token
+          console.log('[Instagram OAuth] Creating connection with Instagram account ID:', instagramAccountId)
+        }
+      }
+      
+      if (!pageWithInstagram?.instagram_business_account || !pageAccessToken) {
+        console.error('[Instagram OAuth] No Instagram account found on any page. Checked pages:', pages.map((p: any) => ({ id: p.id, name: p.name })))
+        
+        // Check if user token has instagram_content_publish permission
+        if (debugData) {
+          const permissions = debugData.data?.scopes || []
+          const hasInstagramPublish = permissions.includes('instagram_content_publish')
+          
+          console.log('[Instagram OAuth] Token permissions:', permissions)
+          
+          if (!hasInstagramPublish) {
+            console.error('[Instagram OAuth] Missing instagram_content_publish permission. This requires App Review.')
+            return redirectWithCleanup('/settings?error=instagram_permission_required')
+          }
+        }
+        
         return redirectWithCleanup('/settings?error=no_instagram_account')
       }
 
-      const igAccountResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${page.instagram_business_account.id}?access_token=${accessToken}&fields=id,username`
-      )
+      // Store Page access token (Instagram API requires Page token, not user token)
+      // But also store user token in refreshToken field (since Instagram doesn't use refresh tokens)
+      // We need user token to fetch username via /me/accounts
+      accessToken = pageAccessToken
+      refreshToken = userAccessToken // Store user token here for username fetching
+      // Note: Page tokens don't expire the same way, but we'll use the user token expiry as reference
 
-      if (!igAccountResponse.ok) {
-        return redirectWithCleanup('/settings?error=profile_fetch_failed')
+      // Get Instagram account details (may already be in pageWithInstagram.instagram_business_account)
+      const igAccount = pageWithInstagram.instagram_business_account
+      
+      if (!igAccount.id) {
+        // If we don't have full Instagram account info, fetch it
+        const igAccountResponse = await fetch(
+          `https://graph.facebook.com/v24.0/${igAccount.id}?access_token=${pageAccessToken}&fields=id,username,account_type`
+        )
+
+        if (!igAccountResponse.ok) {
+          const errorText = await igAccountResponse.text()
+          console.error('[Instagram OAuth] Failed to fetch Instagram account:', {
+            status: igAccountResponse.status,
+            error: errorText,
+          })
+          return redirectWithCleanup('/settings?error=profile_fetch_failed')
+        }
+
+        const fetchedIgAccount = await igAccountResponse.json()
+        platformUserId = fetchedIgAccount.id
+        platformUsername = fetchedIgAccount.username || 'Instagram User'
+      } else {
+        platformUserId = igAccount.id
+        platformUsername = igAccount.username || 'Instagram User'
       }
-
-      const igAccount = await igAccountResponse.json()
-      platformUserId = igAccount.id
-      platformUsername = igAccount.username || 'Instagram User'
+      
+      console.log('[Instagram OAuth] Instagram account found:', {
+        id: platformUserId,
+        username: platformUsername,
+        account_type: igAccount.account_type,
+        page_id: pageWithInstagram.id,
+        page_name: pageWithInstagram.name,
+      })
+      
+      // Store parameters for background username fetch (if username is still default)
+      // Store on request object so it's available after connection is saved
+      if (!platformUsername || platformUsername === 'Instagram User') {
+        (request as any).__instagramFetchParams = {
+          userId: user.id,
+          instagramAccountId: platformUserId,
+          pageAccessToken: pageAccessToken,
+          userAccessToken: userAccessToken, // Store user token for fetching pages
+        }
+      }
 
     } else if (platform === 'threads') {
       if (!THREADS_CLIENT_ID || !THREADS_CLIENT_SECRET) {
         return redirectWithCleanup('/settings?error=oauth_not_configured')
       }
 
-      // Threads uses Facebook OAuth (same flow as Instagram)
+      // Threads OAuth uses its own domain: graph.threads.net (not graph.facebook.com)
+      // Exchange authorization code for access token
       const tokenResponse = await fetch(
-        `https://graph.facebook.com/v24.0/oauth/access_token?` +
-        `client_id=${THREADS_CLIENT_ID}&` +
-        `client_secret=${THREADS_CLIENT_SECRET}&` +
-        `redirect_uri=${encodeURIComponent(THREADS_REDIRECT_URI)}&` +
-        `code=${code}`,
+        `https://graph.threads.net/oauth/access_token`,
         {
-          method: 'GET',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: THREADS_CLIENT_ID,
+            client_secret: THREADS_CLIENT_SECRET,
+            code: code,
+            grant_type: 'authorization_code',
+            redirect_uri: THREADS_REDIRECT_URI,
+          }),
         }
       )
 
       if (!tokenResponse.ok) {
         const error = await tokenResponse.json().catch(() => ({ error: { message: 'Unknown error' } }))
-        console.error('Threads token exchange error:', error)
+        console.error('[Threads OAuth] Token exchange error:', error)
         return redirectWithCleanup(`/settings?error=${encodeURIComponent(error.error?.message || 'token_exchange_failed')}`)
       }
 
@@ -506,39 +758,36 @@ function isAppTypeColumnError(error: any) {
         expires_in: tokenData.expires_in,
         token_type: tokenData.token_type,
       })
+      
+      // Threads API uses the user access token directly (no Page token needed)
       accessToken = tokenData.access_token
-      refreshToken = null
+      refreshToken = null // Threads doesn't use refresh tokens the same way
       tokenExpiry = tokenData.expires_in 
         ? new Date(Date.now() + tokenData.expires_in * 1000)
         : null
 
-      // Fetch Threads account info (similar to Instagram)
-      const pagesResponse = await fetch(
-        `https://graph.facebook.com/v24.0/me/accounts?access_token=${accessToken}&fields=instagram_business_account`
-      )
-
-      if (!pagesResponse.ok) {
-        return redirectWithCleanup('/settings?error=profile_fetch_failed')
-      }
-
-      const pagesData = await pagesResponse.json()
-      const page = pagesData.data?.find((p: any) => p.instagram_business_account)
-      
-      if (!page?.instagram_business_account) {
-        return redirectWithCleanup('/settings?error=no_threads_account')
-      }
-
+      // Fetch Threads account details using /me endpoint
       const threadsAccountResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${page.instagram_business_account.id}?access_token=${accessToken}&fields=id,username`
+        `https://graph.threads.net/v1.0/me?access_token=${accessToken}&fields=id,username`
       )
 
       if (!threadsAccountResponse.ok) {
+        const errorText = await threadsAccountResponse.text()
+        console.error('[Threads OAuth] Failed to fetch Threads account:', {
+          status: threadsAccountResponse.status,
+          error: errorText,
+        })
         return redirectWithCleanup('/settings?error=profile_fetch_failed')
       }
 
       const threadsAccount = await threadsAccountResponse.json()
       platformUserId = threadsAccount.id
       platformUsername = threadsAccount.username || 'Threads User'
+      
+      console.log('[Threads OAuth] Threads account found:', {
+        id: threadsAccount.id,
+        username: threadsAccount.username,
+      })
 
     } else {
       return NextResponse.json(
@@ -601,6 +850,8 @@ function isAppTypeColumnError(error: any) {
       }
     }
 
+    let savedConnectionId: string | null = null
+    
     if (existingConnection) {
       // Update existing connection
       await prisma.socialConnection.update({
@@ -615,6 +866,7 @@ function isAppTypeColumnError(error: any) {
           lastUsed: new Date(),
         },
       })
+      savedConnectionId = existingConnection.id
     } else {
       // Create new connection
       const createData = {
@@ -631,28 +883,63 @@ function isAppTypeColumnError(error: any) {
       }
 
       try {
+        let createdConnection
         if (appTypeColumnAvailable === false) {
           const { appType: _appType, ...legacyData } = createData
-          await prisma.socialConnection.create({
+          createdConnection = await prisma.socialConnection.create({
             data: legacyData,
           })
         } else {
-          await prisma.socialConnection.create({
+          createdConnection = await prisma.socialConnection.create({
             data: createData,
           })
           appTypeColumnAvailable = true
         }
+        savedConnectionId = createdConnection.id
       } catch (createError: any) {
         if (isAppTypeColumnError(createError)) {
           console.warn('[LinkedIn OAuth] appType column not available, creating connection without appType (migration not applied yet)')
           appTypeColumnAvailable = false
           const { appType: _appType, ...legacyData } = createData
-          await prisma.socialConnection.create({
+          const createdConnection = await prisma.socialConnection.create({
             data: legacyData,
           })
+          savedConnectionId = createdConnection.id
         } else {
           throw createError
         }
+      }
+    }
+    
+    // For Instagram, fetch the actual username in the background if we don't have it yet
+    if (platform === 'instagram' && savedConnectionId && (!platformUsername || platformUsername === 'Instagram User')) {
+      const fetchParams = (request as any).__instagramFetchParams
+      if (fetchParams) {
+        // Fire and forget - fetch username asynchronously without blocking the redirect
+        // Use user token from fetchParams (we have it from OAuth), or from refreshToken if stored
+        const userTokenToUse = fetchParams.userAccessToken || (refreshToken ? decrypt(refreshToken) : null)
+        const tokenToUse = userTokenToUse || fetchParams.pageAccessToken
+        const tokenType = userTokenToUse ? 'user' : 'page'
+        
+        fetchInstagramUsernameUtil(
+          savedConnectionId,
+          tokenToUse,
+          fetchParams.instagramAccountId,
+          tokenType
+        ).then(async (username) => {
+          if (username) {
+            // Update connection with fetched username
+            await prisma.socialConnection.update({
+              where: { id: savedConnectionId },
+              data: {
+                platformUsername: username,
+              },
+            })
+            console.log('[Instagram OAuth] Successfully updated username in background:', username)
+          }
+        }).catch((error) => {
+          console.error('[Instagram OAuth] Failed to fetch username in background:', error)
+        })
       }
     }
     

@@ -43,10 +43,26 @@ const INSTAGRAM_CLIENT_SECRET = process.env.INSTAGRAM_CLIENT_SECRET || process.e
 const INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 
   `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/instagram/callback`
 
-const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID // Threads uses Facebook OAuth
-const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET
-const THREADS_REDIRECT_URI = process.env.THREADS_REDIRECT_URI || 
-  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/social/threads/callback`
+// Threads requires its own Client ID and Secret (separate from Facebook)
+// Threads OAuth uses threads.net domain and requires a Threads-specific app
+// IMPORTANT: Threads OAuth REQUIRES HTTPS - cannot use HTTP even for localhost
+const THREADS_CLIENT_ID = process.env.THREADS_CLIENT_ID
+const THREADS_CLIENT_SECRET = process.env.THREADS_CLIENT_SECRET
+// For local development, you must use an HTTPS URL (e.g., ngrok: https://your-domain.ngrok.io)
+// Or set THREADS_REDIRECT_URI environment variable with your HTTPS URL
+const getThreadsRedirectUri = () => {
+  if (process.env.THREADS_REDIRECT_URI) {
+    return process.env.THREADS_REDIRECT_URI
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  // Check if base URL uses HTTPS
+  if (baseUrl.startsWith('https://')) {
+    return `${baseUrl}/api/social/threads/callback`
+  }
+  // For HTTP localhost, return a placeholder that will trigger an error with helpful message
+  return `${baseUrl}/api/social/threads/callback`
+}
+const THREADS_REDIRECT_URI = getThreadsRedirectUri()
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -240,40 +256,80 @@ export async function POST(
         }
 
         // Instagram OAuth 2.0 authorization URL (uses Facebook OAuth)
-        // Scopes for Instagram Business Account posting:
+        // Scopes for Instagram Business Account posting (Instagram Graph API):
         // - pages_show_list: Required to list Facebook Pages connected to Instagram Business Accounts
         // - pages_read_engagement: Required for reading engagement metrics
-        // - instagram_basic: Required dependency for instagram_content_publish (per Facebook permissions docs)
-        // - instagram_content_publish: Required for publishing content to Instagram
+        // - instagram_content_publish: Required for publishing content to Instagram (Instagram Graph API)
+        // - instagram_basic: Required for reading profile metadata of Business accounts (Instagram Graph API)
         // - business_management: Required for managing business accounts
+        // NOTE: instagram_basic and instagram_content_publish are both from Instagram Graph API and are compatible.
+        // The Basic Display API (deprecated) uses user_profile and user_media scopes, which are different.
         const params = new URLSearchParams({
           client_id: INSTAGRAM_CLIENT_ID,
           redirect_uri: INSTAGRAM_REDIRECT_URI,
           state,
-          scope: 'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management',
+          scope: 'pages_show_list,pages_read_engagement,instagram_content_publish,instagram_basic,business_management',
           response_type: 'code',
         })
 
         redirectUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
       } else if (platform === 'threads') {
-        if (!THREADS_CLIENT_ID) {
+        // Threads requires its own Client ID (cannot use Facebook Client ID)
+        // Threads OAuth uses threads.net domain and requires a Threads-specific app
+        const threadsClientId = process.env.THREADS_CLIENT_ID
+        if (!threadsClientId) {
+          console.error('[Threads OAuth] THREADS_CLIENT_ID not set in environment variables')
           return NextResponse.json(
-            { error: 'Threads OAuth not configured. Please set THREADS_CLIENT_ID or FACEBOOK_CLIENT_ID environment variable.' },
+            { error: 'Threads OAuth not configured. Please set THREADS_CLIENT_ID environment variable. Note: Threads requires a separate app ID from Facebook.' },
             { status: 500 }
           )
         }
 
-        // Threads OAuth 2.0 authorization URL (uses Facebook OAuth)
-        // Scopes: threads_basic, threads_content_publish (for Threads posting)
-        const params = new URLSearchParams({
-          client_id: THREADS_CLIENT_ID,
-          redirect_uri: THREADS_REDIRECT_URI,
-          state,
-          scope: 'threads_basic,threads_content_publish,pages_show_list',
-          response_type: 'code',
+        // Threads OAuth REQUIRES HTTPS - check if redirect URI uses HTTPS
+        if (!THREADS_REDIRECT_URI.startsWith('https://')) {
+          console.error('[Threads OAuth] Redirect URI must use HTTPS:', THREADS_REDIRECT_URI)
+          return NextResponse.json(
+            { 
+              error: 'Threads OAuth requires HTTPS. For local development, please:\n' +
+                     '1. Use ngrok or similar tool to create an HTTPS tunnel (e.g., https://your-domain.ngrok.io)\n' +
+                     '2. Set THREADS_REDIRECT_URI environment variable to your HTTPS URL\n' +
+                     '3. Add the HTTPS redirect URI to your Threads app settings in Meta Developer Console\n' +
+                     'Current redirect URI: ' + THREADS_REDIRECT_URI
+            },
+            { status: 500 }
+          )
+        }
+
+        console.log('[Threads OAuth] Initiating OAuth flow', {
+          clientId: threadsClientId.substring(0, 10) + '...',
+          redirectUri: THREADS_REDIRECT_URI,
         })
 
-        redirectUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
+        // Threads OAuth 2.0 authorization URL
+        // IMPORTANT: Threads has its own separate OAuth gateway at threads.net (not facebook.com)
+        // Required scopes:
+        // - threads_basic: Required to know who the user is
+        // - threads_content_publish: Required to post content to Threads
+        // NOTE: Threads uses threads.net domain for OAuth, not facebook.com
+        const params = new URLSearchParams({
+          client_id: threadsClientId,
+          redirect_uri: THREADS_REDIRECT_URI,
+          scope: 'threads_basic,threads_content_publish',
+          response_type: 'code',
+          state,
+        })
+
+        // Try threads.net first (as per guidance), but Threads might redirect to threads.com
+        const oauthUrl = `https://threads.net/oauth/authorize?${params.toString()}`
+        console.log('[Threads OAuth] Generated OAuth URL (first 150 chars):', oauthUrl.substring(0, 150))
+        console.log('[Threads OAuth] Full params:', {
+          client_id: threadsClientId ? threadsClientId.substring(0, 10) + '...' : 'MISSING',
+          redirect_uri: THREADS_REDIRECT_URI,
+          scope: 'threads_basic,threads_content_publish',
+          response_type: 'code',
+          has_state: !!state,
+        })
+        redirectUrl = oauthUrl
       } else {
         return NextResponse.json(
           { error: `Unsupported platform: ${platform}` },

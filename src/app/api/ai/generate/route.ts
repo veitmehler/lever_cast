@@ -202,6 +202,14 @@ First you will receive your context, then you will receive your task.`
     systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
   }
   
+  // Log the prompts for debugging
+  console.log(`\n========== OPENAI SYSTEM MESSAGE ==========`)
+  console.log(systemMessage)
+  console.log(`========== END SYSTEM MESSAGE ==========\n`)
+  console.log(`\n========== OPENAI USER PROMPT ==========`)
+  console.log(prompt)
+  console.log(`========== END USER PROMPT (${prompt.length} characters) ==========\n`)
+  
   const response = await openai.chat.completions.create({
     model,
     messages: [
@@ -239,6 +247,14 @@ First you will receive your context, then you will receive your task.`
     systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
   }
   
+  // Log the prompts for debugging
+  console.log(`\n========== ANTHROPIC SYSTEM MESSAGE ==========`)
+  console.log(systemMessage)
+  console.log(`========== END SYSTEM MESSAGE ==========\n`)
+  console.log(`\n========== ANTHROPIC USER PROMPT ==========`)
+  console.log(prompt)
+  console.log(`========== END USER PROMPT (${prompt.length} characters) ==========\n`)
+  
   const response = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
@@ -256,7 +272,7 @@ First you will receive your context, then you will receive your task.`
 }
 
 // Generate content using Google Gemini
-async function generateWithGemini(apiKey: string, prompt: string, maxTokens: number, model: string = 'gemini-pro', writingStyle?: string | null): Promise<string> {
+async function generateWithGemini(apiKey: string, prompt: string, maxTokens: number, model: string = 'gemini-pro', writingStyle?: string | null, characterLimit?: number): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey)
   
   let systemMessage = `# ROLE:
@@ -265,29 +281,147 @@ You are a world-class social media content creator. You create highly engaging, 
 
 You analyze the topic and write them in a way that resonates with the perfect target audience for the topic.
 
-You are the world's best at what you do.
+You are the world's best at what you do.`
 
-First you will receive your context, then you will receive your task.`
+  if (characterLimit) {
+    systemMessage += `\n\n# CRITICAL CHARACTER LIMIT:\n\nYour response MUST be EXACTLY ${characterLimit} characters or FEWER. This is a HARD LIMIT that CANNOT be exceeded.\n\nIMPORTANT RULES:\n- Count your characters CAREFULLY before responding\n- Your response MUST be ${characterLimit} characters or LESS\n- If your draft exceeds ${characterLimit} characters, SHORTEN it until it fits\n- DO NOT exceed ${characterLimit} characters under ANY circumstances\n- Be concise and impactful within this limit`
+  }
 
   if (writingStyle && writingStyle.trim()) {
     systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
   }
   
-  const genModel = genAI.getGenerativeModel({ 
+  // For Gemini, check prompt length and handle accordingly
+  // Very long prompts (>30k chars) can cause issues, so we'll use systemInstruction for those
+  // For Gemini, always use systemInstruction mode for cleaner separation
+  // This helps prevent the model from getting confused by the large context in the user prompt
+  const promptLength = prompt.length
+  
+  let genModel
+  let result
+  
+  console.log(`[Gemini] Using systemInstruction mode (prompt length: ${promptLength} chars)`)
+  
+  // Log the system instruction
+  console.log(`\n========== GEMINI SYSTEM INSTRUCTION ==========`)
+  console.log(systemMessage)
+  console.log(`========== END SYSTEM INSTRUCTION ==========\n`)
+  
+  // Log the user prompt
+  console.log(`\n========== GEMINI USER PROMPT ==========`)
+  console.log(prompt)
+  console.log(`========== END USER PROMPT (${prompt.length} characters) ==========\n`)
+  
+  genModel = genAI.getGenerativeModel({ 
     model,
     systemInstruction: systemMessage,
     generationConfig: {
-      maxOutputTokens: maxTokens,
+      maxOutputTokens: maxTokens, // We set this high to avoid API truncation
       temperature: 0.7,
     },
   })
   
-  const fullPrompt = `${systemMessage}\n\n${prompt}`
+  // Pass the prompt as-is without additional wrapper instructions
+  result = await genModel.generateContent(prompt)
   
-  const result = await genModel.generateContent(fullPrompt)
+  console.log(`[Gemini] Generating with model: ${model}, maxTokens: ${maxTokens}, characterLimit: ${characterLimit || 'none'}`)
 
-  const response = await result.response
-  return response.text()
+  let response
+  let generatedText = ''
+  
+  try {
+    response = await result.response
+    generatedText = response.text() || ''
+    
+    // Check for blocked content or safety filters
+    if (response.promptFeedback?.blockReason) {
+      console.error('[Gemini] Content blocked:', response.promptFeedback.blockReason)
+      throw new Error(`Gemini blocked the content: ${response.promptFeedback.blockReason}. Please try a different idea or provider.`)
+    }
+    
+    // Check if candidates were filtered
+    if (response.candidates && response.candidates.length > 0) {
+      const candidate = response.candidates[0]
+      if (candidate.finishReason === 'SAFETY') {
+        console.error('[Gemini] Content filtered by safety filters')
+        throw new Error('Gemini filtered the content due to safety concerns. Please try a different idea or provider.')
+      }
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        console.warn('[Gemini] Response truncated due to max tokens')
+        // This is okay, we'll use what we got
+      }
+    }
+  } catch (error: any) {
+    console.error('[Gemini] Error processing response:', error)
+    console.error('[Gemini] Response object:', {
+      candidates: response?.candidates,
+      promptFeedback: response?.promptFeedback,
+    })
+    
+    if (error?.message?.includes('blocked') || error?.message?.includes('SAFETY')) {
+      throw error // Re-throw safety errors
+    }
+    
+    throw new Error(`Gemini API error: ${error?.message || 'Unknown error'}`)
+  }
+  
+  // Handle empty or very short responses
+  if (!generatedText || generatedText.trim().length === 0) {
+    console.error('[Gemini] Empty response received from API')
+    console.error('[Gemini] Response details:', {
+      candidates: response?.candidates,
+      promptFeedback: response?.promptFeedback,
+      finishReason: response?.candidates?.[0]?.finishReason,
+    })
+    throw new Error('Gemini returned an empty response. This may be due to safety filters, token limits, or the prompt being too long. Please try again or use a different provider.')
+  }
+  
+  console.log(`[Gemini] Generated text length: ${generatedText.length} characters`)
+  console.log(`[Gemini] Generated text preview: ${generatedText.substring(0, 200)}...`)
+  
+  // Always enforce character limit immediately after generation (before retry logic)
+  if (characterLimit && generatedText.length > characterLimit) {
+    console.warn(`[Gemini] Generated text exceeds limit: ${generatedText.length} > ${characterLimit}, will truncate after validation`)
+  }
+  
+  // Check if Gemini just returned the raw idea or prompt structure (common issue)
+  if (generatedText.trim().length < 50 || generatedText.includes('# RAW IDEA:') || generatedText.includes('# CONTEXT:')) {
+    console.warn('[Gemini] Warning: Response appears to contain prompt structure or is too short. Retrying with clearer instructions...')
+    
+    // Retry with a simpler, more direct prompt
+    const retryPrompt = `Based on this idea: "${prompt.match(/RAW IDEA:\s*\n\s*(.+?)(?:\n\n|$)/i)?.[1]?.trim() || 'the provided idea'}", create an engaging social media post. ${characterLimit ? `Keep it under ${characterLimit} characters.` : ''} Return ONLY the post content, nothing else.`
+    
+    const retryResult = await genModel.generateContent(`${systemMessage}\n\n${retryPrompt}`)
+    const retryResponse = await retryResult.response
+    const retryText = retryResponse.text()
+    
+    if (retryText.trim().length > 50 && !retryText.includes('# RAW IDEA:') && !retryText.includes('# CONTEXT:')) {
+      console.log('[Gemini] Retry successful, using retry result')
+      generatedText = retryText
+    } else {
+      console.error('[Gemini] Retry also failed, Gemini may not be following instructions properly')
+      throw new Error('Gemini failed to generate content. Please try again or use a different AI provider.')
+    }
+  }
+  
+  // Also check if the generated text is suspiciously similar to the raw idea
+  // (This is a simple check - if the generated text contains most of the raw idea verbatim, it's likely just echoing)
+  const rawIdeaLower = prompt.toLowerCase().match(/raw idea:\s*\n\s*(.+?)(?:\n\n|$)/i)?.[1]?.trim()
+  if (rawIdeaLower && generatedText.toLowerCase().includes(rawIdeaLower.substring(0, Math.min(50, rawIdeaLower.length)))) {
+    const similarity = rawIdeaLower.split(' ').filter(word => generatedText.toLowerCase().includes(word.toLowerCase())).length / rawIdeaLower.split(' ').length
+    if (similarity > 0.7) {
+      console.warn(`[Gemini] Warning: Generated text appears to be too similar to raw idea (${Math.round(similarity * 100)}% similarity). This might indicate Gemini is echoing instead of generating.`)
+    }
+  }
+  
+  // Note: Truncation happens later in the main function using actual platform limits
+  // We don't truncate here since we don't have platform info and want to preserve content
+  // that's within safety buffer limits but might exceed them slightly
+  if (characterLimit) {
+    console.log(`[Gemini] Generated text length: ${generatedText.length}/${characterLimit} characters (safety buffer)`)
+  }
+  
+  return generatedText
 }
 
 // Generate content using OpenRouter (supports multiple models)
@@ -305,6 +439,14 @@ First you will receive your context, then you will receive your task.`
   if (writingStyle && writingStyle.trim()) {
     systemMessage += `\n\n# WRITING STYLE:\n\n${writingStyle.trim()}`
   }
+  
+  // Log the prompts for debugging
+  console.log(`\n========== OPENROUTER SYSTEM MESSAGE ==========`)
+  console.log(systemMessage)
+  console.log(`========== END SYSTEM MESSAGE ==========\n`)
+  console.log(`\n========== OPENROUTER USER PROMPT ==========`)
+  console.log(prompt)
+  console.log(`========== END USER PROMPT (${prompt.length} characters) ==========\n`)
   
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -529,11 +671,32 @@ export async function POST(request: NextRequest) {
             ? template?.threadsTemplate || null
             : template?.twitterTemplate)
       
-      const maxTokens = plat === 'linkedin' || plat === 'facebook' || plat === 'instagram' || plat === 'telegram'
-        ? 1000 
-        : plat === 'threads'
-        ? 300 // Threads has 500 char limit, so fewer tokens
-        : (isTwitterThread ? 2000 : 200) // More tokens for threads
+      // Character limits per platform (with safety buffer)
+      const charLimits: Record<string, number> = {
+        linkedin: 2500,
+        twitter: 270, // 270 instead of 280 to provide safety margin and avoid truncation
+        facebook: 1800,
+        instagram: 1800,
+        telegram: 900,
+        threads: 450,
+      }
+      const characterLimit = charLimits[plat] || 3000
+      
+      // Calculate maxTokens
+      // For Gemini, we need to be VERY generous with maxTokens to avoid "MAX_TOKENS" finish reason errors.
+      // We set a high hard limit (4000) to ensure it never truncates on the API side.
+      // We will strictly enforce the character limit via post-processing truncation.
+      let maxTokens: number
+      if (selectedProvider === 'gemini') {
+        maxTokens = 4000
+      } else {
+        // Other providers: Use standard calculation
+        maxTokens = plat === 'linkedin' || plat === 'facebook' || plat === 'instagram' || plat === 'telegram'
+          ? 1000 
+          : plat === 'threads'
+          ? 300 // Threads has 450 char limit, so fewer tokens
+          : (isTwitterThread ? 2000 : 200) // More tokens for threads
+      }
       
       // Build prompt using the new structure
       let prompt = `# CONTEXT:\n\n## RAW IDEA:\n\n${rawIdea}\n\n`
@@ -556,8 +719,8 @@ export async function POST(request: NextRequest) {
         // THREAD MODE PROMPT
         prompt += `3. Your task now is to create a Twitter/X thread with multiple posts based on the RAW IDEA.\n\n`
         prompt += `STRUCTURE:\n`
-        prompt += `1. Post 1 (Summary): Create an engaging summary/hook post (under 280 characters) that introduces the topic and encourages readers to continue. This will be the main tweet.\n\n`
-        prompt += `2. Posts 2-N (Replies): Extract 1-8 key insights from the RAW IDEA. Each insight should be its own reply post (under 280 characters each).\n\n`
+        prompt += `1. Post 1 (Summary): Create an engaging summary/hook post (under 270 characters) that introduces the topic and encourages readers to continue. This will be the main tweet.\n\n`
+        prompt += `2. Posts 2-N (Replies): Extract 1-8 key insights from the RAW IDEA. Each insight should be its own reply post (under 270 characters each).\n\n`
         prompt += `3. Randomly decide how many insights (between 1-8) based on the depth and complexity of the RAW IDEA.\n\n`
         prompt += `FORMAT: Return the thread as a JSON array where:\n`
         prompt += `- First element: The summary post (no numbering, just the post text)\n`
@@ -582,20 +745,29 @@ export async function POST(request: NextRequest) {
           prompt += `4. Create a post that feels natural, engaging, and resonates with your selected target audience.\n\n`
         }
         
-        if (plat === 'twitter') {
-          prompt += `IMPORTANT: Keep the post under 280 characters.\n\n`
-        } else if (plat === 'threads') {
-          prompt += `IMPORTANT: Keep the post under 500 characters. Make it concise and engaging for Threads.\n\n`
-        } else if (plat === 'telegram') {
-          prompt += `IMPORTANT: Keep the post under 1,000 characters. Make it concise and engaging for Telegram.\n\n`
-        } else if (plat === 'facebook' || plat === 'instagram') {
-          prompt += `IMPORTANT: Keep the post under 2,000 characters. Make it engaging and suitable for ${platformName}'s audience.\n\n`
-        } else {
-          prompt += `Keep it professional and engaging, suitable for LinkedIn.\n\n`
-        }
+        // Add explicit character limit instructions (especially important for Gemini)
+        const limitInstruction = selectedProvider === 'gemini'
+          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters carefully. If your draft is too long, SHORTEN it.`
+          : plat === 'twitter'
+          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
+          : plat === 'threads'
+          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
+          : plat === 'telegram'
+          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
+          : plat === 'facebook' || plat === 'instagram'
+          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a hard limit. Count your characters and ensure you stay within this limit. Make it engaging and suitable for ${platformName}'s audience.`
+          : `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a hard limit. Count your characters and ensure you stay within this limit. Keep it professional and engaging, suitable for LinkedIn.`
         
-        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", "# FACEBOOK POST:", "# INSTAGRAM POST:", "# TELEGRAM POST:", "# THREADS POST:", or any other headers. Return ONLY the actual post text that would be published on ${platformName}.`
+        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", "# FACEBOOK POST:", "# INSTAGRAM POST:", "# TELEGRAM POST:", "# THREADS POST:", or any other headers. Return ONLY the actual post text that would be published on ${platformName}.\n\n`
+        
+        // Place the limit instruction at the VERY END for recency bias for ALL providers
+        prompt += `${limitInstruction}`
       }
+
+      // Log the full prompt for debugging
+      console.log(`\n========== FULL PROMPT FOR ${plat.toUpperCase()} (${selectedProvider}) ==========`)
+      console.log(prompt)
+      console.log(`========== END PROMPT (${prompt.length} characters) ==========\n`)
 
       try {
         let generatedContent = ''
@@ -611,7 +783,10 @@ export async function POST(request: NextRequest) {
             generatedContent = await generateWithAnthropic(apiKey, prompt, maxTokens, selectedModel || 'claude-3-5-sonnet-20241022', writingStyle)
             break
           case 'gemini':
-            generatedContent = await generateWithGemini(apiKey, prompt, maxTokens, selectedModel || 'gemini-pro', writingStyle)
+            // For Twitter threads, don't pass characterLimit because the response is a JSON array, not a single post
+            // Each tweet in the array should be under 280 chars, but that's handled in the prompt instructions
+            const geminiCharacterLimit = isTwitterThread ? undefined : characterLimit
+            generatedContent = await generateWithGemini(apiKey, prompt, maxTokens, selectedModel || 'gemini-pro', writingStyle, geminiCharacterLimit)
             break
           case 'openrouter':
             generatedContent = await generateWithOpenRouter(apiKey, prompt, maxTokens, selectedModel || 'openai/gpt-4o-mini', writingStyle)
@@ -682,7 +857,7 @@ export async function POST(request: NextRequest) {
                   
                   return cleaned
                 })
-                .filter(tweet => tweet.length > 0 && tweet.length <= 280)
+                .filter(tweet => tweet.length > 0 && tweet.length <= 270)
               
               if (validTweets.length === 0) {
                 throw new Error('No valid tweets in thread')
@@ -729,7 +904,7 @@ export async function POST(request: NextRequest) {
                   
                   return cleanSingleTweet(cleaned)
                 })
-                .filter(tweet => tweet.length > 0 && tweet.length <= 280)
+                .filter(tweet => tweet.length > 0 && tweet.length <= 270)
               
               if (tweets.length > 0) {
                 result[plat] = JSON.stringify(tweets)
@@ -744,15 +919,32 @@ export async function POST(request: NextRequest) {
           // SINGLE POST MODE: Store as plain string
           generatedContent = cleanGeneratedContent(generatedContent)
           
-          // Enforce character limits
+          // Truncate only if content exceeds actual platform limits (not safety buffer)
+          // Actual platform limits for truncation
           if (plat === 'twitter' && generatedContent.length > 280) {
-            generatedContent = generatedContent.substring(0, 277) + '...'
+            const truncated = generatedContent.substring(0, 277)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 250 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
           } else if (plat === 'threads' && generatedContent.length > 500) {
-            generatedContent = generatedContent.substring(0, 497) + '...'
+            const truncated = generatedContent.substring(0, 497)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 450 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
           } else if (plat === 'telegram' && generatedContent.length > 1000) {
-            generatedContent = generatedContent.substring(0, 997) + '...'
-          } else if ((plat === 'facebook' || plat === 'instagram') && generatedContent.length > 2000) {
-            generatedContent = generatedContent.substring(0, 1997) + '...'
+            const truncated = generatedContent.substring(0, 997)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 900 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
+          } else if (plat === 'facebook' && generatedContent.length > 2000) {
+            const truncated = generatedContent.substring(0, 1997)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 1800 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
+          } else if (plat === 'instagram' && generatedContent.length > 2000) {
+            const truncated = generatedContent.substring(0, 1997)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 1800 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
+          } else if (plat === 'linkedin' && generatedContent.length > 3000) {
+            const truncated = generatedContent.substring(0, 2997)
+            const lastSpace = truncated.lastIndexOf(' ')
+            generatedContent = lastSpace > 2500 ? truncated.substring(0, lastSpace).trim() + '...' : truncated + '...'
           }
 
           result[plat] = generatedContent || rawIdea

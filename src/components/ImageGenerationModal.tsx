@@ -31,6 +31,15 @@ export function ImageGenerationModal({
   const [availableModels, setAvailableModels] = useState<Array<{ value: string; label: string }>>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false)
+  const [promptError, setPromptError] = useState<string | null>(null)
+  
+  // LLM provider and model for prompt generation
+  const [llmProvider, setLlmProvider] = useState<string>('')
+  const [llmModel, setLlmModel] = useState<string>('')
+  const [availableLlmProviders, setAvailableLlmProviders] = useState<Array<{ value: string; label: string }>>([])
+  const [availableLlmModels, setAvailableLlmModels] = useState<Array<{ value: string; label: string }>>([])
+  const [isLoadingLlmModels, setIsLoadingLlmModels] = useState(false)
+  
   // defaultImageProvider and defaultImageStyle are reserved for future use
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [defaultImageProvider, setDefaultImageProvider] = useState<string | null>(null)
@@ -41,8 +50,16 @@ export function ImageGenerationModal({
   // Load settings on mount
   useEffect(() => {
     if (isOpen) {
+      // Reset state
+      setSettingsLoaded(false)
+      setPrompt('')
+      setPromptError(null)
+      
+      // Load settings (which will call loadAvailableLlmProviders internally after settings load)
       loadSettings()
-      generateInitialPrompt() // This is now async but we don't need to await it
+    } else {
+      // Reset when modal closes
+      setSettingsLoaded(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, postContent])
@@ -54,6 +71,43 @@ export function ImageGenerationModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, provider])
+
+  // Track if settings have been loaded to prevent race conditions
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+
+  // Load LLM models when LLM provider changes
+  useEffect(() => {
+    if (isOpen && llmProvider) {
+      loadLlmModels()
+    } else {
+      setAvailableLlmModels([])
+      // Only clear model if settings haven't been loaded yet (to preserve saved values)
+      if (!settingsLoaded) {
+        setLlmModel('')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, llmProvider])
+
+  // Set default LLM model when models are loaded
+  useEffect(() => {
+    if (availableLlmModels.length > 0 && llmProvider && settingsLoaded) {
+      // If we have a saved model preference, check if it's still available
+      if (llmModel) {
+        const savedModelExists = availableLlmModels.find(m => m.value === llmModel)
+        if (!savedModelExists) {
+          // Saved model is no longer available, use first available
+          setLlmModel(availableLlmModels[0].value)
+          saveLlmSettings(llmProvider, availableLlmModels[0].value)
+        }
+        // If saved model exists, keep it (don't override)
+      } else {
+        // No saved preference, use first available
+        setLlmModel(availableLlmModels[0].value)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableLlmModels, llmProvider, settingsLoaded])
 
   // Set default model when models are loaded
   useEffect(() => {
@@ -87,9 +141,56 @@ export function ImageGenerationModal({
         
         setDefaultImageStyle(settings.defaultImageStyle || '')
         setStyleInstructions(settings.defaultImageStyle || '')
+        
+        // Load saved LLM provider and model for prompt generation
+        // Parse model if it's stored as JSON (like defaultImageModel)
+        const savedLlmProvider = settings.defaultImagePromptLlmProvider
+        const savedLlmModel = settings.defaultImagePromptLlmModel
+        
+        if (savedLlmProvider) {
+          setLlmProvider(savedLlmProvider)
+        }
+        if (savedLlmModel) {
+          try {
+            // Try parsing as JSON first (in case it's stored as JSON string)
+            const parsed = JSON.parse(savedLlmModel)
+            // If parsed successfully and it's a string, use it; otherwise use original
+            setLlmModel(typeof parsed === 'string' ? parsed : savedLlmModel)
+          } catch {
+            // If not JSON, use as plain string
+            setLlmModel(savedLlmModel)
+          }
+        }
+        
+        // Mark settings as loaded
+        setSettingsLoaded(true)
+        
+        // Load providers after settings are loaded, passing saved provider to prevent override
+        loadAvailableLlmProviders(savedLlmProvider)
       }
     } catch (error) {
       console.error('Error loading settings:', error)
+      setSettingsLoaded(true) // Still mark as loaded to prevent infinite waiting
+      // Still try to load providers even if settings fail
+      loadAvailableLlmProviders()
+    }
+  }
+  
+  const saveLlmSettings = async (provider: string, model: string) => {
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          defaultImagePromptLlmProvider: provider,
+          defaultImagePromptLlmModel: model,
+        }),
+      })
+    } catch (error) {
+      console.error('Error saving LLM settings:', error)
+      // Don't show error toast - this is a background save
     }
   }
 
@@ -113,13 +214,66 @@ export function ImageGenerationModal({
     }
   }
 
-  const generateInitialPrompt = async () => {
+  const loadAvailableLlmProviders = async (savedProvider?: string | null) => {
+    try {
+      const response = await fetch('/api/api-keys')
+      if (response.ok) {
+        const keys: Array<{ provider: string; maskedKey: string }> = await response.json()
+        const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
+        const providersWithKeys = keys
+          .filter(key => llmProviders.includes(key.provider) && key.maskedKey)
+          .map(key => ({
+            value: key.provider,
+            label: key.provider === 'openai' ? 'OpenAI' 
+                 : key.provider === 'anthropic' ? 'Anthropic'
+                 : key.provider === 'gemini' ? 'Google Gemini'
+                 : 'OpenRouter',
+          }))
+        setAvailableLlmProviders(providersWithKeys)
+        
+        // Only set default provider if no saved provider exists
+        // Use savedProvider parameter if provided, otherwise check state
+        const currentProvider = savedProvider !== undefined ? savedProvider : llmProvider
+        if (providersWithKeys.length > 0 && !currentProvider) {
+          setLlmProvider(providersWithKeys[0].value)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading LLM providers:', error)
+    }
+  }
+
+  const loadLlmModels = async () => {
+    if (!llmProvider) return
+    
+    setIsLoadingLlmModels(true)
+    try {
+      const response = await fetch(`/api/ai/models/${llmProvider}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableLlmModels(data.models || [])
+      } else {
+        toast.error('Failed to load LLM models')
+        setAvailableLlmModels([])
+      }
+    } catch (error) {
+      console.error('Error loading LLM models:', error)
+      toast.error('Failed to load LLM models')
+      setAvailableLlmModels([])
+    } finally {
+      setIsLoadingLlmModels(false)
+    }
+  }
+
+  const handleGeneratePrompt = async () => {
+    if (!llmProvider || !llmModel) {
+      toast.error('Please select an AI provider and model for prompt generation')
+      return
+    }
+
     setIsLoadingPrompt(true)
+    setPromptError(null)
     
-    // Set initial placeholder while loading
-    setPrompt('Generating optimized prompt...')
-    
-    // Try to generate LLM-optimized prompt
     try {
       const response = await fetch('/api/images/generate-prompt', {
         method: 'POST',
@@ -131,6 +285,8 @@ export function ImageGenerationModal({
           styleInstructions: styleInstructions.trim() || undefined,
           imageProvider: provider,
           imageModel: model || defaultImageModel[provider] || 'fal-ai/flux/schnell',
+          llmProvider: llmProvider,
+          llmModel: llmModel,
         }),
       })
       
@@ -138,30 +294,20 @@ export function ImageGenerationModal({
         const result = await response.json()
         if (result.prompt && result.prompt.trim()) {
           setPrompt(result.prompt)
+          toast.success('Prompt generated successfully')
         } else {
-          // Fallback to simple prompt if LLM didn't return a good result
-          let simplePrompt = postContent.trim()
-          if (simplePrompt.length > 200) {
-            simplePrompt = simplePrompt.substring(0, 200) + '...'
-          }
-          setPrompt(simplePrompt)
+          setPromptError('No prompt returned from AI')
         }
       } else {
-        // Fallback to simple prompt on error
-        let simplePrompt = postContent.trim()
-        if (simplePrompt.length > 200) {
-          simplePrompt = simplePrompt.substring(0, 200) + '...'
-        }
-        setPrompt(simplePrompt)
+        const error = await response.json().catch(() => ({ error: 'Unknown error', details: 'Failed to generate prompt' }))
+        const errorMessage = error.details || error.error || 'Failed to generate prompt'
+        setPromptError(errorMessage)
+        toast.error(errorMessage)
       }
-    } catch {
-      // Fallback to simple prompt on error
-      console.log('[Image Modal] Could not generate LLM prompt, using simple prompt')
-      let simplePrompt = postContent.trim()
-      if (simplePrompt.length > 200) {
-        simplePrompt = simplePrompt.substring(0, 200) + '...'
-      }
-      setPrompt(simplePrompt)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate prompt'
+      setPromptError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoadingPrompt(false)
     }
@@ -269,32 +415,126 @@ export function ImageGenerationModal({
 
         {/* Content */}
         <div className="space-y-4">
+          {/* LLM Provider Selection for Prompt Generation */}
+          {availableLlmProviders.length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-card-foreground mb-2 block">
+                  AI Provider (for Prompt)
+                </label>
+                <select
+                  value={llmProvider}
+                  onChange={(e) => {
+                    const newProvider = e.target.value
+                    setLlmProvider(newProvider)
+                    setLlmModel('') // Reset model when provider changes
+                    // Save provider preference
+                    if (newProvider) {
+                      saveLlmSettings(newProvider, '')
+                    }
+                  }}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Select provider...</option>
+                  {availableLlmProviders.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-card-foreground mb-2 block">
+                  AI Model (for Prompt)
+                  {isLoadingLlmModels && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3 h-3 inline animate-spin" /> Loading...
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={llmModel}
+                  onChange={(e) => {
+                    const newModel = e.target.value
+                    setLlmModel(newModel)
+                    // Save model preference
+                    if (newModel && llmProvider) {
+                      saveLlmSettings(llmProvider, newModel)
+                    }
+                  }}
+                  disabled={availableLlmModels.length === 0 || isLoadingLlmModels || !llmProvider}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {availableLlmModels.length > 0 ? (
+                    availableLlmModels.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">{llmProvider ? 'No models available' : 'Select provider first'}</option>
+                  )}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Prompt */}
           <div>
-            <label className="text-sm font-medium text-card-foreground mb-2 block">
-              Image Prompt
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-card-foreground">
+                Image Prompt
+              </label>
+              {availableLlmProviders.length > 0 && llmProvider && llmModel && (
+                <Button
+                  onClick={handleGeneratePrompt}
+                  disabled={isLoadingPrompt || !llmProvider || !llmModel}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 !border-[#C3F43B] hover:!border-[#C3F43B]"
+                  style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: '#C3F43B' }}
+                >
+                  {isLoadingPrompt ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-2" />
+                      Generate Prompt
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             <div className="relative">
               <textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the image you want to generate..."
-                disabled={isLoadingPrompt}
-                className={`w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] ${
-                  isLoadingPrompt ? 'opacity-50 cursor-not-allowed' : ''
+                onChange={(e) => {
+                  setPrompt(e.target.value)
+                  setPromptError(null) // Clear error when user edits
+                }}
+                placeholder={availableLlmProviders.length > 0 
+                  ? "Write your image prompt here, or click 'Generate Prompt' to create one with AI..."
+                  : "Describe the image you want to generate..."}
+                className={`w-full rounded-lg border px-4 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px] ${
+                  promptError ? 'border-destructive bg-background' : 'border-input bg-background'
                 }`}
               />
-              {isLoadingPrompt && (
-                <div className="absolute right-3 top-3">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {isLoadingPrompt 
-                ? 'Generating optimized prompt with AI...' 
-                : 'Auto-generated from your post content. Edit as needed.'}
-            </p>
+            {promptError && (
+              <p className="text-xs text-destructive mt-1">
+                {promptError}
+              </p>
+            )}
+            {!promptError && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {availableLlmProviders.length > 0 
+                  ? 'Enter a prompt manually or use AI to generate one from your post content.'
+                  : 'Enter a prompt describing the image you want to generate.'}
+              </p>
+            )}
           </div>
 
           {/* Style Instructions */}

@@ -309,7 +309,7 @@ What's your experience?`
                 className="w-full min-h-[150px] rounded-lg border border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Character count: {threadsTemplate.length} / 500
+                Character count: {threadsTemplate.length} / 450
               </p>
             </div>
 

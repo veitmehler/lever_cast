@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, writingStyle, telegramChatId } = body
+    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, defaultImagePromptLlmProvider, defaultImagePromptLlmModel, writingStyle, telegramChatId } = body
 
     console.log('Updating settings with:', {
       theme,
@@ -105,6 +105,8 @@ export async function PATCH(request: NextRequest) {
       defaultImageProvider,
       defaultImageModel: defaultImageModel ? 'present' : 'missing',
       defaultImageStyle: defaultImageStyle ? 'present' : 'missing',
+      defaultImagePromptLlmProvider,
+      defaultImagePromptLlmModel,
       writingStyle: writingStyle ? 'present' : 'missing',
       telegramChatId: telegramChatId ? 'present' : 'missing',
     })
@@ -128,6 +130,8 @@ export async function PATCH(request: NextRequest) {
           defaultImageProvider: defaultImageProvider || null,
           defaultImageModel: defaultImageModel || null,
           defaultImageStyle: defaultImageStyle || null,
+          defaultImagePromptLlmProvider: defaultImagePromptLlmProvider || null,
+          defaultImagePromptLlmModel: defaultImagePromptLlmModel || null,
           writingStyle: writingStyle || null,
           telegramChatId: telegramChatId || null,
         },
@@ -144,6 +148,8 @@ export async function PATCH(request: NextRequest) {
         defaultImageProvider?: string | null
         defaultImageModel?: string | null
         defaultImageStyle?: string | null
+        defaultImagePromptLlmProvider?: string | null
+        defaultImagePromptLlmModel?: string | null
         writingStyle?: string | null
         telegramChatId?: string | null
       } = {
@@ -166,6 +172,12 @@ export async function PATCH(request: NextRequest) {
       }
       if (defaultImageStyle !== undefined) {
         updateData.defaultImageStyle = defaultImageStyle || null
+      }
+      if (defaultImagePromptLlmProvider !== undefined) {
+        updateData.defaultImagePromptLlmProvider = defaultImagePromptLlmProvider || null
+      }
+      if (defaultImagePromptLlmModel !== undefined) {
+        updateData.defaultImagePromptLlmModel = defaultImagePromptLlmModel || null
       }
       if (writingStyle !== undefined) {
         updateData.writingStyle = writingStyle || null

@@ -95,11 +95,26 @@ No explanation. No commentary. No extra characters.`
         break
       }
       case 'gemini': {
-        const genAI = new GoogleGenerativeAI(llmApiKey)
-        const model = genAI.getGenerativeModel({ model: llmModel || 'gemini-pro' })
-        const result = await model.generateContent(`${systemMessage}\n\n${userPrompt}`)
-        const response = await result.response
-        generatedPrompt = response.text()
+        try {
+          const genAI = new GoogleGenerativeAI(llmApiKey)
+          const model = genAI.getGenerativeModel({ model: llmModel || 'gemini-pro' })
+          const result = await model.generateContent(`${systemMessage}\n\n${userPrompt}`)
+          const response = await result.response
+          generatedPrompt = response.text()
+        } catch (error) {
+          // Extract user-friendly error message from Gemini API errors
+          if (error instanceof Error) {
+            // Check for specific error patterns in Gemini error messages
+            if (error.message.includes('overloaded') || error.message.includes('503')) {
+              throw new Error('The model is overloaded. Please try again later.')
+            } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+              throw new Error('Rate limit exceeded. Please try again later.')
+            } else if (error.message.includes('invalid') || error.message.includes('401') || error.message.includes('403')) {
+              throw new Error('Invalid API key or model. Please check your settings.')
+            }
+          }
+          throw error
+        }
         break
       }
       case 'openrouter': {

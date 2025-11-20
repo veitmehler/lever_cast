@@ -879,7 +879,38 @@
 
 ## Change Log
 
-### January 2025 (Latest - Settings Page Infinite Loop Fix & Build Error Resolution)
+### January 2025 (Latest - Character Limits, UI Improvements & Content Formatting)
+- Updated character limits with safety buffers for all platforms
+  - LinkedIn: 2,500 characters (safety buffer), truncates at 3,000 (actual limit)
+  - Facebook: 1,800 characters (safety buffer), truncates at 2,000 (actual limit)
+  - Instagram: 1,800 characters (safety buffer), truncates at 2,000 (actual limit)
+  - Telegram: 900 characters (safety buffer), truncates at 1,000 (actual limit)
+  - Threads: 450 characters (safety buffer), truncates at 500 (actual limit)
+  - Twitter: 270 characters (safety buffer), truncates at 280 (actual limit)
+  - AI generates content within safety buffer limits to prevent truncation
+  - Truncation only occurs if content exceeds actual platform limits
+- Updated preview cards to display actual platform limits (where truncation happens)
+  - Character count displays now show actual platform limits (e.g., "918 / 1,000 characters" for Telegram)
+  - "Over Limit" warnings trigger at actual platform limits, not safety buffers
+  - Separated display limits from generation limits for clarity
+- Enhanced bullet point formatting to handle ❌ (cross mark) emoji
+  - Updated cleanText function to detect ❌ as bullet marker alongside ✅, •, -, *, numbered lists
+  - Added logic to split multiple bullet points on same line into separate lines
+  - Preserves formatting while cleaning AI-generated whitespace artifacts
+- Fixed platform icon visibility in preview cards
+  - Added text-gray-900 color to platform icons to make them visible on white background
+  - Updated Telegram icon from airplane emoji to proper paper airplane SVG matching Telegram logo
+- Removed checkmarks from platform selection buttons
+  - Platform selection now indicated by color change only (cleaner UI)
+  - Removed ✓ symbols from LinkedIn, Twitter, Facebook, Instagram, Telegram, Threads buttons
+- Fixed Image Generation Modal AI Provider/Model persistence
+  - Fixed race condition preventing saved AI Provider and Model from loading
+  - Added settingsLoaded state to track when settings have been loaded
+  - Updated loadAvailableLlmProviders to respect saved values and prevent override
+  - Dropdowns now correctly display previously used AI Provider and Model on modal open
+- **Status**: Character limits optimized, UI improvements complete, content formatting enhanced ✅
+
+### January 2025 (Earlier - Settings Page Infinite Loop Fix & Build Error Resolution)
 - Fixed infinite loop in Settings page (`fetchConnections` and `fetchPages` dependency cycle)
   - Wrapped `fetchConnections` and `fetchPages` in `useCallback` with proper dependencies
   - Added `pagesFetchedRef` and `rateLimitCooldownRef` to prevent duplicate API calls
@@ -1230,7 +1261,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Instagram, Threads, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation, Image Publishing (LinkedIn & Twitter), Automated Scheduling (All Platforms), Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit, Threads API Integration Complete  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Instagram, Threads, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation (including ❌ bullet points), Image Publishing (LinkedIn & Twitter), Automated Scheduling (All Platforms), Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit, Threads API Integration Complete, Optimized Character Limits with Safety Buffers, Enhanced UI/UX  
 **Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access (Instagram posting works but requires verification for production)  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

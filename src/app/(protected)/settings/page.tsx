@@ -775,6 +775,14 @@ export default function SettingsPage() {
             masked[key.provider] = key.maskedKey
           })
           setMaskedKeys(masked)
+          
+          // Fetch models for all LLM providers that were just saved
+          const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
+          keysToSave.forEach(provider => {
+            if (llmProviders.includes(provider) && masked[provider]) {
+              fetchModelsForProvider(provider, true) // Pass true since we just saved the key
+            }
+          })
         }
         setApiKeys({
           openai: '',
@@ -783,13 +791,6 @@ export default function SettingsPage() {
           openrouter: ''
         })
         setEditingApiKeys({})
-        // Fetch models for all LLM providers that have keys
-        const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
-        Object.keys(maskedKeys).forEach(provider => {
-          if (maskedKeys[provider] && llmProviders.includes(provider)) {
-            fetchModelsForProvider(provider, true) // Pass true since we know it has a key
-          }
-        })
         toast.success('All API keys saved successfully')
       } else {
         toast.error('Some API keys failed to save')

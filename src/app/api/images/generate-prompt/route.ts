@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { postContent, styleInstructions, imageProvider, imageModel } = body
+    const { postContent, styleInstructions, imageProvider, imageModel, llmProvider, llmModel } = body
 
     // Validation
     if (!postContent || typeof postContent !== 'string') {
@@ -118,19 +118,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine LLM provider and model for prompt generation
-    const userDefaultProvider = settings.defaultProvider || null
-    const llmProviderOrder = [userDefaultProvider, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-    
+    // Use provided llmProvider and llmModel if available, otherwise fallback to user defaults
     let selectedLLMProvider: string | null = null
     let llmApiKey: string | null = null
     let selectedLLMModel: string | null = null
 
-    for (const prov of llmProviderOrder) {
-      if (prov && apiKeys[prov]) {
-        selectedLLMProvider = prov
-        llmApiKey = apiKeys[prov]
-        selectedLLMModel = defaultModels[prov] || null
-        break
+    if (llmProvider && llmModel) {
+      // Use explicitly provided provider and model
+      if (apiKeys[llmProvider]) {
+        selectedLLMProvider = llmProvider
+        llmApiKey = apiKeys[llmProvider]
+        selectedLLMModel = llmModel
+      } else {
+        return NextResponse.json(
+          { error: `No API key found for LLM provider: ${llmProvider}` },
+          { status: 400 }
+        )
+      }
+    } else {
+      // Fallback to user defaults or auto-select
+      const userDefaultProvider = settings.defaultProvider || null
+      const llmProviderOrder = [userDefaultProvider, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
+      
+      for (const prov of llmProviderOrder) {
+        if (prov && apiKeys[prov]) {
+          selectedLLMProvider = prov
+          llmApiKey = apiKeys[prov]
+          selectedLLMModel = defaultModels[prov] || null
+          break
+        }
       }
     }
 
@@ -153,8 +169,31 @@ export async function POST(request: NextRequest) {
         )
         console.log(`[Image Prompt] Generated prompt: ${prompt.substring(0, 100)}...`)
       } catch (error) {
-        console.error('[Image Prompt] Error generating prompt with LLM, falling back to simple prompt:', error)
-        prompt = generateSimpleImagePrompt(postContent, styleInstructions)
+        console.error('[Image Prompt] Error generating prompt with LLM:', error)
+        
+        // Extract user-friendly error message
+        let errorMessage = 'Failed to generate prompt'
+        if (error instanceof Error) {
+          errorMessage = error.message
+          // Check for specific error patterns
+          if (error.message.includes('overloaded')) {
+            errorMessage = 'The model is overloaded. Please try again later.'
+          } else if (error.message.includes('rate limit')) {
+            errorMessage = 'Rate limit exceeded. Please try again later.'
+          } else if (error.message.includes('invalid')) {
+            errorMessage = 'Invalid API key or model. Please check your settings.'
+          } else if (error.message.includes('503')) {
+            errorMessage = 'Service temporarily unavailable. Please try again later.'
+          }
+        }
+        
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            details: error instanceof Error ? error.message : String(error),
+          },
+          { status: 500 }
+        )
       }
     } else {
       console.log('[Image Prompt] No LLM API key found, using simple prompt generation')

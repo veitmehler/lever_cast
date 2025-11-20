@@ -37,19 +37,35 @@ export function cleanText(text: string | undefined | null): string {
     const hasListItems = lines.some(line => {
       const trimmed = line.trim()
       // Check for common bullet point patterns
-      return /^[✅•\-\*\d]+[\s\.\)]/.test(trimmed) || // Bullet, dash, asterisk, numbered list
-             /^[✅•\-\*]/.test(trimmed) || // Just bullet markers
+      return /^[✅❌•\-\*\d]+[\s\.\)]/.test(trimmed) || // Bullet, dash, asterisk, numbered list (including ❌)
+             /^[✅❌•\-\*]/.test(trimmed) || // Just bullet markers (including ❌)
              /^\d+[\.\)]\s/.test(trimmed) || // Numbered lists (1. or 1))
-             /^[✅•\-\*]\s/.test(trimmed) // Bullet marker followed by space
-    }) || paragraph.includes('✅') // Also check if paragraph contains checkmarks (common in lists)
+             /^[✅❌•\-\*]\s/.test(trimmed) // Bullet marker followed by space (including ❌)
+    }) || paragraph.includes('✅') || paragraph.includes('❌') // Also check if paragraph contains checkmarks or cross marks (common in lists)
 
     if (hasListItems) {
       // This is a list/bullet point paragraph - preserve line breaks between items
       return lines.map(line => {
-        // Clean whitespace within each line but preserve the line break structure
-        return line
-          .replace(/[ \t]+/g, ' ') // Collapse spaces and tabs to single space
-          .trim()
+        // Check if line contains multiple bullet points (e.g., "❌ Item 1 ❌ Item 2")
+        // Split on bullet markers if there are multiple on the same line
+        const bulletPattern = /([✅❌•\-\*])\s+/g
+        const matches = [...line.matchAll(bulletPattern)]
+        
+        if (matches.length > 1) {
+          // Multiple bullets on same line - split them
+          // Split on bullet markers, keeping the marker with each item
+          const parts = line.split(/(?=[✅❌•\-\*]\s+)/).filter(part => part.trim().length > 0)
+          return parts.map(part => {
+            return part
+              .replace(/[ \t]+/g, ' ') // Collapse spaces and tabs to single space
+              .trim()
+          }).join('\n') // Join split items with newlines
+        } else {
+          // Single bullet point on line - just clean whitespace
+          return line
+            .replace(/[ \t]+/g, ' ') // Collapse spaces and tabs to single space
+            .trim()
+        }
       }).filter(line => line.length > 0) // Remove empty lines
         .join('\n') // Preserve single newlines between list items
     } else {

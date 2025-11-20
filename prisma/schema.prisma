@@ -113,20 +113,22 @@ model ApiKey {
 }
 
 model Settings {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  theme                String   @default("light")
-  sidebarState         String   @default("open")
-  defaultProvider      String? // openai, anthropic, gemini, openrouter
-  defaultModel         String?  @db.Text // JSON string: {"openai": "gpt-4o-mini", "anthropic": "claude-3-5-sonnet-20241022", ...}
-  defaultImageProvider String? // fal, openai-dalle, replicate
-  defaultImageModel    String?  @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
-  defaultImageStyle    String?  @db.Text // Default style instructions for image generation
-  writingStyle         String?  @db.Text // Writing style description for AI-generated posts
-  telegramChatId       String? // Default Telegram channel/chat ID (e.g., "@channelname" or numeric ID)
-  lastLogin            DateTime @default(now())
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                            String   @id @default(cuid())
+  userId                        String   @unique
+  theme                         String   @default("light")
+  sidebarState                  String   @default("open")
+  defaultProvider               String? // openai, anthropic, gemini, openrouter
+  defaultModel                  String?  @db.Text // JSON string: {"openai": "gpt-4o-mini", "anthropic": "claude-3-5-sonnet-20241022", ...}
+  defaultImageProvider          String? // fal, openai-dalle, replicate
+  defaultImageModel             String?  @db.Text // JSON string with model per provider: {"fal": "fal-ai/flux/schnell", "openai-dalle": "dall-e-3", ...}
+  defaultImageStyle             String?  @db.Text // Default style instructions for image generation
+  defaultImagePromptLlmProvider String? // LLM provider for image prompt generation (openai, anthropic, gemini, openrouter)
+  defaultImagePromptLlmModel    String? // LLM model for image prompt generation
+  writingStyle                  String?  @db.Text // Writing style description for AI-generated posts
+  telegramChatId                String? // Default Telegram channel/chat ID (e.g., "@channelname" or numeric ID)
+  lastLogin                     DateTime @default(now())
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

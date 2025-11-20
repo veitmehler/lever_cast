@@ -571,7 +571,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                LinkedIn {selectedPlatforms.has('linkedin') && '✓'}
+                LinkedIn
               </button>
             )}
             {availablePlatforms.has('twitter') && (
@@ -594,7 +594,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Twitter {selectedPlatforms.has('twitter') && '✓'}
+                Twitter
               </button>
             )}
             {availablePlatforms.has('facebook') && (
@@ -617,7 +617,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Facebook {selectedPlatforms.has('facebook') && '✓'}
+                Facebook
               </button>
             )}
             {availablePlatforms.has('instagram') && (
@@ -640,7 +640,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Instagram {selectedPlatforms.has('instagram') && '✓'}
+                Instagram
               </button>
             )}
             {availablePlatforms.has('telegram') && (
@@ -663,7 +663,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Telegram {selectedPlatforms.has('telegram') && '✓'}
+                Telegram
               </button>
             )}
             {availablePlatforms.has('threads') && (
@@ -686,7 +686,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
-                Threads {selectedPlatforms.has('threads') && '✓'}
+                Threads
               </button>
             )}
             {availablePlatforms.has('all') && (

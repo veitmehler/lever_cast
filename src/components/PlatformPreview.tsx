@@ -26,8 +26,18 @@ interface PlatformPreviewProps {
   isRegenerating?: boolean
 }
 
-// Platform character limits
+// Platform character limits (with safety buffer) - used for generation
 const CHAR_LIMITS = {
+  linkedin: 2500,
+  twitter: 280,
+  facebook: 1800,
+  instagram: 1800,
+  telegram: 900,
+  threads: 450,
+}
+
+// Actual platform limits (where truncation happens) - used for display
+const PLATFORM_DISPLAY_LIMITS = {
   linkedin: 3000,
   twitter: 280,
   facebook: 2000,
@@ -140,7 +150,11 @@ export function PlatformPreview({
     telegram: {
       bg: '#0088cc',
       name: 'Telegram',
-      icon: '✈',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
+        </svg>
+      ),
     },
     threads: {
       bg: '#000000',
@@ -152,10 +166,11 @@ export function PlatformPreview({
   const config = platformColors[platform]
 
   // Character count logic - handle threads
-  const charLimit = CHAR_LIMITS[platform]
+  const charLimit = CHAR_LIMITS[platform] // Safety buffer limit for generation
+  const displayLimit = PLATFORM_DISPLAY_LIMITS[platform] // Actual platform limit for display
   const totalChars = editedTweets.reduce((sum, tweet) => sum + tweet.length, 0)
   const maxChars = isThread ? editedTweets.length * charLimit : charLimit
-  const isOverLimit = editedTweets.some(tweet => tweet.length > charLimit)
+  const isOverLimit = editedTweets.some(tweet => tweet.length > displayLimit) // Check against actual platform limit
   const charPercentage = (totalChars / maxChars) * 100
 
   // Determine color based on percentage
@@ -183,7 +198,7 @@ export function PlatformPreview({
         }
       >
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-white flex items-center justify-center text-sm font-bold">
+          <div className="w-8 h-8 rounded bg-white flex items-center justify-center text-sm font-bold text-gray-900">
             {config.icon}
           </div>
           <span className="text-white font-semibold">{config.name}</span>
@@ -271,13 +286,13 @@ export function PlatformPreview({
                     )}
                   />
                   <div className={cn('text-xs flex items-center gap-1.5', 
-                    tweet.length > charLimit ? 'text-red-500 dark:text-red-400 font-bold' : 'text-muted-foreground'
+                    tweet.length > displayLimit ? 'text-red-500 dark:text-red-400 font-bold' : 'text-muted-foreground'
                   )}>
-                    {tweet.length > charLimit && <AlertCircle className="w-3.5 h-3.5" />}
+                    {tweet.length > displayLimit && <AlertCircle className="w-3.5 h-3.5" />}
                     <span>
-                      {tweet.length.toLocaleString()} / {charLimit.toLocaleString()} characters
+                      {tweet.length.toLocaleString()} / {displayLimit.toLocaleString()} characters
                     </span>
-                    {tweet.length > charLimit && (
+                    {tweet.length > displayLimit && (
                       <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
                         Over Limit
                       </span>
@@ -353,7 +368,7 @@ export function PlatformPreview({
               <span>
                 {isThread 
                   ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
-                  : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
+                  : `${editedTweets[0]?.length.toLocaleString() || 0} / ${displayLimit.toLocaleString()} characters`
                 }
               </span>
               {isOverLimit && (
@@ -372,7 +387,7 @@ export function PlatformPreview({
             <span>
               {isThread 
                 ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
-                : `${editedTweets[0]?.length.toLocaleString() || 0} / ${charLimit.toLocaleString()} characters`
+                : `${editedTweets[0]?.length.toLocaleString() || 0} / ${displayLimit.toLocaleString()} characters`
               }
             </span>
             {isOverLimit && (

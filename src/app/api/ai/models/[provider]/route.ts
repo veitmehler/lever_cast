@@ -117,23 +117,85 @@ export async function GET(
         }
 
         case 'anthropic': {
-          // Anthropic doesn't have a models list API, so return known models
-          models = [
-            { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-            { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
-            { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
-            { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
-          ]
+          // Fetch models from Anthropic API
+          try {
+            const response = await fetch('https://api.anthropic.com/v1/models', {
+              headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+              },
+            })
+
+            if (response.ok) {
+              const data = await response.json() as { data: Array<{ id: string; display_name?: string }> }
+              models = data.data
+                .filter(model => model.id && model.id.startsWith('claude-'))
+                .map(model => ({
+                  value: model.id,
+                  label: model.display_name || model.id.replace('claude-', 'Claude ').replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+                }))
+                .sort((a, b) => {
+                  // Sort by model version (newer first) and then alphabetically
+                  const aVersion = a.value.match(/\d+\.\d+/)?.[0] || '0'
+                  const bVersion = b.value.match(/\d+\.\d+/)?.[0] || '0'
+                  if (aVersion !== bVersion) {
+                    return bVersion.localeCompare(aVersion)
+                  }
+                  return a.label.localeCompare(b.label)
+                })
+            } else {
+              throw new Error('API request failed')
+            }
+          } catch {
+            // Fallback to known models if API fails
+            models = [
+              { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+              { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+              { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
+              { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
+            ]
+          }
           break
         }
 
         case 'gemini': {
-          // Google Gemini doesn't have a models list API, so return known models
-          models = [
-            { value: 'gemini-pro', label: 'Gemini Pro' },
-            { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-            { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-          ]
+          // Fetch models from Google Gemini API
+          try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
+            
+            if (response.ok) {
+              const data = await response.json() as { models?: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }> }
+              if (data.models) {
+                models = data.models
+                  .filter(model => 
+                    model.name && 
+                    model.name.startsWith('models/') &&
+                    model.supportedGenerationMethods?.includes('generateContent')
+                  )
+                  .map(model => ({
+                    value: model.name.replace('models/', ''),
+                    label: model.displayName || model.name.replace('models/', '').replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+                  }))
+                  .sort((a, b) => {
+                    // Sort by version number (higher/newer first)
+                    const aVersion = a.value.match(/\d+\.\d+/)?.[0] || a.value.match(/\d+/)?.[0] || '0'
+                    const bVersion = b.value.match(/\d+\.\d+/)?.[0] || b.value.match(/\d+/)?.[0] || '0'
+                    return parseFloat(bVersion) - parseFloat(aVersion)
+                  })
+              } else {
+                throw new Error('No models in response')
+              }
+            } else {
+              throw new Error('API request failed')
+            }
+          } catch {
+            // Fallback to known models if API fails
+            models = [
+              { value: 'gemini-pro', label: 'Gemini Pro' },
+              { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+              { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+            ]
+          }
           break
         }
 

@@ -5,6 +5,7 @@ import { Copy, RotateCw, Send, Check, AlertCircle, Calendar } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ScheduleModal } from './ScheduleModal'
+import Image from 'next/image'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
@@ -224,9 +225,11 @@ export function PlatformPreview({
         {/* Attached Image */}
         {image && (
           <div className="mb-3">
-            <img 
+            <Image 
               src={image} 
               alt="Attached to post" 
+              width={800}
+              height={600}
               className="rounded-lg max-h-64 w-full object-cover border border-border"
             />
           </div>

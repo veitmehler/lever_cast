@@ -5,7 +5,6 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { downloadImageFromStorage } from './supabase'
 import { decrypt } from './encryption'
 
 // Threads API uses its own domain: graph.threads.net (not graph.facebook.com)

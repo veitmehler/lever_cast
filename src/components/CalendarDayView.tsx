@@ -19,10 +19,10 @@ type Post = {
 
 interface CalendarDayViewProps {
   // date and onPostClick are reserved for future use
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   date: Date
   posts: Post[]
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   onPostClick?: (post: Post) => void
 }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Loader2, Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 interface ImageGenerationModalProps {
   isOpen: boolean
@@ -392,9 +393,11 @@ export function ImageGenerationModal({
                 Generated Image
               </label>
               <div className="relative rounded-lg overflow-hidden border border-border">
-                <img
+                <Image
                   src={generatedImageUrl}
                   alt="Generated"
+                  width={768}
+                  height={768}
                   className="w-full h-auto max-h-96 object-contain"
                 />
               </div>

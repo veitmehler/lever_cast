@@ -485,8 +485,9 @@ export default function SettingsPage() {
           delete rateLimitCooldownRef.current[platform]
           setRateLimitUntil(prev => {
             if (!prev[platform]) return prev
-            const { [platform]: _removed, ...rest } = prev
-            return rest
+            const updated = { ...prev }
+            delete updated[platform]
+            return updated
           })
           // Mark as fetched if API call succeeded (even if pages array is empty)
           pagesFetchedRef.current.add(platform)
@@ -521,8 +522,9 @@ export default function SettingsPage() {
           delete rateLimitCooldownRef.current[platform]
           setRateLimitUntil(prev => {
             if (!prev[platform]) return prev
-            const { [platform]: _removed, ...rest } = prev
-            return rest
+            const updated = { ...prev }
+            delete updated[platform]
+            return updated
           })
           pagesFetchedRef.current.delete(platform)
           const errorMessage = errorData?.error || `Failed to fetch ${platform} pages (${response.status})`
@@ -540,8 +542,9 @@ export default function SettingsPage() {
       delete rateLimitCooldownRef.current[platform]
       setRateLimitUntil(prev => {
         if (!prev[platform]) return prev
-        const { [platform]: _removed, ...rest } = prev
-        return rest
+        const updated = { ...prev }
+        delete updated[platform]
+        return updated
       })
       // Don't mark as fetched if there was an error, so we can retry
       pagesFetchedRef.current.delete(platform)
@@ -550,7 +553,6 @@ export default function SettingsPage() {
       isLoadingPagesRef.current.delete(platform)
       setIsLoadingPages(prev => ({ ...prev, [platform]: false }))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Empty deps - use refs to access latest state without causing re-renders
 
   // Update post target settings
@@ -587,7 +589,7 @@ export default function SettingsPage() {
   }
 
   // Fetch social connections on mount
-  // Using useCallback with empty deps - fetchPages is stable (empty deps), so we can call it directly
+  // Using useCallback with fetchPages as dependency since we call it inside
   const fetchConnections = useCallback(async () => {
     try {
       setIsLoadingConnections(true)
@@ -622,8 +624,7 @@ export default function SettingsPage() {
     } finally {
       setIsLoadingConnections(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - fetchPages is stable (empty deps), so we can call it directly without dependency
+  }, [fetchPages]) // fetchPages is stable (empty deps), so this is safe
 
   // Check for OAuth callback messages in URL
   useEffect(() => {
@@ -692,13 +693,12 @@ export default function SettingsPage() {
       // Clean up URL
       window.history.replaceState({}, '', '/settings')
     }
-  }, [])
+  }, [fetchConnections])
 
   // Fetch social connections on mount
   useEffect(() => {
     fetchConnections()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - fetchConnections is stable (empty deps), so it won't change
+  }, [fetchConnections]) // fetchConnections is stable (memoized with useCallback), so it won't change
 
   const toggleApiKeyVisibility = (provider: string) => {
     setShowApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))

@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, X, Sparkles } from 'lucide-react'
@@ -1004,9 +1005,11 @@ export default function PostDetailPage({
               <h4 className="text-sm font-semibold text-card-foreground mb-3">Attached Image</h4>
               {post.attachedImage ? (
                 <div className="relative inline-block">
-                  <img
+                  <Image
                     src={post.attachedImage}
                     alt="Attached to post"
+                    width={512}
+                    height={512}
                     className="rounded-lg max-h-48 w-auto object-cover border border-border"
                   />
                   <button

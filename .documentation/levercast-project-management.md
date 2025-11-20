@@ -879,7 +879,32 @@
 
 ## Change Log
 
-### January 2025 (Latest - Threads API Fixes & Scheduled Posts Improvements)
+### January 2025 (Latest - Settings Page Infinite Loop Fix & Build Error Resolution)
+- Fixed infinite loop in Settings page (`fetchConnections` and `fetchPages` dependency cycle)
+  - Wrapped `fetchConnections` and `fetchPages` in `useCallback` with proper dependencies
+  - Added `pagesFetchedRef` and `rateLimitCooldownRef` to prevent duplicate API calls
+  - Fixed dependency cycle where `fetchConnections` called `fetchPages`, causing infinite re-renders
+  - Added rate limit handling to prevent excessive API calls when Facebook returns empty pages
+  - Settings page now loads correctly without causing hundreds of API requests
+- Fixed `useCallback` import issue in IdeaCapture component
+  - Added missing `useCallback` import from `react` in `src/components/IdeaCapture.tsx`
+  - Fixed `ReferenceError: useCallback is not defined` that was causing 500 errors on dashboard
+- Fixed Next.js 15 route handler typing issues
+  - Updated API route handlers to use `Promise<{ provider: string }>` for params (Next.js 15 requirement)
+  - Fixed `RouteContext` type errors in `/api/api-keys/[provider]/route.ts`
+  - All route handlers now properly await params before accessing properties
+- Fixed lint warnings and build errors
+  - Resolved `@typescript-eslint/no-unused-vars` warnings by removing unused variables and imports
+  - Converted all `<img>` tags to Next.js `<Image />` components for better optimization
+  - Added `remotePatterns` configuration in `next.config.ts` for external image hosts (Clerk, Supabase)
+  - Fixed all TypeScript build errors after `git reset --hard HEAD`
+- Fixed build cache and module resolution issues
+  - Resolved `Cannot find module './4586.js'` errors by clearing `.next` cache
+  - Fixed `ENOENT` errors for manifest files by ensuring clean dev server restarts
+  - Added proper process cleanup when restarting development server
+- **Status**: Settings page infinite loop fixed, all build errors resolved, lint warnings addressed ✅
+
+### January 2025 (Earlier - Threads API Fixes & Scheduled Posts Improvements)
 - Fixed Threads API integration to use correct endpoints
   - Updated OAuth flow to use `threads.net/oauth/authorize` (not facebook.com)
   - Updated token exchange to use `graph.threads.net/oauth/access_token`

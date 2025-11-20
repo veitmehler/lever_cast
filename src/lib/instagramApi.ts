@@ -368,7 +368,7 @@ export async function postToInstagram(
     if (connection.refreshToken) {
       try {
         userToken = decrypt(connection.refreshToken)
-      } catch (err) {
+      } catch {
         console.warn('[Instagram API] Could not decrypt user token from refreshToken field')
       }
     }

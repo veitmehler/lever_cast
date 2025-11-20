@@ -1,17 +1,39 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
+
+const remotePatterns: { protocol: 'http' | 'https'; hostname: string }[] = [
+  {
+    protocol: 'https',
+    hostname: 'img.clerk.com',
+  },
+]
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+if (supabaseUrl) {
+  try {
+    const { hostname } = new URL(supabaseUrl)
+    if (hostname) {
+      remotePatterns.push({
+        protocol: 'https',
+        hostname,
+      })
+    }
+  } catch (error) {
+    console.warn('[next.config] Invalid NEXT_PUBLIC_SUPABASE_URL:', error)
+  }
+}
 
 const nextConfig: NextConfig = {
-  // Workaround for Node.js v22 network interface error on macOS
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
     },
   },
-  // Suppress network URL detection to avoid Node.js v22 os.networkInterfaces() bug
   devIndicators: {
-    buildActivity: true,
-    buildActivityPosition: 'bottom-right',
+    position: 'bottom-left',
   },
-};
+  images: {
+    remotePatterns,
+  },
+}
 
-export default nextConfig;
+export default nextConfig

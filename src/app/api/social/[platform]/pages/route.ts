@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { getSocialConnection } from '@/lib/socialConnections'
 import { decrypt } from '@/lib/encryption'
-import { prisma } from '@/lib/prisma'
 
 const LINKEDIN_API_BASE = 'https://api.linkedin.com/v2'
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v24.0'

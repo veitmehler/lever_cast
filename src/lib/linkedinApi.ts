@@ -290,11 +290,6 @@ export async function postToLinkedIn(
       return { success: false, error: 'LinkedIn account not connected' }
     }
     
-    // Determine if this is a company post based on connection and settings
-    const isCompanyPost = connection.postTargetType === 'page' && 
-                          connection.selectedPageId !== null &&
-                    connection.appType === 'company'
-
     // Check if token needs refresh
     if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
       // TODO: Implement token refresh
@@ -574,6 +569,8 @@ export async function refreshLinkedInToken(
   userId: string,
   refreshToken: string
 ): Promise<{ accessToken: string; expiresIn: number } | null> {
+  void userId
+  void refreshToken
   // LinkedIn OAuth 2.0 token refresh
   // TODO: Implement token refresh logic
   return null

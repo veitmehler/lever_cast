@@ -3,6 +3,7 @@
 import { useUser } from '@clerk/nextjs'
 import { useState, useEffect } from 'react'
 import { Mail, Calendar, Shield, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function AccountPage() {
   const { user, isLoaded } = useUser()
@@ -81,10 +82,12 @@ export default function AccountPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               {user?.imageUrl ? (
-                <img 
+                <Image 
                   src={user.imageUrl} 
                   alt={userName}
-                  className="w-12 h-12 rounded-full"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full object-cover"
                 />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-lg font-bold">

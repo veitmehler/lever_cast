@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageGenerationModal } from '@/components/ImageGenerationModal'
+import Image from 'next/image'
 
 // TypeScript definitions for Web Speech API
 interface SpeechRecognition extends EventTarget {
@@ -136,8 +137,31 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
     }
   }
 
+  // Seed default templates
+  // Defined first so fetchTemplates can reference it
+  const seedTemplates = useCallback(async () => {
+    try {
+      console.log('[IdeaCapture] Seeding templates...')
+      const response = await fetch('/api/templates/seed', {
+        method: 'POST',
+      })
+      
+      console.log('[IdeaCapture] Seed response status:', response.status)
+      
+      if (response.ok) {
+        console.log('[IdeaCapture] Templates seeded successfully, refetching...')
+        // Note: Will trigger fetchTemplates via the dependency
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[IdeaCapture] Failed to seed templates:', response.status, errorData)
+      }
+    } catch (error) {
+      console.error('[IdeaCapture] Error seeding templates:', error)
+    }
+  }, [])
+
   // Fetch templates from API
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       setIsLoadingTemplates(true)
       console.log('[IdeaCapture] Fetching templates...')
@@ -173,38 +197,15 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
       }
     } finally {
       setIsLoadingTemplates(false)
-      console.log('[IdeaCapture] Templates loading complete. Current templates:', templates.length)
+      console.log('[IdeaCapture] Templates loading complete')
     }
-  }
-
-  // Seed default templates
-  const seedTemplates = async () => {
-    try {
-      console.log('[IdeaCapture] Seeding templates...')
-      const response = await fetch('/api/templates/seed', {
-        method: 'POST',
-      })
-      
-      console.log('[IdeaCapture] Seed response status:', response.status)
-      
-      if (response.ok) {
-        console.log('[IdeaCapture] Templates seeded successfully, refetching...')
-        await fetchTemplates()
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('[IdeaCapture] Failed to seed templates:', response.status, errorData)
-      }
-    } catch (error) {
-      console.error('[IdeaCapture] Error seeding templates:', error)
-    }
-  }
+  }, [seedTemplates])
 
   useEffect(() => {
     fetchTemplates()
     fetchAvailablePlatforms()
     // Default to "none" - no template selected
     setSelectedTemplate('none')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     // Initialize Speech Recognition API
     if (typeof window !== 'undefined') {
@@ -299,7 +300,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
         }
       }
     }
-  }, [])
+  }, [fetchTemplates])
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -479,9 +480,11 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
       {/* Image Preview */}
       {selectedImage && (
         <div className="mt-4 relative inline-block">
-          <img
+          <Image
             src={selectedImage}
             alt="Attached"
+            width={96}
+            height={96}
             className="h-24 w-24 object-cover rounded-lg border border-border"
           />
           <button

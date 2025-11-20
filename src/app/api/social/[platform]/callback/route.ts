@@ -221,6 +221,14 @@ interface PrismaError extends Error {
   message: string
 }
 
+interface RequestWithInstagramParams extends Request {
+  __instagramFetchParams?: {
+    userAccessToken: string | null
+    pageAccessToken: string
+    instagramAccountId: string
+  }
+}
+
 let tokenData: TokenData | null = null // Store token data for later use (especially for LinkedIn appType determination)
 let isCompanyCallback: boolean = false // For LinkedIn: track if this is a company callback
 let appTypeColumnAvailable: boolean | null = null // Track if social_connections.appType column exists (null = unknown)
@@ -275,23 +283,24 @@ function isAppTypeColumnError(error: unknown): boolean {
       tokenData = await tokenResponse.json()
       
       // Check scopes to determine app type
-      const scopes = tokenData.scope?.split(' ') || []
+      const scopes = (tokenData?.scope as string)?.split(' ') || []
       const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('rw_organization_admin')
       const appType = hasOrganizationScope ? 'company' : 'personal'
       
       console.log('[LinkedIn OAuth] Token exchange successful', {
-        scope: tokenData.scope,
+        scope: tokenData?.scope,
         scopes: scopes,
         appType: appType,
         isCompanyCallback: isCompanyCallback,
         targetType: targetType,
-        expires_in: tokenData.expires_in,
-        token_type: tokenData.token_type,
+        expires_in: tokenData?.expires_in,
+        token_type: tokenData?.token_type,
       })
       
+      if (!tokenData?.access_token) throw new Error('No access token received')
       accessToken = tokenData.access_token
-      refreshToken = tokenData.refresh_token || null
-      tokenExpiry = tokenData.expires_in 
+      refreshToken = tokenData?.refresh_token || null
+      tokenExpiry = tokenData?.expires_in 
         ? new Date(Date.now() + tokenData.expires_in * 1000)
         : null
 
@@ -344,9 +353,10 @@ function isAppTypeColumnError(error: unknown): boolean {
       }
 
       tokenData = await tokenResponse.json()
+      if (!tokenData?.access_token) throw new Error('No access token received')
       accessToken = tokenData.access_token
-      refreshToken = tokenData.refresh_token || null
-      tokenExpiry = tokenData.expires_in 
+      refreshToken = tokenData?.refresh_token || null
+      tokenExpiry = tokenData?.expires_in 
         ? new Date(Date.now() + tokenData.expires_in * 1000)
         : null
 
@@ -858,7 +868,7 @@ function isAppTypeColumnError(error: unknown): boolean {
     // For other platforms, appType is null
     let connectionAppType: 'personal' | 'company' | null = null
     if (platform === 'linkedin') {
-      const scopes = tokenData?.scope?.split(' ') || []
+      const scopes = (tokenData?.scope as string)?.split(' ') || []
       const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin')
       // Use targetType from state, or determine from scopes
       connectionAppType = targetType === 'company' || hasOrganizationScope ? 'company' : 'personal'
@@ -881,7 +891,8 @@ function isAppTypeColumnError(error: unknown): boolean {
           userId_platform_appType: {
             userId: user.id,
             platform,
-            appType: connectionAppType,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            appType: connectionAppType as any,
           },
         },
       })
@@ -1006,7 +1017,7 @@ function isAppTypeColumnError(error: unknown): boolean {
     
     // Log connection details for debugging
     if (platform === 'linkedin') {
-      const scopes = tokenData?.scope?.split(' ') || []
+      const scopes = (tokenData?.scope as string)?.split(' ') || []
       const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin')
       console.log('[LinkedIn OAuth] Connection saved', {
         appType: connectionAppType,

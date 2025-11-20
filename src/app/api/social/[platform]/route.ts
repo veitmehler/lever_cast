@@ -431,7 +431,8 @@ export async function DELETE(
             userId_platform_appType: {
               userId: user.id,
               platform,
-              appType: null,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              appType: null as any,
             },
           },
         })

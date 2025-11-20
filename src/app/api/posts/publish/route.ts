@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     const user = await getOrCreateUser(clerkId)
 
     // Publish to platform
-    let publishResult: { success: true; postUrl: string | string[]; tweetId?: string; tweetIds?: string[] } | { success: false; error: string }
+    let publishResult: { success: true; postUrl: string | string[]; tweetId?: string; tweetIds?: string[]; postId?: string; message?: string } | { success: false; error: string }
 
     if (platform === 'linkedin') {
       const contentStr = Array.isArray(content) ? content[0] : content

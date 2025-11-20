@@ -9,7 +9,8 @@ async function getOrCreateUser(clerkId: string) {
   })
 
   if (!user) {
-    const clerkUser = await clerkClient.users.getUser(clerkId)
+    const client = await clerkClient()
+    const clerkUser = await client.users.getUser(clerkId)
 
     const email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
 
@@ -77,7 +78,7 @@ export async function GET() {
 
     // Parse twitterContent if it's a JSON string (thread)
     const formattedDrafts = drafts.map(draft => {
-      let twitterContent = draft.twitterContent
+      let twitterContent: string | string[] | null = draft.twitterContent
       if (twitterContent && typeof twitterContent === 'string') {
         try {
           const parsed = JSON.parse(twitterContent)

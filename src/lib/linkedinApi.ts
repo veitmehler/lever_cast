@@ -226,12 +226,15 @@ export async function uploadImageToLinkedIn(
 
     // Step 3: Upload image binary to LinkedIn storage URL
     console.log(`[LinkedIn API] Uploading image to LinkedIn storage, content-type: ${contentType}, size: ${imageBuffer.length} bytes`)
+    const uploadBody = imageBuffer instanceof Buffer
+      ? Uint8Array.from(imageBuffer)
+      : new Uint8Array(imageBuffer as unknown as ArrayBuffer)
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': contentType,
       },
-      body: imageBuffer,
+      body: uploadBody,
     })
 
     if (!uploadResponse.ok) {
@@ -431,7 +434,8 @@ export async function postToLinkedIn(
             text: 'Post image', // Title is required
           },
         },
-      ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any
       
       console.log(`[LinkedIn API] Posting with image (using asset URN):`)
       console.log(`[LinkedIn API]   - Asset URN: ${assetUrn}`)
@@ -458,6 +462,7 @@ export async function postToLinkedIn(
     interface LinkedInPostError {
       message?: string
       serviceErrorCode?: number
+      errorDetails?: string
       [key: string]: unknown
     }
 

@@ -9,7 +9,8 @@ async function getOrCreateUser(clerkId: string) {
   })
 
   if (!user) {
-    const clerkUser = await clerkClient.users.getUser(clerkId)
+    const client = await clerkClient()
+    const clerkUser = await client.users.getUser(clerkId)
 
     const email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
 

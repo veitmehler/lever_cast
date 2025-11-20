@@ -785,8 +785,8 @@ export default function SettingsPage() {
         setEditingApiKeys({})
         // Fetch models for all LLM providers that have keys
         const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
-        Object.keys(masked).forEach(provider => {
-          if (masked[provider] && llmProviders.includes(provider)) {
+        Object.keys(maskedKeys).forEach(provider => {
+          if (maskedKeys[provider] && llmProviders.includes(provider)) {
             fetchModelsForProvider(provider, true) // Pass true since we know it has a key
           }
         })
@@ -1507,7 +1507,12 @@ export default function SettingsPage() {
                   facebook: { bg: '#1877F2', icon: 'f', name: 'Facebook' },
                   instagram: { bg: '#E4405F', icon: '📷', name: 'Instagram' },
                   threads: { bg: '#000000', icon: '🧵', name: 'Threads' },
-                }[platform]
+                  telegram: { bg: '#24A1DE', icon: '✈️', name: 'Telegram' },
+                }[platform] ?? {
+                  bg: '#6B7280',
+                  icon: platform.slice(0, 1).toUpperCase(),
+                  name: platform.charAt(0).toUpperCase() + platform.slice(1),
+                }
 
                 const showPageSelector = isConnected && (platform === 'linkedin' || platform === 'facebook')
                 const currentPostTargetType = postTargetTypes[platform] || connection?.postTargetType || 'personal'
@@ -1537,8 +1542,8 @@ export default function SettingsPage() {
                           </div>
                           {isConnected ? (
                             <div className="text-xs text-primary">
-                              Connected{connection.platformUsername ? ` as ${connection.platformUsername}` : ''}
-                              {connection.lastUsed && (
+                              Connected{connection?.platformUsername ? ` as ${connection.platformUsername}` : ''}
+                              {connection?.lastUsed && (
                                 <span className="text-muted-foreground ml-1">
                                   • Last used {new Date(connection.lastUsed).toLocaleDateString()}
                                 </span>
@@ -1586,7 +1591,7 @@ export default function SettingsPage() {
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          {isConnected && platform === 'instagram' && (!connection.platformUsername || connection.platformUsername === 'Instagram User') && (
+                          {isConnected && platform === 'instagram' && (!connection?.platformUsername || connection?.platformUsername === 'Instagram User') && (
                             <Button
                               variant="outline"
                               size="sm"

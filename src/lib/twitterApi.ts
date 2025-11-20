@@ -148,7 +148,11 @@ export async function uploadImageToTwitter(
     // Twitter v2 endpoint supports OAuth 2.0 User Context with media.write scope
     // Requires media_category parameter: "tweet_image" for images attached to tweets
     const formData = new FormData()
-    const blob = new Blob([imageBuffer], { type: 'image/jpeg' }) // Explicitly set content type
+    const blobSource = imageBuffer instanceof Buffer
+      ? Uint8Array.from(imageBuffer)
+      : new Uint8Array(imageBuffer as unknown as ArrayBufferLike)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blob = new Blob([blobSource as any], { type: 'image/jpeg' }) // Explicitly set content type
     formData.append('media', blob, 'image.jpg')
     formData.append('media_category', 'tweet_image') // Required for v2 endpoint
 
@@ -659,11 +663,11 @@ Possible causes:
           } else if (is3HourLimit) {
             const hours = Math.floor(hoursUntilReset || 0)
             const minutes = Math.floor(((hoursUntilReset || 0) - hours) * 60)
-            errorMessage = `Rate limit exceeded (3-hour window). Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 300 tweets per 3-hour window.`
+            errorMessage = `Rate limit exceeded (3-hour window). Please wait ${hours} hour(s) and ${minutes} minute(s) before trying again. Rate limit resets at ${resetTime?.toISOString()}. Twitter allows 300 tweets per 3-hour window.`
           } else if (is15MinLimit) {
-            errorMessage = `Rate limit exceeded (15-minute window). Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}. Twitter allows 100 tweets per 15 minutes (Pro plan) or fewer on Basic/Free plans.`
+            errorMessage = `Rate limit exceeded (15-minute window). Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime?.toISOString()}. Twitter allows 100 tweets per 15 minutes (Pro plan) or fewer on Basic/Free plans.`
           } else {
-            errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}.`
+            errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime?.toISOString()}.`
           }
         } else {
           errorMessage = `Rate limit exceeded. Twitter API rate limits: 100 tweets per 15 minutes (Pro), ${BASIC_TIER_24H_LIMIT} tweets per 24 hours (Basic), or ${FREE_TIER_24H_LIMIT} tweets per 24 hours (Free). Please wait before trying again.`
@@ -741,7 +745,7 @@ Possible causes:
                 const minutesUntilReset = resetTime ? Math.ceil((resetTime.getTime() - Date.now()) / 60000) : null
                 
                 if (minutesUntilReset !== null) {
-                  errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime.toISOString()}.`
+                  errorMessage = `Rate limit exceeded. Please wait ${minutesUntilReset} minute(s) before trying again. Rate limit resets at ${resetTime?.toISOString()}.`
                 } else {
                   errorMessage = `Rate limit exceeded. Twitter allows 300 tweets per 3-hour window. Please wait before trying again.`
                 }

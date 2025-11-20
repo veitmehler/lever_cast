@@ -58,11 +58,25 @@ async function getThreadsAccount(userId: string): Promise<ThreadsAccount> {
 
   if (!accountResponse.ok) {
     const errorText = await accountResponse.text()
-    console.error('[Threads API] Failed to fetch account:', {
-      status: accountResponse.status,
-      error: errorText,
-    })
-    throw new Error(`Failed to fetch Threads account: ${accountResponse.status}`)
+    let errorDetails = ''
+    try {
+      const errorJson = JSON.parse(errorText)
+      errorDetails = errorJson.error?.message || errorText
+      console.error('[Threads API] Failed to fetch account:', {
+        status: accountResponse.status,
+        errorCode: errorJson.error?.code,
+        errorMessage: errorJson.error?.message,
+        errorType: errorJson.error?.type,
+        fullError: errorJson,
+      })
+    } catch {
+      errorDetails = errorText
+      console.error('[Threads API] Failed to fetch account:', {
+        status: accountResponse.status,
+        error: errorText,
+      })
+    }
+    throw new Error(`Failed to fetch Threads account: ${errorDetails || accountResponse.status}`)
   }
 
   const accountData = await accountResponse.json()

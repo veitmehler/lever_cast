@@ -72,9 +72,9 @@ export function PostAnalytics({ platform, analytics, lastSyncedAt, postId, onRef
       } else {
         // Handle error response
         if (result.error === 'permissions_required' || response.status === 403) {
-          setErrorMessage(result.details || result.message || 'LinkedIn analytics requires additional permissions. Please reconnect your LinkedIn account.')
+          setErrorMessage((result.details || result.message || 'LinkedIn analytics requires additional permissions. Please reconnect your LinkedIn account.') as string)
         } else {
-          setErrorMessage(result.message || 'Failed to refresh analytics')
+          setErrorMessage((result.message || 'Failed to refresh analytics') as string)
         }
       }
     } catch (error) {

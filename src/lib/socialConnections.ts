@@ -54,7 +54,8 @@ export async function getSocialConnection(
         userId_platform_appType: {
           userId,
           platform,
-          appType: connectionAppType,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          appType: connectionAppType as any,
         },
       },
     })

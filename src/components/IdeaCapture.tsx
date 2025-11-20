@@ -208,11 +208,11 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
 
     // Initialize Speech Recognition API
     if (typeof window !== 'undefined') {
-      interface WindowWithSpeechRecognition extends Window {
+      type WindowWithSpeechRecognition = Window & {
         SpeechRecognition?: new () => SpeechRecognition
         webkitSpeechRecognition?: new () => SpeechRecognition
       }
-      const SpeechRecognitionConstructor = (window as WindowWithSpeechRecognition).SpeechRecognition || (window as WindowWithSpeechRecognition).webkitSpeechRecognition
+      const SpeechRecognitionConstructor = (window as unknown as WindowWithSpeechRecognition).SpeechRecognition || (window as unknown as WindowWithSpeechRecognition).webkitSpeechRecognition
       
       if (SpeechRecognitionConstructor) {
         const recognition = new SpeechRecognitionConstructor() as SpeechRecognition

@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     let selectedLLMModel: string | null = null
 
     for (const prov of llmProviderOrder) {
-      if (apiKeys[prov]) {
+      if (prov && apiKeys[prov]) {
         selectedLLMProvider = prov
         llmApiKey = apiKeys[prov]
         selectedLLMModel = defaultModels[prov] || null

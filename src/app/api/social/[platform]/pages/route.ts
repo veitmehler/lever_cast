@@ -118,7 +118,7 @@ export async function GET(
     }
 
     // Check if token needs refresh
-    if (connection.tokenExpiry && new Date(connection.tokenExpiry) <= new Date()) {
+    if (connection.tokenExpiry && new Date(connection.tokenExpiry as Date) <= new Date()) {
       return NextResponse.json(
         { error: 'Access token expired. Please reconnect your account.' },
         { status: 401 }

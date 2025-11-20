@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { getTwitterAnalytics } from '@/lib/twitterApi'
 import { getLinkedInAnalytics } from '@/lib/linkedinApi'
 
@@ -110,7 +111,7 @@ export async function GET(request: Request) {
             await prisma.post.update({
               where: { id: post.id },
               data: {
-                analyticsData: analytics,
+                analyticsData: analytics as Prisma.InputJsonValue,
                 analyticsLastSyncedAt: now,
               },
             })
@@ -136,7 +137,7 @@ export async function GET(request: Request) {
               await prisma.post.update({
                 where: { id: post.id },
                 data: {
-                  analyticsData: analytics,
+                  analyticsData: analytics as Prisma.InputJsonValue,
                   analyticsLastSyncedAt: now,
                 },
               })

@@ -9,7 +9,8 @@ async function getOrCreateUser(clerkId: string) {
   })
 
   if (!user) {
-    const clerkUser = await clerkClient.users.getUser(clerkId)
+    const client = await clerkClient()
+    const clerkUser = await client.users.getUser(clerkId)
 
     const email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
 
@@ -116,6 +117,8 @@ export async function GET(request: Request) {
 
 // POST /api/posts - Create a new post
 export async function POST(request: Request) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any
   try {
     const authResult = await auth()
     const userId = authResult.userId
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    body = await request.json()
     const {
       draftId,
       platform,
@@ -291,12 +294,12 @@ export async function POST(request: Request) {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       body: {
-        draftId,
-        platform,
-        hasContent: !!content,
-        scheduledAt,
-        parentPostId,
-        tweetId,
+        draftId: body?.draftId,
+        platform: body?.platform,
+        hasContent: !!body?.content,
+        scheduledAt: body?.scheduledAt,
+        parentPostId: body?.parentPostId,
+        tweetId: body?.tweetId,
       },
     })
     return NextResponse.json(

@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     let selectedModel: string | null = null
 
     for (const prov of providerOrder) {
-      if (apiKeys[prov]) {
+      if (prov && apiKeys[prov]) {
         selectedProvider = prov
         apiKey = apiKeys[prov]
         // Get model for this provider from settings or use default

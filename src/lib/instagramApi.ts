@@ -274,6 +274,7 @@ async function createMediaContainer(
         message?: string
         code?: number
         error_subcode?: number
+        error_user_msg?: string
       }
       message?: string
       [key: string]: unknown

@@ -462,7 +462,7 @@ export default function PostDetailPage({
           setPost(updatedDraft)
         }
 
-        toast.success(result.message, {
+        toast.success(publishResult.message || `Post successfully published to ${platform}!`, {
           description: `Your ${platform} post is now live!`,
         })
       }

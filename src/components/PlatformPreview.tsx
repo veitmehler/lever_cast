@@ -206,6 +206,155 @@ export function PlatformPreview({
         <span className="text-white/80 text-xs">Preview</span>
       </div>
 
+      {/* Content Display */}
+      <div className="p-4 bg-secondary/30">
+        {/* Editable Content */}
+        {isEditing ? (
+          <div className="space-y-4">
+            {editedTweets.map((tweet, index) => {
+              const isSummary = index === 0
+              const isReply = index > 0
+              
+              return (
+                <div key={index} className="space-y-2">
+                  {isThread && (
+                    <div className="flex items-center gap-2 mb-1">
+                      {isSummary ? (
+                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
+                          📌 Summary Post
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          💬 Reply {index}/{editedTweets.length - 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <textarea
+                    value={tweet}
+                    onChange={(e) => {
+                      const updated = [...editedTweets]
+                      updated[index] = e.target.value
+                      setEditedTweets(updated)
+                    }}
+                    className={cn(
+                      "w-full min-h-[150px] p-3 rounded-lg border border-input bg-background text-foreground text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none",
+                      isSummary && "border-l-4 border-primary",
+                      isReply && "border-l-4 border-muted"
+                    )}
+                  />
+                  <div className={cn('text-xs flex items-center gap-1.5', 
+                    tweet.length > displayLimit ? 'text-red-500 dark:text-red-400 font-bold' : 'text-muted-foreground'
+                  )}>
+                    {tweet.length > displayLimit && <AlertCircle className="w-3.5 h-3.5" />}
+                    <span>
+                      {tweet.length.toLocaleString()} / {displayLimit.toLocaleString()} characters
+                    </span>
+                    {tweet.length > displayLimit && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                        Over Limit
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={handleSave}
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Save Changes
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditedTweets(tweets)
+                }}
+                size="sm"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => setIsEditing(true)}
+            className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-3 rounded transition-colors"
+          >
+            {editedTweets.map((tweet, index) => {
+              const isSummary = index === 0
+              const isReply = index > 0
+              
+              return (
+                <div 
+                  key={index}
+                  className={cn(
+                    isThread && index > 0 && "mt-4 border-l-4 border-muted pl-4",
+                    isReply && "text-muted-foreground"
+                  )}
+                >
+                  {isThread && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {isSummary ? (
+                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
+                          📌 Summary Post
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          💬 Reply {index}/{editedTweets.length - 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div>{tweet}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Character Count */}
+        {!isEditing && (
+          <div className="mt-3 flex items-center justify-between">
+            <div className={cn('text-xs flex items-center gap-1.5', getCharCountColor())}>
+              {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
+              <span>
+                {isThread 
+                  ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
+                  : `${editedTweets[0]?.length.toLocaleString() || 0} / ${displayLimit.toLocaleString()} characters`
+                }
+              </span>
+              {isOverLimit && (
+                <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                  Over Limit
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Character Counter in Edit Mode */}
+        {isEditing && (
+          <div className={cn('mt-2 text-xs flex items-center gap-1.5', getCharCountColor())}>
+            {isOverLimit && <AlertCircle className="w-3.5 h-3.5" />}
+            <span>
+              {isThread 
+                ? `${editedTweets.length} tweets • ${totalChars.toLocaleString()} total chars`
+                : `${editedTweets[0]?.length.toLocaleString() || 0} / ${displayLimit.toLocaleString()} characters`
+              }
+            </span>
+            {isOverLimit && (
+              <span className="ml-1 px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] uppercase">
+                Over Limit
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Action Buttons */}
       <div className="p-4 border-t border-border flex items-center gap-2 flex-wrap">

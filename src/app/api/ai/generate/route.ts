@@ -735,17 +735,21 @@ export async function POST(request: NextRequest) {
           : plat === 'threads' ? 'Threads'
           : 'Twitter/X'
         prompt += `3. Your task now is to create a ${platformName} post OUTLINE based on the RAW IDEA.\n\n`
+        prompt += `IMPORTANT: You are creating an OUTLINE, NOT a full post. An outline is a structured list of key points.\n\n`
         prompt += `=> MAKE SURE this post outline contains interesting facts about the RAW IDEA.\n\n`
         prompt += `=> Return outline in short BULLET POINT format (10 words max per bullet point).\n\n`
+        prompt += `=> Each bullet point should be a concise fact or key point about the RAW IDEA.\n\n`
+        prompt += `=> Use bullet points like: • or - or * at the start of each line.\n\n`
         
         if (templateText) {
           prompt += `4. You will create the post OUTLINE following the TEMPLATE STRUCTURE.\n\n`
-          prompt += `5. Remember, you ONLY craft the post OUTLINE.\n\n`
+          prompt += `5. Remember, you ONLY craft the post OUTLINE - NOT the full post text.\n\n`
         } else {
-          prompt += `4. Remember, you ONLY craft the post OUTLINE.\n\n`
+          prompt += `4. Remember, you ONLY craft the post OUTLINE - NOT the full post text.\n\n`
         }
         
-        prompt += `CRITICAL: Return ONLY the post outline. Do NOT include any analysis, headers, explanations, or metadata. Return ONLY the post OUTLINE for the user to follow.\n\n`
+        prompt += `CRITICAL: Return ONLY the post outline in bullet point format. Do NOT write full sentences or paragraphs. Do NOT include any analysis, headers, explanations, or metadata. Return ONLY bullet points for the post OUTLINE.\n\n`
+        prompt += `EXAMPLE FORMAT:\n• First key point about the idea (max 10 words)\n• Second interesting fact (max 10 words)\n• Third important detail (max 10 words)\n\n`
       }
 
       // Log the full prompt for debugging
@@ -778,6 +782,11 @@ export async function POST(request: NextRequest) {
           default:
             throw new Error(`Unsupported provider: ${selectedProvider}`)
         }
+
+        // Log the raw AI response for debugging
+        console.log(`\n========== RAW AI RESPONSE FOR ${plat.toUpperCase()} ==========`)
+        console.log(generatedContent)
+        console.log(`========== END RAW RESPONSE (${generatedContent.length} characters) ==========\n`)
 
         // Clean Unicode whitespace immediately after receiving AI response
         // This prevents weird Unicode whitespace characters that could give away AI-generated content
@@ -901,7 +910,21 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // SINGLE POST MODE: Store as plain string
-          generatedContent = cleanGeneratedContent(generatedContent)
+          // For outlines, preserve bullet point formatting - don't clean as aggressively
+          // Check if content looks like an outline (contains bullet points)
+          const isOutline = generatedContent.includes('•') || 
+                           generatedContent.includes('-') || 
+                           generatedContent.includes('*') ||
+                           /^\s*[-•*]\s+/m.test(generatedContent)
+          
+          if (isOutline) {
+            // For outlines, only clean whitespace, don't remove headers or structure
+            console.log(`[Content Processing] Detected outline format, preserving bullet points`)
+            generatedContent = cleanText(generatedContent).trim()
+          } else {
+            // For regular posts, use full cleaning
+            generatedContent = cleanGeneratedContent(generatedContent)
+          }
           
           // Truncate only if content exceeds actual platform limits (not safety buffer)
           // Actual platform limits for truncation

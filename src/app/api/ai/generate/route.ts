@@ -734,32 +734,18 @@ export async function POST(request: NextRequest) {
           : plat === 'telegram' ? 'Telegram'
           : plat === 'threads' ? 'Threads'
           : 'Twitter/X'
-        prompt += `3. Your task now is to create a ${platformName} post based on the RAW IDEA.\n\n`
+        prompt += `3. Your task now is to create a ${platformName} post OUTLINE based on the RAW IDEA.\n\n`
+        prompt += `=> MAKE SURE this post outline contains interesting facts about the RAW IDEA.\n\n`
+        prompt += `=> Return outline in short BULLET POINT format (10 words max per bullet point).\n\n`
         
         if (templateText) {
-          prompt += `4. You will create the post following the TEMPLATE STRUCTURE.\n\n`
-          prompt += `5. MAKE SURE the post follows the TEMPLATE STRUCTURE but feels natural, engaging, and resonates with your selected target audience.\n\n`
+          prompt += `4. You will create the post OUTLINE following the TEMPLATE STRUCTURE.\n\n`
+          prompt += `5. Remember, you ONLY craft the post OUTLINE.\n\n`
         } else {
-          prompt += `4. Create a post that feels natural, engaging, and resonates with your selected target audience.\n\n`
+          prompt += `4. Remember, you ONLY craft the post OUTLINE.\n\n`
         }
         
-        // Add explicit character limit instructions (especially important for Gemini)
-        const limitInstruction = selectedProvider === 'gemini'
-          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters carefully. If your draft is too long, SHORTEN it.`
-          : plat === 'twitter'
-          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
-          : plat === 'threads'
-          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
-          : plat === 'telegram'
-          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a HARD LIMIT. Count your characters and ensure you stay within this limit. If it's too long, SHORTEN it.`
-          : plat === 'facebook' || plat === 'instagram'
-          ? `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a hard limit. Count your characters and ensure you stay within this limit. Make it engaging and suitable for ${platformName}'s audience.`
-          : `CRITICAL: The post MUST be exactly ${characterLimit} characters or fewer. This is a hard limit. Count your characters and ensure you stay within this limit. Keep it professional and engaging, suitable for LinkedIn.`
-        
-        prompt += `CRITICAL: Return ONLY the post content. Do NOT include any analysis, headers, explanations, or metadata. Do NOT include "# TARGET AUDIENCE ANALYSIS", "# LINKEDIN POST:", "# TWITTER POST:", "# FACEBOOK POST:", "# INSTAGRAM POST:", "# TELEGRAM POST:", "# THREADS POST:", or any other headers. Return ONLY the actual post text that would be published on ${platformName}.\n\n`
-        
-        // Place the limit instruction at the VERY END for recency bias for ALL providers
-        prompt += `${limitInstruction}`
+        prompt += `CRITICAL: Return ONLY the post outline. Do NOT include any analysis, headers, explanations, or metadata. Return ONLY the post OUTLINE for the user to follow.\n\n`
       }
 
       // Log the full prompt for debugging

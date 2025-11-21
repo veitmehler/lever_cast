@@ -456,7 +456,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
           Capture Your Idea
         </h2>
         <p className="text-sm text-muted-foreground">
-          Type or record your thought, and let AI transform it into polished posts
+          Type or record your thought, and let AI transform it into a fact-driven post outline.
         </p>
       </div>
 
@@ -952,7 +952,7 @@ export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
           className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
           <Sparkles className="w-4 h-4 mr-2" />
-          Generate Posts
+          Generate Outline
         </Button>
       </div>
 

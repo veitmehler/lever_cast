@@ -233,6 +233,9 @@
 ### Social Media OAuth & Publishing (COMPLETED)
 - ✅ Implement LinkedIn OAuth 2.0 flow with PKCE (Personal Profiles)
 - ✅ Implement LinkedIn OAuth 2.0 flow with PKCE (Company Pages - separate app)
+- ✅ Fixed LinkedIn Company Pages OAuth scopes (removed OpenID Connect scopes - Community Management API doesn't support openid, profile, email)
+- ✅ Fixed LinkedIn Company Pages callback to handle connections without OpenID Connect (uses placeholder username when profile fetch unavailable)
+- ✅ Fixed LinkedIn Company Pages page fetching to handle rate-limited responses (extracts organization IDs from URN format when organizationalTarget is returned as string)
 - ✅ Implement Twitter/X OAuth 2.0 flow with PKCE
 - ✅ Implement Facebook OAuth 2.0 flow (Meta Graph API v24.0)
 - ✅ Implement Instagram OAuth 2.0 flow (Meta Graph API v24.0)
@@ -547,11 +550,12 @@
 ## Pending Tasks (Prioritized)
 
 ### Platform Authorizations & Verifications (BLOCKING)
-- ⏳ **LinkedIn Community Management API Approval** (BLOCKING Company Pages)
+- ⏳ **LinkedIn Community Management API Approval** (Company Pages Functional, Names May Show as IDs)
   - Status: Application submitted, awaiting LinkedIn review
   - Required: Business verification + use case submission
   - Timeline: Can take several weeks
-  - Impact: Company Page posting and page fetching blocked until approval
+  - Impact: Company Page posting works, but page names may display as IDs (e.g., "Company Page (12345678)") when rate-limited
+  - Note: LinkedIn returns organization URNs as strings when rate-limited, code extracts IDs automatically
   - Action: Monitor LinkedIn Developer Portal for approval status
   
 - ⏳ **Meta Tech Provider Status** (BLOCKING Instagram)
@@ -715,7 +719,7 @@
 - ⚠️ Clerk "Development Mode" warning (normal in dev, will disappear in production)
 - ⚠️ Voice input requires Chrome or Edge browser (Web Speech API not supported in Safari/Firefox)
 - ⚠️ LinkedIn analytics unavailable - LinkedIn has restricted access to r_member_social permission and is not accepting new requests. Users are directed to check analytics on LinkedIn directly.
-- ⚠️ **LinkedIn Community Management API** - Access request pending review (business verification + use case submission required). Company page posting blocked until LinkedIn grants `w_organization_social` + `r_organization_admin` scopes. Timeline: Several weeks.
+- ⚠️ **LinkedIn Community Management API** - Access request pending review (business verification + use case submission required). Company page posting works, but page names may display as IDs when rate-limited. LinkedIn returns organization URNs as strings when rate-limited - code extracts IDs automatically. Timeline: Several weeks for full approval.
 - ⚠️ **Instagram API** - Requires Tech Provider status + Business Verification + Advanced Access approval. Cannot request Advanced Access until Tech Provider and Business Verification are complete. Timeline: Days/weeks for each step.
 - ⚠️ **Facebook Pages** - May require App Review for `pages_manage_posts` permission in production mode
 
@@ -879,7 +883,25 @@
 
 ## Change Log
 
-### January 2025 (Latest - Rebranding to Socioply)
+### January 2025 (Latest - LinkedIn Company Pages OAuth & Page Fetching Fixes)
+- Fixed LinkedIn Company Pages OAuth flow
+  - Removed OpenID Connect scopes (`openid`, `profile`, `email`) from Company Pages OAuth request
+  - LinkedIn's Community Management API does not support OpenID Connect scopes
+  - Updated OAuth scope request to only include: `w_organization_social r_organization_social rw_organization_admin`
+  - Updated callback route to handle Company Pages connections without OpenID Connect
+  - Profile fetching skipped for Company Pages (uses placeholder username when unavailable)
+- Fixed LinkedIn Company Pages page fetching to handle rate-limited responses
+  - LinkedIn returns `organizationalTarget` as a string URN (e.g., `"urn:li:organization:123456789"`) when rate-limited
+  - Updated code to detect string vs object responses and extract organization ID from URN format
+  - Added fallback page names using format: `"Company Page ({last8digits})"` when names unavailable
+  - Pages still functional for posting even when rate-limited (names may not display until limit resets)
+  - Added comprehensive logging to debug API response structure
+- Updated LinkedIn OAuth scope checking to accept both `r_organization_admin` and `rw_organization_admin`
+  - Some LinkedIn apps may grant `rw_organization_admin` instead of `r_organization_admin`
+  - Code now checks for both scope variants to ensure compatibility
+- **Status**: LinkedIn Company Pages OAuth and page fetching fully functional ✅
+
+### January 2025 (Earlier - Rebranding to Socioply)
 - Rebranded application from "Levercast" to "Socioply"
   - Updated all frontend UI references (dashboard, homepage, sidebar, mobile nav, settings)
   - Updated page title metadata in layout.tsx
@@ -1270,7 +1292,7 @@
 ---
 
 **Last Updated**: January 2025  
-**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal, Twitter/X, Facebook, Instagram, Threads, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation (including ❌ bullet points), Image Publishing (LinkedIn & Twitter), Automated Scheduling (All Platforms), Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit, Threads API Integration Complete, Optimized Character Limits with Safety Buffers, Enhanced UI/UX  
-**Pending Authorizations**: ⏳ LinkedIn Community Management API (Company Pages), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access (Instagram posting works but requires verification for production)  
+**Project Status**: ✅ Production Ready - Real AI Integration, AI Image Generation (Fal.ai with 12 models, OpenAI DALL-E, Replicate), Social Media Publishing (LinkedIn Personal & Company Pages, Twitter/X, Facebook, Instagram, Threads, Telegram with Channel Selection), Multi-Platform Draft Support, Content Formatting Preservation (including ❌ bullet points), Image Publishing (LinkedIn & Twitter), Automated Scheduling (All Platforms), Twitter Threads, Supabase Storage, Bulk Actions, Voice Input, Analytics Tracking & Display, Twitter API Rate Limit Tracking, Writing Style Feature, Telegram Channel Selection & Character Limit, Threads API Integration Complete, Optimized Character Limits with Safety Buffers, Enhanced UI/UX, LinkedIn Company Pages OAuth & Page Fetching Fixed  
+**Pending Authorizations**: ⏳ LinkedIn Community Management API Business Verification (Company Pages posting works but page names may show as IDs when rate-limited), ⏳ Meta Tech Provider + Business Verification + Instagram Advanced Access (Instagram posting works but requires verification for production)  
 **Next Milestone**: Complete Platform Authorizations → Production Deployment & User Testing
 

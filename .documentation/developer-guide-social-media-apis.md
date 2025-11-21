@@ -143,12 +143,14 @@ openid profile email w_member_social
 
 #### Company Pages
 ```
-openid profile email w_organization_social r_organization_social r_organization_admin
+w_organization_social r_organization_social rw_organization_admin
 ```
 
 - **`w_organization_social`**: Post to Company Pages (requires "Community Management API" product)
 - **`r_organization_social`**: Read organization content and analytics
-- **`r_organization_admin`**: Admin access to organization (required for fetching pages)
+- **`rw_organization_admin`**: Admin access to organization (required for fetching pages) - includes both read and write permissions
+
+**Important:** LinkedIn's Community Management API does **not** support OpenID Connect scopes (`openid`, `profile`, `email`). Only request organization scopes for Company Pages.
 
 ### OAuth Flow
 
@@ -157,6 +159,8 @@ openid profile email w_organization_social r_organization_social r_organization_
 **Token Exchange:** `https://www.linkedin.com/oauth/v2/accessToken`
 
 **Note:** LinkedIn does **not** support refresh tokens. Tokens are long-lived but may expire.
+
+**Important:** For Company Pages, LinkedIn's Community Management API does **not** support OpenID Connect. Profile fetching will use placeholder values when OpenID Connect scopes are unavailable.
 
 ### API Endpoints
 
@@ -251,8 +255,11 @@ model SocialConnection {
 5. **Fetching Company Pages:**
    - Endpoint: `/organizationalEntityAcls` (not `/organizationAcls`)
    - Projection field: `organizationalTarget` (not `organization`)
-   - Requires `w_organization_social` + `r_organization_admin` scopes
+   - Requires `w_organization_social` + `rw_organization_admin` (or `r_organization_admin`) scopes
    - **Requires business verification** - API will return `ACCESS_DENIED` without verification
+   - **Rate Limiting:** When rate-limited, LinkedIn returns `organizationalTarget` as a string URN (e.g., `"urn:li:organization:123456789"`) instead of an object
+   - Code extracts organization ID from URN format when rate-limited: `urn:li:organization:(\d+)`
+   - Fallback page names use format: `"Company Page ({last8digits})"` when names unavailable
 
 6. **Image Upload Issues:**
    - LinkedIn's image API has known issues
@@ -268,8 +275,14 @@ model SocialConnection {
 **Solution:** 
 1. Ensure "Community Management API" product is approved (requires business verification)
 2. Verify business verification is complete in LinkedIn Developer Portal
-3. Ensure scopes include `w_organization_social` + `r_organization_admin`
+3. Ensure scopes include `w_organization_social` + `rw_organization_admin` (or `r_organization_admin`)
 4. If still denied, check approval status - LinkedIn review can take several weeks
+
+**Issue:** `unauthorized_scope_error` for `openid` scope when connecting Company Pages  
+**Solution:** LinkedIn's Community Management API does not support OpenID Connect scopes. Remove `openid`, `profile`, and `email` from Company Pages OAuth request. Only request organization scopes: `w_organization_social r_organization_social rw_organization_admin`.
+
+**Issue:** Pages show as "Unnamed Page" or "Company Page (12345678)"  
+**Solution:** LinkedIn is rate-limiting organization details. When rate-limited, only organization URNs are returned (not full details). Pages will still work for posting, but names may not display until rate limit resets (usually 24 hours). Code automatically extracts organization IDs from URNs.
 
 **Issue:** `redirect_uri does not match`  
 **Solution:** Both LinkedIn apps must use the same callback URL. Update `LINKEDIN_COMPANY_REDIRECT_URI` to match personal app callback.

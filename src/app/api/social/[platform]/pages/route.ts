@@ -55,7 +55,11 @@ export async function GET(
         connection = await getSocialConnection(user.id, platform, 'company')
         // If no company connection, try personal (but it won't have access to Company Pages)
         if (!connection) {
+          console.warn('[LinkedIn Pages API] No company connection found, trying personal connection (this will not work for Company Pages)')
           connection = await getSocialConnection(user.id, platform, 'personal')
+          if (connection) {
+            console.warn('[LinkedIn Pages API] Using personal connection - Company Pages will not be available. Please connect using the "Company Page" button (not "Personal Profile" or "Business Page").')
+          }
         }
       } else {
         connection = await getSocialConnection(user.id, platform)
@@ -113,6 +117,8 @@ export async function GET(
       console.log('[LinkedIn Pages API] Using connection', {
         appType: connection.appType,
         platformUsername: connection.platformUsername,
+        connectionId: connection.id,
+        note: connection.appType === 'personal' ? 'WARNING: Using personal connection - Company Pages require appType=company. Make sure you connected using the "Company Page" button, not "Personal Profile".' : 'Using company connection - this should work for Company Pages.',
       })
     }
 
@@ -148,10 +154,11 @@ export async function GET(
       // and check the error response
       
       // Fetch LinkedIn Company Pages
-      // LinkedIn requires w_organization_social + r_organization_admin scopes to access company pages
+      // LinkedIn requires w_organization_social + rw_organization_admin (or r_organization_admin) scopes to access company pages
       // Using organizationalEntityAcls endpoint (correct endpoint name per LinkedIn API docs)
       // Note: Query tunneling may be required for long URLs (see LinkedIn API docs)
       console.log('[LinkedIn Pages API] Attempting to fetch organizations with access token')
+      // Fetch LinkedIn Company Pages - try with basic fields first
       const orgsResponse = await fetch(
         `${LINKEDIN_API_BASE}/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED&projection=(elements*(organizationalTarget~(id,name,vanityName)))`,
         {
@@ -191,15 +198,16 @@ export async function GET(
                               errorMessage.includes('permissions') ||
                               errorMessage.includes('w_organization_social') ||
                               errorMessage.includes('r_organization_admin') ||
+                              errorMessage.includes('rw_organization_admin') ||
                               errorMessage.includes('organizationalEntityAcls')
           
           console.warn('[LinkedIn Pages API] Company Pages not available:', {
             reason: isScopeIssue 
-              ? 'LinkedIn Company Pages require w_organization_social and r_organization_admin scopes (Community Management API product)'
+              ? 'LinkedIn Company Pages require w_organization_social and rw_organization_admin (or r_organization_admin) scopes (Community Management API product)'
               : 'LinkedIn Company Pages require the "Community Management API" product (MDP was deprecated April 2024)',
             errorCode: errorCode,
             errorMessage: errorMessage,
-            note: 'Make sure you connected using the "Company Page" button, not "Personal Profile". Company Pages require a separate LinkedIn app with Community Management API approval and both w_organization_social and r_organization_admin scopes.',
+            note: 'Make sure you connected using the "Company Page" button, not "Personal Profile". Company Pages require a separate LinkedIn app with Community Management API approval and both w_organization_social and rw_organization_admin (or r_organization_admin) scopes.',
             endpoint: 'organizationalEntityAcls (correct endpoint per LinkedIn API docs)',
             moreInfo: 'See: https://www.linkedin.com/help/linkedin/answer/a527267/ for Community Management API access',
           })
@@ -217,6 +225,13 @@ export async function GET(
           id: string
           name?: string
           vanityName?: string
+          localizedName?: {
+            [locale: string]: string // e.g., { "en_US": "Company Name" }
+          }
+        } | string // Can be a string URN when rate-limited (e.g., "urn:li:organization:123456789")
+        'organizationalTarget!'?: {
+          message?: string
+          status?: number
         }
       }
 
@@ -225,16 +240,73 @@ export async function GET(
       }
 
       const orgsData = await orgsResponse.json() as LinkedInOrgsResponse
+      console.log('[LinkedIn Pages API] Raw API response:', JSON.stringify(orgsData, null, 2))
+      
       const pages = (orgsData.elements || []).map((element: LinkedInOrgElement) => {
         // LinkedIn API returns organizationalTarget (not organization) per API docs
+        // When rate-limited, organizationalTarget can be a string URN instead of an object
         const org = element.organizationalTarget
+        const error = element['organizationalTarget!']
+        
+        // Check if this is a rate limit error
+        if (error && error.status === 429) {
+          console.warn('[LinkedIn Pages API] Rate limit hit for organization details:', error.message)
+        }
+        
+        // Handle case where organizationalTarget is a string URN (rate-limited response)
+        let orgId: string
+        let orgName: string | undefined
+        let orgVanityName: string | undefined
+        
+        if (typeof org === 'string') {
+          // Extract organization ID from URN format: "urn:li:organization:123456789"
+          const urnMatch = org.match(/urn:li:organization:(\d+)/)
+          orgId = urnMatch ? urnMatch[1] : org
+          orgName = undefined
+          orgVanityName = undefined
+          console.log('[LinkedIn Pages API] Processing organization (rate-limited, URN only):', {
+            urn: org,
+            extractedId: orgId,
+          })
+        } else {
+          // Normal case: organizationalTarget is an object
+          orgId = org.id
+          orgName = org.name
+          orgVanityName = org.vanityName
+          console.log('[LinkedIn Pages API] Processing organization:', {
+            id: org.id,
+            name: org.name,
+            vanityName: org.vanityName,
+            localizedName: org.localizedName,
+          })
+          
+          // Try to get name from localizedName if available
+          if (!orgName && org.localizedName) {
+            orgName = org.localizedName.en_US || 
+                     org.localizedName.en || 
+                     Object.values(org.localizedName)[0] || 
+                     undefined
+          }
+        }
+        
+        // Determine page name
+        let pageName = orgName || orgVanityName
+        
+        // If still no name, use a fallback with the ID
+        if (!pageName) {
+          // Extract last 8 digits from ID for display
+          const displayId = orgId.length > 8 ? orgId.substring(orgId.length - 8) : orgId
+          pageName = `Company Page (${displayId})`
+        }
+        
         return {
-          id: org.id,
-          name: org.name || org.vanityName || 'Unnamed Page',
-          vanityName: org.vanityName,
+          id: orgId,
+          name: pageName,
+          vanityName: orgVanityName,
         }
       })
 
+      console.log('[LinkedIn Pages API] Processed pages:', pages)
       return NextResponse.json({ pages })
     } else if (platform === 'facebook') {
       // Fetch Facebook Pages

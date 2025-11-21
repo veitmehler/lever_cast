@@ -284,13 +284,15 @@ function isAppTypeColumnError(error: unknown): boolean {
       
       // Check scopes to determine app type
       const scopes = (tokenData?.scope as string)?.split(' ') || []
-      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('rw_organization_admin')
+      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin') || scopes.includes('rw_organization_admin')
+      const hasOpenIDScope = scopes.includes('openid')
       const appType = hasOrganizationScope ? 'company' : 'personal'
       
       console.log('[LinkedIn OAuth] Token exchange successful', {
         scope: tokenData?.scope,
         scopes: scopes,
         appType: appType,
+        hasOpenIDScope,
         isCompanyCallback: isCompanyCallback,
         targetType: targetType,
         expires_in: tokenData?.expires_in,
@@ -305,19 +307,32 @@ function isAppTypeColumnError(error: unknown): boolean {
         : null
 
       // Fetch user profile
-      const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      })
+      // For Company Pages (Community Management API), OpenID Connect is not available
+      // Use a fallback approach or skip profile fetching for company connections
+      if (hasOpenIDScope) {
+        // Personal Profile: Use OpenID Connect userinfo endpoint
+        const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        })
 
-      if (!profileResponse.ok) {
-        return redirectWithCleanup('/settings?error=profile_fetch_failed')
+        if (!profileResponse.ok) {
+          const errorText = await profileResponse.text()
+          console.error('[LinkedIn OAuth] Failed to fetch user profile:', errorText)
+          return redirectWithCleanup('/settings?error=profile_fetch_failed')
+        }
+
+        const profile = await profileResponse.json()
+        platformUserId = profile.sub
+        platformUsername = profile.name || profile.email || 'LinkedIn User'
+      } else {
+        // Company Pages: Profile fetching not critical - use placeholder values
+        // The organization scopes don't include profile access, but we can still save the connection
+        console.log('[LinkedIn OAuth] Company Pages connection - skipping profile fetch (OpenID Connect not available)')
+        platformUserId = 'company_connection'
+        platformUsername = 'LinkedIn Company Page'
       }
-
-      const profile = await profileResponse.json()
-      platformUserId = profile.sub
-      platformUsername = profile.name || profile.email || 'LinkedIn User'
 
     } else if (platform === 'twitter') {
       if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
@@ -869,7 +884,7 @@ function isAppTypeColumnError(error: unknown): boolean {
     let connectionAppType: 'personal' | 'company' | null = null
     if (platform === 'linkedin') {
       const scopes = (tokenData?.scope as string)?.split(' ') || []
-      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin')
+      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin') || scopes.includes('rw_organization_admin')
       // Use targetType from state, or determine from scopes
       connectionAppType = targetType === 'company' || hasOrganizationScope ? 'company' : 'personal'
       
@@ -1018,7 +1033,7 @@ function isAppTypeColumnError(error: unknown): boolean {
     // Log connection details for debugging
     if (platform === 'linkedin') {
       const scopes = (tokenData?.scope as string)?.split(' ') || []
-      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin')
+      const hasOrganizationScope = scopes.includes('w_organization_social') || scopes.includes('r_organization_admin') || scopes.includes('rw_organization_admin')
       console.log('[LinkedIn OAuth] Connection saved', {
         appType: connectionAppType,
         scopes: scopes,

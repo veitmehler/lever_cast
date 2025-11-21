@@ -182,7 +182,7 @@ export async function POST(
         state,
         // Request appropriate scopes based on target
         scope: isCompanyPage 
-          ? 'openid profile email w_organization_social r_organization_social r_organization_admin'  // Company Pages
+          ? 'w_organization_social r_organization_social rw_organization_admin'  // Company Pages - Community Management API doesn't support OpenID Connect scopes
           : 'openid profile email w_member_social',       // Personal Profiles
       })
 

@@ -12,7 +12,7 @@ export default function Home() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold">Levercast</h1>
+            <h1 className="text-2xl font-bold">Socioply</h1>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/sign-in">
@@ -109,7 +109,7 @@ export default function Home() {
       <section className="container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto">
           <h3 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            Why creators love Levercast
+            Why creators love Socioply
           </h3>
 
           <div className="space-y-6">
@@ -156,10 +156,10 @@ export default function Home() {
               <div className="w-6 h-6 rounded-lg bg-primary flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">Levercast</span>
+              <span className="font-semibold">Socioply</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Levercast. All rights reserved.
+              © 2024 Socioply. All rights reserved.
             </p>
           </div>
         </div>

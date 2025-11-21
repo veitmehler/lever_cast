@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Levercast',
+  title: 'Socioply',
   description: 'Convert spontaneous ideas into polished social posts',
 }
 

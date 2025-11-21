@@ -1,8 +1,8 @@
-# **Product Requirements Document: Levercast**
+# **Product Requirements Document: Socioply**
 
 ## **1. Elevator Pitch**
 
-Levercast is an AI-powered content ideation and publishing tool for entrepreneurs. It captures spontaneous thoughts via text or voice, formats them into polished posts using customizable AI templates and writing style preferences, and instantly generates optimized versions for multiple platforms—including LinkedIn, Twitter/X, Facebook, Instagram, Threads, and Telegram. By turning scattered inspiration into ready-to-publish content, Levercast helps busy founders save time and amplify their personal brand effortlessly.
+Socioply is an AI-powered content ideation and publishing tool for entrepreneurs. It captures spontaneous thoughts via text or voice, formats them into polished posts using customizable AI templates and writing style preferences, and instantly generates optimized versions for multiple platforms—including LinkedIn, Twitter/X, Facebook, Instagram, Threads, and Telegram. By turning scattered inspiration into ready-to-publish content, Socioply helps busy founders save time and amplify their personal brand effortlessly.
 
 ---
 

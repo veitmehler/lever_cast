@@ -1399,7 +1399,7 @@ export default function SettingsPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Connected Accounts</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Connect your social media accounts to publish directly from Levercast
+            Connect your social media accounts to publish directly from Socioply
           </p>
           
           {isLoadingConnections ? (

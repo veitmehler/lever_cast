@@ -297,9 +297,6 @@ You are the world's best at what you do.`
   // This helps prevent the model from getting confused by the large context in the user prompt
   const promptLength = prompt.length
   
-  let genModel
-  let result
-  
   console.log(`[Gemini] Using systemInstruction mode (prompt length: ${promptLength} chars)`)
   
   // Log the system instruction
@@ -312,7 +309,7 @@ You are the world's best at what you do.`
   console.log(prompt)
   console.log(`========== END USER PROMPT (${prompt.length} characters) ==========\n`)
   
-  genModel = genAI.getGenerativeModel({ 
+  const genModel = genAI.getGenerativeModel({ 
     model,
     systemInstruction: systemMessage,
     generationConfig: {
@@ -322,7 +319,7 @@ You are the world's best at what you do.`
   })
   
   // Pass the prompt as-is without additional wrapper instructions
-  result = await genModel.generateContent(prompt)
+  const result = await genModel.generateContent(prompt)
   
   console.log(`[Gemini] Generating with model: ${model}, maxTokens: ${maxTokens}, characterLimit: ${characterLimit || 'none'}`)
 
@@ -351,18 +348,19 @@ You are the world's best at what you do.`
         // This is okay, we'll use what we got
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Gemini] Error processing response:', error)
     console.error('[Gemini] Response object:', {
       candidates: response?.candidates,
       promptFeedback: response?.promptFeedback,
     })
     
-    if (error?.message?.includes('blocked') || error?.message?.includes('SAFETY')) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage.includes('blocked') || errorMessage.includes('SAFETY')) {
       throw error // Re-throw safety errors
     }
     
-    throw new Error(`Gemini API error: ${error?.message || 'Unknown error'}`)
+    throw new Error(`Gemini API error: ${errorMessage || 'Unknown error'}`)
   }
   
   // Handle empty or very short responses

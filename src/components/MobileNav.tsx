@@ -61,9 +61,9 @@ export function MobileNav() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">L</span>
+            <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
-          <h1 className="text-lg font-semibold text-foreground">Levercast</h1>
+          <h1 className="text-lg font-semibold text-foreground">Socioply</h1>
         </div>
 
         {/* User profile placeholder - actual UserButton is in protected layout */}
@@ -91,7 +91,7 @@ export function MobileNav() {
           {/* Drawer Header */}
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <h1 className="text-xl font-semibold text-foreground">
-              Levercast
+              Socioply
             </h1>
             <button
               onClick={() => setIsOpen(false)}

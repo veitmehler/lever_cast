@@ -1,4 +1,4 @@
-# Levercast - Project Management Documentation
+# Socioply - Project Management Documentation
 
 ## Task Management Instructions
 - Tasks are tagged as **Done**, **ToDo**, or **Backlog**
@@ -879,7 +879,16 @@
 
 ## Change Log
 
-### January 2025 (Latest - Character Limits, UI Improvements & Content Formatting)
+### January 2025 (Latest - Rebranding to Socioply)
+- Rebranded application from "Levercast" to "Socioply"
+  - Updated all frontend UI references (dashboard, homepage, sidebar, mobile nav, settings)
+  - Updated page title metadata in layout.tsx
+  - Changed logo icon from "L" to "S" in mobile navigation
+  - Updated CSS comments to reflect new brand name
+  - Updated main documentation files (project management, product requirements, setup guides)
+  - Backend API files left unchanged (as requested) - still use "Levercast" in API headers
+
+### January 2025 (Earlier - Character Limits, UI Improvements & Content Formatting)
 - Updated character limits with safety buffers for all platforms
   - LinkedIn: 2,500 characters (safety buffer), truncates at 3,000 (actual limit)
   - Facebook: 1,800 characters (safety buffer), truncates at 2,000 (actual limit)

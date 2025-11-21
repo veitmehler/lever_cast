@@ -1,6 +1,6 @@
 # LinkedIn Connection Guide
 
-Use this checklist to connect your LinkedIn presence to Levercast. You can link both your personal profile and (once approved) company pages.
+Use this checklist to connect your LinkedIn presence to Socioply. You can link both your personal profile and (once approved) company pages.
 
 ## Prerequisites
 - LinkedIn account with the correct privileges:
@@ -10,14 +10,14 @@ Use this checklist to connect your LinkedIn presence to Levercast. You can link 
 - For company pages, ensure our LinkedIn app has the **Community Management** product approved (we maintain this centrally).
 
 ## Step-by-Step
-1. **Open Levercast Settings**
+1. **Open Socioply Settings**
    - Navigate to `/settings`.
 
 2. **Connect Personal Profile (optional but recommended)**
    - In “Connected Accounts,” locate the LinkedIn row.
    - Click **Personal Profile**.
    - Sign in to LinkedIn if prompted and approve the requested scopes (`w_member_social`).
-   - You’ll return to Levercast; status should show “Connected as …”.
+   - You’ll return to Socioply; status should show “Connected as …”.
 
 3. **Connect Company Page (requires LinkedIn approval)**
    - Click **Company Page**.
@@ -31,10 +31,10 @@ Use this checklist to connect your LinkedIn presence to Levercast. You can link 
 ## Troubleshooting
 - **`invalid_scope_error`:** LinkedIn hasn’t approved Community Management access yet. We’re awaiting their review—try again after approval.
 - **No company pages listed:** confirm your LinkedIn user is a Super Admin and that you connected via the “Company Page” button.
-- **Connection lost:** disconnect in Levercast, then reconnect. Tokens expire periodically; reauthorization refreshes them.
+- **Connection lost:** disconnect in Socioply, then reconnect. Tokens expire periodically; reauthorization refreshes them.
 - **Analytics unavailable:** LinkedIn currently restricts the `r_member_social` scope. Analytics must be checked directly on LinkedIn.
 
 ## Next Steps
-- Once connected, drafting or scheduling LinkedIn posts in Levercast will target the selected profile/page automatically.
+- Once connected, drafting or scheduling LinkedIn posts in Socioply will target the selected profile/page automatically.
 - You can always switch between personal and company targets in Settings without re-authorizing.
 

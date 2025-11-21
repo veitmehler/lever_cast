@@ -242,9 +242,11 @@ export async function GET(
       const orgsData = await orgsResponse.json() as LinkedInOrgsResponse
       console.log('[LinkedIn Pages API] Raw API response:', JSON.stringify(orgsData, null, 2))
       
-      const pages = (orgsData.elements || []).map((element: LinkedInOrgElement) => {
-        // LinkedIn API returns organizationalTarget (not organization) per API docs
-        // When rate-limited, organizationalTarget can be a string URN instead of an object
+      // First pass: Extract organization IDs and check which ones need name fetching
+      const orgsToFetch: Array<{ id: string; urn: string }> = []
+      const pagesWithNames: Array<{ id: string; name: string; vanityName?: string }> = []
+      
+      for (const element of orgsData.elements || []) {
         const org = element.organizationalTarget
         const error = element['organizationalTarget!']
         
@@ -268,6 +270,8 @@ export async function GET(
             urn: org,
             extractedId: orgId,
           })
+          // Store for later fetching
+          orgsToFetch.push({ id: orgId, urn: org })
         } else {
           // Normal case: organizationalTarget is an object
           orgId = org.id
@@ -287,27 +291,113 @@ export async function GET(
                      Object.values(org.localizedName)[0] || 
                      undefined
           }
+          
+          // If we have a name, add to pagesWithNames immediately
+          if (orgName || orgVanityName) {
+            pagesWithNames.push({
+              id: orgId,
+              name: orgName || orgVanityName || 'Unnamed Page',
+              vanityName: orgVanityName,
+            })
+          } else {
+            // No name available, need to fetch
+            orgsToFetch.push({ id: orgId, urn: `urn:li:organization:${orgId}` })
+          }
         }
+      }
+      
+      // Second pass: Fetch organization names for URNs (rate-limited cases)
+      if (orgsToFetch.length > 0) {
+        console.log(`[LinkedIn Pages API] Fetching organization names for ${orgsToFetch.length} organizations...`)
         
-        // Determine page name
-        let pageName = orgName || orgVanityName
-        
-        // If still no name, use a fallback with the ID
-        if (!pageName) {
-          // Extract last 8 digits from ID for display
-          const displayId = orgId.length > 8 ? orgId.substring(orgId.length - 8) : orgId
-          pageName = `Company Page (${displayId})`
+        for (const orgInfo of orgsToFetch) {
+          try {
+            // Fetch organization details using /v2/organizations/{orgId} endpoint
+            // Add delay between requests to avoid rate limits
+            if (orgsToFetch.indexOf(orgInfo) > 0) {
+              await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay between requests
+            }
+            
+            const orgDetailsResponse = await fetch(
+              `${LINKEDIN_API_BASE}/organizations/${orgInfo.id}?projection=(id,name,vanityName,localizedName)`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                },
+              }
+            )
+            
+            if (orgDetailsResponse.ok) {
+              const orgDetails = await orgDetailsResponse.json() as {
+                id: string
+                name?: string | { localized?: { [locale: string]: string }; preferredLocale?: { country: string; language: string } }
+                vanityName?: string
+                localizedName?: { [locale: string]: string }
+              }
+              
+              // Extract name - can be a string or an object with localized/preferredLocale
+              let orgName: string | undefined
+              
+              if (typeof orgDetails.name === 'string') {
+                orgName = orgDetails.name
+              } else if (orgDetails.name && typeof orgDetails.name === 'object') {
+                // Handle object format: { localized: { en_US: '...' }, preferredLocale: {...} }
+                const nameObj = orgDetails.name as { localized?: { [locale: string]: string }; preferredLocale?: { country: string; language: string } }
+                if (nameObj.localized) {
+                  orgName = nameObj.localized.en_US || 
+                           nameObj.localized.en || 
+                           Object.values(nameObj.localized)[0] || 
+                           undefined
+                }
+              }
+              
+              // Fallback to vanityName or localizedName
+              if (!orgName) {
+                orgName = orgDetails.vanityName
+              }
+              
+              if (!orgName && orgDetails.localizedName) {
+                orgName = orgDetails.localizedName.en_US || 
+                         orgDetails.localizedName.en || 
+                         Object.values(orgDetails.localizedName)[0] || 
+                         undefined
+              }
+              
+              pagesWithNames.push({
+                id: orgInfo.id,
+                name: orgName || `Company Page (${orgInfo.id.substring(orgInfo.id.length - 8)})`,
+                vanityName: orgDetails.vanityName,
+              })
+              
+              console.log(`[LinkedIn Pages API] Fetched organization name for ${orgInfo.id}:`, orgName)
+            } else {
+              // If fetching fails, use fallback name
+              const errorText = await orgDetailsResponse.text()
+              console.warn(`[LinkedIn Pages API] Failed to fetch organization ${orgInfo.id}:`, {
+                status: orgDetailsResponse.status,
+                error: errorText,
+              })
+              
+              pagesWithNames.push({
+                id: orgInfo.id,
+                name: `Company Page (${orgInfo.id.substring(orgInfo.id.length - 8)})`,
+                vanityName: undefined,
+              })
+            }
+          } catch (fetchError) {
+            console.error(`[LinkedIn Pages API] Error fetching organization ${orgInfo.id}:`, fetchError)
+            // Use fallback name on error
+            pagesWithNames.push({
+              id: orgInfo.id,
+              name: `Company Page (${orgInfo.id.substring(orgInfo.id.length - 8)})`,
+              vanityName: undefined,
+            })
+          }
         }
-        
-        return {
-          id: orgId,
-          name: pageName,
-          vanityName: orgVanityName,
-        }
-      })
+      }
 
-      console.log('[LinkedIn Pages API] Processed pages:', pages)
-      return NextResponse.json({ pages })
+      console.log('[LinkedIn Pages API] Processed pages:', pagesWithNames)
+      return NextResponse.json({ pages: pagesWithNames })
     } else if (platform === 'facebook') {
       // Fetch Facebook Pages
       // Note: Requires pages_show_list permission on the user access token

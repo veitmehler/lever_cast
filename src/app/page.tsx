@@ -39,12 +39,12 @@ export default function Home() {
           
           <h2 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
             Turn Ideas into
-            <span className="block text-primary">Social Posts</span>
+            <span className="block text-primary">Post Outlines</span>
           </h2>
           
           <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Transform spontaneous thoughts into polished, platform-optimized content. 
-            Type or speak—AI does the rest.
+            Generate data-driven post outlines based on your past content performance. 
+            Type or speak your idea—AI analyzes what works and creates optimized outlines.
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
@@ -68,7 +68,7 @@ export default function Home() {
             Everything you need to amplify your voice
           </h3>
           <p className="text-muted-foreground text-center mb-16 text-lg">
-            From idea to published post in seconds
+            From idea to performance-optimized outline in seconds
           </p>
 
           <div className="grid gap-8 md:grid-cols-3">
@@ -86,9 +86,9 @@ export default function Home() {
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                 <Zap className="w-6 h-6 text-primary" />
               </div>
-              <h4 className="text-xl font-semibold mb-3">AI Optimization</h4>
+              <h4 className="text-xl font-semibold mb-3">Performance-Based Outlines</h4>
               <p className="text-muted-foreground">
-                Our AI crafts platform-specific posts optimized for LinkedIn, Twitter, and more. Professional quality, instantly.
+                Our AI analyzes your past content performance and generates data-driven post outlines optimized for LinkedIn, Twitter, and more. Based on what actually works.
               </p>
             </div>
 
@@ -114,12 +114,12 @@ export default function Home() {
 
           <div className="space-y-6">
             {[
-              "Generate LinkedIn and Twitter posts in seconds",
-              "Maintain your authentic voice with AI assistance",
-              "Edit and customize before publishing",
+              "Generate post outlines based on your past content performance",
+              "Data-driven insights from your analytics guide outline creation",
+              "Edit and customize outlines before expanding into full posts",
               "Never lose a great idea with voice capture",
-              "Platform-specific formatting automatically applied",
-              "Save drafts and publish when ready"
+              "Platform-specific outline formats automatically applied",
+              "Save outlines and expand them when ready"
             ].map((benefit, i) => (
               <div key={i} className="flex items-start gap-4">
                 <CheckCircle className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
@@ -159,7 +159,7 @@ export default function Home() {
               <span className="font-semibold">Socioply</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Socioply. All rights reserved.
+              © {new Date().getFullYear()} Azavea Inc. All rights reserved.
             </p>
           </div>
         </div>

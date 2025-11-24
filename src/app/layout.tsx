@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Socioply',
-  description: 'Convert spontaneous ideas into polished social posts',
+  description: 'Generate data-driven post outlines based on your past content performance',
 }
 
 export default function RootLayout({

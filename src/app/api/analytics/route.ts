@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 
@@ -30,7 +30,7 @@ interface PostAnalytics {
 }
 
 // GET /api/analytics - Get aggregated analytics for all published posts
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const authResult = await auth()
     const clerkId = authResult.userId
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
         const likes = analyticsData.likes || 0
         // Facebook has reactions: like, love, wow, haha, sad, angry
         // For simplicity, we'll treat like/love/wow/haha as positive, sad/angry as negative
-        const reactions = analyticsData.reactions || {}
+        const reactions = (analyticsData.reactions as Record<string, number>) || {}
         const positiveCount = (reactions.like || 0) + (reactions.love || 0) + (reactions.wow || 0) + (reactions.haha || 0)
         const negativeCount = (reactions.sad || 0) + (reactions.angry || 0)
         totalReactions = likes + positiveCount + negativeCount

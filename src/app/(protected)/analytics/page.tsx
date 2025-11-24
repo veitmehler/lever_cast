@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
 import { BarChart3, RefreshCw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -20,7 +19,6 @@ interface PostAnalytics {
 }
 
 export default function AnalyticsPage() {
-  const { user } = useUser()
   const [analytics, setAnalytics] = useState<PostAnalytics[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)

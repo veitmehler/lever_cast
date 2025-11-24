@@ -5,7 +5,6 @@ import { Copy, RotateCw, Send, Check, AlertCircle, Calendar } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ScheduleModal } from './ScheduleModal'
-import Image from 'next/image'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
@@ -49,16 +48,11 @@ const PLATFORM_DISPLAY_LIMITS = {
 export function PlatformPreview({
   platform,
   content,
-  image,
   onRegenerate,
   onPublish,
   onSchedule,
   onReschedule,
   onContentChange,
-  userName = 'John Doe',
-  userInitials = 'JD',
-  isPublished = false,
-  publishedDate = null,
   isScheduled = false,
   scheduledDate = null,
   scheduledPostId = null,
@@ -410,16 +404,6 @@ export function PlatformPreview({
           >
             <Calendar className="w-4 h-4 mr-2" />
             Change Publish Date
-          </Button>
-        ) : isPublished ? (
-          <Button
-            size="sm"
-            className="flex-1 min-h-[44px] bg-green-600 text-white hover:bg-green-700"
-            disabled
-            title={`Published to ${platform}`}
-          >
-            <Check className="w-4 h-4 mr-2" />
-            Published
           </Button>
         ) : (
           <div className="flex-1 flex gap-1">

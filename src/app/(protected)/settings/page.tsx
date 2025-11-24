@@ -1273,7 +1273,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Writing Style Settings */}
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div className="rounded-lg border border-border bg-card p-6 hidden">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Writing Style</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Define your writing voice and style. This will be used to guide AI-generated posts to match your preferred tone and style.

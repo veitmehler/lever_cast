@@ -203,3 +203,19 @@ model TwitterApiRequest {
   @@index([userId, requestedAt])
   @@map("twitter_api_requests")
 }
+
+// Replaces the in-memory Map in src/lib/oauth.ts with a durable, multi-instance-safe store.
+// States expire after 10 minutes; a cleanup job purges rows older than expiresAt.
+model OAuthState {
+  state        String   @id
+  clerkId      String
+  platform     String // "linkedin" | "twitter" | "facebook" | "instagram" | "threads"
+  codeVerifier String?
+  target       String? // "personal" | "company" (LinkedIn only)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([clerkId, platform])
+  @@map("oauth_states")
+}

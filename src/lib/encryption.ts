@@ -1,89 +1,145 @@
 /**
- * Encryption utility for API keys
- * 
- * NOTE: This is a basic implementation using base64 encoding.
- * For production, this should be upgraded to proper encryption (e.g., AES-256-GCM)
- * using Node.js crypto module with a secure key management system.
+ * AES-256-GCM encryption for API keys and OAuth tokens.
+ *
+ * Ciphertext format (v2):  v2.<iv_b64>.<tag_b64>.<ct_b64>
+ *
+ * Backward compatibility:
+ *   - Existing rows stored as plain base64 (legacy "encryption") are transparently
+ *     decoded by decrypt() so no forced re-encryption is needed before deploying.
+ *   - Run `scripts/migrate-encryption.ts` during the maintenance window to upgrade
+ *     all rows to v2 format.
+ *
+ * Key rotation:
+ *   - Set ENCRYPTION_KEY to the new key.
+ *   - Optionally set ENCRYPTION_KEY_OLD to the previous key during the rotation window;
+ *     decrypt() will try the old key as a fallback before giving up.
+ *   - Remove ENCRYPTION_KEY_OLD once all rows have been re-encrypted.
  */
 
-// ENCRYPTION_KEY is reserved for future use when upgrading to proper encryption
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-change-in-production'
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+
+const ALGO = 'aes-256-gcm'
+const V2_PREFIX = 'v2'
+
+function resolveKey(envVar: string): Buffer | null {
+  const val = process.env[envVar]
+  if (!val) return null
+  const buf = Buffer.from(val, 'base64')
+  if (buf.length !== 32) {
+    throw new Error(
+      `${envVar} must be a base64-encoded 32-byte key (got ${buf.length} bytes). ` +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"'
+    )
+  }
+  return buf
+}
+
+function getPrimaryKey(): Buffer {
+  const key = resolveKey('ENCRYPTION_KEY')
+  if (key) return key
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'ENCRYPTION_KEY env var is required in production. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"'
+    )
+  }
+
+  // Development fallback — never used in production.
+  console.warn(
+    '[encryption] ENCRYPTION_KEY is not set. Using insecure dev fallback. ' +
+      'Set ENCRYPTION_KEY in .env before storing any real tokens.'
+  )
+  return Buffer.alloc(32, 'dev') // 32 bytes, pattern "dev" repeated
+}
+
+function getOldKey(): Buffer | null {
+  return resolveKey('ENCRYPTION_KEY_OLD')
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
- * Encrypts a string value (basic base64 encoding)
- * TODO: Upgrade to proper encryption (AES-256-GCM) in production
+ * Encrypt a plaintext string. Always produces a v2 ciphertext.
  */
-export function encrypt(value: string): string {
-  if (!value) return ''
-  
-  // Simple base64 encoding for now
-  // In production, use: crypto.createCipheriv('aes-256-gcm', key, iv)
-  const encoded = Buffer.from(value).toString('base64')
-  return encoded
+export function encrypt(plaintext: string): string {
+  if (!plaintext) return ''
+  const KEY = getPrimaryKey()
+  const iv = randomBytes(12)
+  const cipher = createCipheriv(ALGO, KEY, iv)
+  const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return `${V2_PREFIX}.${iv.toString('base64')}.${tag.toString('base64')}.${ct.toString('base64')}`
 }
 
 /**
- * Decrypts a string value (basic base64 decoding)
- * TODO: Upgrade to proper decryption (AES-256-GCM) in production
+ * Decrypt a string produced by encrypt() or by the legacy base64 scheme.
+ *
+ * Resolution order:
+ *   1. v2 format → try ENCRYPTION_KEY, then ENCRYPTION_KEY_OLD.
+ *   2. Legacy base64 → base64-decode; return if printable ASCII.
+ *   3. Plaintext passthrough → return as-is if printable ASCII.
+ *   4. Return '' and log a warning.
  */
-export function decrypt(encryptedValue: string): string {
-  if (!encryptedValue) {
-    console.warn('[Encryption] Attempted to decrypt empty value')
-    return ''
-  }
-  
-  try {
-    // Check if value is already a plain string (not base64 encoded)
-    // This can happen if tokens were stored before encryption was implemented
-    if (typeof encryptedValue !== 'string') {
-      console.error('[Encryption] Value is not a string:', typeof encryptedValue)
+export function decrypt(stored: string): string {
+  if (!stored) return ''
+
+  // v2 format: v2.<iv>.<tag>.<ct>
+  if (stored.startsWith(`${V2_PREFIX}.`)) {
+    const parts = stored.split('.')
+    if (parts.length !== 4) {
+      console.error('[encryption] Malformed v2 ciphertext')
       return ''
     }
-    
-    // Try to decode as base64
-    // If it fails, assume it's already plain text (backward compatibility)
-    try {
-      const decoded = Buffer.from(encryptedValue, 'base64').toString('utf-8')
-      
-      // Validate that decoded value looks like a token (not binary garbage)
-      // Tokens are typically alphanumeric strings, not binary data
-      if (decoded && decoded.length > 0 && /^[\x20-\x7E]+$/.test(decoded)) {
-        return decoded
-      } else {
-        // Decoded value looks like binary data, might be double-encoded or corrupted
-        console.warn('[Encryption] Decoded value appears to be binary data, trying as plain text')
-        // Return original value if it looks like a valid token
-        if (/^[\x20-\x7E]+$/.test(encryptedValue)) {
-          return encryptedValue
-        }
-        throw new Error('Decoded value is not valid UTF-8 text')
+    const [, ivB64, tagB64, ctB64] = parts
+    const iv = Buffer.from(ivB64, 'base64')
+    const tag = Buffer.from(tagB64, 'base64')
+    const ct = Buffer.from(ctB64, 'base64')
+
+    const keysToTry: Buffer[] = [getPrimaryKey()]
+    const oldKey = getOldKey()
+    if (oldKey) keysToTry.push(oldKey)
+
+    for (const key of keysToTry) {
+      try {
+        const d = createDecipheriv(ALGO, key, iv)
+        d.setAuthTag(tag)
+        const plain = Buffer.concat([d.update(ct), d.final()]).toString('utf8')
+        return plain
+      } catch {
+        // Try next key
       }
-    } catch (base64Error) {
-      // If base64 decoding fails, check if it's already plain text
-      if (/^[\x20-\x7E]+$/.test(encryptedValue)) {
-        console.warn('[Encryption] Value is not base64 encoded, returning as plain text')
-        return encryptedValue
-      }
-      throw base64Error
     }
-  } catch (error) {
-    console.error('[Encryption] Error decrypting value:', {
-      error: error instanceof Error ? error.message : String(error),
-      valueLength: encryptedValue.length,
-      valuePreview: encryptedValue.substring(0, 50),
-    })
+
+    console.error('[encryption] Failed to decrypt v2 ciphertext with any active key')
     return ''
   }
+
+  // Legacy: base64-encoded plaintext (old "encryption" scheme)
+  try {
+    const decoded = Buffer.from(stored, 'base64').toString('utf8')
+    if (decoded && /^[\x20-\x7E]+$/.test(decoded)) {
+      return decoded
+    }
+  } catch {
+    // Not valid base64
+  }
+
+  // Plaintext passthrough (tokens stored before any encryption was applied)
+  if (/^[\x20-\x7E]+$/.test(stored)) {
+    return stored
+  }
+
+  console.warn('[encryption] Could not decrypt value — returning empty string')
+  return ''
 }
 
 /**
- * Masks an API key for display (shows last 4 characters)
+ * Mask a key for UI display, showing only the last 4 characters.
  */
 export function maskApiKey(key: string): string {
-  if (!key || key.length <= 4) {
-    return '••••••••'
-  }
-  return '•'.repeat(key.length - 4) + key.slice(-4)
+  if (!key || key.length <= 4) return '••••••••'
+  return '•'.repeat(Math.min(20, key.length - 4)) + key.slice(-4)
 }
-

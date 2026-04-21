@@ -5,7 +5,6 @@ import { Copy, RotateCw, Send, Check, AlertCircle, Calendar } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ScheduleModal } from './ScheduleModal'
-import Image from 'next/image'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
@@ -49,16 +48,11 @@ const PLATFORM_DISPLAY_LIMITS = {
 export function PlatformPreview({
   platform,
   content,
-  image,
   onRegenerate,
   onPublish,
   onSchedule,
   onReschedule,
   onContentChange,
-  userName = 'John Doe',
-  userInitials = 'JD',
-  isPublished = false,
-  publishedDate = null,
   isScheduled = false,
   scheduledDate = null,
   scheduledPostId = null,
@@ -206,50 +200,8 @@ export function PlatformPreview({
         <span className="text-white/80 text-xs">Preview</span>
       </div>
 
-      {/* Mock Platform UI */}
+      {/* Content Display */}
       <div className="p-4 bg-secondary/30">
-        {/* User Info */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
-            {userInitials}
-          </div>
-          <div>
-            <div className="font-semibold text-card-foreground text-sm">{userName}</div>
-            <div className="text-xs text-muted-foreground">
-              {isScheduled && scheduledDate
-                ? `Scheduled for ${scheduledDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}`
-                : isPublished && publishedDate
-                  ? `Published ${publishedDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}`
-                  : 'Just now'}
-            </div>
-          </div>
-        </div>
-
-        {/* Attached Image */}
-        {image && (
-          <div className="mb-3">
-            <Image 
-              src={image} 
-              alt="Attached to post" 
-              width={800}
-              height={600}
-              className="rounded-lg max-h-64 w-full object-cover border border-border"
-            />
-          </div>
-        )}
-
         {/* Editable Content */}
         {isEditing ? (
           <div className="space-y-4">
@@ -323,7 +275,10 @@ export function PlatformPreview({
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div 
+            onClick={() => setIsEditing(true)}
+            className="text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-3 rounded transition-colors"
+          >
             {editedTweets.map((tweet, index) => {
               const isSummary = index === 0
               const isReply = index > 0
@@ -331,11 +286,9 @@ export function PlatformPreview({
               return (
                 <div 
                   key={index}
-                  onClick={() => setIsEditing(true)}
                   className={cn(
-                    "text-card-foreground text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-secondary/50 p-3 rounded transition-colors",
-                    isSummary && "border-l-4 border-primary bg-primary/5",
-                    isReply && "border-l-4 border-muted ml-4"
+                    isThread && index > 0 && "mt-4 border-l-4 border-muted pl-4",
+                    isReply && "text-muted-foreground"
                   )}
                 >
                   {isThread && (
@@ -351,9 +304,7 @@ export function PlatformPreview({
                       )}
                     </div>
                   )}
-                  <div className={isReply ? "text-muted-foreground" : ""}>
-                    {tweet}
-                  </div>
+                  <div>{tweet}</div>
                 </div>
               )
             })}
@@ -453,16 +404,6 @@ export function PlatformPreview({
           >
             <Calendar className="w-4 h-4 mr-2" />
             Change Publish Date
-          </Button>
-        ) : isPublished ? (
-          <Button
-            size="sm"
-            className="flex-1 min-h-[44px] bg-green-600 text-white hover:bg-green-700"
-            disabled
-            title={`Published to ${platform}`}
-          >
-            <Check className="w-4 h-4 mr-2" />
-            Published
           </Button>
         ) : (
           <div className="flex-1 flex gap-1">

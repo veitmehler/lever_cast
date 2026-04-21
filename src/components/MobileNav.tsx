@@ -11,6 +11,7 @@ import {
   User, 
   Sparkles,
   Calendar,
+  BarChart3,
   Menu,
   X 
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import {
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Posts', href: '/posts', icon: FileText },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },

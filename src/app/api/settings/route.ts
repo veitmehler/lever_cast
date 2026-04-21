@@ -68,6 +68,8 @@ export async function GET() {
           defaultImageProvider: null,
           defaultImageModel: null,
           defaultImageStyle: null,
+          defaultImagePromptLlmProvider: null,
+          defaultImagePromptLlmModel: null,
           writingStyle: null,
           telegramChatId: null,
         },

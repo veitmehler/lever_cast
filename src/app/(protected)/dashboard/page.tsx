@@ -900,7 +900,7 @@ export default function DashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Welcome to Socioply</h1>
         <p className="text-muted-foreground">
-          Convert your spontaneous ideas into polished, multi-platform social posts.
+          Convert your spontaneous ideas into polished, multi-platform post outlines.
         </p>
       </div>
 
@@ -946,7 +946,7 @@ export default function DashboardPage() {
         <div className="mb-8 rounded-lg border border-border bg-card p-12 text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
           <h3 className="text-xl font-semibold text-card-foreground mb-2">
-            Generating Your Posts...
+            Generating Post Outline
           </h3>
           <p className="text-muted-foreground">
             AI is crafting optimized content for your selected platforms
@@ -958,7 +958,7 @@ export default function DashboardPage() {
       {!isGenerating && generatedContent && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-foreground">Your Generated Posts</h2>
+            <h2 className="text-2xl font-bold text-foreground">Post Outlines:</h2>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

@@ -196,7 +196,7 @@ ${sampleText.trim()}`
               { role: 'user', content: userPrompt },
             ],
             max_tokens: 300,
-            temperature: 0.7,
+            temperature: 0.3,
           })
           writingStyleDescription = response.choices[0]?.message?.content || ''
           break
@@ -240,7 +240,7 @@ ${sampleText.trim()}`
                 { role: 'user', content: userPrompt },
               ],
               max_tokens: 300,
-              temperature: 0.7,
+              temperature: 0.3,
             }),
           })
           

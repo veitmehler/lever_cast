@@ -9,9 +9,6 @@ export interface GeneratedContent {
   threads?: string
 }
 
-// Simulate AI processing delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
 // Extract key points from the idea
 function extractKeyPoints(idea: string): { point1: string; point2: string; point3: string } {
   const sentences = idea.split(/[.!?]+/).filter(s => s.trim().length > 0)
@@ -105,73 +102,5 @@ export async function generateContent(
   
   // Other API errors
   throw new Error('API_ERROR')
-}
-
-// Real publish function using OAuth APIs
-export async function publishToPlatform(
-  platform: 'linkedin' | 'twitter',
-  content: string,
-  userId?: string,
-  imageUrl?: string
-): Promise<{ success: boolean; message: string; postUrl?: string; error?: string }> {
-  // If no userId provided, fall back to mock (for backward compatibility)
-  if (!userId) {
-    await delay(1000)
-    return {
-      success: true,
-      message: `Post successfully published to ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}!`,
-    }
-  }
-
-  try {
-    if (platform === 'linkedin') {
-      const { postToLinkedIn } = await import('./linkedinApi')
-      const result = await postToLinkedIn(userId, content, imageUrl)
-      
-      if (result.success) {
-        return {
-          success: true,
-          message: 'Post successfully published to LinkedIn!',
-          postUrl: result.postUrl,
-        }
-      } else {
-        return {
-          success: false,
-          message: result.error,
-          error: result.error,
-        }
-      }
-    } else if (platform === 'twitter') {
-      const { postToTwitter } = await import('./twitterApi')
-      const result = await postToTwitter(userId, content)
-      
-      if (result.success) {
-        return {
-          success: true,
-          message: 'Post successfully published to Twitter/X!',
-          postUrl: result.postUrl,
-        }
-      } else {
-        return {
-          success: false,
-          message: result.error,
-          error: result.error,
-        }
-      }
-    } else {
-      return {
-        success: false,
-        message: `Unsupported platform: ${platform}`,
-        error: `Unsupported platform: ${platform}`,
-      }
-    }
-  } catch (error) {
-    console.error(`Error publishing to ${platform}:`, error)
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
 }
 

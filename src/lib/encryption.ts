@@ -16,7 +16,8 @@
  *   - Remove ENCRYPTION_KEY_OLD once all rows have been re-encrypted.
  */
 
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import 'server-only'
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 
 const ALGO = 'aes-256-gcm'
 const V2_PREFIX = 'v2'

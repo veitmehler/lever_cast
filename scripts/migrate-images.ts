@@ -64,22 +64,29 @@ function extractContentType(url: string, buffer: Buffer): string {
 async function main() {
   console.log('🖼️  Starting image migration: Supabase Storage → AWS S3\n')
 
-  // Find all posts with Supabase Storage URLs
+  // Find all rows with Supabase Storage URLs (posts.imageUrl + drafts.attachedImage)
   const posts = await prisma.post.findMany({
-    where: {
-      imageUrl: { contains: 'supabase.co' },
-    },
+    where: { imageUrl: { contains: 'supabase.co' } },
     select: { id: true, imageUrl: true },
   })
+  const drafts = await prisma.draft.findMany({
+    where: { attachedImage: { contains: 'supabase.co' } },
+    select: { id: true, attachedImage: true },
+  })
 
-  if (posts.length === 0) {
-    console.log('✅ No posts with Supabase imageUrls found — nothing to migrate.')
+  if (posts.length === 0 && drafts.length === 0) {
+    console.log('✅ No posts or drafts with Supabase URLs — nothing to migrate.')
     return
   }
 
-  // Deduplicate by URL so we only upload each unique image once
-  const uniqueUrls = [...new Set(posts.map(p => p.imageUrl!))]
-  console.log(`Found ${posts.length} post(s) referencing ${uniqueUrls.length} unique image(s).\n`)
+  // Deduplicate across both tables so we only upload each unique image once
+  const uniqueUrls = [
+    ...new Set([
+      ...posts.map(p => p.imageUrl!),
+      ...drafts.map(d => d.attachedImage!),
+    ]),
+  ]
+  console.log(`Found ${posts.length} post(s) and ${drafts.length} draft(s) referencing ${uniqueUrls.length} unique image(s).\n`)
 
   // Map: supabaseUrl → cloudFrontUrl (built during upload phase)
   const urlMap = new Map<string, string>()
@@ -118,31 +125,37 @@ async function main() {
 
   // Phase 2 — update DB rows
   console.log('\n  Updating database URLs…')
-  let updated = 0
-  let skipped = 0
+  let postsUpdated = 0
+  let postsSkipped = 0
+  let draftsUpdated = 0
+  let draftsSkipped = 0
 
   for (const post of posts) {
-    const oldUrl = post.imageUrl!
-    const newUrl = urlMap.get(oldUrl)
-
-    if (!newUrl) {
-      skipped++
-      continue
-    }
-
+    const newUrl = urlMap.get(post.imageUrl!)
+    if (!newUrl) { postsSkipped++; continue }
     await prisma.post.update({
       where: { id: post.id },
       data: { imageUrl: newUrl },
     })
-    updated++
+    postsUpdated++
+  }
+
+  for (const draft of drafts) {
+    const newUrl = urlMap.get(draft.attachedImage!)
+    if (!newUrl) { draftsSkipped++; continue }
+    await prisma.draft.update({
+      where: { id: draft.id },
+      data: { attachedImage: newUrl },
+    })
+    draftsUpdated++
   }
 
   console.log(`\n✅ Migration complete.`)
-  console.log(`   ${updated} post(s) updated to CloudFront URLs`)
-  console.log(`   ${skipped} post(s) skipped (upload failed or URL not matched)`)
+  console.log(`   ${postsUpdated} post(s) updated, ${postsSkipped} skipped`)
+  console.log(`   ${draftsUpdated} draft(s) updated, ${draftsSkipped} skipped`)
 
-  if (skipped > 0) {
-    console.log('\n⚠️  Some posts were skipped. Run the script again after fixing errors above.')
+  if (postsSkipped > 0 || draftsSkipped > 0) {
+    console.log('\n⚠️  Some rows were skipped. Re-run the script after fixing errors above.')
   }
 }
 

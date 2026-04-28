@@ -4,7 +4,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { downloadImageFromStorage } from './supabase'
+import { downloadImageFromStorage } from './storage'
 import { decrypt } from './encryption'
 
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v24.0'

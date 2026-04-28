@@ -6,7 +6,7 @@
 
 import { prisma } from './prisma'
 import { decrypt } from './encryption'
-import { downloadImageFromStorage } from './supabase'
+import { downloadImageFromStorage } from './storage'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
 

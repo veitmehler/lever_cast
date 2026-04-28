@@ -6,7 +6,7 @@
 import { getSocialConnection } from './socialConnections'
 import { encrypt, decrypt } from './encryption'
 import { prisma } from './prisma'
-import { downloadImageFromStorage } from './supabase'
+import { downloadImageFromStorage } from './storage'
 
 const TWITTER_API_BASE = 'https://api.twitter.com/2'
 // TWITTER_API_V1_BASE is reserved for future use

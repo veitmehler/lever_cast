@@ -9,7 +9,7 @@ import {
   generateWithOpenAIDALLE,
   generateWithReplicate,
 } from '@/lib/imageGeneration'
-import { uploadImageToStorage } from '@/lib/supabase'
+import { uploadImageToStorage } from '@/lib/storage'
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {

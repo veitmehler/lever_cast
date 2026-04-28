@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { uploadImageToStorage } from '@/lib/supabase'
+import { uploadImageToStorage } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -150,7 +150,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Extract path from URL if needed
-    const { deleteImageFromStorage, extractFilePathFromUrl } = await import('@/lib/supabase')
+    const { deleteImageFromStorage, extractFilePathFromUrl } = await import('@/lib/storage')
     const finalPath = filePath || extractFilePathFromUrl(url)
 
     if (!finalPath) {

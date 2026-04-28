@@ -5,7 +5,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { downloadImageFromStorage } from './supabase'
+import { downloadImageFromStorage } from './storage'
 import { prisma } from './prisma'
 import { decrypt } from './encryption'
 import { fetchInstagramUsername } from './instagramUsername'

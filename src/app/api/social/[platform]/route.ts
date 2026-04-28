@@ -149,7 +149,7 @@ export async function POST(
       })
       
       // Generate OAuth state token with target type stored in state
-      const stateData = generateOAuthState(clerkId, platform, targetType)
+      const stateData = await generateOAuthState(clerkId, platform, targetType)
       state = stateData.state
       codeVerifier = stateData.codeVerifier
       
@@ -189,7 +189,7 @@ export async function POST(
       redirectUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`
     } else {
       // Generate OAuth state token for other platforms
-      const stateData = generateOAuthState(clerkId, platform)
+      const stateData = await generateOAuthState(clerkId, platform)
       state = stateData.state
       codeVerifier = stateData.codeVerifier
 

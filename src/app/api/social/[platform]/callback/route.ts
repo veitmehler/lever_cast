@@ -169,8 +169,8 @@ export async function GET(
       )
     }
 
-    // Verify state token
-    let stateVerification = verifyOAuthState(state, clerkId, platform)
+    // Verify state token (DB-backed, async; cookies remain as fallback below)
+    let stateVerification = await verifyOAuthState(state, clerkId, platform)
 
     if (!stateVerification.valid && stateCookieData?.state === state) {
       // Fallback to cookie data if state token not found (for Twitter PKCE)

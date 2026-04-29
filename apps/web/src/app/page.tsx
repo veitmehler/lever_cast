@@ -15,12 +15,12 @@ export default function Home() {
             <h1 className="text-2xl font-bold">Socioply</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/sign-in">
+            <Link href="https://app.socioply.com/sign-in">
               <Button variant="outline" className="hover:bg-primary/20 hover:border-primary/50">
                 Sign In
               </Button>
             </Link>
-            <Link href="/sign-up">
+            <Link href="https://app.socioply.com/sign-up">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Get Started
               </Button>
@@ -48,7 +48,7 @@ export default function Home() {
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/sign-up">
+            <Link href="https://app.socioply.com/sign-up">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
                 <Sparkles className="w-5 h-5 mr-2" />
                 Get Started Free
@@ -139,7 +139,7 @@ export default function Home() {
           <p className="text-xl text-muted-foreground mb-8">
             Join entrepreneurs turning ideas into engagement
           </p>
-          <Link href="/sign-up">
+          <Link href="https://app.socioply.com/sign-up">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
               <Sparkles className="w-5 h-5 mr-2" />
               Get Started Free

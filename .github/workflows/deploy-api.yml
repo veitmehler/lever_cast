@@ -18,25 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Install pnpm
+        run: npm install -g pnpm@9.15.4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @socioply/db exec prisma generate
+        run: pnpm --filter @socioply/api exec prisma generate
         env:
           DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
 
       - name: Run DB migrations
-        run: pnpm --filter @socioply/db exec prisma migrate deploy
+        run: pnpm --filter @socioply/api exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
 
@@ -57,14 +55,14 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/lever_cast-api:latest
             ghcr.io/${{ github.repository_owner }}/lever_cast-api:${{ github.sha }}
 
-      - name: Deploy to DigitalOcean droplet via Tailscale SSH
+      - name: Connect to Tailscale
         uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Pull and restart containers
+      - name: Pull and restart containers on droplet
         run: |
           ssh -o StrictHostKeyChecking=no socioply@socioply-api-01 \
             "cd /opt/socioply && docker compose pull && docker compose up -d --remove-orphans"

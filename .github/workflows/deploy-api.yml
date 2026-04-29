@@ -1,0 +1,70 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @socioply/db exec prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
+
+      - name: Run DB migrations
+        run: pnpm --filter @socioply/db exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/lever_cast-api:latest
+            ghcr.io/${{ github.repository_owner }}/lever_cast-api:${{ github.sha }}
+
+      - name: Deploy to DigitalOcean droplet via Tailscale SSH
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Pull and restart containers
+        run: |
+          ssh -o StrictHostKeyChecking=no socioply@socioply-api-01 \
+            "cd /opt/socioply && docker compose pull && docker compose up -d --remove-orphans"

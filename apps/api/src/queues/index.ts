@@ -12,12 +12,9 @@ export async function getBoss(): Promise<PgBoss> {
 
   boss = new PgBoss({
     connectionString,
-    // Use a dedicated schema to avoid collisions with app tables
     schema: 'pgboss',
-    // Archival: keep completed jobs for 7 days
     archiveCompletedAfterSeconds: 60 * 60 * 24 * 7,
     deleteAfterSeconds: 60 * 60 * 24 * 30,
-    // Monitor interval: check for jobs every 2 seconds
     monitorStateIntervalSeconds: 2,
   })
 
@@ -36,23 +33,13 @@ export async function stopBoss(): Promise<void> {
   }
 }
 
-// ─── Queue names ─────────────────────────────────────────────────────────────
 export const QUEUES = {
-  // Social publishing
   PUBLISH: 'publish',
   PUBLISH_SCHEDULED: 'publish-scheduled',
   ANALYTICS_SYNC: 'analytics-sync',
-
-  // Image generation
   IMAGE_GENERATE: 'image-generate',
-
-  // OAuth maintenance
   OAUTH_STATE_CLEANUP: 'oauth-state-cleanup',
-
-  // Database maintenance
   DB_BACKUP: 'db-backup',
-
-  // Article pipeline (Phase 8 — requires DO droplet)
   ARTICLE_PIPELINE: 'article-pipeline',
   ARTICLE_ENRICHMENT: 'article-enrichment',
   ARTICLE_OUTPUT: 'article-output',

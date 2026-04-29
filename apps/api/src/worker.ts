@@ -2,20 +2,33 @@
  * pg-boss worker process.
  * Run with: node dist/worker.js
  *
- * Each queue is registered with a batchSize that controls how many jobs are
- * fetched per polling cycle. Handler implementations are stubs here — they
- * will be filled in Phase 7.
+ * Phase 7 implements the four core handlers:
+ *   - publish-scheduled  (replaces Vercel cron at /api/posts/publish-scheduled)
+ *   - analytics-sync     (replaces Vercel cron at /api/posts/sync-analytics)
+ *   - oauth-state-cleanup
+ *   - db-backup
+ *
+ * Article-pipeline handlers are stubs until Phase 8.
  */
 
 import PgBoss from 'pg-boss'
-import { getBoss, stopBoss, QUEUES } from './queues/index.js'
+import { getBoss, stopBoss, QUEUES } from './queues/index'
+import {
+  publishHandler,
+  publishScheduledHandler,
+  PublishJobData,
+  PublishScheduledJobData,
+} from './handlers/publish'
+import { analyticsSyncHandler, AnalyticsSyncJobData } from './handlers/analytics'
+import { oauthStateCleanupHandler, OAuthCleanupJobData } from './handlers/oauth'
+import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
 
 async function main() {
   console.log('[worker] starting…')
 
   const boss = await getBoss()
 
-  // ── Graceful shutdown ─────────────────────────────────────────────────────
+  // ── Graceful shutdown ───────────────────────────────────────────────────────
   const shutdown = async (signal: string) => {
     console.log(`[worker] received ${signal}, shutting down…`)
     await stopBoss()
@@ -24,87 +37,63 @@ async function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   process.on('SIGINT', () => shutdown('SIGINT'))
 
-  // ── Social publishing ─────────────────────────────────────────────────────
+  // ── Cron schedules ──────────────────────────────────────────────────────────
+  await boss.schedule(QUEUES.PUBLISH_SCHEDULED, '* * * * *', {})      // every minute
+  await boss.schedule(QUEUES.ANALYTICS_SYNC, '0 2 * * *', {})         // daily 02:00 UTC
+  await boss.schedule(QUEUES.OAUTH_STATE_CLEANUP, '0 * * * *', {})    // hourly
+  await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * 0', {})              // Sunday 03:00 UTC
 
-  await boss.work(
+  // ── Social publishing ───────────────────────────────────────────────────────
+  await boss.work<PublishJobData>(
     QUEUES.PUBLISH,
     { batchSize: 5 },
-    async (jobs: PgBoss.Job[]) => {
-      for (const job of jobs) {
-        console.log(`[worker] publish job ${job.id}`)
-        // TODO Phase 7: await publishHandler(job.data)
-      }
-    },
+    publishHandler,
   )
 
-  await boss.work(
+  await boss.work<PublishScheduledJobData>(
     QUEUES.PUBLISH_SCHEDULED,
-    { batchSize: 5 },
-    async (jobs: PgBoss.Job[]) => {
-      for (const job of jobs) {
-        console.log(`[worker] publish-scheduled job ${job.id}`)
-        // TODO Phase 7: await publishScheduledHandler(job.data)
-      }
-    },
+    { batchSize: 1 },
+    publishScheduledHandler,
   )
 
-  await boss.work(
+  // ── Analytics ───────────────────────────────────────────────────────────────
+  await boss.work<AnalyticsSyncJobData>(
     QUEUES.ANALYTICS_SYNC,
-    { batchSize: 5 },
-    async (jobs: PgBoss.Job[]) => {
-      for (const job of jobs) {
-        console.log(`[worker] analytics-sync job ${job.id}`)
-        // TODO Phase 7: await analyticsSyncHandler(job.data)
-      }
-    },
+    { batchSize: 1 },
+    analyticsSyncHandler,
   )
 
-  // ── Image generation ──────────────────────────────────────────────────────
+  // ── Maintenance ─────────────────────────────────────────────────────────────
+  await boss.work<OAuthCleanupJobData>(
+    QUEUES.OAUTH_STATE_CLEANUP,
+    { batchSize: 1 },
+    oauthStateCleanupHandler,
+  )
 
+  await boss.work<DbBackupJobData>(
+    QUEUES.DB_BACKUP,
+    { batchSize: 1 },
+    dbBackupHandler,
+  )
+
+  // ── Image generation ────────────────────────────────────────────────────────
   await boss.work(
     QUEUES.IMAGE_GENERATE,
     { batchSize: 3 },
     async (jobs: PgBoss.Job[]) => {
       for (const job of jobs) {
-        console.log(`[worker] image-generate job ${job.id}`)
-        // TODO Phase 7: await imageGenerateHandler(job.data)
+        console.log(`[image-generate] job ${job.id} — TODO Phase 8`)
       }
     },
   )
 
-  // ── Maintenance ───────────────────────────────────────────────────────────
-
-  await boss.work(
-    QUEUES.OAUTH_STATE_CLEANUP,
-    { batchSize: 1 },
-    async (jobs: PgBoss.Job[]) => {
-      for (const job of jobs) {
-        console.log(`[worker] oauth-state-cleanup job ${job.id}`)
-        // TODO Phase 7: delete oauth_states where expiresAt < now()
-      }
-    },
-  )
-
-  await boss.work(
-    QUEUES.DB_BACKUP,
-    { batchSize: 1 },
-    async (jobs: PgBoss.Job[]) => {
-      for (const job of jobs) {
-        console.log(`[worker] db-backup job ${job.id}`)
-        // TODO Phase 7: await dbBackupHandler(job.data)
-      }
-    },
-  )
-
-  // ── Article pipeline (Phase 8 — DO droplet required) ─────────────────────
-
+  // ── Article pipeline (Phase 8 — DO droplet required) ───────────────────────
   await boss.work(
     QUEUES.ARTICLE_PIPELINE,
     { batchSize: 2 },
     async (jobs: PgBoss.Job[]) => {
       for (const job of jobs) {
-        console.log(`[worker] article-pipeline job ${job.id}`)
-        // TODO Phase 8: await articlePipelineHandler(job.data)
+        console.log(`[article-pipeline] job ${job.id} — TODO Phase 8`)
       }
     },
   )
@@ -114,8 +103,7 @@ async function main() {
     { batchSize: 1 },
     async (jobs: PgBoss.Job[]) => {
       for (const job of jobs) {
-        console.log(`[worker] article-enrichment job ${job.id}`)
-        // TODO Phase 8: await articleEnrichmentHandler(job.data)
+        console.log(`[article-enrichment] job ${job.id} — TODO Phase 8`)
       }
     },
   )
@@ -125,8 +113,7 @@ async function main() {
     { batchSize: 3 },
     async (jobs: PgBoss.Job[]) => {
       for (const job of jobs) {
-        console.log(`[worker] article-output job ${job.id}`)
-        // TODO Phase 8: await articleOutputHandler(job.data)
+        console.log(`[article-output] job ${job.id} — TODO Phase 8`)
       }
     },
   )
@@ -136,18 +123,10 @@ async function main() {
     { batchSize: 3 },
     async (jobs: PgBoss.Job[]) => {
       for (const job of jobs) {
-        console.log(`[worker] generate-social-from-article job ${job.id}`)
-        // TODO Phase 8: await generateSocialFromArticleHandler(job.data)
+        console.log(`[generate-social-from-article] job ${job.id} — TODO Phase 8`)
       }
     },
   )
-
-  // ── Cron schedules (replace Vercel crons post-Phase 8 cutover) ────────────
-
-  await boss.schedule(QUEUES.PUBLISH_SCHEDULED, '* * * * *', {})
-  await boss.schedule(QUEUES.ANALYTICS_SYNC, '0 2 * * *', {})
-  await boss.schedule(QUEUES.OAUTH_STATE_CLEANUP, '*/10 * * * *', {})
-  await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * *', {})
 
   console.log('[worker] all queues registered, crons scheduled — ready')
 }

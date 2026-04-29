@@ -183,7 +183,7 @@ export async function imageRoutes(app: FastifyInstance) {
       }
 
       // Resolve image model
-      let selectedModel = model
+      let selectedModel: string = model || ''
       if (!selectedModel) {
         if (settings.defaultImageModel) {
           try {

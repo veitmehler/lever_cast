@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/posts/publish-scheduled",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/posts/sync-analytics",
-      "schedule": "0 2 * * *"
-    }
-  ]
-}
+{}

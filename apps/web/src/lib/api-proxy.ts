@@ -1,0 +1,84 @@
+/**
+ * Thin proxy helper — forwards authenticated requests from Vercel to the DO API.
+ *
+ * Usage:
+ *   export async function POST(request: NextRequest) {
+ *     return proxyToApi(request, '/api/ai/generate')
+ *   }
+ *
+ * The helper:
+ *  1. Verifies the Clerk session (returns 401 if not authenticated).
+ *  2. Gets a short-lived Clerk JWT for the DO API to verify.
+ *  3. Forwards the raw request body + content-type to the DO API.
+ *  4. Streams the DO API response back to the browser.
+ */
+
+import { auth } from '@clerk/nextjs/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+const DO_API_BASE = process.env.DO_API_BASE ?? 'https://api.socioply.com'
+
+export async function proxyToApi(
+  request: NextRequest,
+  path: string,
+  options: { method?: string } = {},
+): Promise<NextResponse> {
+  // 1. Authenticate the caller
+  const { userId, getToken } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // 2. Get a Clerk JWT to forward to the DO API
+  const token = await getToken()
+  if (!token) {
+    return NextResponse.json({ error: 'Could not obtain auth token' }, { status: 401 })
+  }
+
+  // 3. Forward the request
+  const method = options.method ?? request.method
+  const contentType = request.headers.get('content-type') ?? 'application/json'
+  const isBodyless = ['GET', 'HEAD'].includes(method.toUpperCase())
+
+  const upstreamUrl = `${DO_API_BASE}${path}`
+
+  let body: ArrayBuffer | undefined
+  if (!isBodyless) {
+    body = await request.arrayBuffer()
+  }
+
+  const upstreamResponse = await fetch(upstreamUrl, {
+    method,
+    headers: {
+      'Content-Type': contentType,
+      Authorization: `Bearer ${token}`,
+    },
+    body: body ? body : undefined,
+  })
+
+  // 4. Return the upstream response body as-is
+  const responseBody = await upstreamResponse.arrayBuffer()
+  const responseContentType =
+    upstreamResponse.headers.get('content-type') ?? 'application/json'
+
+  return new NextResponse(responseBody, {
+    status: upstreamResponse.status,
+    headers: {
+      'Content-Type': responseContentType,
+    },
+  })
+}
+
+/**
+ * Convenience wrapper for routes that proxy a specific HTTP method to the DO API
+ * under the same path as the route file.
+ */
+export function makeProxy(path: string) {
+  return {
+    GET: (request: NextRequest) => proxyToApi(request, path, { method: 'GET' }),
+    POST: (request: NextRequest) => proxyToApi(request, path, { method: 'POST' }),
+    PUT: (request: NextRequest) => proxyToApi(request, path, { method: 'PUT' }),
+    PATCH: (request: NextRequest) => proxyToApi(request, path, { method: 'PATCH' }),
+    DELETE: (request: NextRequest) => proxyToApi(request, path, { method: 'DELETE' }),
+  }
+}

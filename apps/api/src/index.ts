@@ -3,6 +3,8 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import { aiRoutes } from './routes/ai'
+import { imageRoutes } from './routes/images'
 
 async function main() {
   const app = Fastify({
@@ -26,15 +28,13 @@ async function main() {
     return { status: 'ok', ts: new Date().toISOString() }
   })
 
-  // Route registrations will be added in Phase 8 (endpoint cutover)
-  // import { aiRoutes }       from './routes/ai'
-  // import { socialRoutes }   from './routes/social'
-  // import { postRoutes }     from './routes/posts'
-  // import { imagesRoutes }   from './routes/images'
-  // await app.register(aiRoutes,     { prefix: '/api/ai' })
-  // await app.register(socialRoutes, { prefix: '/api/social' })
+  // Phase 8 — AI and image routes
+  await app.register(aiRoutes, { prefix: '/api/ai' })
+  await app.register(imageRoutes, { prefix: '/api/images' })
+
+  // Phase 8b — coming next:
   // await app.register(postRoutes,   { prefix: '/api/posts' })
-  // await app.register(imagesRoutes, { prefix: '/api/images' })
+  // await app.register(socialRoutes, { prefix: '/api/social' })
 
   const port = Number(process.env.PORT ?? 3001)
   const host = '0.0.0.0'

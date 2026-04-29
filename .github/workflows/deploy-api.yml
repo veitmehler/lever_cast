@@ -10,7 +10,7 @@ on:
       - '.github/workflows/deploy-api.yml'
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,26 +18,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        run: npm install -g pnpm@9.15.4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm --filter @socioply/api exec prisma generate
-        env:
-          DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
-
-      - name: Run DB migrations
-        run: pnpm --filter @socioply/api exec prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DO_DIRECT_URL }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -56,16 +36,20 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/lever_cast-api:latest
             ghcr.io/${{ github.repository_owner }}/lever_cast-api:${{ github.sha }}
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+
+    steps:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-        continue-on-error: true
 
       - name: Pull and restart containers on droplet
         run: |
           ssh -o StrictHostKeyChecking=no socioply@socioply-api-01 \
             "cd /opt/socioply && docker compose pull && docker compose up -d --remove-orphans"
-        continue-on-error: true

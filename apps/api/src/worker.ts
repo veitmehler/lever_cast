@@ -41,6 +41,11 @@ async function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   process.on('SIGINT', () => shutdown('SIGINT'))
 
+  // ── Create queues (pg-boss v10 requires explicit createQueue before use) ────
+  for (const queueName of Object.values(QUEUES)) {
+    await boss.createQueue(queueName)
+  }
+
   // ── Cron schedules ──────────────────────────────────────────────────────────
   await boss.schedule(QUEUES.PUBLISH_SCHEDULED, '* * * * *', {})      // every minute
   await boss.schedule(QUEUES.ANALYTICS_SYNC, '0 2 * * *', {})         // daily 02:00 UTC

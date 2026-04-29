@@ -12,7 +12,7 @@ COPY packages/db/package.json ./packages/db/
 COPY apps/api/package.json ./apps/api/
 
 # Install only production + api deps (filter includes workspace deps)
-RUN pnpm install --frozen-lockfile --filter @socioply/api...
+RUN pnpm install --filter @socioply/api...
 
 # ─── Stage 2: build ───────────────────────────────────────────────────────────
 FROM node:20-alpine AS build

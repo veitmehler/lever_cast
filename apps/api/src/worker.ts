@@ -1,3 +1,7 @@
+// DigitalOcean managed Postgres uses a self-signed CA certificate.
+// Connection is still encrypted (TLS); this only skips CA chain verification.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
 /**
  * pg-boss worker process.
  * Run with: node dist/worker.js

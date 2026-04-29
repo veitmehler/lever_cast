@@ -1,3 +1,6 @@
+// DigitalOcean managed Postgres uses a self-signed CA certificate.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 

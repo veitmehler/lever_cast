@@ -14,8 +14,8 @@ COPY .npmrc ./
 COPY packages/db/package.json ./packages/db/
 COPY apps/api/package.json ./apps/api/
 
-# Install all dependencies (pnpm hoists to root node_modules)
-RUN pnpm install --no-frozen-lockfile
+# Install all deps with flat node_modules (required for Docker COPY between stages)
+RUN pnpm install --no-frozen-lockfile --shamefully-hoist
 
 # Copy source files
 COPY packages/db ./packages/db

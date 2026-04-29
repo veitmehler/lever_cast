@@ -5,9 +5,9 @@ let boss: PgBoss | null = null
 export async function getBoss(): Promise<PgBoss> {
   if (boss) return boss
 
-  const connectionString = process.env.DATABASE_URL
+  const connectionString = process.env.PGBOSS_DATABASE_URL || process.env.DIRECT_URL
   if (!connectionString) {
-    throw new Error('DATABASE_URL is not set')
+    throw new Error('PGBOSS_DATABASE_URL or DIRECT_URL must be set (pg-boss needs a direct connection, not PgBouncer)')
   }
 
   boss = new PgBoss({

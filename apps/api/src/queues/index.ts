@@ -16,6 +16,7 @@ export async function getBoss(): Promise<PgBoss> {
     archiveCompletedAfterSeconds: 60 * 60 * 24 * 7,
     deleteAfterSeconds: 60 * 60 * 24 * 30,
     monitorStateIntervalSeconds: 2,
+    ssl: { rejectUnauthorized: false },
   })
 
   boss.on('error', (err) => {

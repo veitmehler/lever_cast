@@ -1,0 +1,34 @@
+# Exclude all node_modules — Docker installs its own inside the image
+**/node_modules
+
+# Build outputs
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+
+# Env files (secrets baked in via runtime env_file, never the image)
+.env*
+**/.env*
+
+# Git
+.git
+.gitignore
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Cursor / agent metadata
+.cursor
+.documentation
+.plans
+
+# Docs / CI artifacts that aren't needed in the image
+README.md
+*.md
+
+# Apps not needed in this image
+apps/web

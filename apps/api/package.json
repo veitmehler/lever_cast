@@ -1,0 +1,30 @@
+{
+  "name": "@socioply/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js"
+  },
+  "prisma": {
+    "schema": "../../packages/db/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1038.0",
+    "@clerk/backend": "^1.30.0",
+    "@fastify/cors": "^10.0.2",
+    "@prisma/client": "^6.19.3",
+    "fastify": "^5.3.3",
+    "pg-boss": "^10.1.5",
+    "prisma": "^6.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.19.3",
+    "typescript": "^5"
+  }
+}

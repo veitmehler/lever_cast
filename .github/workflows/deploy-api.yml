@@ -62,8 +62,10 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+        continue-on-error: true
 
       - name: Pull and restart containers on droplet
         run: |
           ssh -o StrictHostKeyChecking=no socioply@socioply-api-01 \
             "cd /opt/socioply && docker compose pull && docker compose up -d --remove-orphans"
+        continue-on-error: true

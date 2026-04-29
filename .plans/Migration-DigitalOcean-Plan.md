@@ -1,6 +1,15 @@
 # Migration Plan: Supabase + Vercel → Digital Ocean
 
-> **Status:** v3.1 — final, comprehensive, implementation-ready.
+> **Status:** v3.2 — final, comprehensive, implementation-ready. Phases 0, 1 (DB + S3/CF only — droplet now provisioned manually per runbook), 3, 4, 5, 6 already shipped. Phase 2 (monorepo), Phase 7 (pg-boss worker code), Phase 8 (endpoint cutover) outstanding. Phase 8 is the gating prerequisite for the **Article Production Pipeline** (`.plans/article-production-pipeline.implementation-plan.md`).
+>
+> **Changes from v3.1 (this revision):**
+> - **Article pipeline elevated to primary driver.** Originally framed as "one of many" long-running workloads; the latest product alignment makes the article pipeline the *killer feature* that justifies the migration. Without the droplet (Phase 8), the article pipeline is functionally impossible to ship (single article = 8–25 min wall time vs. Vercel's 300 s ceiling).
+> - **Translation queue removed.** Per the Levercast v1 scope of the article pipeline plan, the source plan's Steps 19–24 (translate to 8 languages) are deferred to v2. The `article-translation` queue is dropped from §3.2.
+> - **Enrichment queue bumped (`teamSize` 2 → 3) and made mandatory.** Mermaid-based enrichment is now part of every article (vs. optional Napkin in source); cheaper and faster than Napkin (~$0.05 / 30–120 s per article instead of $0.30–$2.40 / 5–15 min).
+> - **Two new queues added:** `article-output` (WP/HTML/Bundle export workers) and `generate-social-from-article` (manual-trigger social-from-article handoff).
+> - **Cross-reference inserted** at end of §3 pointing at the article pipeline plan.
+> - **Phase 8 prerequisite note** added (must ship before article pipeline implementation begins).
+>
 > **Changes from v3:**
 > - **Object storage switched from DO Spaces → AWS S3 + CloudFront** (user decision: long-term durability, mature lifecycle/Glacier ecosystem, more global PoPs). Phases 1, 5, 9, 12 updated accordingly.
 > - **Re-sequenced timeline**: Phases 2 (repo restructure), 3 (AES encryption), 4 (Postgres OAuth state) are non-destructive and run **in parallel** with Phase 1 (DO/AWS provisioning). They ship to current Vercel + Supabase and improve production immediately, regardless of when the rest of the migration completes.
@@ -16,20 +25,23 @@
 >
 > **Both prior open items are now resolved:**
 > 1. ~~Storage retention model~~ — confirmed: **images stored until user deletes them**; AWS S3 + CloudFront is the canonical long-term store; no automatic lifecycle expiration on user content (90-day lifecycle still applied to `tmp/*` only).
-> 2. ~~Cron / publish isolation~~ — confirmed: **separate `pg-boss` queues per workload** (`publish`, `publish-scheduled`, `analytics-sync`, `article-pipeline`, `article-translation`, `article-enrichment`).
+> 2. ~~Cron / publish isolation~~ — confirmed: **separate `pg-boss` queues per workload** (`publish`, `publish-scheduled`, `analytics-sync`, `article-pipeline`, `article-enrichment`, `article-output`, `generate-social-from-article`).
 
 ---
 
 ## 0. Goals & Drivers
 
-| Goal | Driver |
-|---|---|
-| Remove Supabase row/storage limits and tier-based pricing | Cost & data growth (drafts, posts, analytics JSON, future Article pipeline) |
-| Run **long-running workloads** (image gen, bulk publishing, threads, analytics sync, **article pipeline ~30 LLM calls × 15–45 min**) | Vercel function timeout (60 s Pro / 300 s Fluid) is a hard ceiling |
-| Owned backend with predictable scaling (workers, queues, cron) | Avoid Vercel-specific lock-in (`vercel.json` cron, edge constraints, function ms billing) |
-| Keep snappy frontend UX | Vercel CDN/ISR/Image optimizer still valuable |
-| Deterministic concurrency control | Article pipeline must not exhaust DB pool or starve scheduled publishing |
-| Minimize ops surface and monthly cost | Solo developer; no need for HA Redis or k8s |
+> **Primary driver (v3.2):** Ship the article production pipeline. This is the killer feature that makes the migration economically and architecturally necessary. Single-article wall time is 8–25 min (Phases A+B+C of the article pipeline plan), which is impossible on Vercel's 300 s (Fluid) function ceiling. Everything else below is secondary cleanup that the move enables.
+
+| Goal | Priority | Driver |
+|---|---|---|
+| **Run the article pipeline (Phase A: 8–15 min, Phase B: 1–3 min, Phase C: 0.5–2 min)** | ⭐ **Primary** | Vercel cannot run > 300 s functions; pipeline = ~22 LLM calls + Mermaid rendering per article. See `.plans/article-production-pipeline.implementation-plan.md`. |
+| Remove Supabase row/storage limits and tier-based pricing | High | Cost & data growth (drafts, posts, analytics JSON, articles, diagrams) |
+| Run other long-running workloads (image gen, bulk publishing, threads, analytics sync) | High | Same Vercel ceiling; more workloads converge on the worker once it exists |
+| Owned backend with predictable scaling (workers, queues, cron) | High | Avoid Vercel-specific lock-in (`vercel.json` cron, edge constraints, function ms billing) |
+| Keep snappy frontend UX | Medium | Vercel CDN/ISR/Image optimizer still valuable |
+| Deterministic concurrency control | High | Article pipeline must not exhaust DB pool or starve scheduled publishing |
+| Minimize ops surface and monthly cost | Medium | Solo developer; no need for HA Redis or k8s |
 
 ---
 
@@ -67,17 +79,23 @@
 
 **Concurrent active connections**: typically 4–8 against Supabase pooler. Easy.
 
-### 2.2 Future workload (article pipeline live, 100 users, mixed-day distribution)
+### 2.2 Future workload (article pipeline live, 100 users, mixed-day distribution) — v3.2
 
-| Operation | Per user/day | DB writes/article | LLM calls/article | Wall time/article |
-|---|---|---|---|---|
-| Article pipeline (Phase A+B, steps 1–18) | 1–5 | 100–150 | ~22 | 8–25 min |
-| Translation (Phase C, steps 19–24) | as above × 2 langs | 30–50 | ~6 | 4–10 min |
-| Enrichment (Phase D, Napkin) | as above | 10–20 | ~2 | 3–10 min |
-| Image generation (Fal/DALL-E) | 1–3 | 5 | 1–3 | 10–90 s |
+| Operation | Per user/day | DB writes/article | LLM calls/article | Wall time/article | Notes |
+|---|---|---|---|---|---|
+| Article pipeline Phase A+B (steps 1–13, 15, 17, 18) | 1–5 | 80–120 | ~17 | 8–25 min | Step 14 dropped (no internal categories); steps 16 dormant (no JSON-LD) |
+| Article enrichment Phase C (Mermaid) | same as A+B | 5–15 | 3–8 | **0.5–2 min** | ⭐ Mandatory; replaces source plan's optional Napkin enrichment. Much cheaper & faster. |
+| Article output Phase D (WP / HTML / Bundle) | 0–3 per article | 1 (OutputAttempt row) | 0 | **5–60 s** | Manual trigger; user picks target(s). WP is slowest (media uploads). |
+| Article-to-social handoff Phase E | 0–1 per article | 1 draft + N posts | per existing flow | 10–30 s | Manual trigger; reuses existing `/api/ai/generate` |
+| Image generation (Fal/DALL-E, ad-hoc) | 1–3 | 5 | 1–3 | 10–90 s | Unchanged |
+| ~~Translation (source plan steps 19–24)~~ | — | — | — | — | ⭐ **Out of scope v1** |
 
 **Bursty concurrency** (when 5 users hit "Run All" at once on 50 topics each): worst case **~250 in-flight articles**.
 With `teamSize=5` cap on `article-pipeline`, only 5 run concurrently — the rest queue in `pgboss.job`. Each running article holds **~2 Prisma connections** during SQL bursts (idle most of the time during LLM waits, thanks to PgBouncer transaction-pool mode).
+
+**Enrichment burst sizing:** at `teamSize=3` for `article-enrichment`, even if 50 articles all hit Phase C in the same minute (a 5-user burst with 10 articles each finishing Phase B simultaneously), the queue drains in ~50 / 3 × 1 min = ~17 min worst case — well within UX expectations since enrichment runs in background with status visible in UI.
+
+**Output queue sizing:** users typically trigger one output target at a time per article. At `teamSize=5`, even a burst of 25 simultaneous "Publish to WordPress" clicks finishes inside 5 min (WP target is the slowest at ~60 s including all media uploads).
 
 ### 2.3 Why this drives a dedicated DB
 
@@ -132,23 +150,62 @@ Cost delta vs reuse: **+$15/mo**. LLM spend at "Medium" load is **$300–900/day
 | `GET /api/social/[platform]/pages`, `/settings`, `/instagram/refresh-username` | **DO API** | Co-locate with token store |
 | `GET /api/social/connections` | **Vercel** (DB read via DO API) | Light read |
 | `GET/POST/DELETE /api/api-keys/*` | **DO API** | After encryption upgrade, encryption key only lives on DO |
-| **(future)** `POST /api/pipeline/trigger`, `process-all`, `resume`, `upload-csv` | **DO API → pg-boss `article-pipeline`** | Defined fully in `.plans/article-production-pipeline.implementation-plan.md` |
+| **(NEW)** `POST /api/topics`, `POST /api/topics/csv` | **DO API → pg-boss `article-pipeline`** (article modes only; `social_only` skips queue) | See `.plans/article-production-pipeline.implementation-plan.md` §15.1 |
+| **(NEW)** `POST /api/articles/:jobId/approve`, `/resume`, `/rerun`, `/rerun-step`, `/reenrich` | **DO API → pg-boss `article-pipeline` & `article-enrichment`** | Phase B/C control |
+| **(NEW)** `POST /api/articles/:jobId/output/{wordpress,html,bundle}` | **DO API → pg-boss `article-output`** | One worker handles all three target types |
+| **(NEW)** `POST /api/articles/:jobId/generate-social` | **DO API → pg-boss `generate-social-from-article`** | Manual trigger; reuses existing AI generation prompts |
+| **(NEW)** `GET /api/articles`, `GET /api/articles/:jobId`, `GET /api/articles/:jobId/events` (SSE) | **DO API** | Job inspection + live status stream |
+| **(NEW)** `GET/POST/PATCH/DELETE /api/wp/connections/*` | **DO API** | WordPress credential CRUD; `appPassword` encrypted with the same AES-256-GCM key as `ApiKey` |
 
-### 3.2 `pg-boss` queue topology (final)
+### 3.2 `pg-boss` queue topology (final, v3.2)
 
 | Queue | `teamSize` | `teamConcurrency` | Owner | Notes |
 |---|---|---|---|---|
 | `publish` | 10 | 1 | worker | Manual user publish; very short jobs |
 | `publish-scheduled` | 10 | 1 | worker | Per-post delayed job; replaces Vercel Cron |
 | `analytics-sync` | 2 | 1 | worker | Repeatable daily; can run parallel platforms |
-| `article-pipeline` | **5** | 1 | worker | One job = whole article (steps 1–18) |
-| `article-translation` | 3 | 1 | worker | Independent queue so a translation backlog doesn't block new article generations |
-| `article-enrichment` | 2 | 1 | worker | Slowest (Napkin); kept low so it never starves the others |
-| `image-generate` | 5 | 1 | worker | Used by both Article pipeline (step 15) and ad-hoc image generation |
+| `article-pipeline` | **5** | 1 | worker | Phase A + Phase B (steps 1–18) of article generation |
+| `article-enrichment` | **3** (was 2) | 1 | worker | ⭐ **Mandatory** Mermaid enrichment; bumped because every article now goes through this. Wall time 30 s – 2 min (vs. Napkin's 5–15 min) so 3 concurrent is safe. |
+| **`article-output`** | **5** | 1 | worker | ⭐ NEW — handles WordPress publish, HTML export, and Bundle export. One worker per target type via discriminator in job payload. |
+| **`generate-social-from-article`** | **5** | 1 | worker | ⭐ NEW — manual-trigger handoff that reuses the existing AI generation path. Short jobs (10–30 s). |
+| `image-generate` | 5 | 1 | worker | Used by Article pipeline Step 15 + ad-hoc image generation + on-demand diagram-PNG re-rasterization for social posts |
 | `oauth-state-cleanup` | 1 | 1 | worker | Hourly TTL purge |
 | `db-backup` | 1 | 1 | worker | Weekly `pg_dump → S3` (`socioply-backups` bucket, Glacier after 30 d) |
+| ~~`article-translation`~~ | — | — | — | ⭐ **REMOVED** — translation deferred to v2 (see article pipeline plan §13). |
 
-**Total in-flight worker jobs (worst case)**: 39. Each Prisma `connection_limit=2` → **at most 78 logical client connections, multiplexed by PgBouncer transaction-pool mode onto ≤14 physical Postgres backends.** Within budget (see §4).
+**Total worker concurrency budget:** 10+10+2+5+3+5+5+5+1+1 = **47 in-flight jobs maximum**. Each holds 1–2 Prisma connections during DB bursts; idle most of the time during LLM waits. PgBouncer transaction-pool mode multiplexes effectively, so the dedicated 22-connection cluster handles this comfortably for ≤100 concurrent active users.
+
+**Trigger dependencies:**
+- `article-pipeline` completion → emits `article.approved` event → caller (UI button) explicitly `boss.send`s `article-enrichment`.
+- `article-enrichment` completion → flips `ArticleJob.status='enriched'` → UI unlocks output buttons.
+- `article-output` and `generate-social-from-article` are **always manual** — never auto-triggered after enrichment. The user explicitly clicks each.
+
+**Total in-flight worker jobs (worst case)**: 47 (was 39 in v3.1; +5 for `article-output`, +5 for `generate-social-from-article`, -3 for removed `article-translation`, +1 from bumping `article-enrichment` 2→3). Each Prisma `connection_limit=2` → **at most 94 logical client connections, multiplexed by PgBouncer transaction-pool mode onto ≤16 physical Postgres backends.** Within budget (see §4).
+
+---
+
+### 3.3 Cross-reference: Article Production Pipeline
+
+The full specification of the article-generation feature — including database models, prompt templates, pipeline orchestration, enrichment via Mermaid, output targets, and WordPress integration — lives in:
+
+> **`.plans/article-production-pipeline.implementation-plan.md`** (Levercast v1, ~1900 lines)
+
+This migration plan provisions the **infrastructure** (DO droplet, Postgres cluster, S3 bucket, queue topology) on which that pipeline runs. The two documents are tightly coupled:
+
+| Migration plan responsibility | Article pipeline plan responsibility |
+|---|---|
+| DO droplet + Fastify worker (Phase 8) | Pipeline executor + step runner code that runs *on* the worker |
+| Postgres `socioply` DB + `pgboss` schema | `Topic`, `ArticleJob`, `PipelineStep`, `SitePage`, `ArticleDiagram`, `WordPressConnection` table definitions |
+| S3 bucket `socioply-images-prod` + CloudFront `cdn.socioply.com` | Image upload paths (`/diagrams/{jobId}/...`, `/exports/{userId}/{jobId}/...`) |
+| `pg-boss` queue topology (§3.2) | Which queue each pipeline phase enqueues onto |
+| AES-256-GCM encryption (Phase 3 — already shipped) | `WordPressConnection.appPassword` and `ApiKey.encryptedKey` encryption |
+
+**Implementation order:** Phases 1–8 of this migration plan must complete before article pipeline implementation begins. Specifically:
+- Phases 1–6 (DB cutover, repo restructure, encryption, OAuth state, S3 storage) — ✅ already shipped
+- Phase 7 — pending (Vercel cron → pg-boss migration)
+- **Phase 8 — pending and blocking** for article pipeline (DO droplet + Fastify worker + queue registration)
+
+After Phase 8 ships, the article pipeline is implementable end-to-end per its own checklist (`.plans/article-production-pipeline.implementation-plan.md` §16).
 
 ---
 
@@ -827,6 +884,8 @@ After 48 h of clean operation:
 ---
 
 ### Phase 8 — Endpoint Cutover (Day 6–7, ~4 h)
+
+> ⭐ **Hard prerequisite for the Article Production Pipeline.** Phase 8 must complete before any work on `.plans/article-production-pipeline.implementation-plan.md` begins. Single-article wall time (8–25 min) exceeds Vercel's 300 s function ceiling by 5–10×; the DO worker is the only place this code can run. After Phase 8 ships, the article pipeline implementation can begin per its own checklist (§16 of the article plan).
 
 Per route, replace the Vercel handler body with a thin proxy that forwards to DO API with the Clerk JWT.
 

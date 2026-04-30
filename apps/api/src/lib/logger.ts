@@ -28,7 +28,7 @@ if (process.env.LOGTAIL_TOKEN) {
       // Better Stack EU region requires a custom ingestion endpoint;
       // US region works with the SDK default.
       ...(process.env.LOGTAIL_ENDPOINT
-        ? { options: { endpoint: process.env.LOGTAIL_ENDPOINT } }
+        ? { endpoint: process.env.LOGTAIL_ENDPOINT }
         : {}),
     },
   })

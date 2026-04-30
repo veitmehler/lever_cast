@@ -23,7 +23,14 @@ const targets: pino.TransportTargetOptions[] = [
 if (process.env.LOGTAIL_TOKEN) {
   targets.push({
     target: '@logtail/pino',
-    options: { sourceToken: process.env.LOGTAIL_TOKEN },
+    options: {
+      sourceToken: process.env.LOGTAIL_TOKEN,
+      // Better Stack EU region requires a custom ingestion endpoint;
+      // US region works with the SDK default.
+      ...(process.env.LOGTAIL_ENDPOINT
+        ? { options: { endpoint: process.env.LOGTAIL_ENDPOINT } }
+        : {}),
+    },
   })
 }
 

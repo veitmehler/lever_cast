@@ -16,7 +16,11 @@ import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 
 async function main() {
-  const app = Fastify({ logger })
+  // Fastify 5 requires a plain config object for `logger`, not a pino instance.
+  // We pass our shared logger as the child logger used by request handlers.
+  const app = Fastify({
+    loggerInstance: logger,
+  })
 
   // ── CORS ───────────────────────────────────────────────────────────────────
   await app.register(cors, {

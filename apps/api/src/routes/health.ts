@@ -3,7 +3,18 @@ import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import { prisma } from '../lib/prisma'
 import { getBoss } from '../queues/index'
 
-const s3 = new S3Client({ region: process.env.S3_REGION ?? 'us-east-1' })
+// Use the same non-standard env var names as the rest of the app (ACCESS_KEY_ID
+// instead of AWS_ACCESS_KEY_ID) so this works without changing droplet config.
+const s3 = new S3Client({
+  region: process.env.S3_REGION ?? 'us-east-1',
+  credentials:
+    process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: process.env.ACCESS_KEY_ID,
+          secretAccessKey: process.env.SECRET_ACCESS_KEY,
+        }
+      : undefined,
+})
 
 export async function healthRoutes(app: FastifyInstance) {
   // Shallow health — used by Docker HEALTHCHECK and Caddy

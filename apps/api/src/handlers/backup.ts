@@ -44,8 +44,23 @@ export async function dbBackupHandler(jobs: PgBoss.Job<DbBackupJobData>[]) {
   const key = `db/socioply-${date}.sql.gz`
   logger.info({ key, bucket: backupBucket }, '[db-backup] streaming pg_dump to S3')
 
-  // pg_dump | gzip — piped directly into the S3 upload stream (no tmp file needed)
-  const dump = spawn('pg_dump', ['--no-owner', '--no-acl', '--format=plain', directUrl])
+  // Parse the connection URL into individual pg_dump flags to avoid shell
+  // quoting issues with special characters (?, =, %) in the URL string.
+  const url = new URL(directUrl)
+  const pgEnv = {
+    ...process.env,
+    PGPASSWORD: decodeURIComponent(url.password),
+    PGSSLMODE: url.searchParams.get('sslmode') ?? 'require',
+  }
+  const pgArgs = [
+    '--no-owner', '--no-acl', '--format=plain',
+    '-h', url.hostname,
+    '-p', url.port || '5432',
+    '-U', url.username,
+    url.pathname.slice(1), // database name (strip leading /)
+  ]
+
+  const dump = spawn('pg_dump', pgArgs, { env: pgEnv })
   const gzip = spawn('gzip', ['-9'])
   dump.stdout.pipe(gzip.stdin)
   dump.stderr.on('data', (d: Buffer) => logger.warn({ stderr: d.toString() }, '[db-backup] pg_dump stderr'))

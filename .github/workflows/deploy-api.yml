@@ -65,21 +65,26 @@ jobs:
           fi
           echo "Secret length: ${#DROPLET_IP}"
 
-      - name: Tailscale diagnostics
+      - name: Verify Tailscale is connected
         env:
           DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
         run: |
           echo "── tailscale status ────────────────────────────────────"
-          tailscale status || true
-          echo ""
-          echo "── current node identity ───────────────────────────────"
-          tailscale whois "$(tailscale ip -4 | head -1)" || true
-          echo ""
-          echo "── droplet whois ───────────────────────────────────────"
-          tailscale whois "$DROPLET_IP" || true
+          if ! tailscale status >/dev/null 2>&1; then
+            echo "::error::Tailscale is NOT logged in on the runner."
+            echo "::error::The OAuth client probably lacks 'Auth Keys: Write' scope or is not authorized for tag:ci."
+            echo "::error::Recreate the OAuth client at https://login.tailscale.com/admin/settings/oauth"
+            echo "::error::Required: scope = 'Auth Keys: Write', tag = 'tag:ci'"
+            tailscale status || true
+            exit 1
+          fi
+          tailscale status
           echo ""
           echo "── ping droplet ────────────────────────────────────────"
-          tailscale ping --c 3 --timeout 10s "$DROPLET_IP" || true
+          if ! tailscale ping --c 3 --timeout 10s "$DROPLET_IP"; then
+            echo "::error::Cannot reach droplet at $DROPLET_IP via Tailscale."
+            exit 1
+          fi
 
       - name: Deploy to droplet via Tailscale SSH
         env:

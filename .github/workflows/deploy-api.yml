@@ -85,34 +85,45 @@ jobs:
       - name: Deploy to droplet
         run: |
           ssh droplet 'bash -s' << 'ENDSSH'
-            set -e
+            set -euo pipefail
 
-            # ── 1. Save the currently running image for rollback ──────────────────
+            echo "::group::1. Tag current :latest as :previous (for rollback)"
             docker tag ghcr.io/veitmehler/lever_cast-api:latest \
-                       ghcr.io/veitmehler/lever_cast-api:previous 2>/dev/null || true
+                       ghcr.io/veitmehler/lever_cast-api:previous 2>/dev/null \
+              && echo "Tagged" || echo "No existing :latest to tag (first deploy?)"
+            echo "::endgroup::"
 
-            # ── 2. Pull the new image ─────────────────────────────────────────────
+            echo "::group::2. Pull new image"
             cd /opt/socioply
             docker compose pull
+            echo "::endgroup::"
 
-            # ── 3. Run Prisma migrations (in a one-off container, before restart) ─
+            echo "::group::3. Run Prisma migrations"
             docker compose run --rm --no-deps \
               -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
               npx prisma migrate deploy \
               --schema=/app/packages/db/prisma/schema.prisma
+            echo "::endgroup::"
 
-            # ── 4. Restart all containers with the new image ──────────────────────
+            echo "::group::4. Restart all containers"
             docker compose up -d --remove-orphans
+            docker compose ps
+            echo "::endgroup::"
 
-            # ── 5. Health check ───────────────────────────────────────────────────
-            echo "Waiting for API to start..."
+            echo "::group::5. Health check"
+            echo "Waiting 10s for API to come up..."
             sleep 10
-            if curl -sf https://api.socioply.com/health; then
-              echo "Health check passed"
-            else
-              echo "Health check FAILED — rolling back"
-              DEPLOY_TAG=previous docker compose up -d --remove-orphans
-              exit 1
-            fi
+            for i in 1 2 3 4 5; do
+              if curl -sf https://api.socioply.com/health; then
+                echo ""
+                echo "Health check PASSED on attempt $i"
+                exit 0
+              fi
+              echo "Attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "Health check FAILED after 5 attempts — rolling back"
+            DEPLOY_TAG=previous docker compose up -d --remove-orphans
+            exit 1
           ENDSSH

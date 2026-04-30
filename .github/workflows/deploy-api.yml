@@ -53,6 +53,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          args: --ssh
 
       - name: Verify droplet IP secret is set
         env:
@@ -68,7 +69,7 @@ jobs:
         env:
           DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
         run: |
-          ssh -o StrictHostKeyChecking=no socioply@$DROPLET_IP << 'ENDSSH'
+          tailscale ssh -o StrictHostKeyChecking=no socioply@$DROPLET_IP << 'ENDSSH'
             set -e
 
             # ── 1. Save the currently running image for rollback ──────────────────

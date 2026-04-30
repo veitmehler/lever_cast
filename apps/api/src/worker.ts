@@ -1,21 +1,13 @@
 // DigitalOcean managed Postgres uses a self-signed CA certificate.
-// Connection is still encrypted (TLS); this only skips CA chain verification.
+// Connection is still TLS-encrypted; this only skips CA chain verification.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 
-/**
- * pg-boss worker process.
- * Run with: node dist/worker.js
- *
- * Phase 7 implements the four core handlers:
- *   - publish-scheduled  (replaces Vercel cron at /api/posts/publish-scheduled)
- *   - analytics-sync     (replaces Vercel cron at /api/posts/sync-analytics)
- *   - oauth-state-cleanup
- *   - db-backup
- *
- * Article-pipeline handlers are stubs until Phase 8.
- */
+// Sentry must be initialised before any other imports that might throw
+import { initSentry, Sentry } from './lib/sentry'
+initSentry('worker')
 
 import PgBoss from 'pg-boss'
+import { logger } from './lib/logger'
 import { getBoss, stopBoss, QUEUES } from './queues/index'
 import {
   publishHandler,
@@ -26,15 +18,32 @@ import {
 import { analyticsSyncHandler, AnalyticsSyncJobData } from './handlers/analytics'
 import { oauthStateCleanupHandler, OAuthCleanupJobData } from './handlers/oauth'
 import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
+import { pgMonitorHandler } from './handlers/pg-monitor'
+
+/** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
+function withSentry<T>(
+  name: string,
+  fn: (jobs: PgBoss.Job<T>[]) => Promise<void>,
+): (jobs: PgBoss.Job<T>[]) => Promise<void> {
+  return async (jobs) => {
+    try {
+      await fn(jobs)
+    } catch (err) {
+      logger.error({ err, queue: name }, 'worker handler error')
+      Sentry.captureException(err, { tags: { queue: name } })
+      throw err
+    }
+  }
+}
 
 async function main() {
-  console.log('[worker] starting…')
+  logger.info('[worker] starting…')
 
   const boss = await getBoss()
 
   // ── Graceful shutdown ───────────────────────────────────────────────────────
   const shutdown = async (signal: string) => {
-    console.log(`[worker] received ${signal}, shutting down…`)
+    logger.info(`[worker] received ${signal}, shutting down…`)
     await stopBoss()
     process.exit(0)
   }
@@ -51,96 +60,105 @@ async function main() {
   await boss.schedule(QUEUES.ANALYTICS_SYNC, '0 2 * * *', {})         // daily 02:00 UTC
   await boss.schedule(QUEUES.OAUTH_STATE_CLEANUP, '0 * * * *', {})    // hourly
   await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * 0', {})              // Sunday 03:00 UTC
+  await boss.schedule(QUEUES.PG_CONN_MONITOR, '*/15 * * * *', {})     // every 15 min
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
     QUEUES.PUBLISH,
     { batchSize: 5 },
-    publishHandler,
+    withSentry('publish', publishHandler),
   )
 
   await boss.work<PublishScheduledJobData>(
     QUEUES.PUBLISH_SCHEDULED,
     { batchSize: 1 },
-    publishScheduledHandler,
+    withSentry('publish-scheduled', publishScheduledHandler),
   )
 
   // ── Analytics ───────────────────────────────────────────────────────────────
   await boss.work<AnalyticsSyncJobData>(
     QUEUES.ANALYTICS_SYNC,
     { batchSize: 1 },
-    analyticsSyncHandler,
+    withSentry('analytics-sync', analyticsSyncHandler),
   )
 
   // ── Maintenance ─────────────────────────────────────────────────────────────
   await boss.work<OAuthCleanupJobData>(
     QUEUES.OAUTH_STATE_CLEANUP,
     { batchSize: 1 },
-    oauthStateCleanupHandler,
+    withSentry('oauth-state-cleanup', oauthStateCleanupHandler),
   )
 
   await boss.work<DbBackupJobData>(
     QUEUES.DB_BACKUP,
     { batchSize: 1 },
-    dbBackupHandler,
+    withSentry('db-backup', dbBackupHandler),
+  )
+
+  // ── PG connection monitor ────────────────────────────────────────────────────
+  await boss.work(
+    QUEUES.PG_CONN_MONITOR,
+    { batchSize: 1 },
+    withSentry('pg-conn-monitor', async () => { await pgMonitorHandler() }),
   )
 
   // ── Image generation ────────────────────────────────────────────────────────
   await boss.work(
     QUEUES.IMAGE_GENERATE,
     { batchSize: 3 },
-    async (jobs: PgBoss.Job[]) => {
+    withSentry('image-generate', async (jobs) => {
       for (const job of jobs) {
-        console.log(`[image-generate] job ${job.id} — TODO Phase 8`)
+        logger.info({ jobId: job.id }, '[image-generate] TODO Phase 9')
       }
-    },
+    }),
   )
 
-  // ── Article pipeline (Phase 8 — DO droplet required) ───────────────────────
+  // ── Article pipeline (Phase 9 — DO droplet required) ───────────────────────
   await boss.work(
     QUEUES.ARTICLE_PIPELINE,
     { batchSize: 2 },
-    async (jobs: PgBoss.Job[]) => {
+    withSentry('article-pipeline', async (jobs) => {
       for (const job of jobs) {
-        console.log(`[article-pipeline] job ${job.id} — TODO Phase 8`)
+        logger.info({ jobId: job.id }, '[article-pipeline] TODO Phase 9')
       }
-    },
+    }),
   )
 
   await boss.work(
     QUEUES.ARTICLE_ENRICHMENT,
     { batchSize: 1 },
-    async (jobs: PgBoss.Job[]) => {
+    withSentry('article-enrichment', async (jobs) => {
       for (const job of jobs) {
-        console.log(`[article-enrichment] job ${job.id} — TODO Phase 8`)
+        logger.info({ jobId: job.id }, '[article-enrichment] TODO Phase 9')
       }
-    },
+    }),
   )
 
   await boss.work(
     QUEUES.ARTICLE_OUTPUT,
     { batchSize: 3 },
-    async (jobs: PgBoss.Job[]) => {
+    withSentry('article-output', async (jobs) => {
       for (const job of jobs) {
-        console.log(`[article-output] job ${job.id} — TODO Phase 8`)
+        logger.info({ jobId: job.id }, '[article-output] TODO Phase 9')
       }
-    },
+    }),
   )
 
   await boss.work(
     QUEUES.GENERATE_SOCIAL_FROM_ARTICLE,
     { batchSize: 3 },
-    async (jobs: PgBoss.Job[]) => {
+    withSentry('generate-social-from-article', async (jobs) => {
       for (const job of jobs) {
-        console.log(`[generate-social-from-article] job ${job.id} — TODO Phase 8`)
+        logger.info({ jobId: job.id }, '[generate-social-from-article] TODO Phase 9')
       }
-    },
+    }),
   )
 
-  console.log('[worker] all queues registered, crons scheduled — ready')
+  logger.info('[worker] all queues registered, crons scheduled — ready')
 }
 
 main().catch((err) => {
-  console.error('[worker] fatal error:', err)
+  logger.error({ err }, '[worker] fatal error')
+  Sentry.captureException(err)
   process.exit(1)
 })

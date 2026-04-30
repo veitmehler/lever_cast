@@ -1,5 +1,6 @@
 import { verifyToken } from '@clerk/backend'
 import type { FastifyRequest, FastifyReply } from 'fastify'
+import { Sentry } from '../lib/sentry'
 
 /**
  * Verify a Clerk Bearer token from the Authorization header.
@@ -29,6 +30,7 @@ export async function requireAuth(
 
   try {
     const payload = await verifyToken(token, { secretKey })
+    Sentry.setUser({ id: payload.sub })
     return payload.sub // Clerk user ID
   } catch (err) {
     request.log.warn({ err }, 'Clerk token verification failed')

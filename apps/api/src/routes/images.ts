@@ -119,7 +119,7 @@ function extractFilePathFromUrl(url: string): string | null {
 
 export async function imageRoutes(app: FastifyInstance) {
   // POST /api/images/generate
-  app.post('/generate', async (request, reply) => {
+  app.post('/generate', { config: { rateLimit: { max: 10, timeWindow: '1 minute', keyGenerator: (req: any) => req.clerkId ?? req.ip } } }, async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
 

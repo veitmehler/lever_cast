@@ -1,4 +1,5 @@
 import PgBoss from 'pg-boss'
+import { Sentry } from '../lib/sentry'
 
 let boss: PgBoss | null = null
 
@@ -21,6 +22,7 @@ export async function getBoss(): Promise<PgBoss> {
 
   boss.on('error', (err) => {
     console.error('[pg-boss] error:', err)
+    Sentry.captureException(err)
   })
 
   await boss.start()
@@ -41,6 +43,7 @@ export const QUEUES = {
   IMAGE_GENERATE: 'image-generate',
   OAUTH_STATE_CLEANUP: 'oauth-state-cleanup',
   DB_BACKUP: 'db-backup',
+  PG_CONN_MONITOR: 'pg-conn-monitor',
   ARTICLE_PIPELINE: 'article-pipeline',
   ARTICLE_ENRICHMENT: 'article-enrichment',
   ARTICLE_OUTPUT: 'article-output',

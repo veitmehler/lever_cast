@@ -83,15 +83,15 @@ CSV upload  ──────────────┘                       
                                                             │
                                                             ▼
    PipelineExecutor.execute()                        ── Phase A (Pre-Approval) ──
-      for each PromptTemplate where stepNumber ∈ [1..12]:
-        StepRunner.execute()
-          ├─ resolve {{variables}}
-          ├─ pick provider/model
+   for each PromptTemplate where stepNumber ∈ [1..12]:
+     StepRunner.execute()
+        ├─ resolve {{variables}}
+        ├─ pick provider/model
           ├─ call LLM (Google Search tool for steps 6,7,8,10,12)
           ├─ parse (JSON for steps 2/12/13)
           └─ persist PipelineStep.output, aggregate cost/tokens
-      ArticleJob.status = "completed"
-                                                            │
+   ArticleJob.status = "completed"
+         │
                                                             ▼  user clicks "Approve" in /workflow/[jobId]
    approveJobDirectly(jobId)                         ── Phase B (Approval Chain) ──
       Step 13  generate_seo_metadata

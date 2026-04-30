@@ -207,7 +207,7 @@ function buildSystemMessage(writingStyle?: string | null): string {
 
 export async function aiRoutes(app: FastifyInstance) {
   // POST /api/ai/generate
-  app.post('/generate', async (request, reply) => {
+  app.post('/generate', { config: { rateLimit: { max: 30, timeWindow: '1 minute', keyGenerator: (req: any) => req.clerkId ?? req.ip } } }, async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
 
@@ -462,7 +462,7 @@ export async function aiRoutes(app: FastifyInstance) {
   })
 
   // POST /api/ai/analyze-writing-style
-  app.post('/analyze-writing-style', async (request, reply) => {
+  app.post('/analyze-writing-style', { config: { rateLimit: { max: 10, timeWindow: '1 minute', keyGenerator: (req: any) => req.clerkId ?? req.ip } } }, async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
 

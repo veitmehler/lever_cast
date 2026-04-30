@@ -27,13 +27,18 @@ RUN cd apps/api && npx prisma generate && npx tsc
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime
 
-# Article pipeline (Phase 8): Chromium + Mermaid CLI pre-installed
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+# Phase 9: postgresql-client for pg_dump (DB backup handler)
+# Article pipeline: Chromium + Mermaid CLI
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont postgresql16-client
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     CHROME_BIN=/usr/bin/chromium-browser
 
 RUN npm install -g @mermaid-js/mermaid-cli
+
+# GIT_SHA for Sentry release tagging
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
 
 WORKDIR /app
 

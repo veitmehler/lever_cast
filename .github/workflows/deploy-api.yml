@@ -54,9 +54,21 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Deploy to droplet via Tailscale SSH
+      - name: Verify droplet IP secret is set
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
         run: |
-          ssh -o StrictHostKeyChecking=no socioply@${{ secrets.DROPLET_TAILSCALE_IP }} << 'ENDSSH'
+          if [ -z "$DROPLET_IP" ]; then
+            echo "ERROR: DROPLET_TAILSCALE_IP secret is empty or unset"
+            exit 1
+          fi
+          echo "Secret length: ${#DROPLET_IP}"
+
+      - name: Deploy to droplet via Tailscale SSH
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
+        run: |
+          ssh -o StrictHostKeyChecking=no socioply@$DROPLET_IP << 'ENDSSH'
             set -e
 
             # ── 1. Save the currently running image for rollback ──────────────────

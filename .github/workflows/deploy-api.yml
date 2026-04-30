@@ -47,50 +47,44 @@ jobs:
     needs: build-and-push
 
     steps:
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          args: --ssh
-
-      - name: Verify droplet IP secret is set
+      - name: Verify deploy secrets are set
         env:
-          DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
+          DROPLET_IP: ${{ secrets.DROPLET_PUBLIC_IP }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           if [ -z "$DROPLET_IP" ]; then
-            echo "ERROR: DROPLET_TAILSCALE_IP secret is empty or unset"
+            echo "::error::DROPLET_PUBLIC_IP secret is empty or unset"
             exit 1
           fi
-          echo "Secret length: ${#DROPLET_IP}"
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::DEPLOY_SSH_KEY secret is empty or unset"
+            exit 1
+          fi
+          echo "Droplet IP set (length: ${#DROPLET_IP}), deploy key set (length: ${#DEPLOY_KEY})"
 
-      - name: Verify Tailscale is connected
+      - name: Configure SSH
         env:
-          DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DROPLET_IP: ${{ secrets.DROPLET_PUBLIC_IP }}
         run: |
-          echo "── tailscale status ────────────────────────────────────"
-          if ! tailscale status >/dev/null 2>&1; then
-            echo "::error::Tailscale is NOT logged in on the runner."
-            echo "::error::The OAuth client probably lacks 'Auth Keys: Write' scope or is not authorized for tag:ci."
-            echo "::error::Recreate the OAuth client at https://login.tailscale.com/admin/settings/oauth"
-            echo "::error::Required: scope = 'Auth Keys: Write', tag = 'tag:ci'"
-            tailscale status || true
-            exit 1
-          fi
-          tailscale status
-          echo ""
-          echo "── ping droplet ────────────────────────────────────────"
-          if ! tailscale ping --c 3 --timeout 10s "$DROPLET_IP"; then
-            echo "::error::Cannot reach droplet at $DROPLET_IP via Tailscale."
-            exit 1
-          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "Host droplet" >> ~/.ssh/config
+          echo "  HostName $DROPLET_IP" >> ~/.ssh/config
+          echo "  User socioply" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          echo "  IdentitiesOnly yes" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
 
-      - name: Deploy to droplet via Tailscale SSH
-        env:
-          DROPLET_IP: ${{ secrets.DROPLET_TAILSCALE_IP }}
+      - name: Smoke-test SSH connection
+        run: ssh droplet 'echo "SSH OK from $(hostname) as $(whoami)"'
+
+      - name: Deploy to droplet
         run: |
-          tailscale ssh socioply@$DROPLET_IP << 'ENDSSH'
+          ssh droplet 'bash -s' << 'ENDSSH'
             set -e
 
             # ── 1. Save the currently running image for rollback ──────────────────
@@ -114,9 +108,11 @@ jobs:
             # ── 5. Health check ───────────────────────────────────────────────────
             echo "Waiting for API to start..."
             sleep 10
-            curl -sf https://api.socioply.com/health \
-              && echo "Health check passed" \
-              || { echo "Health check FAILED — rolling back"; \
-                   DEPLOY_TAG=previous docker compose up -d --remove-orphans; \
-                   exit 1; }
+            if curl -sf https://api.socioply.com/health; then
+              echo "Health check passed"
+            else
+              echo "Health check FAILED — rolling back"
+              DEPLOY_TAG=previous docker compose up -d --remove-orphans
+              exit 1
+            fi
           ENDSSH

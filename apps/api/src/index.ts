@@ -16,6 +16,7 @@ import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 import { topicRoutes } from './routes/topics'
 import { articleRoutes } from './routes/articles'
+import { wpConnectionRoutes } from './routes/wp-connections'
 import { adminApiRoutes } from './routes/admin-api/index'
 
 async function main() {
@@ -62,6 +63,7 @@ async function main() {
   await app.register(imageRoutes, { prefix: '/api/images' })
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })
+  await app.register(wpConnectionRoutes, { prefix: '/api' })
   await app.register(adminApiRoutes, { prefix: '/api/admin' })
 
   // Admin UI — only registered when explicitly enabled; blocked externally by Caddy

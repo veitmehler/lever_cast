@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
 import { getBoss, QUEUES } from '../queues/index'
+import { VALID_TARGETS } from '../article-pipeline/output/registry'
 
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
@@ -281,6 +283,96 @@ export async function articleRoutes(app: FastifyInstance) {
     }
 
     return reply.status(202).send({ ok: true, message: 'Re-enrichment enqueued' })
+  })
+
+  // ── POST /api/articles/:jobId/output/:target ─────────────────────────────
+  app.post<{
+    Params: { jobId: string; target: string }
+    Body: Record<string, unknown>
+  }>('/articles/:jobId/output/:target', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId, target } = request.params
+    if (!VALID_TARGETS.includes(target)) {
+      return reply.status(400).send({ error: `Invalid target. Valid: ${VALID_TARGETS.join(', ')}` })
+    }
+
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+    if (job.status !== 'enriched') {
+      return reply.status(400).send({ error: `Job must be enriched before exporting (current: ${job.status})` })
+    }
+
+    const config = request.body ?? {}
+    const payloadHash = createHash('sha256')
+      .update(JSON.stringify({ jobId, target, config }))
+      .digest('hex')
+      .slice(0, 16)
+
+    const attempt = await prisma.outputAttempt.create({
+      data: {
+        jobId,
+        userId: user.id,
+        target,
+        status: 'pending',
+        payloadHash,
+      },
+    })
+
+    const boss = await getBoss()
+    await boss.send(QUEUES.ARTICLE_OUTPUT, {
+      jobId,
+      target,
+      attemptId: attempt.id,
+      config,
+    })
+
+    return reply.status(202).send({ outputAttemptId: attempt.id })
+  })
+
+  // ── GET /api/articles/:jobId/output/attempts ──────────────────────────────
+  app.get<{ Params: { jobId: string } }>('/articles/:jobId/output/attempts', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({ where: { id: jobId, userId: user.id } })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    const attempts = await prisma.outputAttempt.findMany({
+      where: { jobId },
+      orderBy: { startedAt: 'desc' },
+    })
+
+    return reply.send({ attempts })
+  })
+
+  // ── GET /api/articles/:jobId/output/attempts/:attemptId ──────────────────
+  app.get<{
+    Params: { jobId: string; attemptId: string }
+  }>('/articles/:jobId/output/attempts/:attemptId', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId, attemptId } = request.params
+    const attempt = await prisma.outputAttempt.findFirst({
+      where: { id: attemptId, jobId, userId: user.id },
+    })
+    if (!attempt) return reply.status(404).send({ error: 'Attempt not found' })
+
+    return reply.send({ attempt })
   })
 
   // ── POST /api/articles/:jobId/rerun — full rerun from step 1 ─────────────

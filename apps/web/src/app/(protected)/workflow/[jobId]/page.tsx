@@ -8,6 +8,7 @@ import {
   ChevronLeft, Loader2, CheckCircle2, XCircle, Clock,
   AlertTriangle, DollarSign, Zap, FileText, Play, ThumbsUp,
   Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
+  Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -33,6 +34,17 @@ type ErrorLog = {
   errorType: string
   errorMessage: string
   createdAt: string
+}
+
+type OutputAttempt = {
+  id: string
+  target: string
+  status: 'pending' | 'success' | 'failed'
+  resultUrl?: string | null
+  errorMessage?: string | null
+  startedAt: string
+  completedAt?: string | null
+  durationMs?: number | null
 }
 
 type FeaturedImage = {
@@ -163,6 +175,9 @@ export default function WorkflowJobPage() {
   const [isResuming, setIsResuming] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [isReEnriching, setIsReEnriching] = useState(false)
+  const [exportingTarget, setExportingTarget] = useState<string | null>(null)
+  const [attempts, setAttempts] = useState<OutputAttempt[]>([])
+  const [showAttempts, setShowAttempts] = useState(false)
 
   // Live SSE state (overlays DB state while pipeline is running)
   const [liveSteps, setLiveSteps]   = useState<PipelineStep[]>([])
@@ -241,6 +256,45 @@ export default function WorkflowJobPage() {
       toast.error('Failed to resume pipeline')
     } finally {
       setIsResuming(false)
+    }
+  }
+
+  const fetchAttempts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/articles/${jobId}/output/attempts`)
+      if (res.ok) {
+        const data = await res.json()
+        setAttempts(data.attempts ?? [])
+      }
+    } catch { /* silent */ }
+  }, [jobId])
+
+  useEffect(() => {
+    if (job?.status === 'enriched') fetchAttempts()
+  }, [job?.status, fetchAttempts])
+
+  const handleExport = async (target: string, config: Record<string, unknown> = {}) => {
+    setExportingTarget(target)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/output/${target}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Export failed')
+      toast.success(`${target.charAt(0).toUpperCase() + target.slice(1)} export queued`)
+      // Poll attempts every 3s until the attempt completes
+      let polls = 0
+      const poll = setInterval(async () => {
+        await fetchAttempts()
+        polls++
+        if (polls > 20) clearInterval(poll)
+      }, 3000)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setExportingTarget(null)
     }
   }
 
@@ -576,6 +630,106 @@ export default function WorkflowJobPage() {
             </div>
           </div>
         )}
+
+        {/* ── Export panel (gated to enriched) ─────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Download className="h-4 w-4 text-gray-400" />
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider flex-1">
+              Export
+            </h2>
+            <Link href={`/workflow/${jobId}/preview`} target="_blank"
+              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+              <Eye className="h-3.5 w-3.5" /> Preview
+            </Link>
+          </div>
+
+          {displayStatus !== 'enriched' ? (
+            <p className="text-sm text-gray-400 italic">
+              🔒 Export buttons unlock once enrichment completes (status: {displayStatus}).
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {/* HTML */}
+              <Button
+                size="sm" variant="outline"
+                onClick={() => handleExport('html')}
+                disabled={exportingTarget === 'html'}
+              >
+                {exportingTarget === 'html'
+                  ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  : <Globe className="h-4 w-4 mr-1.5" />}
+                Download HTML
+              </Button>
+
+              {/* Bundle */}
+              <Button
+                size="sm" variant="outline"
+                onClick={() => handleExport('bundle')}
+                disabled={exportingTarget === 'bundle'}
+              >
+                {exportingTarget === 'bundle'
+                  ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  : <Package className="h-4 w-4 mr-1.5" />}
+                Download Bundle (.zip)
+              </Button>
+
+              {/* WordPress — requires connection */}
+              <Link href="/settings/wordpress">
+                <Button size="sm" variant="outline">
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  Publish to WordPress
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Attempt history */}
+          {attempts.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAttempts((v) => !v)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showAttempts
+                  ? <ChevronUp className="h-3.5 w-3.5" />
+                  : <ChevronDown className="h-3.5 w-3.5" />}
+                Export history ({attempts.length})
+              </button>
+              {showAttempts && (
+                <div className="mt-3 space-y-2">
+                  {attempts.map((a) => (
+                    <div key={a.id} className="flex items-center gap-3 text-xs rounded-lg bg-gray-50 px-3 py-2">
+                      <span className={`font-medium capitalize w-16 ${
+                        a.status === 'success' ? 'text-green-600'
+                        : a.status === 'failed' ? 'text-red-500'
+                        : 'text-yellow-600'}`}>
+                        {a.status}
+                      </span>
+                      <span className="text-gray-500 font-medium w-20 capitalize">{a.target}</span>
+                      <span className="text-gray-400">
+                        {new Date(a.startedAt).toLocaleString()}
+                      </span>
+                      {a.durationMs && (
+                        <span className="text-gray-400">{(a.durationMs / 1000).toFixed(1)}s</span>
+                      )}
+                      {a.resultUrl && (
+                        <a href={a.resultUrl} target="_blank" rel="noopener noreferrer"
+                          className="ml-auto text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                          Open <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {a.status === 'failed' && a.errorMessage && (
+                        <span className="ml-auto text-red-500 truncate max-w-xs">{a.errorMessage}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ── Pipeline steps ────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">

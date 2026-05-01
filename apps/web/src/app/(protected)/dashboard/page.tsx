@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
@@ -20,7 +19,6 @@ type DashboardMode = 'social_only' | 'article_first' | 'article_only'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { user } = useUser()
   const [dashMode, setDashMode] = useState<DashboardMode>('social_only')
   const [articleIdea, setArticleIdea] = useState('')
@@ -28,7 +26,11 @@ export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
-  const prefillIdea = searchParams?.get('idea') ?? null
+  // Read from window.location to avoid useSearchParams() / Suspense requirement during static export.
+  const [prefillIdea] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('idea')
+  })
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all'>('all')

@@ -931,14 +931,14 @@ export default function DashboardPage() {
             onClick={() => setDashMode(value)}
             className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-colors text-left ${
               dashMode === value
-                ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-medium'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                ? 'border-primary/40 bg-primary/10 text-primary font-medium'
+                : 'border-border bg-card text-foreground hover:bg-muted/50 hover:border-border'
             }`}
           >
-            <Icon className={`h-4 w-4 flex-shrink-0 ${dashMode === value ? 'text-indigo-600' : 'text-gray-400'}`} />
+            <Icon className={`h-4 w-4 flex-shrink-0 ${dashMode === value ? 'text-primary' : 'text-muted-foreground'}`} />
             <div>
               <span className="block leading-tight">{label}</span>
-              <span className={`text-xs leading-tight ${dashMode === value ? 'text-indigo-500' : 'text-gray-400'}`}>{desc}</span>
+              <span className={`text-xs leading-tight ${dashMode === value ? 'text-primary/70' : 'text-muted-foreground'}`}>{desc}</span>
             </div>
           </button>
         ))}
@@ -946,8 +946,8 @@ export default function DashboardPage() {
 
       {/* ── Article creation form (article modes) ───────────────────────── */}
       {dashMode !== 'social_only' && (
-        <div className="mb-8 bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-3">
+        <div className="mb-8 bg-card rounded-2xl border border-border p-6">
+          <h2 className="text-base font-semibold text-card-foreground mb-3">
             {dashMode === 'article_first' ? 'Create an Article (+ social posts when ready)' : 'Create an Article'}
           </h2>
           <textarea
@@ -955,7 +955,7 @@ export default function DashboardPage() {
             onChange={(e) => setArticleIdea(e.target.value)}
             placeholder="Describe the topic or idea for your article…"
             rows={3}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none mb-3"
+            className="w-full border border-border rounded-xl px-4 py-3 text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mb-3"
           />
           <div className="flex justify-end">
             <Button

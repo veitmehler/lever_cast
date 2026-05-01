@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Eye, EyeOff, Save, Loader2, Check, RefreshCw } from 'lucide-react'
+import { Eye, EyeOff, Save, Loader2, Check, RefreshCw, ArrowDownToLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -9,6 +9,7 @@ interface KeyStatus {
   provider: string
   hasEnvKey: boolean
   hasDbKey: boolean
+  hasUserKey: boolean
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function LLMKeysPage() {
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [migrating, setMigrating] = useState(false)
 
   async function fetchStatuses() {
     setLoading(true)
@@ -45,10 +47,7 @@ export default function LLMKeysPage() {
 
   async function saveKey(provider: string) {
     const key = inputs[provider]?.trim()
-    if (!key) {
-      toast.error('Enter a key first')
-      return
-    }
+    if (!key) { toast.error('Enter a key first'); return }
     setSaving((s) => ({ ...s, [provider]: true }))
     try {
       const res = await fetch(`/api/admin/llm-keys/${provider}`, {
@@ -67,6 +66,30 @@ export default function LLMKeysPage() {
     }
   }
 
+  async function migrateFromUserKeys() {
+    setMigrating(true)
+    try {
+      const res = await fetch('/api/admin/llm-keys/migrate', { method: 'POST' })
+      if (!res.ok) throw new Error('Migration failed')
+      const result = await res.json()
+      if (result.migrated?.length > 0) {
+        toast.success(`Migrated: ${result.migrated.join(', ')}`)
+      } else {
+        toast.info('No user keys found to migrate')
+      }
+      if (result.failed?.length > 0) {
+        toast.error(`Failed to migrate: ${result.failed.join(', ')}`)
+      }
+      await fetchStatuses()
+    } catch {
+      toast.error('Migration failed')
+    } finally {
+      setMigrating(false)
+    }
+  }
+
+  const hasAnyUserKey = statuses.some((s) => s.hasUserKey && !s.hasDbKey)
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
@@ -82,14 +105,37 @@ export default function LLMKeysPage() {
         </Button>
       </div>
 
-      {loading && (
+      {/* One-time migration banner */}
+      {!loading && hasAnyUserKey && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-blue-800">User API keys detected</p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              You have API keys stored in your user settings. Click to copy them into the system key store so
+              the article pipeline can use them.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+            onClick={migrateFromUserKeys}
+            disabled={migrating}
+          >
+            {migrating
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              : <ArrowDownToLine className="h-3.5 w-3.5 mr-1.5" />}
+            Migrate keys
+          </Button>
+        </div>
+      )}
+
+      {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading...
         </div>
-      )}
-
-      {!loading && (
+      ) : (
         <div className="space-y-3">
           {statuses.map((s) => (
             <div key={s.provider} className="rounded-lg border border-border bg-card p-4">
@@ -98,9 +144,12 @@ export default function LLMKeysPage() {
                   <p className="font-medium text-sm text-foreground">
                     {PROVIDER_LABELS[s.provider] ?? s.provider}
                   </p>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-2 mt-1">
                     <SourceBadge label="ENV" active={s.hasEnvKey} />
                     <SourceBadge label="DB" active={s.hasDbKey} />
+                    {s.hasUserKey && !s.hasDbKey && (
+                      <SourceBadge label="USER KEY (not migrated)" active={false} warning />
+                    )}
                   </div>
                 </div>
                 {(s.hasEnvKey || s.hasDbKey) && (
@@ -121,16 +170,10 @@ export default function LLMKeysPage() {
                   />
                   <button
                     type="button"
-                    onClick={() =>
-                      setVisible((v) => ({ ...v, [s.provider]: !v[s.provider] }))
-                    }
+                    onClick={() => setVisible((v) => ({ ...v, [s.provider]: !v[s.provider] }))}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {visible[s.provider] ? (
-                      <EyeOff className="h-3.5 w-3.5" />
-                    ) : (
-                      <Eye className="h-3.5 w-3.5" />
-                    )}
+                    {visible[s.provider] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 </div>
                 <Button
@@ -138,11 +181,9 @@ export default function LLMKeysPage() {
                   onClick={() => saveKey(s.provider)}
                   disabled={saving[s.provider] || !inputs[s.provider]?.trim()}
                 >
-                  {saving[s.provider] ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Save className="h-3.5 w-3.5" />
-                  )}
+                  {saving[s.provider]
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Save className="h-3.5 w-3.5" />}
                 </Button>
               </div>
             </div>
@@ -151,20 +192,30 @@ export default function LLMKeysPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Env-var keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY,
-        FAL_KEY) are always read first. DB keys are a fallback for changing keys without redeploy.
+        Env-var keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, FAL_KEY)
+        are always read first. DB keys are a fallback for changing keys without redeploying.
       </p>
     </div>
   )
 }
 
-function SourceBadge({ label, active }: { label: string; active: boolean }) {
+function SourceBadge({
+  label,
+  active,
+  warning,
+}: {
+  label: string
+  active: boolean
+  warning?: boolean
+}) {
   return (
     <span
       className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
         active
           ? 'bg-green-500/20 text-green-400'
-          : 'bg-muted text-muted-foreground'
+          : warning
+            ? 'bg-yellow-500/15 text-yellow-600'
+            : 'bg-muted text-muted-foreground'
       }`}
     >
       {label}

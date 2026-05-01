@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../../middleware/admin'
-import { listSystemApiKeys, setSystemApiKey } from '../../lib/system-keys'
+import { listSystemApiKeys, setSystemApiKey, migrateUserKeysToSystem } from '../../lib/system-keys'
 
 interface SetKeyBody {
   key: string
@@ -31,4 +31,13 @@ export async function llmKeysAdminRoutes(app: FastifyInstance) {
       return reply.send({ ok: true, provider })
     },
   )
+
+  // One-time migration: copy per-user ApiKey rows → SystemApiKey
+  app.post('/llm-keys/migrate', async (request, reply) => {
+    const admin = await requireAdmin(request, reply)
+    if (!admin) return
+    const result = await migrateUserKeysToSystem()
+    request.log.info(result, '[admin] migrated user keys to system')
+    return reply.send({ ok: true, ...result })
+  })
 }

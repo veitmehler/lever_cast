@@ -1,22 +1,34 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { IdeaCapture } from '@/components/IdeaCapture'
 import { PlatformPreview } from '@/components/PlatformPreview'
 import { ScheduleModal } from '@/components/ScheduleModal'
 import { generateContent, GeneratedContent } from '@/lib/mockAI'
 import { ApiKeyRequiredModal } from '@/components/ApiKeyRequiredModal'
-import { Loader2, Save, Send, Calendar } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Loader2, Save, Send, Calendar, Newspaper, MessageSquare, FileEdit } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
 type PlatformKey = 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
 const PLATFORM_ORDER: PlatformKey[] = ['linkedin', 'facebook', 'instagram', 'twitter', 'threads', 'telegram']
 
+type DashboardMode = 'social_only' | 'article_first' | 'article_only'
+
 export default function DashboardPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useUser()
+  const [dashMode, setDashMode] = useState<DashboardMode>('social_only')
+  const [articleIdea, setArticleIdea] = useState('')
+  const [isCreatingArticle, setIsCreatingArticle] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
+  const prefillIdea = searchParams?.get('idea') ?? null
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null)
   const [rawIdea, setRawIdea] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all'>('all')
@@ -904,9 +916,84 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* ── Mode toggle ─────────────────────────────────────────────────── */}
+      <div className="mb-5 flex gap-2 flex-wrap">
+        {([
+          { value: 'social_only',  label: 'Social posts',    icon: MessageSquare, desc: 'Instant multi-platform drafts' },
+          { value: 'article_first',label: 'Article + social', icon: FileEdit,      desc: 'Full article, then social posts' },
+          { value: 'article_only', label: 'Article only',     icon: Newspaper,     desc: 'Long-form article pipeline (~10 min)' },
+        ] as { value: DashboardMode; label: string; icon: React.ComponentType<{className?: string}>; desc: string }[]).map(({ value, label, icon: Icon, desc }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setDashMode(value)}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-colors text-left ${
+              dashMode === value
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-medium'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <Icon className={`h-4 w-4 flex-shrink-0 ${dashMode === value ? 'text-indigo-600' : 'text-gray-400'}`} />
+            <div>
+              <span className="block leading-tight">{label}</span>
+              <span className={`text-xs leading-tight ${dashMode === value ? 'text-indigo-500' : 'text-gray-400'}`}>{desc}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Article creation form (article modes) ───────────────────────── */}
+      {dashMode !== 'social_only' && (
+        <div className="mb-8 bg-white rounded-2xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-3">
+            {dashMode === 'article_first' ? 'Create an Article (+ social posts when ready)' : 'Create an Article'}
+          </h2>
+          <textarea
+            value={articleIdea}
+            onChange={(e) => setArticleIdea(e.target.value)}
+            placeholder="Describe the topic or idea for your article…"
+            rows={3}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none mb-3"
+          />
+          <div className="flex justify-end">
+            <Button
+              onClick={async () => {
+                const trimmed = articleIdea.trim()
+                if (!trimmed) return
+                setIsCreatingArticle(true)
+                try {
+                  const res = await fetch('/api/topics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic: trimmed, mode: dashMode }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) throw new Error(data.error ?? 'Failed to create article')
+                  toast.success('Article pipeline started!')
+                  router.push(`/workflow/${data.jobId}`)
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to start article')
+                } finally {
+                  setIsCreatingArticle(false)
+                }
+              }}
+              disabled={isCreatingArticle || !articleIdea.trim()}
+            >
+              {isCreatingArticle ? (
+                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Starting…</>
+              ) : (
+                <><Newspaper className="h-4 w-4 mr-1.5" />Create Article</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Idea Capture Widget */}
+      {dashMode === 'social_only' && (
       <div className="mb-8">
-        <IdeaCapture 
+        <IdeaCapture
+          initialIdea={prefillIdea ?? undefined}
           onGenerate={handleGenerate} 
           onImageAttached={async (imageUrl: string) => {
             // Update local state immediately for preview
@@ -940,6 +1027,7 @@ export default function DashboardPage() {
           }}
         />
       </div>
+      )}
 
       {/* Loading State */}
       {isGenerating && (

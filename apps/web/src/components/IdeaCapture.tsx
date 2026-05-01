@@ -83,11 +83,12 @@ interface IdeaCaptureProps {
     image?: string,
     twitterFormat?: 'single' | 'thread'
   ) => void
-  onImageAttached?: (imageUrl: string) => void // Callback when image is attached after posts are generated
+  onImageAttached?: (imageUrl: string) => void
+  initialIdea?: string
 }
 
-export function IdeaCapture({ onGenerate, onImageAttached }: IdeaCaptureProps) {
-  const [content, setContent] = useState('')
+export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCaptureProps) {
+  const [content, setContent] = useState(initialIdea ?? '')
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)

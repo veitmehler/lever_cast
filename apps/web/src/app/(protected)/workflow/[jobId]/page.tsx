@@ -9,6 +9,7 @@ import {
   AlertTriangle, DollarSign, Zap, FileText, Play, ThumbsUp,
   Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
+  Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -681,6 +682,16 @@ export default function WorkflowJobPage() {
                   Publish to WordPress
                 </Button>
               </Link>
+
+              {/* Generate Social Posts from article */}
+              {sitePage?.excerpt && (
+                <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>
+                  <Button size="sm" variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+                    <Share2 className="h-4 w-4 mr-1.5" />
+                    Generate Social Posts
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 

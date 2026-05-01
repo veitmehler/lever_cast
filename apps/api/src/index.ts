@@ -15,6 +15,7 @@ import { imageRoutes } from './routes/images'
 import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 import { topicRoutes } from './routes/topics'
+import multipart from '@fastify/multipart'
 import { articleRoutes } from './routes/articles'
 import { wpConnectionRoutes } from './routes/wp-connections'
 import { adminApiRoutes } from './routes/admin-api/index'
@@ -27,6 +28,7 @@ async function main() {
   })
 
   // ── CORS ───────────────────────────────────────────────────────────────────
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 /* 10 MB */ } })
   await app.register(cors, {
     origin: [
       'https://app.socioply.com',

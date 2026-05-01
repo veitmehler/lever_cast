@@ -9,6 +9,7 @@ on:
       - 'pnpm-lock.yaml'
       - '.dockerignore'
       - '.github/workflows/deploy-api.yml'
+  workflow_dispatch: # allows manual trigger from GitHub Actions UI
 
 # Prevent concurrent deploys — cancel any in-flight run when a newer push arrives
 concurrency:

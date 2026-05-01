@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Globe, Plus, Trash2, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Globe, Plus, Trash2, CheckCircle2, XCircle, Loader2, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -288,7 +288,7 @@ function AddConnectionForm({
             <li>Sign in to your WordPress admin dashboard.</li>
             <li>Go to <strong>Users → Profile</strong> (or edit the user you want to use).</li>
             <li>Scroll down to the <strong>Application Passwords</strong> section.</li>
-            <li>Type <code>Levercast</code> in the "New Application Password Name" field.</li>
+            <li>Type <code>Levercast</code> in the &ldquo;New Application Password Name&rdquo; field.</li>
             <li>Click <strong>Add New Application Password</strong> and copy the generated value.</li>
           </ol>
           <p className="text-xs text-blue-600 mt-1">

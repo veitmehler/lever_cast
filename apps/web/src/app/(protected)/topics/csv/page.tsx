@@ -8,16 +8,6 @@ import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ParsedRow = {
-  topic: string
-  scheduledDate?: string
-  mode?: string
-  slug?: string
-  category?: string
-  excludedKeywords?: string
-  defaultOutputTargets?: string
-}
-
 type ImportResult = {
   row: number
   topicId?: string

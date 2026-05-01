@@ -1,4 +1,4 @@
-import type { BrandSettings, PlatformSettings, OutlineFramework } from '@repo/db'
+import type { BrandSettings, PlatformSettings, OutlineFramework } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { getGlobalExcludedKeywords } from './keyword-validator'
 

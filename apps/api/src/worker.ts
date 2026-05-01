@@ -19,6 +19,10 @@ import { analyticsSyncHandler, AnalyticsSyncJobData } from './handlers/analytics
 import { oauthStateCleanupHandler, OAuthCleanupJobData } from './handlers/oauth'
 import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
 import { pgMonitorHandler } from './handlers/pg-monitor'
+import { articlePipelineHandler, ArticlePipelineJobData } from './handlers/article-pipeline'
+import { articleEnrichmentHandler, ArticleEnrichmentJobData } from './handlers/article-enrichment'
+import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-output'
+import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
 function withSentry<T>(
@@ -113,45 +117,29 @@ async function main() {
     }),
   )
 
-  // ── Article pipeline (Phase 9 — DO droplet required) ───────────────────────
-  await boss.work(
+  // ── Article pipeline ────────────────────────────────────────────────────────
+  await boss.work<ArticlePipelineJobData>(
     QUEUES.ARTICLE_PIPELINE,
     { batchSize: 2 },
-    withSentry('article-pipeline', async (jobs) => {
-      for (const job of jobs) {
-        logger.info({ jobId: job.id }, '[article-pipeline] TODO Phase 9')
-      }
-    }),
+    withSentry('article-pipeline', articlePipelineHandler),
   )
 
-  await boss.work(
+  await boss.work<ArticleEnrichmentJobData>(
     QUEUES.ARTICLE_ENRICHMENT,
     { batchSize: 1 },
-    withSentry('article-enrichment', async (jobs) => {
-      for (const job of jobs) {
-        logger.info({ jobId: job.id }, '[article-enrichment] TODO Phase 9')
-      }
-    }),
+    withSentry('article-enrichment', articleEnrichmentHandler),
   )
 
-  await boss.work(
+  await boss.work<ArticleOutputJobData>(
     QUEUES.ARTICLE_OUTPUT,
     { batchSize: 3 },
-    withSentry('article-output', async (jobs) => {
-      for (const job of jobs) {
-        logger.info({ jobId: job.id }, '[article-output] TODO Phase 9')
-      }
-    }),
+    withSentry('article-output', articleOutputHandler),
   )
 
-  await boss.work(
+  await boss.work<GenerateSocialFromArticleJobData>(
     QUEUES.GENERATE_SOCIAL_FROM_ARTICLE,
     { batchSize: 3 },
-    withSentry('generate-social-from-article', async (jobs) => {
-      for (const job of jobs) {
-        logger.info({ jobId: job.id }, '[generate-social-from-article] TODO Phase 9')
-      }
-    }),
+    withSentry('generate-social-from-article', generateSocialFromArticleHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

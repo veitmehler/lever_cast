@@ -14,6 +14,8 @@ import { aiRoutes } from './routes/ai'
 import { imageRoutes } from './routes/images'
 import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
+import { topicRoutes } from './routes/topics'
+import { adminApiRoutes } from './routes/admin-api/index'
 
 async function main() {
   // Fastify 5 requires a plain config object for `logger`, not a pino instance.
@@ -57,15 +59,13 @@ async function main() {
   await app.register(healthRoutes)
   await app.register(aiRoutes, { prefix: '/api/ai' })
   await app.register(imageRoutes, { prefix: '/api/images' })
+  await app.register(topicRoutes, { prefix: '/api' })
+  await app.register(adminApiRoutes, { prefix: '/api/admin' })
 
   // Admin UI — only registered when explicitly enabled; blocked externally by Caddy
   if (process.env.ADMIN_ENABLED === 'true') {
     await app.register(adminRoutes, { prefix: '/admin' })
   }
-
-  // Phase 8b — coming next:
-  // await app.register(postRoutes,   { prefix: '/api/posts' })
-  // await app.register(socialRoutes, { prefix: '/api/social' })
 
   // ── Listen ─────────────────────────────────────────────────────────────────
   const port = Number(process.env.PORT ?? 3001)

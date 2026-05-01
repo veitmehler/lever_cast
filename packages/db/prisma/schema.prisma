@@ -19,17 +19,24 @@ model User {
   clerkId   String   @unique
   name      String?
   email     String   @unique
+  role      String   @default("user") // user | admin
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  drafts             Draft[]
-  posts              Post[]
-  apiKeys            ApiKey[]
-  settings           Settings?
-  templates          Template[]
-  socialConnections  SocialConnection[]
-  twitterApiRequests TwitterApiRequest[]
+  drafts                Draft[]
+  posts                 Post[]
+  apiKeys               ApiKey[]
+  settings              Settings?
+  templates             Template[]
+  socialConnections     SocialConnection[]
+  twitterApiRequests    TwitterApiRequest[]
+  topics                Topic[]
+  articleJobs           ArticleJob[]
+  llmUsage              LLMUsage[]
+  wordPressConnections  WordPressConnection[]
+  errorLogs             ErrorLog[]
+  media                 Media[]
 
   @@map("users")
 }
@@ -218,4 +225,269 @@ model OAuthState {
   @@index([expiresAt])
   @@index([clerkId, platform])
   @@map("oauth_states")
+}
+
+// ─────────────────────────────────────────────
+// Article Pipeline
+// ─────────────────────────────────────────────
+
+model Media {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  s3Key     String
+  url       String
+  altText   String?
+  mimeType  String?
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  sitePageFeaturedImages SitePage[] @relation("SitePageFeaturedImage")
+
+  @@index([userId])
+  @@map("media")
+}
+
+model WordPressConnection {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label           String
+  siteUrl         String
+  username        String
+  appPassword     String   @db.Text
+  defaultAuthorId Int?
+  defaultStatus   String   @default("draft")
+  defaultCategoryId Int?
+  lastVerifiedAt  DateTime?
+  lastError       String?
+  topics          Topic[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, siteUrl])
+  @@index([userId])
+  @@map("wordpress_connections")
+}
+
+model Topic {
+  id                    String               @id @default(cuid())
+  userId                String
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic                 String
+  scheduledDate         DateTime
+  excludedKeywords      String[]
+  status                String               @default("pending")
+  mode                  String               @default("social_only") // social_only | article_first | article_only
+  defaultOutputTargets  String[]
+  wordPressConnectionId String?
+  wordPressConnection   WordPressConnection? @relation(fields: [wordPressConnectionId], references: [id])
+  slug                  String?
+  category              String?
+  publishingDate        DateTime?
+  outlineFrameworkNumber Int?
+  articleJobs           ArticleJob[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@index([mode])
+  @@map("topics")
+}
+
+model ArticleJob {
+  id              String   @id @default(cuid())
+  topicId         String
+  topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          String   @default("pending") // pending | in_progress | completed | approved | enriched | exported | failed
+  currentStep     Int      @default(0)
+  enrichmentJobId String?
+  totalCost       Float    @default(0)
+  totalTokens     Int      @default(0)
+  createdAt       DateTime @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  approvedAt      DateTime?
+  enrichedAt      DateTime?
+  pipelineSteps   PipelineStep[]
+  sitePage        SitePage?
+  errorLogs       ErrorLog[]
+  outputAttempts  OutputAttempt[]
+  llmUsage        LLMUsage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("article_jobs")
+}
+
+model PipelineStep {
+  id               String      @id @default(cuid())
+  jobId            String
+  job              ArticleJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stepNumber       Int
+  stepName         String
+  status           String      @default("pending") // pending | running | completed | failed
+  provider         String?
+  model            String?
+  promptTemplateId String?
+  promptTemplate   PromptTemplate? @relation(fields: [promptTemplateId], references: [id])
+  inputTokens      Int         @default(0)
+  outputTokens     Int         @default(0)
+  totalTokens      Int         @default(0)
+  cost             Float       @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  duration         Int?
+  output           String?     @db.Text
+  errorMessage     String?     @db.Text
+  retryCount       Int         @default(0)
+
+  @@unique([jobId, stepNumber])
+  @@map("pipeline_steps")
+}
+
+model PromptTemplate {
+  id              String   @id @default(cuid())
+  stepNumber      Int      @unique
+  stepName        String
+  systemPrompt    String?  @db.Text
+  userPrompt      String   @db.Text
+  variables       Json?
+  defaultProvider String   @default("gemini")
+  defaultModel    String   @default("gemini-2.5-flash")
+  version         Int      @default(1)
+  isActive        Boolean  @default(true)
+  pipelineSteps   PipelineStep[]
+
+  @@map("prompt_templates")
+}
+
+model SitePage {
+  id               String    @id @default(cuid())
+  jobId            String?   @unique
+  job              ArticleJob? @relation(fields: [jobId], references: [id])
+  userId           String
+  slug             String
+  title            String
+  bodyHtml         String?   @db.Text
+  originalBodyHtml String?   @db.Text
+  featuredImageId  String?
+  featuredImage    Media?    @relation("SitePageFeaturedImage", fields: [featuredImageId], references: [id])
+  publishedAt      DateTime?
+  readingTime      Int?
+  seoTitle         String?
+  seoDescription   String?
+  citations        Json?
+  disclaimer       String?   @db.Text
+  excerpt          String?   @db.VarChar(160)
+  primaryKeyword   String?
+  enrichmentStatus  String   @default("pending") // pending | in_progress | completed | failed
+  enrichmentError   String?
+  enrichedAt       DateTime?
+  diagrams         ArticleDiagram[]
+
+  @@unique([userId, slug])
+  @@index([primaryKeyword])
+  @@index([userId])
+  @@map("site_pages")
+}
+
+model ArticleDiagram {
+  id             String   @id @default(cuid())
+  sitePageId     String
+  sitePage       SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  position       Int
+  sectionAnchor  String
+  sectionTitle   String
+  caption        String?
+  mermaidSyntax  String   @db.Text
+  svgContent     String   @db.Text
+  pngS3Key       String?
+  pngWidth       Int?
+  pngHeight      Int?
+  pngGeneratedAt DateTime?
+  llmProvider    String
+  llmModel       String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  cost           Float    @default(0)
+  createdAt      DateTime @default(now())
+
+  @@unique([sitePageId, position])
+  @@index([sitePageId])
+  @@map("article_diagrams")
+}
+
+model OutputAttempt {
+  id          String     @id @default(cuid())
+  jobId       String
+  job         ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId      String
+  target      String                // wordpress | html | bundle | preview
+  targetRefId String?
+  status      String     @default("pending") // pending | success | failed
+  startedAt   DateTime   @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  resultUrl   String?
+  errorMessage String?
+  payloadHash  String?
+
+  @@index([jobId])
+  @@index([userId, target])
+  @@map("output_attempts")
+}
+
+model ErrorLog {
+  id           String      @id @default(cuid())
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  jobId        String?
+  job          ArticleJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  errorType    String
+  errorMessage String      @db.Text
+  stackTrace   String?     @db.Text
+  context      Json?
+  resolved     Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  @@index([userId])
+  @@index([jobId])
+  @@index([createdAt])
+  @@map("error_logs")
+}
+
+model LLMUsage {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId        String?
+  job          ArticleJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  stepNumber   Int?
+  provider     String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  cost         Float
+  source       String      // article-pipeline | social-only | enrichment | image-gen
+  createdAt    DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@index([jobId])
+  @@index([source])
+  @@map("llm_usage")
+}
+
+model SystemApiKey {
+  id           String   @id @default(cuid())
+  provider     String   @unique // gemini | openai | anthropic | openrouter | fal-ai
+  encryptedKey String   @db.Text
+  updatedAt    DateTime @updatedAt
+
+  @@map("system_api_keys")
 }

@@ -104,11 +104,10 @@ export default async function ArticleJobDetailPage({
                 {step.output && (
                   <details className="mt-1">
                     <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                      Output ({step.output.length} chars)
+                      Output ({step.output.length.toLocaleString()} chars)
                     </summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted/30 p-2 text-xs text-foreground whitespace-pre-wrap break-words">
-                      {step.output.slice(0, 2000)}
-                      {step.output.length > 2000 ? '\n… (truncated)' : ''}
+                    <pre className="mt-2 max-h-96 overflow-auto rounded bg-muted/30 p-2 text-xs text-foreground whitespace-pre-wrap break-words">
+                      {step.output}
                     </pre>
                   </details>
                 )}

@@ -150,7 +150,7 @@ function FrameworkCard({
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">
               Description
-              <span className="ml-1.5 font-normal text-muted-foreground">(used by LLM auto-assignment — "when to use")</span>
+              <span className="ml-1.5 font-normal text-muted-foreground">(used by LLM auto-assignment — &ldquo;when to use&rdquo;)</span>
             </label>
             <textarea
               value={description}

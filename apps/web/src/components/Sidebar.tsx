@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Calendar
+  Calendar,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,8 +36,9 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isLargeScreen, setIsLargeScreen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
-  // Load sidebar state from API after mount
+  // Load sidebar state and user role after mount
   useEffect(() => {
     const fetchSidebarState = async () => {
       try {
@@ -47,7 +49,6 @@ export function Sidebar() {
             setIsCollapsed(settings.sidebarState === 'collapsed')
           }
         } else {
-          // Fallback to localStorage if API fails
           const saved = localStorage.getItem('sidebar-collapsed')
           if (saved !== null) {
             setIsCollapsed(JSON.parse(saved))
@@ -55,7 +56,6 @@ export function Sidebar() {
         }
       } catch (error) {
         console.error('Error fetching sidebar state:', error)
-        // Fallback to localStorage if API fails
         const saved = localStorage.getItem('sidebar-collapsed')
         if (saved !== null) {
           setIsCollapsed(JSON.parse(saved))
@@ -65,7 +65,20 @@ export function Sidebar() {
       }
     }
 
+    const fetchRole = async () => {
+      try {
+        const res = await fetch('/api/auth/sync-user')
+        if (res.ok) {
+          const user = await res.json()
+          setIsAdmin(user.role === 'admin')
+        }
+      } catch {
+        // silently ignore — non-admin view is the safe default
+      }
+    }
+
     fetchSidebarState()
+    fetchRole()
   }, [])
 
   // Track screen size for responsive behavior
@@ -177,6 +190,32 @@ export function Sidebar() {
             )
           })}
         </nav>
+
+        {/* Admin link — only visible to admins */}
+        {isAdmin && (
+          <div className="px-3 pb-1">
+            <Link
+              href="/admin"
+              className={cn(
+                'group relative flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                pathname.startsWith('/admin')
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                shouldBeCollapsed && 'justify-center'
+              )}
+            >
+              <span className={cn(pathname.startsWith('/admin') && 'text-primary')}>
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+              {!shouldBeCollapsed && <span className="ml-3">Admin</span>}
+              {shouldBeCollapsed && (
+                <div className="absolute left-full ml-2 hidden rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md group-hover:block whitespace-nowrap">
+                  Admin
+                </div>
+              )}
+            </Link>
+          </div>
+        )}
 
         {/* Toggle Button - Only on desktop */}
         {isLargeScreen && (

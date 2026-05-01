@@ -114,10 +114,26 @@ async function executeStep2WithValidation(
     }
 
     const parsed = result.parsedOutput as Record<string, unknown> | undefined
-    const primaryKeyword =
-      (parsed?.['Primary Keyword'] ?? parsed?.primaryKeyword ?? parsed?.primary_keyword) as
-        | string
-        | undefined
+
+    // Handle multiple JSON shapes Gemini and other LLMs return for the primary keyword:
+    // 1. { primary_keyword: "..." }          (ideal)
+    // 2. { primaryKeyword: "..." }
+    // 3. { "Primary Keyword": "..." }
+    // 4. { keywords: [{ type: "Primary Keyword", keyword: "..." }, ...] }
+    // 5. { keywords: [{ keyword: "...", type: "primary" }, ...] }
+    let primaryKeyword: string | undefined =
+      (parsed?.['Primary Keyword'] ?? parsed?.primaryKeyword ?? parsed?.primary_keyword) as string | undefined
+
+    if (!primaryKeyword && Array.isArray(parsed?.keywords)) {
+      const kwArray = parsed!.keywords as Array<Record<string, string>>
+      const pkEntry = kwArray.find(
+        (k) =>
+          k.type?.toLowerCase().includes('primary') ||
+          k.keyword_type?.toLowerCase().includes('primary') ||
+          k.category?.toLowerCase().includes('primary'),
+      )
+      primaryKeyword = pkEntry?.keyword ?? pkEntry?.value ?? kwArray[0]?.keyword
+    }
 
     if (!primaryKeyword) {
       logger.warn({ jobId, attempt }, '[executor] step 2 produced no primary keyword — retrying')

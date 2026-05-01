@@ -33,14 +33,14 @@ Return the outline in a structured format.`,
 
 Excluded keywords (do not use): {{excludedKeywords}}
 
-Provide:
-1. Primary keyword
-2. 5-10 secondary keywords
-3. Long-tail keyword variations
-4. Search intent for each keyword
-5. Estimated difficulty level
-
-Format as JSON.`,
+Return ONLY a JSON object (no markdown fences, no extra text) with this exact structure:
+{
+  "primary_keyword": "the single best target keyword phrase",
+  "secondary_keywords": ["kw1", "kw2", "kw3"],
+  "long_tail_keywords": ["long tail 1", "long tail 2"],
+  "search_intent": "informational | commercial | transactional | navigational",
+  "difficulty": "low | medium | high"
+}`,
   },
   {
     stepNumber: 3,

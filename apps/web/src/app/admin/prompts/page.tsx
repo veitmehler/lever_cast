@@ -97,8 +97,8 @@ export default function AdminPromptsPage() {
   return (
     <div className="max-w-5xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Prompt Templates</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-foreground">Prompt Templates</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Click a template to edit its system prompt, user prompt, provider, and model.
           Admin edits are preserved on re-seed.
         </p>
@@ -142,7 +142,7 @@ export default function AdminPromptsPage() {
 
             return (
               <section key={group.label}>
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   {group.label}
                 </h2>
                 <div className="space-y-2">
@@ -153,15 +153,15 @@ export default function AdminPromptsPage() {
                       <Link
                         key={t.id}
                         href={`/admin/prompts/${t.stepNumber}`}
-                        className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all"
+                        className="group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 hover:border-border/80 hover:shadow-sm transition-all"
                       >
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                           {t.stepNumber}
                         </div>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-gray-900">{label}</span>
+                            <span className="text-sm font-medium text-foreground">{label}</span>
                             <ProviderBadge provider={t.defaultProvider} />
                             <span className="text-xs text-gray-400">{t.defaultModel}</span>
                           </div>
@@ -183,7 +183,7 @@ export default function AdminPromptsPage() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
                           <Edit3 className="h-3.5 w-3.5" />
                           Edit
                           <ChevronRight className="h-3.5 w-3.5" />

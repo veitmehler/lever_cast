@@ -148,15 +148,15 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
         <div>
           <Link
             href="/admin/prompts"
-            className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-2 transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2 transition-colors"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             All prompts
           </Link>
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-semibold text-foreground">
             {STEP_LABELS[template.stepNumber] ?? `Step ${template.stepNumber}`}
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5 font-mono">{template.stepName}</p>
+          <p className="text-sm text-muted-foreground mt-0.5 font-mono">{template.stepName}</p>
         </div>
         <Button
           onClick={handleSave}
@@ -178,15 +178,15 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
         {/* ── Left: prompts + model settings ─────────────────────────── */}
         <div className="space-y-5">
           {/* Provider + model row */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Model settings</h2>
+          <div className="bg-card rounded-xl border border-border p-5">
+            <h2 className="text-sm font-semibold text-foreground mb-4">Model settings</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Provider</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Provider</label>
                 <select
                   value={provider}
                   onChange={(e) => setProvider(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
                 >
                   {PROVIDER_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -194,44 +194,44 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Model</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Model</label>
                 <input
                   type="text"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                   placeholder="e.g. claude-sonnet-4-5-20250929"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
                 />
               </div>
             </div>
           </div>
 
           {/* System prompt */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="bg-card rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-700">System prompt</h2>
-              <span className="text-xs text-gray-400">{systemPrompt.length} chars</span>
+              <h2 className="text-sm font-semibold text-foreground">System prompt</h2>
+              <span className="text-xs text-muted-foreground">{systemPrompt.length} chars</span>
             </div>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={5}
               placeholder="Optional system prompt…"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-y leading-relaxed"
+              className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
             />
           </div>
 
           {/* User prompt */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="bg-card rounded-xl border border-border p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-700">User prompt</h2>
-              <span className="text-xs text-gray-400">{userPrompt.length} chars</span>
+              <h2 className="text-sm font-semibold text-foreground">User prompt</h2>
+              <span className="text-xs text-muted-foreground">{userPrompt.length} chars</span>
             </div>
             <textarea
               value={userPrompt}
               onChange={(e) => setUserPrompt(e.target.value)}
               rows={20}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-mono text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-y leading-relaxed"
+              className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
             />
           </div>
         </div>
@@ -239,19 +239,19 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
         {/* ── Right: variable reference panel ─────────────────────────── */}
         <div className="space-y-4">
           {/* Info */}
-          <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4 text-xs text-indigo-700 flex gap-2">
+          <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/20 p-4 text-xs text-indigo-400 flex gap-2">
             <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <div>
-              <strong>Variables</strong> are written as{' '}
-              <code className="bg-indigo-100 px-1 rounded">{'{{variable_name}}'}</code>.
-              Click any variable below to insert it at cursor position.
+              <strong className="text-indigo-300">Variables</strong> are written as{' '}
+              <code className="bg-indigo-500/20 px-1 rounded">{'{{variable_name}}'}</code>.
+              Click any variable below to copy it to your clipboard.
             </div>
           </div>
 
           {/* Used / step-relevant variables */}
           {relevantVars.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                 Variables for this step
               </h3>
               <div className="space-y-1.5">
@@ -263,11 +263,11 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
           )}
 
           {/* All other variables (collapsed) */}
-          <details className="bg-white rounded-xl border border-gray-200">
-            <summary className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-400 cursor-pointer select-none hover:text-gray-600">
+          <details className="bg-card rounded-xl border border-border">
+            <summary className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors">
               All other variables ({allOtherVars.length})
             </summary>
-            <div className="px-4 pb-4 space-y-1.5 border-t border-gray-100 pt-3">
+            <div className="px-4 pb-4 space-y-1.5 border-t border-border pt-3">
               {allOtherVars.map((v) => (
                 <VarRow key={v.name} v={v} used={false} />
               ))}
@@ -295,18 +295,18 @@ function VarRow({
     <button
       type="button"
       onClick={handleCopy}
-      className="w-full text-left group flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+      className="w-full text-left group flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors"
     >
       <Hash
-        className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${used ? 'text-indigo-500' : 'text-gray-300'}`}
+        className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${used ? 'text-indigo-400' : 'text-muted-foreground/40'}`}
       />
       <div className="min-w-0">
         <span
-          className={`block text-xs font-mono ${used ? 'text-indigo-700 font-semibold' : 'text-gray-600'}`}
+          className={`block text-xs font-mono ${used ? 'text-indigo-400 font-semibold' : 'text-muted-foreground'}`}
         >
           {`{{${v.name}}}`}
         </span>
-        <span className="block text-xs text-gray-400 truncate">{v.description}</span>
+        <span className="block text-xs text-muted-foreground/60 truncate">{v.description}</span>
       </div>
     </button>
   )

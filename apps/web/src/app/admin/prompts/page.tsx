@@ -1,8 +1,8 @@
-import Link from 'next/link'
-import { auth } from '@clerk/nextjs/server'
-import { ChevronRight, Cpu, Edit3, Hash } from 'lucide-react'
+'use client'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { ChevronRight, Cpu, Edit3, Hash, Loader2, AlertTriangle } from 'lucide-react'
 
 interface PromptTemplate {
   id: string
@@ -16,21 +16,6 @@ interface PromptTemplate {
   isActive: boolean
 }
 
-async function getPrompts(token: string): Promise<PromptTemplate[]> {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/prompts`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.templates ?? []
-  } catch {
-    return []
-  }
-}
-
-// Extract {{variable}} tokens from a string
 function extractVars(text: string): string[] {
   const matches = text.match(/\{\{([^}]+)\}\}/g) ?? []
   return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '').trim()))]
@@ -53,7 +38,6 @@ function ProviderBadge({ provider }: { provider: string }) {
   )
 }
 
-// Friendly label for known step names
 const STEP_LABELS: Record<string, string> = {
   generate_outline:               'Outline',
   keyword_research:               'Keyword Research',
@@ -80,10 +64,33 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   { label: 'Phase C — Enrichment',                   steps: [20] },
 ]
 
-export default async function AdminPromptsPage() {
-  const { getToken } = await auth()
-  const token = await getToken()
-  const templates = token ? await getPrompts(token) : []
+export default function AdminPromptsPage() {
+  const [templates, setTemplates] = useState<PromptTemplate[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/prompts', { cache: 'no-store' })
+        if (!res.ok) {
+          const body = await res.text()
+          if (alive) setError(`HTTP ${res.status}: ${body || res.statusText}`)
+          return
+        }
+        const data = await res.json()
+        if (alive) setTemplates(data.templates ?? [])
+      } catch (err) {
+        if (alive) setError((err as Error).message ?? 'Failed to load prompt templates')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const byStep = Object.fromEntries(templates.map((t) => [t.stepNumber, t]))
 
@@ -97,73 +104,99 @@ export default async function AdminPromptsPage() {
         </p>
       </div>
 
-      <div className="space-y-8">
-        {PHASE_GROUPS.map((group) => {
-          const groupTemplates = group.steps
-            .map((n) => byStep[n])
-            .filter(Boolean) as PromptTemplate[]
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading templates…
+        </div>
+      )}
 
-          if (groupTemplates.length === 0) return null
+      {!loading && error && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-semibold">Could not load prompt templates</div>
+            <div className="mt-1 font-mono text-xs">{error}</div>
+            <div className="mt-2 text-xs">
+              If you just deployed, the worker may still be restarting. Otherwise check that
+              your account has admin role.
+            </div>
+          </div>
+        </div>
+      )}
 
-          return (
-            <section key={group.label}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-                {group.label}
-              </h2>
-              <div className="space-y-2">
-                {groupTemplates.map((t) => {
-                  const vars = extractVars((t.systemPrompt ?? '') + ' ' + t.userPrompt)
-                  const label = STEP_LABELS[t.stepName] ?? t.stepName
-                  return (
-                    <Link
-                      key={t.id}
-                      href={`/admin/prompts/${t.stepNumber}`}
-                      className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all"
-                    >
-                      {/* Step number */}
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500">
-                        {t.stepNumber}
-                      </div>
+      {!loading && !error && templates.length === 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-500">
+          No prompt templates found. Run the seed script to populate them.
+        </div>
+      )}
 
-                      {/* Name + vars */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-900">{label}</span>
-                          <ProviderBadge provider={t.defaultProvider} />
-                          <span className="text-xs text-gray-400">{t.defaultModel}</span>
+      {!loading && !error && templates.length > 0 && (
+        <div className="space-y-8">
+          {PHASE_GROUPS.map((group) => {
+            const groupTemplates = group.steps
+              .map((n) => byStep[n])
+              .filter(Boolean) as PromptTemplate[]
+
+            if (groupTemplates.length === 0) return null
+
+            return (
+              <section key={group.label}>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+                  {group.label}
+                </h2>
+                <div className="space-y-2">
+                  {groupTemplates.map((t) => {
+                    const vars = extractVars((t.systemPrompt ?? '') + ' ' + t.userPrompt)
+                    const label = STEP_LABELS[t.stepName] ?? t.stepName
+                    return (
+                      <Link
+                        key={t.id}
+                        href={`/admin/prompts/${t.stepNumber}`}
+                        className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all"
+                      >
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500">
+                          {t.stepNumber}
                         </div>
-                        {vars.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {vars.slice(0, 8).map((v) => (
-                              <span
-                                key={v}
-                                className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-mono text-indigo-600"
-                              >
-                                <Hash className="h-2.5 w-2.5" />
-                                {v}
-                              </span>
-                            ))}
-                            {vars.length > 8 && (
-                              <span className="text-xs text-gray-400">+{vars.length - 8} more</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Edit caret */}
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Edit
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
-          )
-        })}
-      </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-gray-900">{label}</span>
+                            <ProviderBadge provider={t.defaultProvider} />
+                            <span className="text-xs text-gray-400">{t.defaultModel}</span>
+                          </div>
+                          {vars.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {vars.slice(0, 8).map((v) => (
+                                <span
+                                  key={v}
+                                  className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-mono text-indigo-600"
+                                >
+                                  <Hash className="h-2.5 w-2.5" />
+                                  {v}
+                                </span>
+                              ))}
+                              {vars.length > 8 && (
+                                <span className="text-xs text-gray-400">+{vars.length - 8} more</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
+                          <Edit3 className="h-3.5 w-3.5" />
+                          Edit
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -127,7 +127,7 @@ Return as JSON array with question text.`,
     stepNumber: 7,
     stepName: 'find_faq_facts',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-2.5-flash',
     systemPrompt: 'You are a research expert specializing in finding accurate, verifiable facts and data.',
     userPrompt: `For each of these FAQ questions, provide detailed, factual answers with supporting data:
 

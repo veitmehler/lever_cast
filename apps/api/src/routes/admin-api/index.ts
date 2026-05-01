@@ -4,6 +4,7 @@ import { costsAdminRoutes } from './costs'
 import { usersAdminRoutes } from './users'
 import { errorsAdminRoutes } from './errors'
 import { articlesAdminRoutes } from './articles'
+import { promptsAdminRoutes } from './prompts'
 
 export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(llmKeysAdminRoutes)
@@ -11,4 +12,5 @@ export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(usersAdminRoutes)
   await app.register(errorsAdminRoutes)
   await app.register(articlesAdminRoutes)
+  await app.register(promptsAdminRoutes)
 }

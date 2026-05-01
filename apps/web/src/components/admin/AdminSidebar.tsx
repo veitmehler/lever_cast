@@ -10,12 +10,14 @@ import {
   AlertTriangle,
   FileText,
   ChevronLeft,
+  MessageSquareText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'LLM Keys', href: '/admin/llm', icon: Key },
+  { label: 'Prompts', href: '/admin/prompts', icon: MessageSquareText },
   { label: 'Costs', href: '/admin/costs', icon: DollarSign },
   { label: 'Articles', href: '/admin/articles', icon: FileText },
   { label: 'Users', href: '/admin/users', icon: Users },

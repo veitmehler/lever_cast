@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 async function getUserId(clerkId: string): Promise<string | null> {
@@ -73,7 +74,7 @@ export async function PATCH(request: NextRequest) {
 
     type StringField = typeof stringFields[number]
 
-    const data: Partial<Record<StringField, string | null>> & { socialMediaLinks?: unknown } = {}
+    const data: Prisma.BrandSettingsUpdateInput = {}
 
     for (const field of stringFields) {
       if (field in body) {
@@ -85,21 +86,21 @@ export async function PATCH(request: NextRequest) {
     if ('socialMediaLinks' in body) {
       const raw = body.socialMediaLinks
       if (Array.isArray(raw)) {
-        // Only keep entries with both platform and url populated
-        data.socialMediaLinks = raw
+        const sanitized = raw
           .filter((l: unknown) => l && typeof l === 'object' && (l as Record<string, unknown>).platform && (l as Record<string, unknown>).url)
           .map((l: unknown) => {
             const link = l as Record<string, unknown>
             return { platform: String(link.platform).trim(), url: String(link.url).trim() }
           })
+        data.socialMediaLinks = sanitized as Prisma.InputJsonValue
       } else {
-        data.socialMediaLinks = null
+        data.socialMediaLinks = Prisma.JsonNull
       }
     }
 
     const settings = await prisma.brandSettings.upsert({
       where: { userId },
-      create: { userId, ...data },
+      create: { userId, ...data } as Prisma.BrandSettingsUncheckedCreateInput,
       update: data,
     })
 

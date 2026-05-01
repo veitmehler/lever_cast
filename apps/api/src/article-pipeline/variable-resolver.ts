@@ -1,0 +1,224 @@
+import { prisma } from '../lib/prisma'
+import { getGlobalExcludedKeywords } from './keyword-validator'
+
+// Maps generic {{<step_name>_output}} variable suffixes to step numbers
+const STEP_NAME_MAP: Record<string, number> = {
+  generate_outline: 1,
+  keyword_research: 2,
+  find_supporting_keywords: 3,
+  optimize_outline_seo: 4,
+  write_search_intent_intro: 5,
+  research_faqs: 6,
+  find_faq_facts: 7,
+  find_article_facts: 8,
+  write_article: 9,
+  fact_check_article: 10,
+  adjust_incorrect_facts: 11,
+  find_citations: 12,
+  generate_seo_metadata: 13,
+  select_category: 14,
+  generate_image_prompt: 15,
+}
+
+export interface PipelineContext {
+  jobId: string
+  userId: string
+  topicId: string
+  topicText: string           // Topic.topic
+  topicSlug?: string | null   // Topic.slug (may be empty for manual topics)
+  completedSteps: Map<number, string>  // stepNumber -> raw output string
+  parsedSteps: Map<number, unknown>    // stepNumber -> parsed JSON (for steps 2, 12, 13)
+  // Filled in progressively as the pipeline runs
+  excludedKeywordsCache?: string
+}
+
+/** Replace all {{variable}} placeholders in a prompt string. */
+export async function resolveVariables(
+  template: string,
+  ctx: PipelineContext,
+): Promise<string> {
+  const VARIABLE_RE = /\{\{\s*([^}]+?)\s*\}\}/g
+  const replacements = new Map<string, string>()
+
+  // Find all unique placeholders first
+  const vars = new Set<string>()
+  let m: RegExpExecArray | null
+  while ((m = VARIABLE_RE.exec(template)) !== null) {
+    vars.add(m[1].trim())
+  }
+
+  // Resolve each variable (using cache where possible)
+  for (const varName of vars) {
+    const value = await resolveVariable(varName, ctx)
+    replacements.set(varName, value)
+  }
+
+  // Apply all replacements
+  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, name: string) => {
+    return replacements.get(name.trim()) ?? ''
+  })
+}
+
+async function resolveVariable(name: string, ctx: PipelineContext): Promise<string> {
+  switch (name) {
+    // ── Topic fields ────────────────────────────────────────────────────────
+    case 'topic':
+      return ctx.topicText
+
+    case 'slug':
+      return ctx.topicSlug ?? ''
+
+    // ── Global excluded keywords ─────────────────────────────────────────────
+    case 'excludedKeywords':
+    case 'excluded_keywords': {
+      if (ctx.excludedKeywordsCache === undefined) {
+        ctx.excludedKeywordsCache = await getGlobalExcludedKeywords(ctx.userId)
+      }
+      // Also include keywords that have been added to Topic.excludedKeywords
+      const topic = await prisma.topic.findUnique({
+        where: { id: ctx.topicId },
+        select: { excludedKeywords: true },
+      })
+      const topicExcluded = topic?.excludedKeywords?.join(', ') ?? ''
+      const combined = [ctx.excludedKeywordsCache, topicExcluded].filter(Boolean).join(', ')
+      return combined
+    }
+
+    // ── Step outputs ─────────────────────────────────────────────────────────
+    case 'outline':
+      return ctx.completedSteps.get(1) ?? ''
+
+    case 'keywords':
+      return ctx.completedSteps.get(2) ?? ''
+
+    case 'primaryKeyword':
+    case 'primary_keyword':
+    case 'primaryKeywords':  // typo in Step 3 prompt — map to same
+      return extractPrimaryKeyword(ctx.parsedSteps.get(2)) ?? ''
+
+    case 'secondary_keywords': {
+      const parsed = ctx.parsedSteps.get(2)
+      return extractSecondaryKeywords(parsed)
+    }
+
+    case 'salient_entities': {
+      const parsed = ctx.parsedSteps.get(2)
+      return extractSalientEntities(parsed)
+    }
+
+    case 'searchIntent':
+    case 'intro':
+      return ctx.completedSteps.get(5) ?? ''
+
+    case 'faqQuestions':
+    case 'faqs':
+      return ctx.completedSteps.get(6) ?? ''
+
+    case 'facts':
+      return ctx.completedSteps.get(8) ?? ''
+
+    case 'article':
+    case 'article_html':
+      // Prefer the corrected article (step 11), fall back to step 9
+      return ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
+
+    case 'factCheckIssues':
+      return ctx.completedSteps.get(10) ?? ''
+
+    case 'article_title': {
+      const sitePage = await prisma.sitePage.findFirst({ where: { jobId: ctx.jobId } })
+      return sitePage?.seoTitle ?? sitePage?.title ?? ctx.topicText
+    }
+
+    case 'articleSummary':
+    case 'article_summary': {
+      const articleBody = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
+      return articleBody.slice(0, 1000) + (articleBody.length > 1000 ? '...' : '')
+    }
+
+    case 'article_excerpt': {
+      const sitePage = await prisma.sitePage.findFirst({ where: { jobId: ctx.jobId } })
+      return sitePage?.excerpt ?? ''
+    }
+
+    case 'article_disclaimer': {
+      const sitePage = await prisma.sitePage.findFirst({ where: { jobId: ctx.jobId } })
+      return sitePage?.disclaimer ?? ''
+    }
+
+    case 'seo_title':
+    case 'seo_description':
+    case 'article_slug': {
+      const parsed = ctx.parsedSteps.get(13) as Record<string, string> | undefined
+      if (name === 'seo_title') return parsed?.metaTitle ?? parsed?.['meta title'] ?? ''
+      if (name === 'seo_description') return parsed?.metaDescription ?? parsed?.['meta description'] ?? ''
+      return parsed?.urlSlug ?? parsed?.slug ?? ''
+    }
+
+    case 'citation_urls': {
+      const raw = ctx.completedSteps.get(12) ?? ''
+      try {
+        const data = JSON.parse(raw) as { resource_links?: Array<{ link_url: string }> } | Array<{ link_url: string }>
+        const links = Array.isArray(data) ? data : (data.resource_links ?? [])
+        return links.map((l) => l.link_url).filter(Boolean).join(', ')
+      } catch { return '' }
+    }
+
+    case 'current_date':
+      return new Date().toISOString()
+
+    // ── Generic step output accessor: {{<step_name>_output}} ─────────────────
+    default: {
+      if (name.endsWith('_output')) {
+        const stepName = name.replace(/_output$/, '')
+        const stepNumber = STEP_NAME_MAP[stepName]
+        if (stepNumber !== undefined) {
+          return ctx.completedSteps.get(stepNumber) ?? ''
+        }
+      }
+      return ''  // unknown variable → empty string
+    }
+  }
+}
+
+// ── Keyword extraction helpers ──────────────────────────────────────────────
+
+function extractPrimaryKeyword(parsed: unknown): string | undefined {
+  if (!parsed || typeof parsed !== 'object') return undefined
+  const obj = parsed as Record<string, unknown>
+  const val = obj['Primary Keyword'] ?? obj['primaryKeyword'] ?? obj['primary_keyword']
+  return typeof val === 'string' ? val.trim() : undefined
+}
+
+function extractSecondaryKeywords(parsed: unknown): string {
+  if (!parsed || typeof parsed !== 'object') return ''
+  const obj = parsed as Record<string, unknown>
+  const keywords: string[] = []
+  for (let i = 1; i <= 5; i++) {
+    const key = `Secondary Keywords ${i}`
+    const altKey = `secondary_keyword_${i}`
+    const val = obj[key] ?? obj[altKey]
+    if (typeof val === 'string' && val.trim()) keywords.push(val.trim())
+  }
+  // Also accept array form
+  if (!keywords.length) {
+    const arr = obj['secondaryKeywords'] ?? obj['secondary_keywords']
+    if (Array.isArray(arr)) return arr.filter(Boolean).join(', ')
+  }
+  return keywords.join(', ')
+}
+
+function extractSalientEntities(parsed: unknown): string {
+  if (!parsed || typeof parsed !== 'object') return ''
+  const obj = parsed as Record<string, unknown>
+  const entities: string[] = []
+  for (let i = 1; i <= 5; i++) {
+    const val = obj[`Salient Entity ${i}`] ?? obj[`salient_entity_${i}`]
+    if (typeof val === 'string' && val.trim()) entities.push(val.trim())
+  }
+  if (!entities.length) {
+    const arr = obj['salientEntities'] ?? obj['salient_entities']
+    if (Array.isArray(arr)) return arr.filter(Boolean).join(', ')
+  }
+  return entities.join(', ')
+}

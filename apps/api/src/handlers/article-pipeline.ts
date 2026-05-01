@@ -1,6 +1,7 @@
 import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
 import { prisma } from '../lib/prisma'
+import { runPipelinePhaseA } from '../article-pipeline/executor'
 
 export interface ArticlePipelineJobData {
   jobId: string
@@ -11,13 +12,17 @@ export async function articlePipelineHandler(
 ): Promise<void> {
   for (const job of jobs) {
     const { jobId } = job.data
-    logger.info({ jobId, pgBossJobId: job.id }, '[article-pipeline] received — Phase A2 not implemented yet')
+    logger.info({ jobId, pgBossJobId: job.id }, '[article-pipeline] starting Phase A execution')
 
-    await prisma.articleJob.update({
-      where: { id: jobId },
-      data: { status: 'in_progress', startedAt: new Date() },
-    }).catch((err) => {
-      logger.warn({ jobId, err }, '[article-pipeline] could not update job status')
-    })
+    try {
+      await runPipelinePhaseA(jobId)
+      logger.info({ jobId }, '[article-pipeline] Phase A completed successfully')
+    } catch (err) {
+      logger.error({ jobId, err }, '[article-pipeline] Phase A failed')
+      // Status is already set to 'failed' inside runPipelinePhaseA on error
+      await prisma.articleJob
+        .update({ where: { id: jobId }, data: { status: 'failed' } })
+        .catch(() => {})
+    }
   }
 }

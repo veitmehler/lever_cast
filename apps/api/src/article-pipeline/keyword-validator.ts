@@ -18,7 +18,19 @@ export async function validatePrimaryKeywordUniqueness(
   userId: string,
   currentJobId: string,
 ): Promise<{ isUnique: boolean; conflict?: string }> {
-  const normalised = keyword.toLowerCase().trim()
+  // Defensive coercion — never trust the caller. If somehow an object slips through,
+  // try common leaf fields before giving up so we never crash the worker on a TypeError.
+  let kw: string
+  if (typeof keyword === 'string') {
+    kw = keyword
+  } else if (keyword && typeof keyword === 'object') {
+    const o = keyword as Record<string, unknown>
+    kw = String(o.keyword ?? o.value ?? o.term ?? o.phrase ?? '')
+  } else {
+    kw = String(keyword ?? '')
+  }
+  const normalised = kw.toLowerCase().trim()
+  if (!normalised) return { isUnique: false, conflict: '(empty)' }
   const existing = await prisma.sitePage.findFirst({
     where: {
       userId,

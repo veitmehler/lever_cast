@@ -102,18 +102,18 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::3. Run Prisma migrations"
-            docker compose run --rm --no-deps \
+            docker compose run --rm -T --no-deps \
               -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
               npx prisma migrate deploy \
-              --schema=/app/packages/db/prisma/schema.prisma
+              --schema=/app/packages/db/prisma/schema.prisma < /dev/null
             echo "::endgroup::"
 
             echo "::group::3b. Seed prompt templates"
-            docker compose run --rm --no-deps \
+            docker compose run --rm -T --no-deps \
               -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
-              /app/node_modules/.bin/tsx /app/packages/db/prisma/seed.ts
+              /app/node_modules/.bin/tsx /app/packages/db/prisma/seed.ts < /dev/null
             echo "::endgroup::"
 
             echo "::group::4. Restart all containers"

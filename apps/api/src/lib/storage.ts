@@ -135,6 +135,26 @@ export function extractFilePathFromUrl(url: string): string | null {
 }
 
 /**
+ * Upload a raw Buffer to S3 at an explicit key (for article featured images, diagrams, etc.).
+ * Returns the CloudFront CDN URL.
+ */
+export async function uploadBufferWithKey(
+  key: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<{ url: string; path: string }> {
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }),
+  )
+  return { url: `${getCdnBase()}/${key}`, path: key }
+}
+
+/**
  * Download an image by its public URL and return a Buffer.
  * Works for both CloudFront URLs (new) and legacy Supabase Storage URLs.
  * Used server-side when attaching images to OAuth platform API calls.

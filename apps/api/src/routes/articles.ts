@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
+import { approveArticleJob } from '../article-pipeline/approval-service'
 
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
@@ -49,7 +50,11 @@ export async function articleRoutes(app: FastifyInstance) {
       include: {
         topic: true,
         pipelineSteps: { orderBy: { stepNumber: 'asc' } },
-        sitePage: true,
+        sitePage: {
+          include: {
+            featuredImage: { select: { id: true, url: true, altText: true } },
+          },
+        },
         errorLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
         llmUsage: { orderBy: { createdAt: 'desc' }, take: 50 },
       },
@@ -177,6 +182,35 @@ export async function articleRoutes(app: FastifyInstance) {
     })
 
     return reply.send({ ok: true, message: 'Pipeline resume started' })
+  })
+
+  // ── POST /api/articles/:jobId/approve — trigger Phase B approval chain ───
+  app.post<{ Params: { jobId: string } }>('/articles/:jobId/approve', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+      select: { id: true, status: true },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    if (job.status !== 'completed') {
+      return reply.status(400).send({
+        error: `Cannot approve a job with status: ${job.status}. Job must be 'completed' first.`,
+      })
+    }
+
+    // Fire-and-forget — approval runs in the background; client watches via SSE
+    approveArticleJob(jobId).catch((err) => {
+      request.log.error({ jobId, err }, '[articles] approval failed')
+    })
+
+    return reply.status(202).send({ ok: true, message: 'Approval chain started' })
   })
 
   // ── POST /api/articles/:jobId/rerun — full rerun from step 1 ─────────────

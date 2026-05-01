@@ -121,6 +121,10 @@ jobs:
             docker compose ps
             echo "::endgroup::"
 
+            echo "::group::4b. Prune dangling images to reclaim disk"
+            docker image prune -f
+            echo "::endgroup::"
+
             echo "::group::5. Health check"
             echo "Waiting 10s for API to come up..."
             sleep 10

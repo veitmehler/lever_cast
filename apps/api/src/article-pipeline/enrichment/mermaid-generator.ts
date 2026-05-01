@@ -15,6 +15,10 @@ const MODEL    = 'claude-sonnet-4-5-20250929'
 const TEMPERATURE = 0.3
 const MAX_TOKENS  = 1_024
 
+const VERBOSE  = process.env.VERBOSE_LLM_LOGS === 'true'
+const TRUNCATE = parseInt(process.env.VERBOSE_LLM_LOGS_TRUNCATE ?? '3000', 10)
+function trunc(s: string) { return TRUNCATE > 0 && s.length > TRUNCATE ? s.slice(0, TRUNCATE) + `… [+${s.length - TRUNCATE} chars]` : s }
+
 // Max section HTML sent to the LLM — keeps token count low
 const MAX_SECTION_HTML = 3_000
 
@@ -76,14 +80,45 @@ export async function generateMermaidDiagram(opts: {
   retryContext?: string
 }): Promise<DiagramResult> {
   const adapter = getLLMAdapter(PROVIDER)
+  const userPrompt = buildUserPrompt(opts)
+
+  if (VERBOSE) {
+    logger.info(
+      {
+        jobId: opts.jobId,
+        position: opts.position,
+        provider: PROVIDER,
+        model: MODEL,
+        systemPrompt: trunc(SYSTEM_PROMPT),
+        userPrompt: trunc(userPrompt),
+      },
+      '[llm-verbose] PROMPT (mermaid)',
+    )
+  }
 
   const response = await adapter.call({
     systemPrompt: SYSTEM_PROMPT,
-    userPrompt: buildUserPrompt(opts),
+    userPrompt,
     model: MODEL,
     temperature: TEMPERATURE,
     maxTokens: MAX_TOKENS,
   })
+
+  if (VERBOSE) {
+    logger.info(
+      {
+        jobId: opts.jobId,
+        position: opts.position,
+        provider: PROVIDER,
+        model: MODEL,
+        inputTokens: response.tokens.input,
+        outputTokens: response.tokens.output,
+        cost: response.cost,
+        response: trunc(response.content),
+      },
+      '[llm-verbose] RESPONSE (mermaid)',
+    )
+  }
 
   const raw = cleanTextOutput(response.content).trim()
 

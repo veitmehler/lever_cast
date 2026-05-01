@@ -9,6 +9,16 @@ import type { PipelineContext } from './variable-resolver'
 // Steps whose output is parsed as JSON
 const JSON_STEPS = new Set([2, 12, 13])
 
+// Set VERBOSE_LLM_LOGS=true in the environment to log full prompts + responses.
+// Set VERBOSE_LLM_LOGS_TRUNCATE=0 to disable truncation (logs full text).
+const VERBOSE = process.env.VERBOSE_LLM_LOGS === 'true'
+const TRUNCATE = parseInt(process.env.VERBOSE_LLM_LOGS_TRUNCATE ?? '3000', 10)
+
+function truncate(s: string, n: number): string {
+  if (n <= 0) return s
+  return s.length > n ? s.slice(0, n) + `… [+${s.length - n} chars]` : s
+}
+
 // Steps that use Gemini generative search
 const SEARCH_STEPS = new Set([6, 7, 8, 10, 12])
 
@@ -82,12 +92,43 @@ export class StepRunner {
       attempt++
       try {
         const adapter = getLLMAdapter(provider)
+
+        if (VERBOSE) {
+          logger.info(
+            {
+              jobId: this.jobId,
+              step: this.stepNumber,
+              provider,
+              model,
+              systemPrompt: systemPrompt ? truncate(systemPrompt, TRUNCATE) : null,
+              userPrompt: truncate(userPrompt, TRUNCATE),
+            },
+            '[llm-verbose] PROMPT',
+          )
+        }
+
         const llmResponse = await adapter.call({
           systemPrompt,
           userPrompt,
           model,
           useGenerativeSearch: useSearch,
         })
+
+        if (VERBOSE) {
+          logger.info(
+            {
+              jobId: this.jobId,
+              step: this.stepNumber,
+              provider,
+              model,
+              inputTokens: llmResponse.tokens.input,
+              outputTokens: llmResponse.tokens.output,
+              cost: llmResponse.cost,
+              response: truncate(llmResponse.content, TRUNCATE),
+            },
+            '[llm-verbose] RESPONSE',
+          )
+        }
 
         const rawOutput = llmResponse.content
         let finalOutput: string

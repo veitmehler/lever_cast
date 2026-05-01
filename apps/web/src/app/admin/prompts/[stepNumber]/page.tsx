@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { auth } from '@clerk/nextjs/server'
 import { PromptEditor } from './PromptEditor'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
@@ -16,13 +17,17 @@ interface PromptTemplate {
 }
 
 async function getTemplate(stepNumber: number, token: string): Promise<PromptTemplate | null> {
-  const res = await fetch(`${API_URL}/api/admin/prompts/${stepNumber}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return data.template ?? null
+  try {
+    const res = await fetch(`${API_URL}/api/admin/prompts/${stepNumber}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.template ?? null
+  } catch {
+    return null
+  }
 }
 
 export default async function PromptEditorPage({
@@ -34,7 +39,6 @@ export default async function PromptEditorPage({
   const stepNumber = parseInt(raw, 10)
   if (isNaN(stepNumber)) notFound()
 
-  const { auth } = await import('@clerk/nextjs/server')
   const { getToken } = await auth()
   const token = await getToken()
   if (!token) notFound()

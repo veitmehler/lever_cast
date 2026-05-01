@@ -95,6 +95,58 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
   logger.info({ jobId }, '[executor] Phase A complete — job status set to completed')
 }
 
+/**
+ * Robustly extract the primary keyword string from whatever JSON shape an LLM returns.
+ * Handles all observed Gemini / OpenAI response variants:
+ *   { primary_keyword: "string" }
+ *   { primary_keyword: { keyword: "string", ... } }
+ *   { keyword_research: { primary_keyword: { keyword: "string" } } }
+ *   { keywords: [{ type: "Primary Keyword", keyword: "string" }, ...] }
+ */
+function extractPrimaryKeyword(parsed: Record<string, unknown> | undefined): string | undefined {
+  if (!parsed) return undefined
+
+  // Helper to unwrap a leaf that may be a plain string or an object with a keyword/value/term field
+  function unwrap(v: unknown): string | undefined {
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>
+      const leaf = o.keyword ?? o.value ?? o.term ?? o.phrase
+      if (typeof leaf === 'string' && leaf.trim()) return leaf.trim()
+    }
+    return undefined
+  }
+
+  // 1. Top-level primary_keyword / primaryKeyword / "Primary Keyword"
+  const direct =
+    unwrap(parsed.primary_keyword) ??
+    unwrap(parsed.primaryKeyword) ??
+    unwrap(parsed['Primary Keyword'])
+  if (direct) return direct
+
+  // 2. Wrapped inside a keyword_research object: { keyword_research: { primary_keyword: ... } }
+  if (parsed.keyword_research && typeof parsed.keyword_research === 'object') {
+    const kr = extractPrimaryKeyword(parsed.keyword_research as Record<string, unknown>)
+    if (kr) return kr
+  }
+
+  // 3. keywords array: [{ type: "Primary Keyword", keyword: "..." }]
+  if (Array.isArray(parsed.keywords)) {
+    const kwArray = parsed.keywords as Array<Record<string, unknown>>
+    const pkEntry = kwArray.find((k) => {
+      const t = String(k.type ?? k.keyword_type ?? k.category ?? '').toLowerCase()
+      return t.includes('primary')
+    })
+    const candidate = pkEntry ?? kwArray[0]
+    if (candidate) {
+      const kw = unwrap(candidate.keyword ?? candidate.value ?? candidate.term ?? candidate)
+      if (kw) return kw
+    }
+  }
+
+  return undefined
+}
+
 /** Special handling for Step 2: retry up to 3 times if the primary keyword is not unique. */
 async function executeStep2WithValidation(
   jobId: string,
@@ -114,26 +166,7 @@ async function executeStep2WithValidation(
     }
 
     const parsed = result.parsedOutput as Record<string, unknown> | undefined
-
-    // Handle multiple JSON shapes Gemini and other LLMs return for the primary keyword:
-    // 1. { primary_keyword: "..." }          (ideal)
-    // 2. { primaryKeyword: "..." }
-    // 3. { "Primary Keyword": "..." }
-    // 4. { keywords: [{ type: "Primary Keyword", keyword: "..." }, ...] }
-    // 5. { keywords: [{ keyword: "...", type: "primary" }, ...] }
-    let primaryKeyword: string | undefined =
-      (parsed?.['Primary Keyword'] ?? parsed?.primaryKeyword ?? parsed?.primary_keyword) as string | undefined
-
-    if (!primaryKeyword && Array.isArray(parsed?.keywords)) {
-      const kwArray = parsed!.keywords as Array<Record<string, string>>
-      const pkEntry = kwArray.find(
-        (k) =>
-          k.type?.toLowerCase().includes('primary') ||
-          k.keyword_type?.toLowerCase().includes('primary') ||
-          k.category?.toLowerCase().includes('primary'),
-      )
-      primaryKeyword = pkEntry?.keyword ?? pkEntry?.value ?? kwArray[0]?.keyword
-    }
+    const primaryKeyword = extractPrimaryKeyword(parsed)
 
     if (!primaryKeyword) {
       logger.warn({ jobId, attempt }, '[executor] step 2 produced no primary keyword — retrying')

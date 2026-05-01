@@ -109,6 +109,13 @@ jobs:
               --schema=/app/packages/db/prisma/schema.prisma
             echo "::endgroup::"
 
+            echo "::group::3b. Seed prompt templates"
+            docker compose run --rm --no-deps \
+              -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+              api \
+              /app/node_modules/.bin/tsx /app/packages/db/prisma/seed.ts
+            echo "::endgroup::"
+
             echo "::group::4. Restart all containers"
             docker compose up -d --remove-orphans
             docker compose ps

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { cookies, headers } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
 import { ChevronRight, Cpu, Edit3, Hash } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
@@ -17,13 +17,17 @@ interface PromptTemplate {
 }
 
 async function getPrompts(token: string): Promise<PromptTemplate[]> {
-  const res = await fetch(`${API_URL}/api/admin/prompts`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.templates ?? []
+  try {
+    const res = await fetch(`${API_URL}/api/admin/prompts`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.templates ?? []
+  } catch {
+    return []
+  }
 }
 
 // Extract {{variable}} tokens from a string
@@ -77,7 +81,6 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
 ]
 
 export default async function AdminPromptsPage() {
-  const { auth } = await import('@clerk/nextjs/server')
   const { getToken } = await auth()
   const token = await getToken()
   const templates = token ? await getPrompts(token) : []

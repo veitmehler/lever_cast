@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
+import { assignOutlineFramework } from '../article-pipeline/outline-assignment'
 
 // Accepted CSV header variations → normalised field name
 const CSV_ALIASES: Record<string, string> = {
@@ -26,6 +27,16 @@ const CSV_ALIASES: Record<string, string> = {
   wordpressconnectionid: 'wordPressConnectionId',
   'excluded keywords': 'excludedKeywords',
   excludedkeywords: 'excludedKeywords',
+  'outline framework': 'outlineFrameworkNumber',
+  outlineframework: 'outlineFrameworkNumber',
+  outline_framework: 'outlineFrameworkNumber',
+  'outline framework number': 'outlineFrameworkNumber',
+  'special instructions': 'outlineSpecialInstructions',
+  specialinstructions: 'outlineSpecialInstructions',
+  outline_special_instructions: 'outlineSpecialInstructions',
+  'real case studies': 'realCaseStudies',
+  realcasestudies: 'realCaseStudies',
+  real_case_studies: 'realCaseStudies',
 }
 
 function normaliseCsvRow(raw: Record<string, string>): Record<string, string> {
@@ -46,6 +57,10 @@ interface CreateTopicBody {
   wordPressConnectionId?: string
   slug?: string
   category?: string
+  // Article Pipeline V2
+  outlineFrameworkNumber?: number | null
+  outlineSpecialInstructions?: string | null
+  realCaseStudies?: string | null
 }
 
 export async function topicRoutes(app: FastifyInstance) {
@@ -67,6 +82,9 @@ export async function topicRoutes(app: FastifyInstance) {
       wordPressConnectionId,
       slug,
       category,
+      outlineFrameworkNumber,
+      outlineSpecialInstructions,
+      realCaseStudies,
     } = request.body
 
     if (!topic?.trim()) {
@@ -84,12 +102,21 @@ export async function topicRoutes(app: FastifyInstance) {
         wordPressConnectionId: wordPressConnectionId ?? null,
         slug: slug ?? null,
         category: category ?? null,
+        outlineFrameworkNumber: outlineFrameworkNumber ?? null,
+        outlineFrameworkSource: outlineFrameworkNumber != null ? 'user' : null,
+        outlineSpecialInstructions: outlineSpecialInstructions ?? null,
+        realCaseStudies: realCaseStudies ?? null,
       },
     })
 
     if (mode === 'social_only') {
       logger.info({ topicId: topicRow.id, mode }, '[topics] social_only — no article job created')
       return reply.status(201).send({ topicId: topicRow.id, mode })
+    }
+
+    // Auto-assign outline framework if not explicitly set (fire-and-forget before enqueue)
+    if (outlineFrameworkNumber == null) {
+      await assignOutlineFramework(topicRow.id)
     }
 
     const job = await prisma.articleJob.create({
@@ -155,6 +182,11 @@ export async function topicRoutes(app: FastifyInstance) {
         : []
 
       try {
+        const csvOutlineNumber = row.outlineFrameworkNumber
+          ? parseInt(row.outlineFrameworkNumber, 10)
+          : null
+        const hasExplicitFramework = csvOutlineNumber != null && !isNaN(csvOutlineNumber)
+
         const topicRow = await prisma.topic.create({
           data: {
             userId: user.id,
@@ -166,12 +198,21 @@ export async function topicRoutes(app: FastifyInstance) {
             excludedKeywords,
             defaultOutputTargets,
             wordPressConnectionId: row.wordPressConnectionId || null,
+            outlineFrameworkNumber: hasExplicitFramework ? csvOutlineNumber : null,
+            outlineFrameworkSource: hasExplicitFramework ? 'csv' : null,
+            outlineSpecialInstructions: row.outlineSpecialInstructions || null,
+            realCaseStudies: row.realCaseStudies || null,
           },
         })
 
         if (mode === 'social_only') {
           results.push({ row: i + 1, topicId: topicRow.id, mode })
           continue
+        }
+
+        // Auto-assign if not provided in CSV
+        if (!hasExplicitFramework) {
+          await assignOutlineFramework(topicRow.id)
         }
 
         const job = await prisma.articleJob.create({
@@ -213,5 +254,19 @@ export async function topicRoutes(app: FastifyInstance) {
     })
 
     return reply.send(topics)
+  })
+
+  // ── GET /api/outline-frameworks — public list for dashboard dropdown ───────
+  app.get('/outline-frameworks', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const frameworks = await prisma.outlineFramework.findMany({
+      where: { isActive: true },
+      orderBy: { number: 'asc' },
+      select: { number: true, label: true, description: true },
+    })
+
+    return reply.send({ frameworks })
   })
 }

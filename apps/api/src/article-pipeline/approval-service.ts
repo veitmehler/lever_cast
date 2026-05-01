@@ -10,10 +10,11 @@
  *   3. Step 15  — generate_image_prompt  (text prompt sent to Fal.ai)
  *      ↳ generateFeaturedImage → uploadFeaturedImageToS3 → Media row
  *   4. Upsert SitePage (body, SEO fields, citations, featured image)
- *   5. Step 17  — generate_excerpt       → SitePage.excerpt
- *   6. Step 18  — generate_legal_disclaimer → SitePage.disclaimer
- *   7. Mark ArticleJob.status = 'approved'
- *   8. Enqueue 'article-enrichment' via pg-boss
+ *   5. Step 16  — generate_schema_markup → SitePage.schemaJson (non-fatal if fails)
+ *   6. Step 17  — generate_excerpt       → SitePage.excerpt
+ *   7. Step 18  — generate_legal_disclaimer → SitePage.disclaimer
+ *   8. Mark ArticleJob.status = 'approved'
+ *   9. Enqueue 'article-enrichment' via pg-boss
  */
 
 import type { Prisma } from '@prisma/client'
@@ -226,6 +227,32 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     },
   })
 
+  // ── Step 16: generate_schema_markup ───────────────────────────────────────
+  // Runs after SitePage upsert so {{article_url}} resolves (slug is now persisted).
+  logger.info({ jobId }, '[approval] step 16 — generate_schema_markup')
+  await prisma.articleJob.update({ where: { id: jobId }, data: { currentStep: 16 } })
+
+  try {
+    const runner16 = new StepRunner(jobId, 16, ctx)
+    const result16 = await runner16.execute()
+    ctx.completedSteps.set(16, result16.output)
+
+    const rawSchema = result16.output.trim()
+    if (rawSchema) {
+      // Validate it's parseable JSON before persisting
+      JSON.parse(rawSchema)
+      await prisma.sitePage.update({
+        where: { jobId },
+        data: { schemaJson: rawSchema },
+      })
+      logger.info({ jobId }, '[approval] step 16 — schema markup persisted')
+    }
+  } catch (err) {
+    // Schema markup failure is non-fatal — log + Sentry, article is still approved
+    logger.error({ jobId, err }, '[approval] step 16 — schema markup failed, continuing')
+    Sentry.captureException(err, { tags: { phase: 'approval', step: 16 } })
+  }
+
   // ── Step 17: generate_excerpt ──────────────────────────────────────────────
   logger.info({ jobId }, '[approval] step 17 — generate_excerpt')
   await prisma.articleJob.update({ where: { id: jobId }, data: { currentStep: 17 } })
@@ -256,7 +283,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
 
   // ── Aggregate costs & mark approved ───────────────────────────────────────
   const approvalSteps = await prisma.pipelineStep.findMany({
-    where: { jobId, stepNumber: { in: [13, 15, 17, 18] }, status: 'completed' },
+    where: { jobId, stepNumber: { in: [13, 15, 16, 17, 18] }, status: 'completed' },
     select: { cost: true, inputTokens: true, outputTokens: true },
   })
 
@@ -271,7 +298,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     data: {
       status: 'approved',
       approvedAt: new Date(),
-      currentStep: 18,
+      currentStep: 18,  // highest completed Phase B step
       totalCost: { increment: addedCost },
       totalTokens: { increment: addedTokens },
     },

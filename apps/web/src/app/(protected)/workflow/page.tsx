@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  FileText, Plus, Loader2, RefreshCw, ChevronRight, X, Sparkles,
+  FileText, Plus, Loader2, RefreshCw, ChevronRight, X, Sparkles, ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -72,15 +72,34 @@ function ProgressBar({ currentStep }: { currentStep: number }) {
   )
 }
 
+interface OutlineFrameworkOption {
+  number: number
+  label: string
+  description: string | null
+}
+
 // ── New Article Form ───────────────────────────────────────────────────────────
 
 function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated: (jobId: string) => void }) {
-  const [topic, setTopic] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [topic, setTopic]                     = useState('')
+  const [isSubmitting, setIsSubmitting]       = useState(false)
+  const [frameworks, setFrameworks]           = useState<OutlineFrameworkOption[]>([])
+  const [frameworksLoading, setFwLoading]     = useState(true)
+  // null = Auto-select (LLM will assign)
+  const [selectedFramework, setSelectedFw]    = useState<number | null>(null)
+  const [showAdvanced, setShowAdvanced]       = useState(false)
+  const [specialInstructions, setSpecialInst] = useState('')
+  const [realCaseStudies, setRealCaseStudies] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
+    // Load available frameworks for the dropdown
+    fetch('/api/outline-frameworks')
+      .then((r) => r.ok ? r.json() : { frameworks: [] })
+      .then((data) => setFrameworks(data.frameworks ?? []))
+      .catch(() => setFrameworks([]))
+      .finally(() => setFwLoading(false))
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,7 +112,13 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
       const res = await fetch('/api/topics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: trimmed, mode: 'article_only' }),
+        body: JSON.stringify({
+          topic: trimmed,
+          mode: 'article_only',
+          outlineFrameworkNumber: selectedFramework ?? null,
+          outlineSpecialInstructions: specialInstructions.trim() || null,
+          realCaseStudies: realCaseStudies.trim() || null,
+        }),
       })
 
       if (!res.ok) {
@@ -132,6 +157,7 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Topic */}
         <div>
           <label htmlFor="topic-input" className="block text-sm font-medium text-gray-700 mb-1.5">
             Topic
@@ -149,6 +175,84 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
           <p className="text-xs text-gray-400 mt-1">
             Be specific — a detailed topic produces a better article and tighter SEO targeting.
           </p>
+        </div>
+
+        {/* Outline Framework */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Outline Framework
+          </label>
+          <div className="relative">
+            <select
+              value={selectedFramework ?? ''}
+              onChange={(e) => setSelectedFw(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+              disabled={isSubmitting || frameworksLoading}
+              className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-8 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60"
+            >
+              <option value="">Auto-select (AI picks the best fit)</option>
+              {frameworks.map((f) => (
+                <option key={f.number} value={f.number}>
+                  {f.number}. {f.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          </div>
+          {selectedFramework != null && (
+            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+              {frameworks.find((f) => f.number === selectedFramework)?.description}
+            </p>
+          )}
+          {selectedFramework == null && (
+            <p className="text-xs text-gray-400 mt-1">
+              GPT-4o-mini will pick the most appropriate framework for your topic.
+            </p>
+          )}
+        </div>
+
+        {/* Advanced options toggle */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            {showAdvanced ? 'Hide' : 'Show'} advanced options
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Special Instructions
+                  <span className="ml-1 font-normal text-gray-400">(optional — outline focus areas or custom direction)</span>
+                </label>
+                <textarea
+                  value={specialInstructions}
+                  onChange={(e) => setSpecialInst(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Focus on the legal risks for small businesses. Include a section on insurance."
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Real Case Studies / Anecdotes
+                  <span className="ml-1 font-normal text-gray-400">(optional — woven into the article for credibility)</span>
+                </label>
+                <textarea
+                  value={realCaseStudies}
+                  onChange={(e) => setRealCaseStudies(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Client A reduced their renewal time from 2 weeks to 3 days after implementing X."
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 pt-1">

@@ -1,3 +1,4 @@
+import type { BrandSettings, PlatformSettings, OutlineFramework } from '@repo/db'
 import { prisma } from '../lib/prisma'
 import { getGlobalExcludedKeywords } from './keyword-validator'
 
@@ -30,6 +31,48 @@ export interface PipelineContext {
   parsedSteps: Map<number, unknown>    // stepNumber -> parsed JSON (for steps 2, 12, 13)
   // Filled in progressively as the pipeline runs
   excludedKeywordsCache?: string
+  // Lazy-loaded caches for new V2 models
+  brandSettingsCache?: BrandSettings | null
+  platformSettingsCache?: PlatformSettings | null
+  outlineFrameworkCache?: OutlineFramework | null
+  writingStyleCache?: string | null
+}
+
+// ── Lazy loaders ────────────────────────────────────────────────────────────
+
+async function getBrandSettings(ctx: PipelineContext): Promise<BrandSettings | null> {
+  if (ctx.brandSettingsCache !== undefined) return ctx.brandSettingsCache
+  ctx.brandSettingsCache = await prisma.brandSettings.findUnique({ where: { userId: ctx.userId } })
+  return ctx.brandSettingsCache
+}
+
+async function getPlatformSettings(ctx: PipelineContext): Promise<PlatformSettings | null> {
+  if (ctx.platformSettingsCache !== undefined) return ctx.platformSettingsCache
+  ctx.platformSettingsCache = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
+  return ctx.platformSettingsCache
+}
+
+async function getOutlineFramework(ctx: PipelineContext): Promise<OutlineFramework | null> {
+  if (ctx.outlineFrameworkCache !== undefined) return ctx.outlineFrameworkCache
+  const topic = await prisma.topic.findUnique({
+    where: { id: ctx.topicId },
+    select: { outlineFrameworkNumber: true },
+  })
+  if (!topic?.outlineFrameworkNumber) { ctx.outlineFrameworkCache = null; return null }
+  ctx.outlineFrameworkCache = await prisma.outlineFramework.findUnique({
+    where: { number: topic.outlineFrameworkNumber },
+  })
+  return ctx.outlineFrameworkCache
+}
+
+async function getWritingStyle(ctx: PipelineContext): Promise<string> {
+  if (ctx.writingStyleCache !== undefined) return ctx.writingStyleCache ?? ''
+  const settings = await prisma.settings.findUnique({
+    where: { userId: ctx.userId },
+    select: { writingStyle: true },
+  })
+  ctx.writingStyleCache = settings?.writingStyle ?? null
+  return ctx.writingStyleCache ?? ''
 }
 
 /** Replace all {{variable}} placeholders in a prompt string. */
@@ -166,6 +209,124 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
 
     case 'current_date':
       return new Date().toISOString()
+
+    // ── Article pipeline V2 variables ─────────────────────────────────────────
+
+    case 'outline_framework': {
+      const fw = await getOutlineFramework(ctx)
+      return fw?.body ?? ''
+    }
+
+    case 'writing_style':
+      return getWritingStyle(ctx)
+
+    case 'google_guidelines': {
+      const ps = await getPlatformSettings(ctx)
+      return ps?.googleGuidelines ?? ''
+    }
+
+    case 'geolocation': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.geolocation ?? ''
+    }
+
+    case 'who': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.who ?? ''
+    }
+
+    case 'our_experience': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.ourExperience ?? ''
+    }
+
+    case 'article_goal': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.articleGoal ?? ''
+    }
+
+    case 'special_instructions': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.specialInstructions ?? ''
+    }
+
+    case 'author_name': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.defaultAuthorName ?? ''
+    }
+
+    case 'author_website': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.defaultAuthorWebsite ?? ''
+    }
+
+    case 'outline_special_instructions': {
+      const topic = await prisma.topic.findUnique({
+        where: { id: ctx.topicId },
+        select: { outlineSpecialInstructions: true },
+      })
+      return topic?.outlineSpecialInstructions ?? ''
+    }
+
+    case 'real_case_studies': {
+      const topic = await prisma.topic.findUnique({
+        where: { id: ctx.topicId },
+        select: { realCaseStudies: true },
+      })
+      return topic?.realCaseStudies ?? ''
+    }
+
+    case 'organization_name': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationName ?? ''
+    }
+
+    case 'organization_website': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationWebsite ?? ''
+    }
+
+    case 'organization_email': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationEmail ?? ''
+    }
+
+    case 'organization_phone': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationPhone ?? ''
+    }
+
+    case 'organization_address': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationAddress ?? ''
+    }
+
+    case 'social_media_links': {
+      const bs = await getBrandSettings(ctx)
+      if (!bs?.socialMediaLinks) return ''
+      const links = bs.socialMediaLinks as Array<{ platform: string; url: string }>
+      if (!Array.isArray(links)) return ''
+      return links.map((l) => `${l.platform}: ${l.url}`).join('\n')
+    }
+
+    case 'published_date': {
+      const topic = await prisma.topic.findUnique({
+        where: { id: ctx.topicId },
+        select: { publishingDate: true },
+      })
+      if (!topic?.publishingDate) return ''
+      return topic.publishingDate.toISOString().split('T')[0] // YYYY-MM-DD
+    }
+
+    case 'article_url': {
+      const [topic, bs] = await Promise.all([
+        prisma.topic.findUnique({ where: { id: ctx.topicId }, select: { slug: true } }),
+        getBrandSettings(ctx),
+      ])
+      const base = bs?.organizationWebsite?.replace(/\/$/, '') ?? ''
+      const slug = topic?.slug ?? ctx.topicSlug ?? ''
+      return slug ? `${base}/${slug}` : base
+    }
 
     // ── Generic step output accessor: {{<step_name>_output}} ─────────────────
     default: {

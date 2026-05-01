@@ -28,6 +28,7 @@ model User {
   posts                 Post[]
   apiKeys               ApiKey[]
   settings              Settings?
+  brandSettings         BrandSettings?
   templates             Template[]
   socialConnections     SocialConnection[]
   twitterApiRequests    TwitterApiRequest[]
@@ -286,10 +287,13 @@ model Topic {
   slug                  String?
   category              String?
   publishingDate        DateTime?
-  outlineFrameworkNumber Int?
-  articleJobs           ArticleJob[]
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  outlineFrameworkNumber     Int?
+  outlineSpecialInstructions String?  @db.Text // per-article focus areas / special notes for the outline
+  realCaseStudies            String?  @db.Text // per-article real anecdotes or case studies (optional)
+  outlineFrameworkSource     String?           // diagnostic: 'user' | 'csv' | 'llm_assigned'
+  articleJobs                ArticleJob[]
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   @@index([userId])
   @@index([scheduledDate])
@@ -386,6 +390,7 @@ model SitePage {
   disclaimer       String?   @db.Text
   excerpt          String?   @db.VarChar(160)
   primaryKeyword   String?
+  schemaJson       String?   @db.Text            // JSON-LD from Step 16 (generate_schema_markup)
   enrichmentStatus  String   @default("pending") // pending | in_progress | completed | failed
   enrichmentError   String?
   enrichedAt       DateTime?
@@ -490,4 +495,55 @@ model SystemApiKey {
   updatedAt    DateTime @updatedAt
 
   @@map("system_api_keys")
+}
+
+// ─── Article Pipeline V2 Models ───────────────────────────────────────────────
+
+model OutlineFramework {
+  id          String   @id @default(cuid())
+  number      Int      @unique                // 1..12 — matches CSV "Outline Framework" column
+  label       String                           // e.g., "Pillar / Educational Foundation"
+  description String?  @db.Text               // "when to use" — used by LLM auto-assignment
+  body        String   @db.Text               // full framework body injected into prompts
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("outline_frameworks")
+}
+
+model PlatformSettings {
+  id               String   @id @default("singleton") // only one row
+  googleGuidelines String?  @db.Text                  // Google Helpful Content guidelines text
+  updatedAt        DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model BrandSettings {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Article brand context (used by prompt variable resolver)
+  geolocation          String? @db.Text
+  who                  String? @db.Text // target audience description
+  ourExperience        String? @db.Text // firm / author experience blurb
+  articleGoal          String? @db.Text // strategic goal of each article
+  specialInstructions  String? @db.Text // global special instructions injected into every article
+  defaultAuthorName    String?
+  defaultAuthorWebsite String?
+
+  // Organization / schema markup fields (used in Wave 4)
+  organizationName     String?
+  organizationWebsite  String?
+  organizationEmail    String?
+  organizationPhone    String?
+  organizationAddress  String? @db.Text
+  socialMediaLinks     Json?   // [{ platform: string, url: string }]
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("brand_settings")
 }

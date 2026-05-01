@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
-import { decrypt } from '../lib/encryption'
+import { getSystemApiKey } from '../lib/system-keys'
 import {
   generateImagePromptWithLLM,
   generateSimpleImagePrompt,
@@ -77,11 +77,27 @@ async function getOrCreateUser(clerkId: string) {
   })
 }
 
-async function getUserApiKeys(userId: string): Promise<Record<string, string>> {
-  const apiKeys = await prisma.apiKey.findMany({ where: { userId } })
-  const decrypted: Record<string, string> = {}
-  apiKeys.forEach((k) => { decrypted[k.provider] = decrypt(k.encryptedKey) })
-  return decrypted
+const IMAGE_SYSTEM_KEY_MAP: Record<string, string> = {
+  fal: 'fal-ai',
+  'openai-dalle': 'openai',
+  replicate: 'replicate',
+}
+
+const LLM_PROVIDER_ORDER = ['openai', 'anthropic', 'gemini'] as const
+const LLM_DEFAULT_MODELS: Record<string, string> = {
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-sonnet-20241022',
+  gemini: 'gemini-2.5-flash',
+}
+
+async function resolveSystemLLMProvider(): Promise<{
+  provider: string; apiKey: string; model: string
+} | null> {
+  for (const prov of LLM_PROVIDER_ORDER) {
+    const apiKey = await getSystemApiKey(prov)
+    if (apiKey) return { provider: prov, apiKey, model: LLM_DEFAULT_MODELS[prov] }
+  }
+  return null
 }
 
 function getDefaultModel(provider: string): string {
@@ -144,66 +160,27 @@ export async function imageRoutes(app: FastifyInstance) {
 
     try {
       const user = await getOrCreateUser(clerkId)
-      const apiKeys = await getUserApiKeys(user.id)
 
-      const imageApiKey = apiKeys[provider]
+      const systemKeyName = IMAGE_SYSTEM_KEY_MAP[provider] ?? provider
+      const imageApiKey = await getSystemApiKey(systemKeyName)
       if (!imageApiKey) {
-        return reply.status(400).send({
-          error: `No API key found for ${provider}. Please add your API key in settings.`,
+        return reply.status(503).send({
+          error: `No system API key configured for ${provider}. Ask your administrator to add it.`,
         })
       }
 
-      let settings = await prisma.settings.findUnique({ where: { userId: user.id } })
-      if (!settings) {
-        settings = await prisma.settings.create({
-          data: { userId: user.id, theme: 'light', sidebarState: 'open' },
-        })
-      }
+      const selectedModel: string = model || getDefaultModel(provider)
 
-      let defaultModels: Record<string, string> = {}
-      if (settings.defaultModel) {
-        try { defaultModels = JSON.parse(settings.defaultModel) } catch { /* ignore */ }
-      }
-
-      // Pick an LLM for prompt generation
-      const userDefault = settings.defaultProvider || null
-      const llmProviderOrder = [userDefault, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-
-      let selectedLLMProvider: string | null = null
-      let llmApiKey: string | null = null
-      let selectedLLMModel: string | null = null
-
-      for (const prov of llmProviderOrder) {
-        if (prov && apiKeys[prov]) {
-          selectedLLMProvider = prov
-          llmApiKey = apiKeys[prov]
-          selectedLLMModel = defaultModels[prov] || null
-          break
-        }
-      }
-
-      // Resolve image model
-      let selectedModel: string = model || ''
-      if (!selectedModel) {
-        if (settings.defaultImageModel) {
-          try {
-            const defaults = JSON.parse(settings.defaultImageModel)
-            selectedModel = defaults[provider] || getDefaultModel(provider)
-          } catch {
-            selectedModel = getDefaultModel(provider)
-          }
-        } else {
-          selectedModel = getDefaultModel(provider)
-        }
-      }
+      // Pick a system LLM for prompt generation
+      const llmResolved = await resolveSystemLLMProvider()
 
       // Generate image prompt via LLM
       let prompt: string
-      if (selectedLLMProvider && llmApiKey && selectedLLMModel) {
+      if (llmResolved) {
         try {
           prompt = await generateImagePromptWithLLM(
             postContent, styleInstructions, provider, selectedModel,
-            selectedLLMProvider, selectedLLMModel, llmApiKey,
+            llmResolved.provider, llmResolved.model, llmResolved.apiKey,
           )
         } catch {
           prompt = generateSimpleImagePrompt(postContent, styleInstructions)
@@ -278,53 +255,15 @@ export async function imageRoutes(app: FastifyInstance) {
     }
 
     try {
-      const user = await getOrCreateUser(clerkId)
-      const apiKeys = await getUserApiKeys(user.id)
-
-      let settings = await prisma.settings.findUnique({ where: { userId: user.id } })
-      if (!settings) {
-        settings = await prisma.settings.create({
-          data: { userId: user.id, theme: 'light', sidebarState: 'open' },
-        })
-      }
-
-      let defaultModels: Record<string, string> = {}
-      if (settings.defaultModel) {
-        try { defaultModels = JSON.parse(settings.defaultModel) } catch { /* ignore */ }
-      }
-
-      let selectedLLMProvider: string | null = null
-      let llmApiKey: string | null = null
-      let selectedLLMModel: string | null = null
-
-      if (llmProvider && llmModel) {
-        if (!apiKeys[llmProvider]) {
-          return reply.status(400).send({ error: `No API key found for LLM provider: ${llmProvider}` })
-        }
-        selectedLLMProvider = llmProvider
-        llmApiKey = apiKeys[llmProvider]
-        selectedLLMModel = llmModel
-      } else {
-        const userDefault = settings.defaultProvider || null
-        const order = [userDefault, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-        for (const prov of order) {
-          if (prov && apiKeys[prov]) {
-            selectedLLMProvider = prov
-            llmApiKey = apiKeys[prov]
-            selectedLLMModel = defaultModels[prov] || null
-            break
-          }
-        }
-      }
-
+      const llmResolved = await resolveSystemLLMProvider()
       const selectedImageModel = imageModel || getDefaultModel(imageProvider)
 
       let prompt: string
-      if (selectedLLMProvider && llmApiKey && selectedLLMModel) {
+      if (llmResolved) {
         try {
           prompt = await generateImagePromptWithLLM(
             postContent, styleInstructions, imageProvider, selectedImageModel,
-            selectedLLMProvider, selectedLLMModel, llmApiKey,
+            llmResolved.provider, llmResolved.model, llmResolved.apiKey,
           )
         } catch (err) {
           let msg = 'Failed to generate prompt'

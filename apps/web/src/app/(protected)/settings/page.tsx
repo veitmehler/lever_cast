@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X } from 'lucide-react'
+import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
@@ -37,281 +37,101 @@ type SocialPage = {
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
-  const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({})
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({
-    openai: '',
-    anthropic: '',
-    gemini: '',
-    openrouter: ''
-  })
-  const [maskedKeys, setMaskedKeys] = useState<Record<string, string>>({})
-  const [selectedProvider, setSelectedProvider] = useState('openai')
-  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({
-    openai: 'gpt-4o-mini',
-    anthropic: 'claude-3-5-sonnet-20241022',
-    gemini: 'gemini-pro',
-    openrouter: 'openai/gpt-4o-mini',
-  })
-  const [providerModels, setProviderModels] = useState<Record<string, Array<{ value: string; label: string }>>>({
-    openai: [],
-    anthropic: [],
-    gemini: [],
-    openrouter: [],
-  })
-  const [isLoadingModels, setIsLoadingModels] = useState<Record<string, boolean>>({})
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isSavingAISettings, setIsSavingAISettings] = useState(false)
   const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([])
   const [isLoadingConnections, setIsLoadingConnections] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState<Record<string, boolean>>({})
   const [isConnecting, setIsConnecting] = useState<Record<string, boolean>>({})
-  const [editingApiKeys, setEditingApiKeys] = useState<Record<string, boolean>>({})
-  const [showImageApiKeys, setShowImageApiKeys] = useState<Record<string, boolean>>({})
   const [availablePages, setAvailablePages] = useState<Record<string, SocialPage[]>>({})
   const [isLoadingPages, setIsLoadingPages] = useState<Record<string, boolean>>({})
   const [rateLimitUntil, setRateLimitUntil] = useState<Record<string, number | null>>({})
   const [postTargetTypes, setPostTargetTypes] = useState<Record<string, 'personal' | 'page'>>({})
-  // Track which platforms have already had their pages fetched to prevent duplicate calls
   const pagesFetchedRef = useRef<Set<string>>(new Set())
   const [selectedPageIds, setSelectedPageIds] = useState<Record<string, string>>({})
   const [isRefreshingUsername, setIsRefreshingUsername] = useState<Record<string, boolean>>({})
 
-  // Image generation settings
-  const [imageApiKeys, setImageApiKeys] = useState<Record<string, string>>({
-    fal: '',
-    'openai-dalle': '',
-    replicate: '',
-  })
-  const [imageMaskedKeys, setImageMaskedKeys] = useState<Record<string, string>>({})
-  const [selectedImageProvider, setSelectedImageProvider] = useState('fal')
-  const [selectedImageModels, setSelectedImageModels] = useState<Record<string, string>>({
-    fal: 'fal-ai/flux/schnell',
-    'openai-dalle': 'dall-e-3',
-    replicate: 'stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf',
-  })
-  const [imageProviderModels, setImageProviderModels] = useState<Record<string, Array<{ value: string; label: string }>>>({
-    fal: [],
-    'openai-dalle': [],
-    replicate: [],
-  })
-  const [isLoadingImageModels, setIsLoadingImageModels] = useState<Record<string, boolean>>({})
-  const [isSavingImageSettings, setIsSavingImageSettings] = useState(false)
-  const [defaultImageStyle, setDefaultImageStyle] = useState('')
-  const [editingImageApiKeys, setEditingImageApiKeys] = useState<Record<string, boolean>>({})
-  
   // Writing style settings
   const [writingStyle, setWritingStyle] = useState('')
   const [isSavingWritingStyle, setIsSavingWritingStyle] = useState(false)
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false)
   const [showStyleAnalysisModal, setShowStyleAnalysisModal] = useState(false)
   const [sampleText, setSampleText] = useState('')
-  
+
+  // Telegram bot token (per-user, stays in ApiKey table)
+  const [telegramBotToken, setTelegramBotToken] = useState('')
+  const [telegramMaskedKey, setTelegramMaskedKey] = useState('')
+  const [isEditingTelegram, setIsEditingTelegram] = useState(false)
+  const [showTelegramKey, setShowTelegramKey] = useState(false)
+
   // Telegram channel settings
   const [telegramChatId, setTelegramChatId] = useState('')
   const [isSavingTelegramChatId, setIsSavingTelegramChatId] = useState(false)
 
-  // Fetch settings and API keys on mount
+  // Article Brand Profile — content fields
+  const [geolocation, setGeolocation]                   = useState('')
+  const [who, setWho]                                   = useState('')
+  const [ourExperience, setOurExperience]               = useState('')
+  const [articleGoal, setArticleGoal]                   = useState('')
+  const [brandSpecialInstructions, setBrandSpecialInst] = useState('')
+  const [defaultAuthorName, setDefaultAuthorName]       = useState('')
+  const [defaultAuthorWebsite, setDefaultAuthorWebsite] = useState('')
+
+  // Article Brand Profile — organization / schema markup fields
+  const [organizationName, setOrganizationName]         = useState('')
+  const [organizationWebsite, setOrganizationWebsite]   = useState('')
+  const [organizationEmail, setOrganizationEmail]       = useState('')
+  const [organizationPhone, setOrganizationPhone]       = useState('')
+  const [organizationAddress, setOrganizationAddress]   = useState('')
+  const [socialMediaLinks, setSocialMediaLinks]         = useState<Array<{ platform: string; url: string }>>([])
+
+  const [isSavingBrand, setIsSavingBrand]               = useState(false)
+
+  // Fetch settings and Telegram key on mount
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        setIsLoading(true)
-        
-        // Fetch settings
-        const settingsResponse = await fetch('/api/settings')
-        if (settingsResponse.ok) {
-          const settings = await settingsResponse.json()
-          if (settings.defaultProvider) {
-            setSelectedProvider(settings.defaultProvider)
-          }
-          if (settings.defaultModel) {
-            try {
-              const models = JSON.parse(settings.defaultModel)
-              setSelectedModels(prev => ({ ...prev, ...models }))
-            } catch {
-              // If not JSON, ignore
-            }
-          }
+        const [settingsRes, keysRes, brandRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/api-keys'),
+          fetch('/api/brand-settings'),
+        ])
 
-          // Fetch image generation settings
-          if (settings.defaultImageProvider) {
-            setSelectedImageProvider(settings.defaultImageProvider)
-          }
-          if (settings.defaultImageModel) {
-            try {
-              const models = JSON.parse(settings.defaultImageModel)
-              setSelectedImageModels(prev => ({ ...prev, ...models }))
-            } catch {
-              // If not JSON, ignore
-            }
-          }
-          if (settings.defaultImageStyle) {
-            setDefaultImageStyle(settings.defaultImageStyle)
-          }
-          if (settings.writingStyle) {
-            setWritingStyle(settings.writingStyle)
-          }
-          if (settings.telegramChatId) {
-            setTelegramChatId(settings.telegramChatId)
-          }
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          if (settings.writingStyle) setWritingStyle(settings.writingStyle)
+          if (settings.telegramChatId) setTelegramChatId(settings.telegramChatId)
         }
 
-        // Fetch API keys
-        const keysResponse = await fetch('/api/api-keys')
-        if (keysResponse.ok) {
-          const keys: ApiKeyData[] = await keysResponse.json()
-          const masked: Record<string, string> = {}
-          keys.forEach(key => {
-            masked[key.provider] = key.maskedKey
-          })
-          setMaskedKeys(masked)
-          
-          // Fetch models for LLM providers that have API keys
-          const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
-          Object.keys(masked).forEach(provider => {
-            if (masked[provider] && llmProviders.includes(provider)) {
-              console.log(`Found API key for ${provider}, fetching models...`)
-              fetchModelsForProvider(provider, true) // Pass true since we know it has a key
-            }
-          })
+        if (keysRes.ok) {
+          const keys: ApiKeyData[] = await keysRes.json()
+          const telegramRow = keys.find((k) => k.provider === 'telegram')
+          if (telegramRow) setTelegramMaskedKey(telegramRow.maskedKey)
         }
 
-        // Fetch image API keys
-        const imageKeysResponse = await fetch('/api/api-keys')
-        if (imageKeysResponse.ok) {
-          const keys: ApiKeyData[] = await imageKeysResponse.json()
-          const masked: Record<string, string> = {}
-          keys.forEach(key => {
-            if (['fal', 'openai-dalle', 'replicate', 'telegram'].includes(key.provider)) {
-              masked[key.provider] = key.maskedKey
-            }
-          })
-          setImageMaskedKeys(masked)
-          
-          // Fetch models for image providers that have API keys
-          Object.keys(masked).forEach(provider => {
-            if (masked[provider] && !['telegram'].includes(provider)) {
-              fetchImageModelsForProvider(provider)
-            }
-          })
+        if (brandRes.ok) {
+          const brand = await brandRes.json()
+          if (brand.geolocation)          setGeolocation(brand.geolocation)
+          if (brand.who)                  setWho(brand.who)
+          if (brand.ourExperience)        setOurExperience(brand.ourExperience)
+          if (brand.articleGoal)          setArticleGoal(brand.articleGoal)
+          if (brand.specialInstructions)  setBrandSpecialInst(brand.specialInstructions)
+          if (brand.defaultAuthorName)    setDefaultAuthorName(brand.defaultAuthorName)
+          if (brand.defaultAuthorWebsite) setDefaultAuthorWebsite(brand.defaultAuthorWebsite)
+          // Organization fields
+          if (brand.organizationName)    setOrganizationName(brand.organizationName)
+          if (brand.organizationWebsite) setOrganizationWebsite(brand.organizationWebsite)
+          if (brand.organizationEmail)   setOrganizationEmail(brand.organizationEmail)
+          if (brand.organizationPhone)   setOrganizationPhone(brand.organizationPhone)
+          if (brand.organizationAddress) setOrganizationAddress(brand.organizationAddress)
+          if (Array.isArray(brand.socialMediaLinks)) setSocialMediaLinks(brand.socialMediaLinks)
         }
       } catch (error) {
         console.error('Error fetching settings:', error)
-      } finally {
-        setIsLoading(false)
       }
     }
 
     fetchSettings()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Function to fetch image models for a provider
-  const fetchImageModelsForProvider = async (provider: string) => {
-    if (!imageMaskedKeys[provider]) return // No API key, can't fetch models
-    
-    setIsLoadingImageModels(prev => ({ ...prev, [provider]: true }))
-    try {
-      const response = await fetch(`/api/ai/models/${provider}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.models && data.models.length > 0) {
-          setImageProviderModels(prev => ({
-            ...prev,
-            [provider]: data.models,
-          }))
-          // Set default model if not already set
-          if (!selectedImageModels[provider] && data.models[0]) {
-            setSelectedImageModels(prev => ({
-              ...prev,
-              [provider]: data.models[0].value,
-            }))
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Error fetching image models for ${provider}:`, error)
-    } finally {
-      setIsLoadingImageModels(prev => ({ ...prev, [provider]: false }))
-    }
-  }
-
-  // Fetch image models when API keys are saved
-  useEffect(() => {
-    Object.keys(imageMaskedKeys).forEach(provider => {
-      if (imageMaskedKeys[provider]) {
-        fetchImageModelsForProvider(provider)
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageMaskedKeys])
-
-  const handleSaveImageApiKey = async (provider: string) => {
-    const apiKey = imageApiKeys[provider]?.trim()
-    if (!apiKey) {
-      toast.error('Please enter an API key')
-      return
-    }
-
-    try {
-      setIsSaving(true)
-      const response = await fetch('/api/api-keys', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ provider, apiKey }),
-      })
-
-      if (response.ok) {
-        const result: ApiKeyData = await response.json()
-        setImageMaskedKeys(prev => ({ ...prev, [provider]: result.maskedKey }))
-        setImageApiKeys(prev => ({ ...prev, [provider]: '' })) // Clear input
-        setEditingImageApiKeys(prev => ({ ...prev, [provider]: false }))
-        // Fetch models for this provider
-        fetchImageModelsForProvider(provider)
-        toast.success(`${provider} API key saved successfully`)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to save API key')
-      }
-    } catch (error) {
-      console.error('Error saving API key:', error)
-      toast.error('Failed to save API key')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleSaveImageSettings = async () => {
-    try {
-      setIsSavingImageSettings(true)
-      const response = await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          defaultImageProvider: selectedImageProvider,
-          defaultImageModel: JSON.stringify(selectedImageModels),
-          defaultImageStyle: defaultImageStyle,
-        }),
-      })
-
-      if (response.ok) {
-        toast.success('Image generation settings saved successfully')
-      } else {
-        const error = await response.json()
-        console.error('Failed to save image settings:', error)
-        toast.error(error.details || error.error || 'Failed to save image settings')
-      }
-    } catch (error) {
-      console.error('Error saving image settings:', error)
-      toast.error('Failed to save image settings')
-    } finally {
-      setIsSavingImageSettings(false)
-    }
-  }
 
   const handleSaveWritingStyle = async () => {
     try {
@@ -375,51 +195,6 @@ export default function SettingsPage() {
       toast.error('Failed to analyze writing style')
     } finally {
       setIsAnalyzingStyle(false)
-    }
-  }
-
-  // Function to fetch models for a provider
-  const fetchModelsForProvider = async (provider: string, hasApiKey?: boolean) => {
-    // Check if provider has API key (either from parameter or state)
-    const hasKey = hasApiKey !== undefined ? hasApiKey : !!maskedKeys[provider]
-    if (!hasKey) {
-      console.log(`Skipping model fetch for ${provider}: No API key`)
-      return // No API key, can't fetch models
-    }
-    
-    console.log(`Fetching models for ${provider}...`)
-    setIsLoadingModels(prev => ({ ...prev, [provider]: true }))
-    try {
-      const response = await fetch(`/api/ai/models/${provider}`)
-      if (response.ok) {
-        const data = await response.json()
-        console.log(`Models fetched for ${provider}:`, data.models?.length || 0)
-        if (data.models && data.models.length > 0) {
-          setProviderModels(prev => ({
-            ...prev,
-            [provider]: data.models,
-          }))
-          // Set default model if not already set
-          setSelectedModels(prev => {
-            if (!prev[provider] && data.models[0]) {
-              return {
-                ...prev,
-                [provider]: data.models[0].value,
-              }
-            }
-            return prev
-          })
-        } else {
-          console.warn(`No models returned for ${provider}`)
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error(`Failed to fetch models for ${provider}:`, response.status, errorData)
-      }
-    } catch (error) {
-      console.error(`Error fetching models for ${provider}:`, error)
-    } finally {
-      setIsLoadingModels(prev => ({ ...prev, [provider]: false }))
     }
   }
 
@@ -700,135 +475,38 @@ export default function SettingsPage() {
     fetchConnections()
   }, [fetchConnections]) // fetchConnections is stable (memoized with useCallback), so it won't change
 
-  const toggleApiKeyVisibility = (provider: string) => {
-    setShowApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
-  }
-
-  const handleSaveApiKey = async (provider: string) => {
-    const apiKey = apiKeys[provider]?.trim()
-    if (!apiKey) {
-      toast.error('Please enter an API key')
-      return
-    }
-
+  const handleSaveBrandProfile = async () => {
+    setIsSavingBrand(true)
     try {
-      setIsSaving(true)
-      const response = await fetch('/api/api-keys', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ provider, apiKey }),
-      })
-
-      if (response.ok) {
-        const result: ApiKeyData = await response.json()
-        setMaskedKeys(prev => ({ ...prev, [provider]: result.maskedKey }))
-        setApiKeys(prev => ({ ...prev, [provider]: '' })) // Clear input
-        setEditingApiKeys(prev => ({ ...prev, [provider]: false }))
-        // Fetch models for this provider
-        fetchModelsForProvider(provider, true) // Pass true since we just saved the key
-        toast.success(`${provider} API key saved successfully`)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to save API key')
-      }
-    } catch (error) {
-      console.error('Error saving API key:', error)
-      toast.error('Failed to save API key')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleSaveAllApiKeys = async () => {
-    const providers = Object.keys(apiKeys)
-    const keysToSave = providers.filter(provider => apiKeys[provider]?.trim())
-
-    if (keysToSave.length === 0) {
-      toast.error('No API keys to save')
-      return
-    }
-
-    try {
-      setIsSaving(true)
-      const promises = keysToSave.map(provider =>
-        fetch('/api/api-keys', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ provider, apiKey: apiKeys[provider].trim() }),
-        })
-      )
-
-      const results = await Promise.all(promises)
-      const allSuccess = results.every(r => r.ok)
-
-      if (allSuccess) {
-        // Refresh masked keys
-        const response = await fetch('/api/api-keys')
-        if (response.ok) {
-          const keys: ApiKeyData[] = await response.json()
-          const masked: Record<string, string> = {}
-          keys.forEach(key => {
-            masked[key.provider] = key.maskedKey
-          })
-          setMaskedKeys(masked)
-          
-          // Fetch models for all LLM providers that were just saved
-          const llmProviders = ['openai', 'anthropic', 'gemini', 'openrouter']
-          keysToSave.forEach(provider => {
-            if (llmProviders.includes(provider) && masked[provider]) {
-              fetchModelsForProvider(provider, true) // Pass true since we just saved the key
-            }
-          })
-        }
-        setApiKeys({
-          openai: '',
-          anthropic: '',
-          gemini: '',
-          openrouter: ''
-        })
-        setEditingApiKeys({})
-        toast.success('All API keys saved successfully')
-      } else {
-        toast.error('Some API keys failed to save')
-      }
-    } catch (error) {
-      console.error('Error saving API keys:', error)
-      toast.error('Failed to save API keys')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleSaveAISettings = async () => {
-    try {
-      setIsSavingAISettings(true)
-      const response = await fetch('/api/settings', {
+      const res = await fetch('/api/brand-settings', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          defaultProvider: selectedProvider,
-          defaultModel: JSON.stringify(selectedModels),
+          geolocation: geolocation || null,
+          who: who || null,
+          ourExperience: ourExperience || null,
+          articleGoal: articleGoal || null,
+          specialInstructions: brandSpecialInstructions || null,
+          defaultAuthorName: defaultAuthorName || null,
+          defaultAuthorWebsite: defaultAuthorWebsite || null,
+          organizationName: organizationName || null,
+          organizationWebsite: organizationWebsite || null,
+          organizationEmail: organizationEmail || null,
+          organizationPhone: organizationPhone || null,
+          organizationAddress: organizationAddress || null,
+          socialMediaLinks: socialMediaLinks.filter((l) => l.platform && l.url),
         }),
       })
-
-      if (response.ok) {
-        toast.success('AI settings saved successfully')
+      if (res.ok) {
+        toast.success('Brand profile saved')
       } else {
-        const error = await response.json()
-        console.error('Failed to save AI settings:', error)
-        toast.error(error.details || error.error || 'Failed to save AI settings')
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to save brand profile')
       }
-    } catch (error) {
-      console.error('Error saving AI settings:', error)
-      toast.error('Failed to save AI settings')
+    } catch {
+      toast.error('Failed to save brand profile')
     } finally {
-      setIsSavingAISettings(false)
+      setIsSavingBrand(false)
     }
   }
 
@@ -880,396 +558,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* API Keys */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-xl font-semibold text-card-foreground mb-4">AI Provider Settings</h2>
-          
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="text-sm font-medium text-card-foreground mb-2 block">
-                Default LLM Provider
-              </label>
-              <select
-                value={selectedProvider}
-                onChange={(e) => setSelectedProvider(e.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic (Claude)</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Select which provider to use by default when generating content
-              </p>
-            </div>
-
-            {/* Model Selection for each provider */}
-            <div className="space-y-3">
-              {['openai', 'anthropic', 'gemini', 'openrouter'].map((provider) => {
-                const hasApiKey = !!maskedKeys[provider]
-                const models = providerModels[provider] || []
-                const isLoadingModel = isLoadingModels[provider]
-                
-                return (
-                  <div key={provider}>
-                    <label className="text-sm font-medium text-card-foreground mb-2 block capitalize">
-                      {provider === 'openrouter' ? 'OpenRouter' : provider} Model
-                      {hasApiKey && isLoadingModel && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-3 h-3 inline animate-spin" /> Loading models...
-                        </span>
-                      )}
-                      {hasApiKey && !isLoadingModel && models.length === 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">(No models available)</span>
-                      )}
-                    </label>
-                    <select
-                      value={selectedModels[provider] || models[0]?.value || ''}
-                      onChange={(e) => setSelectedModels(prev => ({ ...prev, [provider]: e.target.value }))}
-                      disabled={models.length === 0 || isLoadingModel}
-                      className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {models.length > 0 ? (
-                        models.map((model) => (
-                          <option key={model.value} value={model.value}>
-                            {model.label}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">No models available</option>
-                      )}
-                    </select>
-                    {!hasApiKey && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Add an API key to see available models
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <Button
-              onClick={handleSaveAISettings}
-              disabled={isSavingAISettings}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isSavingAISettings ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving AI Settings...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save AI Settings
-                </>
-              )}
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4">
-                {Object.keys(apiKeys).map((provider) => {
-                  const hasExistingKey = !!maskedKeys[provider]
-                  const isEditing = editingApiKeys[provider] || false
-                  const inputValue = apiKeys[provider] || ''
-                  const displayValue = inputValue || (hasExistingKey && !isEditing ? maskedKeys[provider] : '')
-                  
-                  return (
-                    <div key={provider}>
-                      <label className="text-sm font-medium text-card-foreground mb-2 block capitalize">
-                        {provider} API Key
-                        {hasExistingKey && !isEditing && !inputValue && (
-                          <span className="ml-2 text-xs text-muted-foreground">(Saved)</span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type={showApiKeys[provider] && (inputValue || isEditing) ? 'text' : 'password'}
-                            value={isEditing ? inputValue : displayValue}
-                            onChange={(e) => {
-                              setApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
-                              if (!isEditing && hasExistingKey) {
-                                setEditingApiKeys(prev => ({ ...prev, [provider]: true }))
-                              }
-                            }}
-                            placeholder={hasExistingKey && !isEditing ? maskedKeys[provider] : `Enter your ${provider} API key`}
-                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          />
-                          {(inputValue || isEditing) && (
-                            <button
-                              onClick={() => toggleApiKeyVisibility(provider)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showApiKeys[provider] ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {(inputValue || isEditing) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!inputValue || isSaving}
-                            onClick={() => {
-                              handleSaveApiKey(provider)
-                              setEditingApiKeys(prev => ({ ...prev, [provider]: false }))
-                            }}
-                            className="px-3"
-                          >
-                            {isSaving ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Check className="w-4 h-4" />
-                            )}
-                          </Button>
-                        )}
-                        {hasExistingKey && !isEditing && !inputValue && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingApiKeys(prev => ({ ...prev, [provider]: true }))
-                              setApiKeys(prev => ({ ...prev, [provider]: '' }))
-                            }}
-                            className="px-3"
-                          >
-                            Edit
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <Button 
-                className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={handleSaveAllApiKeys}
-                disabled={isSaving || Object.values(apiKeys).every(key => !key.trim())}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save API Keys
-                  </>
-                )}
-              </Button>
-            </>
-          )}
-        </div>
-
-        {/* AI Image Generation Settings */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-xl font-semibold text-card-foreground mb-4">AI Image Generation Settings</h2>
-          
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="text-sm font-medium text-card-foreground mb-2 block">
-                Default Image Provider
-              </label>
-              <select
-                value={selectedImageProvider}
-                onChange={(e) => setSelectedImageProvider(e.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="fal">Fal.ai</option>
-                <option value="openai-dalle">OpenAI DALL-E</option>
-                <option value="replicate">Replicate</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Select which provider to use by default when generating images
-              </p>
-            </div>
-
-            {/* Model Selection for each image provider */}
-            <div className="space-y-3">
-              {['fal', 'openai-dalle', 'replicate'].map((provider) => {
-                const hasApiKey = !!imageMaskedKeys[provider]
-                const models = imageProviderModels[provider] || []
-                const isLoadingModel = isLoadingImageModels[provider]
-                const providerLabel = provider === 'openai-dalle' ? 'OpenAI DALL-E' : provider === 'fal' ? 'Fal.ai' : 'Replicate'
-                
-                return (
-                  <div key={provider}>
-                    <label className="text-sm font-medium text-card-foreground mb-2 block">
-                      {providerLabel} Model
-                      {hasApiKey && isLoadingModel && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-3 h-3 inline animate-spin" /> Loading models...
-                        </span>
-                      )}
-                      {hasApiKey && !isLoadingModel && models.length === 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">(No models available)</span>
-                      )}
-                    </label>
-                    <select
-                      value={selectedImageModels[provider] || models[0]?.value || ''}
-                      onChange={(e) => setSelectedImageModels(prev => ({ ...prev, [provider]: e.target.value }))}
-                      disabled={models.length === 0}
-                      className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {models.length > 0 ? (
-                        models.map((model) => (
-                          <option key={model.value} value={model.value}>
-                            {model.label}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">No models available</option>
-                      )}
-                    </select>
-                    {!hasApiKey && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Add an API key to see available models
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-card-foreground mb-2 block">
-                Default Style Instructions
-              </label>
-              <textarea
-                value={defaultImageStyle}
-                onChange={(e) => setDefaultImageStyle(e.target.value)}
-                placeholder="e.g., minimalist, professional, colorful, abstract..."
-                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Default style instructions to append to image generation prompts
-              </p>
-            </div>
-
-            <Button
-              onClick={handleSaveImageSettings}
-              disabled={isSavingImageSettings}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isSavingImageSettings ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving Image Settings...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Image Settings
-                </>
-              )}
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4">
-                {['fal', 'openai-dalle', 'replicate'].map((provider) => {
-                  const hasExistingKey = !!imageMaskedKeys[provider]
-                  const isEditing = editingImageApiKeys[provider] || false
-                  const inputValue = imageApiKeys[provider] || ''
-                  const displayValue = inputValue || (hasExistingKey && !isEditing ? imageMaskedKeys[provider] : '')
-                  const providerLabel = provider === 'openai-dalle' ? 'OpenAI DALL-E' : provider === 'fal' ? 'Fal.ai' : 'Replicate'
-                  
-                  return (
-                    <div key={provider}>
-                      <label className="text-sm font-medium text-card-foreground mb-2 block">
-                        {providerLabel} API Key
-                        {hasExistingKey && !isEditing && !inputValue && (
-                          <span className="ml-2 text-xs text-muted-foreground">(Saved)</span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type={showImageApiKeys[provider] && (inputValue || isEditing) ? 'text' : 'password'}
-                            value={isEditing ? inputValue : displayValue}
-                            onChange={(e) => {
-                              setImageApiKeys(prev => ({ ...prev, [provider]: e.target.value }))
-                              if (!isEditing && hasExistingKey) {
-                                setEditingImageApiKeys(prev => ({ ...prev, [provider]: true }))
-                              }
-                            }}
-                            placeholder={hasExistingKey && !isEditing ? imageMaskedKeys[provider] : `Enter your ${providerLabel} API key`}
-                            className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          />
-                          {(inputValue || isEditing) && (
-                            <button
-                              onClick={() => {
-                                setShowImageApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
-                              }}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showImageApiKeys[provider] ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {(inputValue || isEditing) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!inputValue || isSaving}
-                            onClick={() => {
-                              handleSaveImageApiKey(provider)
-                              setEditingImageApiKeys(prev => ({ ...prev, [provider]: false }))
-                            }}
-                            className="px-3"
-                          >
-                            {isSaving ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Check className="w-4 h-4" />
-                            )}
-                          </Button>
-                        )}
-                        {hasExistingKey && !isEditing && !inputValue && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingImageApiKeys(prev => ({ ...prev, [provider]: true }))
-                              setImageApiKeys(prev => ({ ...prev, [provider]: '' }))
-                            }}
-                            className="px-3"
-                          >
-                            Edit
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
         </div>
 
         {/* Writing Style Settings */}
@@ -1394,6 +682,280 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+        {/* Article Brand Profile */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Article Brand Profile</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Context about you and your business that the AI uses when writing long-form articles.
+            These fields are <strong>not</strong> used for social posts — only article generation.
+            Leave any field blank and the AI will work in general terms for that aspect.
+          </p>
+
+          <div className="space-y-5">
+            {/* Geographic focus */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Geographic focus
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{geolocation}}'}</code></span>
+              </label>
+              <input
+                type="text"
+                value={geolocation}
+                onChange={(e) => setGeolocation(e.target.value)}
+                placeholder='e.g. "United States", "Sydney, Australia", or "Global"'
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Used to constrain facts and statistics to your market.</p>
+            </div>
+
+            {/* About you / your business */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                About you / your business
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{who}}'}</code></span>
+              </label>
+              <textarea
+                value={who}
+                onChange={(e) => setWho(e.target.value)}
+                placeholder="Who are you? What do you do? Who do you serve? Write in your own voice."
+                rows={4}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+            </div>
+
+            {/* Relevant experience */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Your relevant experience
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{our_experience}}'}</code></span>
+              </label>
+              <textarea
+                value={ourExperience}
+                onChange={(e) => setOurExperience(e.target.value)}
+                placeholder="Years in the field, types of work, areas of expertise. Concrete details only — no fluff."
+                rows={4}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Grounds the article&apos;s authority claims in real experience.</p>
+            </div>
+
+            {/* Article goal */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Goal of your articles
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{article_goal}}'}</code></span>
+              </label>
+              <textarea
+                value={articleGoal}
+                onChange={(e) => setArticleGoal(e.target.value)}
+                placeholder="What outcome do you want each article to drive? E.g. newsletter sign-ups, leads, brand authority, education."
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Steers tone and calls-to-action across all articles.</p>
+            </div>
+
+            {/* Special instructions */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Standing instructions for every article
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{special_instructions}}'}</code></span>
+              </label>
+              <textarea
+                value={brandSpecialInstructions}
+                onChange={(e) => setBrandSpecialInst(e.target.value)}
+                placeholder="Rules that apply to every article: e.g., always use Oxford commas, never mention competitors by name, write at 8th-grade reading level."
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Different from per-article special instructions — these apply globally.</p>
+            </div>
+
+            {/* Author info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">
+                  Default author name
+                  <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_name}}'}</code></span>
+                </label>
+                <input
+                  type="text"
+                  value={defaultAuthorName}
+                  onChange={(e) => setDefaultAuthorName(e.target.value)}
+                  placeholder="e.g. Jane Smith"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">The article&apos;s bylined voice.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">
+                  Default author website
+                  <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_website}}'}</code></span>
+                </label>
+                <input
+                  type="url"
+                  value={defaultAuthorWebsite}
+                  onChange={(e) => setDefaultAuthorWebsite(e.target.value)}
+                  placeholder="https://example.com/about"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Used in schema markup alongside the organization details below.</p>
+              </div>
+            </div>
+
+            {/* Organization / Schema Markup sub-section */}
+            <div className="pt-2">
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-card-foreground">Organization &amp; Schema Markup</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Used to generate JSON-LD structured data injected into every published article.
+                    These details appear in search engines as publisher information.
+                  </p>
+                </div>
+
+                {/* Name + Website */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Organization name
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_name}}'}</code></span>
+                    </label>
+                    <input
+                      type="text"
+                      value={organizationName}
+                      onChange={(e) => setOrganizationName(e.target.value)}
+                      placeholder="Acme Legal Group"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Organization website
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_website}}'}</code></span>
+                    </label>
+                    <input
+                      type="url"
+                      value={organizationWebsite}
+                      onChange={(e) => setOrganizationWebsite(e.target.value)}
+                      placeholder="https://acmelegal.com"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Email + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Contact email
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_email}}'}</code></span>
+                    </label>
+                    <input
+                      type="email"
+                      value={organizationEmail}
+                      onChange={(e) => setOrganizationEmail(e.target.value)}
+                      placeholder="hello@acmelegal.com"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Phone number
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_phone}}'}</code></span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={organizationPhone}
+                      onChange={(e) => setOrganizationPhone(e.target.value)}
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-1">
+                    Business address
+                    <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_address}}'}</code></span>
+                  </label>
+                  <textarea
+                    value={organizationAddress}
+                    onChange={(e) => setOrganizationAddress(e.target.value)}
+                    placeholder="123 Main St, Suite 400, New York, NY 10001"
+                    rows={2}
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+                  />
+                </div>
+
+                {/* Social media links */}
+                <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Social media profiles
+                    <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{social_media_links}}'}</code></span>
+                  </label>
+                  <div className="space-y-2">
+                    {socialMediaLinks.map((link, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={link.platform}
+                          onChange={(e) => {
+                            const next = [...socialMediaLinks]
+                            next[idx] = { ...next[idx], platform: e.target.value }
+                            setSocialMediaLinks(next)
+                          }}
+                          placeholder="Platform (e.g. LinkedIn)"
+                          className="w-36 shrink-0 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <input
+                          type="url"
+                          value={link.url}
+                          onChange={(e) => {
+                            const next = [...socialMediaLinks]
+                            next[idx] = { ...next[idx], url: e.target.value }
+                            setSocialMediaLinks(next)
+                          }}
+                          placeholder="https://linkedin.com/company/acmelegal"
+                          className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSocialMediaLinks(socialMediaLinks.filter((_, i) => i !== idx))}
+                          className="shrink-0 rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          aria-label="Remove link"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setSocialMediaLinks([...socialMediaLinks, { platform: '', url: '' }])}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add social profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleSaveBrandProfile}
+                disabled={isSavingBrand}
+              >
+                {isSavingBrand
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                  : <><Save className="w-4 h-4 mr-2" />Save Brand Profile</>}
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* Connected Accounts */}
         <div className="rounded-lg border border-border bg-card p-6">
@@ -1788,11 +1350,9 @@ export default function SettingsPage() {
               
               {/* Telegram - Uses API Key instead of OAuth */}
               {(() => {
-                const telegramKey = maskedKeys['telegram'] || imageMaskedKeys['telegram']
-                const hasTelegramKey = !!telegramKey
-                const isEditingTelegram = editingApiKeys['telegram'] || editingImageApiKeys['telegram'] || false
-                const telegramInputValue = apiKeys['telegram'] || imageApiKeys['telegram'] || ''
-                const telegramDisplayValue = telegramInputValue || (hasTelegramKey && !isEditingTelegram ? telegramKey : '')
+                const hasTelegramKey = !!telegramMaskedKey
+                const telegramInputValue = telegramBotToken
+                const telegramDisplayValue = telegramInputValue || (hasTelegramKey && !isEditingTelegram ? telegramMaskedKey : '')
                 
                 const handleSaveTelegramKey = async () => {
                   const apiKey = telegramInputValue?.trim()
@@ -1813,12 +1373,9 @@ export default function SettingsPage() {
 
                     if (response.ok) {
                       const result: ApiKeyData = await response.json()
-                      setMaskedKeys(prev => ({ ...prev, telegram: result.maskedKey }))
-                      setImageMaskedKeys(prev => ({ ...prev, telegram: result.maskedKey }))
-                      setApiKeys(prev => ({ ...prev, telegram: '' }))
-                      setImageApiKeys(prev => ({ ...prev, telegram: '' }))
-                      setEditingApiKeys(prev => ({ ...prev, telegram: false }))
-                      setEditingImageApiKeys(prev => ({ ...prev, telegram: false }))
+                      setTelegramMaskedKey(result.maskedKey)
+                      setTelegramBotToken('')
+                      setIsEditingTelegram(false)
                       toast.success('Telegram bot token saved successfully')
                     } else {
                       const error = await response.json()
@@ -1847,16 +1404,7 @@ export default function SettingsPage() {
                       body: JSON.stringify({ provider: 'telegram' }),
                     })
                     if (response.ok) {
-                      setMaskedKeys(prev => {
-                        const updated = { ...prev }
-                        delete updated.telegram
-                        return updated
-                      })
-                      setImageMaskedKeys(prev => {
-                        const updated = { ...prev }
-                        delete updated.telegram
-                        return updated
-                      })
+                      setTelegramMaskedKey('')
                       toast.success('Telegram bot token removed successfully')
                     } else {
                       const error = await response.json()
@@ -1882,27 +1430,23 @@ export default function SettingsPage() {
                         </div>
                         <div className="relative">
                           <input
-                            type={showApiKeys['telegram'] && (telegramInputValue || isEditingTelegram) ? 'text' : 'password'}
+                            type={showTelegramKey && (telegramInputValue || isEditingTelegram) ? 'text' : 'password'}
                             value={isEditingTelegram ? telegramInputValue : telegramDisplayValue}
                             onChange={(e) => {
-                              setApiKeys(prev => ({ ...prev, telegram: e.target.value }))
-                              setImageApiKeys(prev => ({ ...prev, telegram: e.target.value }))
+                              setTelegramBotToken(e.target.value)
                               if (!isEditingTelegram && hasTelegramKey) {
-                                setEditingApiKeys(prev => ({ ...prev, telegram: true }))
-                                setEditingImageApiKeys(prev => ({ ...prev, telegram: true }))
+                                setIsEditingTelegram(true)
                               }
                             }}
-                            placeholder={hasTelegramKey && !isEditingTelegram ? telegramKey : 'Enter your Telegram bot token'}
+                            placeholder={hasTelegramKey && !isEditingTelegram ? telegramMaskedKey : 'Enter your Telegram bot token'}
                             className="w-full rounded-lg border border-input bg-background px-4 py-2 pr-10 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                           />
                           {(telegramInputValue || isEditingTelegram) && (
                             <button
-                              onClick={() => {
-                                setShowApiKeys(prev => ({ ...prev, telegram: !prev.telegram }))
-                              }}
+                              onClick={() => setShowTelegramKey((v) => !v)}
                               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             >
-                              {showApiKeys['telegram'] ? (
+                              {showTelegramKey ? (
                                 <EyeOff className="w-4 h-4" />
                               ) : (
                                 <Eye className="w-4 h-4" />
@@ -1979,11 +1523,7 @@ export default function SettingsPage() {
                           variant="outline"
                           size="sm"
                           disabled={!telegramInputValue || isSaving}
-                          onClick={() => {
-                            handleSaveTelegramKey()
-                            setEditingApiKeys(prev => ({ ...prev, telegram: false }))
-                            setEditingImageApiKeys(prev => ({ ...prev, telegram: false }))
-                          }}
+                          onClick={() => handleSaveTelegramKey()}
                           className="px-3"
                         >
                           {isSaving ? (
@@ -1999,10 +1539,8 @@ export default function SettingsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setEditingApiKeys(prev => ({ ...prev, telegram: true }))
-                              setEditingImageApiKeys(prev => ({ ...prev, telegram: true }))
-                              setApiKeys(prev => ({ ...prev, telegram: '' }))
-                              setImageApiKeys(prev => ({ ...prev, telegram: '' }))
+                              setIsEditingTelegram(true)
+                              setTelegramBotToken('')
                             }}
                             className="px-3"
                           >

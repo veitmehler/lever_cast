@@ -3,9 +3,9 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { prisma } from '../lib/prisma'
-import { decrypt } from '../lib/encryption'
 import { cleanText } from '../lib/utils'
 import { requireAuth } from '../middleware/auth'
+import { getSystemApiKey } from '../lib/system-keys'
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -13,19 +13,32 @@ async function getOrCreateUser(clerkId: string) {
   const user = await prisma.user.findUnique({ where: { clerkId } })
   if (user) return user
 
-  // User doesn't exist yet — create with empty fields (Clerk webhook will fill them in)
   return prisma.user.create({
     data: { clerkId, name: clerkId, email: `${clerkId}@placeholder.local` },
   })
 }
 
-async function getUserApiKeys(userId: string): Promise<Record<string, string>> {
-  const apiKeys = await prisma.apiKey.findMany({ where: { userId } })
-  const decrypted: Record<string, string> = {}
-  apiKeys.forEach((k) => {
-    decrypted[k.provider] = decrypt(k.encryptedKey)
-  })
-  return decrypted
+const SYSTEM_PROVIDER_ORDER = ['openai', 'anthropic', 'gemini', 'openrouter'] as const
+const SYSTEM_DEFAULT_MODELS: Record<string, string> = {
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-sonnet-20241022',
+  gemini: 'gemini-2.5-flash',
+  openrouter: 'openai/gpt-4o-mini',
+}
+
+/** Resolves the first available system LLM provider+key, optionally preferring one. */
+async function resolveSystemProvider(preferredProvider?: string | null): Promise<{
+  provider: string; apiKey: string; model: string
+} | null> {
+  const order = preferredProvider && (SYSTEM_PROVIDER_ORDER as readonly string[]).includes(preferredProvider)
+    ? [preferredProvider, ...SYSTEM_PROVIDER_ORDER.filter((p) => p !== preferredProvider)]
+    : [...SYSTEM_PROVIDER_ORDER]
+
+  for (const prov of order) {
+    const apiKey = await getSystemApiKey(prov)
+    if (apiKey) return { provider: prov, apiKey, model: SYSTEM_DEFAULT_MODELS[prov] ?? 'gpt-4o-mini' }
+  }
+  return null
 }
 
 function cleanSingleTweet(tweet: string): string {
@@ -225,18 +238,12 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const user = await getOrCreateUser(clerkId)
-      const apiKeys = await getUserApiKeys(user.id)
 
       let settings = await prisma.settings.findUnique({ where: { userId: user.id } })
       if (!settings) {
         settings = await prisma.settings.create({
           data: { userId: user.id, theme: 'light', sidebarState: 'open' },
         })
-      }
-
-      let defaultModels: Record<string, string> = {}
-      if (settings.defaultModel) {
-        try { defaultModels = JSON.parse(settings.defaultModel) } catch { /* ignore */ }
       }
 
       // Resolve platforms
@@ -281,30 +288,14 @@ export async function aiRoutes(app: FastifyInstance) {
         template = templates.find((t) => t.isDefault) || templates[0] || null
       }
 
-      // Select provider
-      const userDefault = settings.defaultProvider || null
-      const providerOrder = provider
-        ? [provider, userDefault, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-        : [userDefault, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-
-      let selectedProvider: string | null = null
-      let apiKey: string | null = null
-      let selectedModel: string | null = null
-
-      for (const prov of providerOrder) {
-        if (prov && apiKeys[prov]) {
-          selectedProvider = prov
-          apiKey = apiKeys[prov]
-          selectedModel = defaultModels[prov] || null
-          break
-        }
-      }
-
-      if (!selectedProvider || !apiKey) {
-        return reply.status(400).send({
-          error: 'No API key found', provider: 'template', requiresApiKey: true,
+      // Select system provider
+      const resolved = await resolveSystemProvider(provider ?? null)
+      if (!resolved) {
+        return reply.status(503).send({
+          error: 'No LLM provider is configured. Please ask your administrator to set up API keys.',
         })
       }
+      const { provider: selectedProvider, apiKey, model: selectedModel } = resolved
 
       const result: Record<string, string> = {}
 
@@ -474,7 +465,6 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const user = await getOrCreateUser(clerkId)
-      const apiKeys = await getUserApiKeys(user.id)
 
       let settings = await prisma.settings.findUnique({ where: { userId: user.id } })
       if (!settings) {
@@ -483,30 +473,13 @@ export async function aiRoutes(app: FastifyInstance) {
         })
       }
 
-      let defaultModels: Record<string, string> = {}
-      if (settings.defaultModel) {
-        try { defaultModels = JSON.parse(settings.defaultModel) } catch { /* ignore */ }
+      const resolved = await resolveSystemProvider()
+      if (!resolved) {
+        return reply.status(503).send({
+          error: 'No LLM provider is configured. Please ask your administrator to set up API keys.',
+        })
       }
-
-      const userDefault = settings.defaultProvider || null
-      const providerOrder = [userDefault, 'openai', 'anthropic', 'gemini', 'openrouter'].filter(Boolean)
-
-      let selectedProvider: string | null = null
-      let apiKey: string | null = null
-      let selectedModel: string | null = null
-
-      for (const prov of providerOrder) {
-        if (prov && apiKeys[prov]) {
-          selectedProvider = prov
-          apiKey = apiKeys[prov]
-          selectedModel = defaultModels[prov] || null
-          break
-        }
-      }
-
-      if (!apiKey || !selectedProvider) {
-        return reply.status(400).send({ error: 'No API key found. Please add an API key in Settings.' })
-      }
+      const { provider: selectedProvider, apiKey, model: selectedModel } = resolved
 
       const systemMessage = `# ROLE: 
 

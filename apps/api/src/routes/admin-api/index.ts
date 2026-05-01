@@ -5,6 +5,7 @@ import { usersAdminRoutes } from './users'
 import { errorsAdminRoutes } from './errors'
 import { articlesAdminRoutes } from './articles'
 import { promptsAdminRoutes } from './prompts'
+import { outlineFrameworksAdminRoutes } from './outline-frameworks'
 
 export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(llmKeysAdminRoutes)
@@ -13,4 +14,5 @@ export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(errorsAdminRoutes)
   await app.register(articlesAdminRoutes)
   await app.register(promptsAdminRoutes)
+  await app.register(outlineFrameworksAdminRoutes)
 }

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
+import { getBoss, QUEUES } from '../queues/index'
 
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
@@ -53,6 +54,10 @@ export async function articleRoutes(app: FastifyInstance) {
         sitePage: {
           include: {
             featuredImage: { select: { id: true, url: true, altText: true } },
+            diagrams: {
+              select: { id: true, position: true, sectionTitle: true, caption: true, pngS3Key: true },
+              orderBy: { position: 'asc' },
+            },
           },
         },
         errorLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
@@ -62,7 +67,22 @@ export async function articleRoutes(app: FastifyInstance) {
 
     if (!job) return reply.status(404).send({ error: 'Article job not found' })
 
-    return reply.send({ job })
+    // Attach CDN URLs to diagrams so the frontend doesn't need to know the CDN base
+    const cdnBase = (process.env.CDN_BASE ?? '').replace(/\/$/, '')
+    const enrichedJob = {
+      ...job,
+      sitePage: job.sitePage
+        ? {
+            ...job.sitePage,
+            diagrams: (job.sitePage.diagrams ?? []).map((d) => ({
+              ...d,
+              cdnUrl: d.pngS3Key ? `${cdnBase}/${d.pngS3Key}` : null,
+            })),
+          }
+        : null,
+    }
+
+    return reply.send({ job: enrichedJob })
   })
 
   // ── GET /api/articles/:jobId/events — SSE status stream ──────────────────
@@ -89,7 +109,8 @@ export async function articleRoutes(app: FastifyInstance) {
     reply.raw.setHeader('X-Accel-Buffering', 'no')
     reply.raw.flushHeaders()
 
-    const TERMINAL_STATUSES = new Set(['completed', 'approved', 'enriched', 'failed'])
+    // SSE keeps streaming through approval + enrichment; stops only at truly terminal states
+    const TERMINAL_STATUSES = new Set(['enriched', 'failed'])
     let closed = false
 
     const sendEvent = (data: Record<string, unknown>) => {
@@ -211,6 +232,55 @@ export async function articleRoutes(app: FastifyInstance) {
     })
 
     return reply.status(202).send({ ok: true, message: 'Approval chain started' })
+  })
+
+  // ── POST /api/articles/:jobId/re-enrich — retry enrichment from scratch ──
+  app.post<{ Params: { jobId: string } }>('/articles/:jobId/re-enrich', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+      include: { sitePage: true },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    if (!['approved', 'enriched'].includes(job.status)) {
+      return reply.status(400).send({
+        error: `Cannot re-enrich a job with status: ${job.status}. Job must be 'approved' or 'enriched'.`,
+      })
+    }
+
+    if (job.sitePage) {
+      // Wipe existing diagrams + restore original bodyHtml
+      await prisma.articleDiagram.deleteMany({ where: { sitePageId: job.sitePage.id } })
+      await prisma.sitePage.update({
+        where: { id: job.sitePage.id },
+        data: {
+          bodyHtml: job.sitePage.originalBodyHtml,
+          enrichmentStatus: 'pending',
+          enrichmentError: null,
+          enrichedAt: null,
+        },
+      })
+    }
+
+    await prisma.articleJob.update({
+      where: { id: jobId },
+      data: { status: 'approved', enrichedAt: null },
+    })
+
+    const boss = await getBoss()
+    const enrichmentBossId = await boss.send(QUEUES.ARTICLE_ENRICHMENT, { jobId })
+    if (enrichmentBossId) {
+      await prisma.articleJob.update({ where: { id: jobId }, data: { enrichmentJobId: enrichmentBossId } })
+    }
+
+    return reply.status(202).send({ ok: true, message: 'Re-enrichment enqueued' })
   })
 
   // ── POST /api/articles/:jobId/rerun — full rerun from step 1 ─────────────

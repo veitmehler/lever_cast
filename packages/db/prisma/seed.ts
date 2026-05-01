@@ -362,10 +362,39 @@ Return ONLY the disclaimer text. No explanations, no markdown, no code blocks. J
   },
 ]
 
+// ── Enrichment template (not a numbered pipeline step — uses stepNumber 20) ─────
+const ENRICHMENT_TEMPLATES = [
+  {
+    stepNumber: 20,
+    stepName: 'enrichment_generate_diagram',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    systemPrompt:
+      'You generate Mermaid.js diagrams that visually summarize a section of an article. ' +
+      'You output ONLY valid Mermaid syntax — no explanation, no code fences, no markdown. ' +
+      'The diagram type must be appropriate to the content ' +
+      '(flowchart for processes, sequenceDiagram for interactions, gantt for timelines, ' +
+      'classDiagram for hierarchies, mindmap for concept maps, pie for proportions, ' +
+      'timeline for chronologies). ' +
+      'If no diagram type fits the section, output exactly the string SKIP.',
+    userPrompt: `Article topic: {{article_topic}}
+Primary keyword: {{primary_keyword}}
+
+Section heading: {{section_title}}
+
+Section HTML:
+{{section_html}}
+
+Output a Mermaid diagram that adds visual clarity to this section. Pick the most appropriate diagram type. Do not exceed 12 nodes. Use plain English labels. No code fences. No commentary.
+
+If the section is purely narrative or doesn't benefit from a visual, output exactly: SKIP`,
+  },
+]
+
 async function main() {
   console.log('Seeding prompt templates...')
 
-  for (const template of PROMPT_TEMPLATES) {
+  for (const template of [...PROMPT_TEMPLATES, ...ENRICHMENT_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,
@@ -380,7 +409,8 @@ async function main() {
     console.log(`  ✓ Step ${template.stepNumber}: ${template.stepName}`)
   }
 
-  console.log(`\nSeeded ${PROMPT_TEMPLATES.length} prompt templates.`)
+  const total = PROMPT_TEMPLATES.length + ENRICHMENT_TEMPLATES.length
+  console.log(`\nSeeded ${total} prompt templates.`)
 }
 
 main()

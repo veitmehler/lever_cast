@@ -7,7 +7,7 @@ import Image from 'next/image'
 import {
   ChevronLeft, Loader2, CheckCircle2, XCircle, Clock,
   AlertTriangle, DollarSign, Zap, FileText, Play, ThumbsUp,
-  Image as ImageIcon, Search, Tag, BookOpen,
+  Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -41,6 +41,15 @@ type FeaturedImage = {
   altText?: string | null
 }
 
+type ArticleDiagram = {
+  id: string
+  position: number
+  sectionTitle: string
+  caption?: string | null
+  pngS3Key?: string | null
+  cdnUrl?: string | null
+}
+
 type SitePage = {
   id: string
   title: string
@@ -50,9 +59,11 @@ type SitePage = {
   primaryKeyword?: string | null
   readingTime?: number | null
   enrichmentStatus?: string | null
+  enrichmentError?: string | null
   excerpt?: string | null
   disclaimer?: string | null
   featuredImage?: FeaturedImage | null
+  diagrams?: ArticleDiagram[]
 }
 
 type ArticleJob = {
@@ -109,13 +120,15 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   pending:     { label: 'Pending',          color: 'text-gray-500',   bg: 'bg-gray-100' },
   in_progress: { label: 'Generating…',      color: 'text-blue-700',   bg: 'bg-blue-50' },
   completed:   { label: 'Needs Approval',   color: 'text-yellow-700', bg: 'bg-yellow-50' },
-  approved:    { label: 'Approved',         color: 'text-purple-700', bg: 'bg-purple-50' },
+  approved:    { label: 'Adding Diagrams…', color: 'text-purple-700', bg: 'bg-purple-50' },
   enriched:    { label: 'Ready to Export',  color: 'text-green-700',  bg: 'bg-green-50' },
   failed:      { label: 'Failed',           color: 'text-red-700',    bg: 'bg-red-50' },
 }
 
-// Statuses where the pipeline is actively running (either generation or approval)
+// Statuses where the pipeline is actively running (SSE should be open)
 const ACTIVE_STATUSES = new Set(['pending', 'in_progress'])
+// Enrichment is running when approved (diagrams being generated in background)
+const ENRICHMENT_ACTIVE = new Set(['approved'])
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -149,6 +162,7 @@ export default function WorkflowJobPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isResuming, setIsResuming] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [isReEnriching, setIsReEnriching] = useState(false)
 
   // Live SSE state (overlays DB state while pipeline is running)
   const [liveSteps, setLiveSteps]   = useState<PipelineStep[]>([])
@@ -203,10 +217,10 @@ export default function WorkflowJobPage() {
     es.onerror = () => { es.close() }
   }, [jobId, fetchJob])
 
-  // Start SSE when job is actively running
+  // Start SSE when job is actively running OR in enrichment
   useEffect(() => {
     if (!job) return
-    if (ACTIVE_STATUSES.has(job.status)) {
+    if (ACTIVE_STATUSES.has(job.status) || ENRICHMENT_ACTIVE.has(job.status)) {
       startSSE()
     }
     return () => { sseRef.current?.close() }
@@ -227,6 +241,25 @@ export default function WorkflowJobPage() {
       toast.error('Failed to resume pipeline')
     } finally {
       setIsResuming(false)
+    }
+  }
+
+  const handleReEnrich = async () => {
+    setIsReEnriching(true)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/re-enrich`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to re-enrich')
+      }
+      toast.success('Re-enrichment started — generating diagrams…')
+      setLiveSteps([]); setLiveStatus(null); setLiveStep(null)
+      await fetchJob()
+      startSSE()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to re-enrich')
+    } finally {
+      setIsReEnriching(false)
     }
   }
 
@@ -286,6 +319,7 @@ export default function WorkflowJobPage() {
     : []
 
   const isGenerating = ACTIVE_STATUSES.has(displayStatus)
+  const isEnriching  = displayStatus === 'approved' && !isApproving
   const totalSteps   = 12 + (showApprovalSteps ? APPROVAL_STEPS.length : 0)
   const progressPct  = Math.min(100, Math.round((displayStep / totalSteps) * 100))
 
@@ -388,6 +422,25 @@ export default function WorkflowJobPage() {
               </Button>
             )}
 
+            {/* Enrichment running indicator */}
+            {isEnriching && (
+              <Button disabled className="bg-indigo-600 opacity-75">
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                Adding Diagrams…
+              </Button>
+            )}
+
+            {/* Re-enrich button (enrichment failed or enriched but user wants fresh diagrams) */}
+            {(displayStatus === 'enriched' || (displayStatus === 'approved' && !isEnriching)) &&
+              job.sitePage?.enrichmentStatus === 'failed' && (
+              <Button size="sm" variant="outline" onClick={handleReEnrich} disabled={isReEnriching}>
+                {isReEnriching
+                  ? <Loader2   className="h-4 w-4 mr-1.5 animate-spin" />
+                  : <RefreshCw className="h-4 w-4 mr-1.5" />}
+                Retry Diagrams
+              </Button>
+            )}
+
             {/* Resume button */}
             {displayStatus === 'failed' && (
               <Button size="sm" variant="outline" onClick={handleResume} disabled={isResuming}>
@@ -474,6 +527,53 @@ export default function WorkflowJobPage() {
                 </div>
               )}
             </dl>
+          </div>
+        )}
+
+        {/* ── Enrichment status banner ─────────────────────────────────── */}
+        {isEnriching && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-indigo-600 animate-spin flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-indigo-800">Generating diagrams…</p>
+              <p className="text-xs text-indigo-600 mt-0.5">
+                Claude is creating Mermaid diagrams for each section. This takes 30 s – 2 min.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Diagrams (visible after enrichment) ──────────────────────── */}
+        {sitePage?.diagrams && sitePage.diagrams.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="h-4 w-4 text-gray-400" />
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                Diagrams ({sitePage.diagrams.length})
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {sitePage.diagrams.map((diagram) => (
+                <div key={diagram.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                  {diagram.cdnUrl && (
+                    <div className="relative w-full aspect-video bg-gray-50">
+                      <Image
+                        src={diagram.cdnUrl}
+                        alt={diagram.sectionTitle}
+                        fill
+                        className="object-contain p-2"
+                        sizes="(max-width: 640px) 100vw, 50vw"
+                      />
+                    </div>
+                  )}
+                  <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
+                    <p className="text-xs font-medium text-gray-700 truncate">
+                      {diagram.position}. {diagram.sectionTitle}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

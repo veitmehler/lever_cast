@@ -46,6 +46,7 @@ WORKDIR /app
 COPY --from=build /app/apps/api/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/db ./packages/db
+COPY --from=build /app/apps/api/puppeteer-config.json ./puppeteer-config.json
 
 # Non-root user for security
 RUN addgroup -S socioply && adduser -S socioply -G socioply

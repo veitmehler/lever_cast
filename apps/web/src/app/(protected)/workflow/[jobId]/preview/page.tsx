@@ -25,6 +25,23 @@ interface ArticlePreviewData {
   }>
 }
 
+type RawStep = { stepNumber: number; status: string; output?: string | null }
+
+/** Resolve the best available article body from the API response.
+ *  Priority: sitePage.bodyHtml → step 11 output → step 9 output */
+function resolveBodyHtml(sp: Record<string, unknown>, steps: RawStep[]): string {
+  if (sp.bodyHtml && typeof sp.bodyHtml === 'string' && sp.bodyHtml.trim()) {
+    return sp.bodyHtml
+  }
+  // Fall back to step output directly from pipelineSteps
+  const completed = steps.filter((s) => s.status === 'completed')
+  const step11 = completed.find((s) => s.stepNumber === 11)
+  if (step11?.output?.trim()) return step11.output
+  const step9 = completed.find((s) => s.stepNumber === 9)
+  if (step9?.output?.trim()) return step9.output
+  return ''
+}
+
 async function getPreviewData(jobId: string, token: string): Promise<ArticlePreviewData | null> {
   const res = await fetch(`${API_URL}/api/articles/${jobId}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -32,10 +49,15 @@ async function getPreviewData(jobId: string, token: string): Promise<ArticlePrev
   })
   if (!res.ok) return null
   const data = await res.json()
-  const sp = data.job?.sitePage
+  const job = data.job
+  const sp = job?.sitePage
   if (!sp) return null
+
+  const steps: RawStep[] = job?.pipelineSteps ?? []
+  const bodyHtml = resolveBodyHtml(sp as Record<string, unknown>, steps)
+
   return {
-    title: sp.seoTitle ?? sp.title ?? data.job?.topic?.idea ?? 'Article Preview',
+    title: sp.seoTitle ?? sp.title ?? job?.topic?.topic ?? 'Article Preview',
     seoTitle: sp.seoTitle ?? sp.title ?? '',
     seoDescription: sp.seoDescription ?? '',
     slug: sp.slug ?? '',
@@ -43,7 +65,7 @@ async function getPreviewData(jobId: string, token: string): Promise<ArticlePrev
     disclaimer: sp.disclaimer ?? '',
     primaryKeyword: sp.primaryKeyword ?? '',
     readingTime: sp.readingTime,
-    bodyHtml: sp.bodyHtml ?? '',
+    bodyHtml,
     citations: (() => {
       const raw = sp.citations
       if (!raw) return []
@@ -128,14 +150,20 @@ export default async function ArticlePreviewPage({
             )}
 
             {/* Article body */}
-            <div
-              className="prose prose-neutral dark:prose-invert max-w-none
-                prose-headings:font-bold
-                prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-                prose-img:rounded-lg prose-img:w-full
-                prose-figcaption:text-center"
-              dangerouslySetInnerHTML={{ __html: data.bodyHtml }}
-            />
+            {data.bodyHtml ? (
+              <div
+                className="prose prose-neutral dark:prose-invert max-w-none
+                  prose-headings:font-bold
+                  prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                  prose-img:rounded-lg prose-img:w-full
+                  prose-figcaption:text-center"
+                dangerouslySetInnerHTML={{ __html: data.bodyHtml }}
+              />
+            ) : (
+              <p className="text-muted-foreground italic text-sm">
+                Article body not yet available — the approval chain may still be running, or step 11 produced no output.
+              </p>
+            )}
 
             {/* Diagrams strip */}
             {data.diagrams && data.diagrams.length > 0 && (

@@ -44,16 +44,17 @@ export async function proxyToApi(
 
   let body: ArrayBuffer | undefined
   if (!isBodyless) {
-    body = await request.arrayBuffer()
+    const raw = await request.arrayBuffer()
+    if (raw.byteLength > 0) body = raw
   }
 
   const upstreamResponse = await fetch(upstreamUrl, {
     method,
     headers: {
-      'Content-Type': contentType,
+      ...(body ? { 'Content-Type': contentType } : {}),
       Authorization: `Bearer ${token}`,
     },
-    body: body ? body : undefined,
+    body,
   })
 
   // 4. Return the upstream response body as-is

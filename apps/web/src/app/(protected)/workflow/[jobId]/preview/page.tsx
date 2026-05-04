@@ -78,21 +78,21 @@ export default async function ArticlePreviewPage({
   const validCitations = data.citations.filter((c) => c.link_url)
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-background py-10 px-4">
       <div className="max-w-3xl mx-auto">
 
         {/* Google snippet preview */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8 font-sans">
-          <div className="text-xs text-green-700 mb-1 truncate">
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-8 font-sans">
+          <div className="text-xs text-green-700 dark:text-green-400 mb-1 truncate">
             {data.slug || 'your-site.com/article-slug'}
           </div>
-          <div className="text-lg font-semibold text-blue-800 leading-tight mb-1">
+          <div className="text-lg font-semibold text-blue-800 dark:text-blue-200 leading-tight mb-1">
             {data.seoTitle}
           </div>
-          <div className="text-sm text-gray-600 leading-relaxed">{data.seoDescription}</div>
+          <div className="text-sm text-muted-foreground leading-relaxed">{data.seoDescription}</div>
         </div>
 
-        <article className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <article className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
           {/* Featured image */}
           {data.featuredImage?.url && (
             <div className="relative w-full" style={{ paddingTop: '52%' }}>
@@ -108,13 +108,13 @@ export default async function ArticlePreviewPage({
           )}
 
           <div className="px-8 py-10">
-            <h1 className="text-3xl font-bold text-gray-900 leading-tight mb-4">{data.title}</h1>
+            <h1 className="text-3xl font-bold text-card-foreground leading-tight mb-4">{data.title}</h1>
 
             {/* Meta bar */}
-            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-6">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-6">
               {data.readingTime && <span>{data.readingTime} min read</span>}
               {data.primaryKeyword && (
-                <span className="bg-indigo-50 text-indigo-600 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                <span className="bg-primary/10 text-primary rounded-full px-2.5 py-0.5 text-xs font-medium">
                   {data.primaryKeyword}
                 </span>
               )}
@@ -122,44 +122,42 @@ export default async function ArticlePreviewPage({
 
             {/* Excerpt */}
             {data.excerpt && (
-              <p className="text-lg text-gray-600 italic border-l-4 border-indigo-200 pl-4 mb-8 leading-relaxed">
+              <p className="text-lg text-muted-foreground italic border-l-4 border-primary/40 pl-4 mb-8 leading-relaxed">
                 {data.excerpt}
               </p>
             )}
 
             {/* Article body */}
             <div
-              className="prose prose-gray max-w-none
-                prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-3
-                prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6
-                prose-p:text-gray-700 prose-p:leading-relaxed
-                prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline
-                prose-figure:my-6 prose-figcaption:text-center prose-figcaption:text-sm prose-figcaption:text-gray-500
-                prose-img:rounded-lg prose-img:shadow-sm prose-img:w-full"
+              className="prose prose-neutral dark:prose-invert max-w-none
+                prose-headings:font-bold
+                prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                prose-img:rounded-lg prose-img:w-full
+                prose-figcaption:text-center"
               dangerouslySetInnerHTML={{ __html: data.bodyHtml }}
             />
 
             {/* Diagrams strip */}
             {data.diagrams && data.diagrams.length > 0 && (
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+              <div className="mt-8 border-t border-border pt-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                   Diagrams
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {data.diagrams
                     .filter((d) => d.cdnUrl)
                     .map((d) => (
-                      <figure key={d.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                      <figure key={d.id} className="border border-border rounded-xl overflow-hidden">
                         <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
                           <Image
                             src={d.cdnUrl!}
                             alt={d.caption ?? d.sectionTitle}
                             fill
-                            className="object-contain p-2 bg-white"
+                            className="object-contain p-2"
                             sizes="(max-width: 640px) 100vw, 50vw"
                           />
                         </div>
-                        <figcaption className="text-xs text-gray-500 text-center px-2 py-1.5 bg-gray-50">
+                        <figcaption className="text-xs text-muted-foreground text-center px-2 py-1.5 bg-muted">
                           {d.position}. {d.caption ?? d.sectionTitle}
                         </figcaption>
                       </figure>
@@ -170,18 +168,18 @@ export default async function ArticlePreviewPage({
 
             {/* Citations */}
             {validCitations.length > 0 && (
-              <section className="mt-10 border-t border-gray-100 pt-6">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <section className="mt-10 border-t border-border pt-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   References
                 </h2>
                 <ol className="space-y-1.5 list-decimal pl-5">
                   {validCitations.map((c, i) => (
-                    <li key={i} className="text-sm text-gray-600">
+                    <li key={i} className="text-sm text-muted-foreground">
                       <a
                         href={c.link_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-indigo-600 hover:underline"
+                        className="text-primary hover:underline"
                       >
                         {c.link_title || c.link_url}
                       </a>
@@ -193,7 +191,7 @@ export default async function ArticlePreviewPage({
 
             {/* Disclaimer */}
             {data.disclaimer && (
-              <footer className="mt-8 bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-500 leading-relaxed">
+              <footer className="mt-8 bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
                 {data.disclaimer}
               </footer>
             )}
@@ -204,7 +202,7 @@ export default async function ArticlePreviewPage({
         <div className="mt-6 text-center">
           <a
             href={`/workflow/${jobId}`}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Back to job
           </a>

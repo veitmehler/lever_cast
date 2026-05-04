@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -120,6 +121,91 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Article body typography ──────────────────────────────────────────────── */
+/* Used on the /workflow/[jobId]/preview page instead of @tailwindcss/typography */
+.article-body {
+  color: var(--card-foreground);
+  line-height: 1.75;
+  font-size: 1rem;
+}
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5, .article-body h6 {
+  color: var(--card-foreground);
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+}
+.article-body h1 { font-size: 1.875rem; }
+.article-body h2 { font-size: 1.375rem; }
+.article-body h3 { font-size: 1.125rem; }
+.article-body p {
+  color: var(--card-foreground);
+  margin-top: 0;
+  margin-bottom: 1.1em;
+}
+.article-body ul, .article-body ol {
+  padding-left: 1.5em;
+  margin-bottom: 1.1em;
+}
+.article-body li { margin-bottom: 0.35em; color: var(--card-foreground); }
+.article-body strong { font-weight: 700; color: var(--card-foreground); }
+.article-body em { font-style: italic; }
+.article-body a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.article-body a:hover { text-decoration: underline; }
+.article-body blockquote {
+  border-left: 4px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+  font-style: italic;
+  margin: 1.25em 0;
+}
+.article-body figure { margin: 1.5em 0; }
+.article-body figcaption {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-top: 0.5em;
+}
+.article-body img {
+  border-radius: 0.5rem;
+  width: 100%;
+  height: auto;
+}
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.1em;
+}
+.article-body th, .article-body td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  color: var(--card-foreground);
+}
+.article-body th { background: var(--muted); font-weight: 600; }
+.article-body code {
+  background: var(--muted);
+  color: var(--card-foreground);
+  border-radius: 0.25rem;
+  padding: 0.15em 0.35em;
+  font-size: 0.9em;
+}
+.article-body pre {
+  background: var(--muted);
+  border-radius: 0.5rem;
+  padding: 1em;
+  overflow-x: auto;
+  margin-bottom: 1.1em;
+}
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
 }
 
 /* React Calendar Styles */

@@ -63,7 +63,14 @@ type ArticleDiagram = {
   cdnUrl?: string | null
 }
 
-type CitationEntry = { link_title?: string; link_url?: string; title?: string; url?: string }
+type CitationEntry = {
+  link_title?: string
+  link_url?: string
+  title?: string
+  url?: string
+  sourceTitle?: string  // legacy prompt format (pre-v3 reseed)
+  sourceUrl?: string    // legacy prompt format (pre-v3 reseed)
+}
 
 type SitePage = {
   id: string
@@ -133,18 +140,42 @@ const ENRICHMENT_ACTIVE = new Set(['approved'])
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function stripHtml(html: string): string {
+/** Convert HTML article body to Markdown for LLM-readable review text. */
+function htmlToMarkdown(html: string): string {
   return html
-    .replace(/<br\s*\/?>/gi, '\n')
+    // Headings — strip inner tags to get plain heading text
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, c) => `\n# ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, c) => `\n## ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, c) => `\n### ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_, c) => `\n#### ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (_, c) => `\n##### ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (_, c) => `\n###### ${c.replace(/<[^>]+>/g, '').trim()}\n\n`)
+    // Inline formatting (before tag stripping)
+    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
+    .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**')
+    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
+    .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*')
+    // Links
+    .replace(/<a[^>]+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)')
+    // List items (strip inner tags for clean bullet text)
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, c) => `- ${c.replace(/<[^>]+>/g, '').trim()}\n`)
+    // Paragraphs
     .replace(/<\/p>/gi, '\n\n')
-    .replace(/<\/li>/gi, '\n')
+    .replace(/<p[^>]*>/gi, '')
+    // Block-level containers — just ensure newlines around them
+    .replace(/<\/?(?:ul|ol|blockquote|div|section|article|figure)[^>]*>/gi, '\n')
+    // Line breaks
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Strip all remaining tags
     .replace(/<[^>]+>/g, '')
+    // HTML entities
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    // Collapse 3+ consecutive newlines to 2
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -159,14 +190,31 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
         ? (data as { resource_links: CitationEntry[] }).resource_links
         : []
     return links
-      .filter((c) => c.link_url ?? c.url)
+      .filter((c) => c.link_url ?? c.url ?? c.sourceUrl)
       .map((c) => ({
-        title: c.link_title ?? c.title ?? '',
-        url:   c.link_url   ?? c.url   ?? '',
+        title: c.link_title ?? c.title ?? c.sourceTitle ?? '',
+        url:   c.link_url   ?? c.url   ?? c.sourceUrl   ?? '',
       }))
   } catch {
     return []
   }
+}
+
+/**
+ * Resolve citations with a two-level fallback:
+ *   1. sitePage.citations (populated after approval)
+ *   2. step 12 pipeline output (available from the moment step 12 completes)
+ * This ensures citations are shown even before the user clicks Approve.
+ */
+function resolveCitations(
+  sp: SitePage,
+  pipelineSteps: PipelineStep[],
+): Array<{ title: string; url: string }> {
+  const fromSitePage = parseCitations(sp.citations)
+  if (fromSitePage.length > 0) return fromSitePage
+  return parseCitations(
+    pipelineSteps.find((s) => s.stepNumber === 12 && s.status === 'completed')?.output,
+  )
 }
 
 function buildReviewText(
@@ -180,32 +228,40 @@ function buildReviewText(
     pipelineSteps.find((s) => s.stepNumber === 11 && s.status === 'completed')?.output?.trim() ||
     pipelineSteps.find((s) => s.stepNumber === 9  && s.status === 'completed')?.output?.trim() ||
     ''
-  const bodyText = bodySource ? stripHtml(bodySource) : '[Article body not yet available]'
+  const bodyMarkdown = bodySource ? htmlToMarkdown(bodySource) : '[Article body not yet available]'
 
   const title = sp.seoTitle ?? sp.title ?? ''
-  const citations = parseCitations(sp.citations)
+  const citations = resolveCitations(sp, pipelineSteps)
 
   const citationLines = citations.length > 0
-    ? citations.map((c, i) => `- Link ${i + 1} Title: ${c.title}\n- Link ${i + 1} URL: ${c.url}`).join('\n')
-    : '[No citations found]'
+    ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
+    : '[No citations available for this article]'
 
-  return `Does this article comply with and satisfy:
+  return `# Evaluation Request
+
+Does this article comply with and satisfy:
 
 1. Google's "People First" principles
 2. Google's E-E-A-T framework
 3. Google's Helpful Content guidelines and rules?
 
-Article to evaluate:
+---
 
-${title}
+# ${title}
 
-${bodyText}
+${bodyMarkdown}
 
-Author Name: ${brand.defaultAuthorName ?? ''}
-Author Bio: ${brand.ourExperience ?? ''}
-Author Links: Website: ${brand.defaultAuthorWebsite ?? ''}
+---
 
-Supported by the following Citations:
+## Author
+
+**Name:** ${brand.defaultAuthorName ?? ''}
+**Bio:** ${brand.ourExperience ?? ''}
+**Website:** ${brand.defaultAuthorWebsite ?? ''}
+
+---
+
+## Citations
 
 ${citationLines}`
 }
@@ -442,6 +498,7 @@ export default function WorkflowJobPage() {
   if (!job) return null
 
   const sitePage = job.sitePage
+  const hasCitations = sitePage ? resolveCitations(sitePage, job.pipelineSteps).length > 0 : false
 
   return (
     <div className="min-h-screen bg-background">
@@ -562,7 +619,7 @@ export default function WorkflowJobPage() {
 
             {showReview && (
               <div className="px-6 pb-6 border-t border-border">
-                <div className="flex items-center justify-between mt-4 mb-2">
+                <div className="flex items-center justify-between mt-4 mb-3">
                   <p className="text-xs text-muted-foreground">
                     Paste this into ChatGPT, Claude, or Gemini to evaluate Google compliance.
                   </p>
@@ -577,6 +634,14 @@ export default function WorkflowJobPage() {
                       : <><ClipboardCopy className="h-3.5 w-3.5" /> Copy all</>}
                   </Button>
                 </div>
+                {!hasCitations && (
+                  <div className="flex items-start gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2.5 mb-3">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                      No citations found for this article. Citations are searched in Step 12 — check that the step completed successfully.
+                    </p>
+                  </div>
+                )}
                 <textarea
                   readOnly
                   value={buildReviewText(sitePage, job.pipelineSteps, brandSettings)}

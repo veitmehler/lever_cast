@@ -75,7 +75,11 @@ export class GeminiAdapter implements LLMAdapter {
     const genModel = genAI.getGenerativeModel({
       model,
       ...(options.systemPrompt ? { systemInstruction: options.systemPrompt } : {}),
-      generationConfig: { temperature, maxOutputTokens: maxTokens },
+      generationConfig: {
+        temperature,
+        maxOutputTokens: maxTokens,
+        ...(options.jsonMode ? { responseMimeType: 'application/json' } : {}),
+      },
     })
 
     const result = await genModel.generateContent(options.userPrompt)

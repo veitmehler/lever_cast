@@ -13,6 +13,8 @@ export interface LLMCallOptions {
   temperature?: number
   maxTokens?: number
   useGenerativeSearch?: boolean
+  /** Force JSON output mode (Gemini: responseMimeType = 'application/json'). */
+  jsonMode?: boolean
 }
 
 export interface LLMAdapter {

@@ -9,6 +9,18 @@ import type { PipelineContext } from './variable-resolver'
 // Steps whose output is parsed as JSON
 const JSON_STEPS = new Set([2, 12, 13])
 
+// Steps that use Gemini generative search
+const SEARCH_STEPS = new Set([6, 7, 8, 10, 12])
+
+// Steps that need BOTH search grounding AND structured JSON output.
+// Gemini can't do both in one call, so we use a two-phase approach:
+//   Phase 1 — search call → returns grounded prose research
+//   Phase 2 — standard call with jsonMode:true → converts prose to JSON
+const SEARCH_JSON_STEPS = new Set([12])
+
+// Higher token budget for JSON steps to avoid truncation before the JSON is emitted.
+const JSON_STEP_MAX_TOKENS = 16384
+
 // Set VERBOSE_LLM_LOGS=true in the environment to log full prompts + responses.
 // Set VERBOSE_LLM_LOGS_TRUNCATE=0 to disable truncation (logs full text).
 const VERBOSE = process.env.VERBOSE_LLM_LOGS === 'true'
@@ -18,9 +30,6 @@ function truncate(s: string, n: number): string {
   if (n <= 0) return s
   return s.length > n ? s.slice(0, n) + `… [+${s.length - n} chars]` : s
 }
-
-// Steps that use Gemini generative search
-const SEARCH_STEPS = new Set([6, 7, 8, 10, 12])
 
 const MAX_RETRIES = 3
 const BASE_RETRY_DELAY_MS = 1000
@@ -63,6 +72,7 @@ export class StepRunner {
     const model = template.defaultModel
     const useSearch = SEARCH_STEPS.has(this.stepNumber)
     const isJsonStep = JSON_STEPS.has(this.stepNumber)
+    const isTwoPhase = SEARCH_JSON_STEPS.has(this.stepNumber)
 
     // Create/update the PipelineStep row to 'running'
     await prisma.pipelineStep.upsert({
@@ -93,6 +103,50 @@ export class StepRunner {
       try {
         const adapter = getLLMAdapter(provider)
 
+        // ── Phase 1: search-grounded research call ─────────────────────────
+        // For two-phase steps (e.g. Step 12), run the search call first to get
+        // grounded prose, then hand it to Phase 2 to extract structured JSON.
+        let searchResearch: string | undefined
+        let phase1Tokens = { input: 0, output: 0, total: 0 }
+        let phase1Cost = 0
+        if (isTwoPhase) {
+          if (VERBOSE) {
+            logger.info(
+              { jobId: this.jobId, step: this.stepNumber, provider, model, phase: 1, userPrompt: truncate(userPrompt, TRUNCATE) },
+              '[llm-verbose] PROMPT (phase-1 search)',
+            )
+          }
+          const searchResponse = await adapter.call({
+            systemPrompt,
+            userPrompt,
+            model,
+            maxTokens: JSON_STEP_MAX_TOKENS,
+            useGenerativeSearch: true,
+          })
+          searchResearch = searchResponse.content
+          phase1Tokens = searchResponse.tokens
+          phase1Cost = searchResponse.cost
+          if (VERBOSE) {
+            logger.info(
+              { jobId: this.jobId, step: this.stepNumber, phase: 1, response: truncate(searchResearch, TRUNCATE) },
+              '[llm-verbose] RESPONSE (phase-1 search)',
+            )
+          }
+          logger.info(
+            { jobId: this.jobId, step: this.stepNumber, researchLength: searchResearch.length },
+            '[step-runner] phase-1 search complete; proceeding to phase-2 JSON extraction',
+          )
+        }
+
+        // ── Phase 2 (or standard call) ─────────────────────────────────────
+        // For two-phase steps, build a lean structuring prompt from the phase-1
+        // research.  For all other steps, use the original prompt as-is.
+        const phase2UserPrompt = isTwoPhase && searchResearch
+          ? buildStructuringPrompt(this.stepNumber, searchResearch)
+          : userPrompt
+
+        const phase2SystemPrompt = isTwoPhase ? null : systemPrompt
+
         if (VERBOSE) {
           logger.info(
             {
@@ -100,18 +154,25 @@ export class StepRunner {
               step: this.stepNumber,
               provider,
               model,
-              systemPrompt: systemPrompt ? truncate(systemPrompt, TRUNCATE) : null,
-              userPrompt: truncate(userPrompt, TRUNCATE),
+              phase: isTwoPhase ? 2 : undefined,
+              systemPrompt: phase2SystemPrompt ? truncate(phase2SystemPrompt, TRUNCATE) : null,
+              userPrompt: truncate(phase2UserPrompt, TRUNCATE),
             },
-            '[llm-verbose] PROMPT',
+            isTwoPhase ? '[llm-verbose] PROMPT (phase-2 json)' : '[llm-verbose] PROMPT',
           )
         }
 
         const llmResponse = await adapter.call({
-          systemPrompt,
-          userPrompt,
+          systemPrompt: phase2SystemPrompt,
+          userPrompt: phase2UserPrompt,
           model,
-          useGenerativeSearch: useSearch,
+          // Fix B: larger token budget for JSON steps — model must finish emitting
+          // the full JSON structure without truncation mid-array.
+          maxTokens: isJsonStep ? JSON_STEP_MAX_TOKENS : undefined,
+          // Two-phase steps use jsonMode (no search) in phase 2.
+          // Other search steps continue using search grounding.
+          useGenerativeSearch: isTwoPhase ? false : useSearch,
+          jsonMode: isTwoPhase ? true : false,
         })
 
         if (VERBOSE) {
@@ -126,7 +187,7 @@ export class StepRunner {
               cost: llmResponse.cost,
               response: truncate(llmResponse.content, TRUNCATE),
             },
-            '[llm-verbose] RESPONSE',
+            isTwoPhase ? '[llm-verbose] RESPONSE (phase-2 json)' : '[llm-verbose] RESPONSE',
           )
         }
 
@@ -135,23 +196,16 @@ export class StepRunner {
         let parsedOutput: unknown | undefined
 
         if (isJsonStep) {
-          try {
-            const { data, log } = cleanAndParseJSON(rawOutput)
-            parsedOutput = data
-            finalOutput = JSON.stringify(data)
-            if (log.fixes.length) {
-              logger.info(
-                { jobId: this.jobId, step: this.stepNumber, fixes: log.fixes },
-                '[step-runner] JSON fixes applied',
-              )
-            }
-          } catch (parseErr) {
-            // Store raw output anyway and log the failure
-            logger.warn(
-              { jobId: this.jobId, step: this.stepNumber, parseErr },
-              '[step-runner] JSON parse failed; storing raw output',
+          // Fix C: JSON parse failure is a real error for JSON steps — throw so
+          // the retry loop can attempt recovery instead of silently storing prose.
+          const { data, log } = cleanAndParseJSON(rawOutput)
+          parsedOutput = data
+          finalOutput = JSON.stringify(data)
+          if (log.fixes.length) {
+            logger.info(
+              { jobId: this.jobId, step: this.stepNumber, fixes: log.fixes },
+              '[step-runner] JSON fixes applied',
             )
-            finalOutput = rawOutput
           }
         } else {
           finalOutput = cleanTextOutput(rawOutput)
@@ -159,23 +213,29 @@ export class StepRunner {
 
         const durationMs = Date.now() - startTime
 
+        // Accumulate tokens / cost across both phases for accurate accounting.
+        const totalInputTokens  = llmResponse.tokens.input  + phase1Tokens.input
+        const totalOutputTokens = llmResponse.tokens.output + phase1Tokens.output
+        const totalTokens       = llmResponse.tokens.total  + phase1Tokens.total
+        const totalCost         = llmResponse.cost           + phase1Cost
+
         // Persist step result
         await prisma.pipelineStep.update({
           where: { jobId_stepNumber: { jobId: this.jobId, stepNumber: this.stepNumber } },
           data: {
             status: 'completed',
             output: finalOutput,
-            inputTokens: llmResponse.tokens.input,
-            outputTokens: llmResponse.tokens.output,
-            totalTokens: llmResponse.tokens.total,
-            cost: llmResponse.cost,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            totalTokens,
+            cost: totalCost,
             duration: durationMs,
             retryCount: attempt - 1,
             completedAt: new Date(),
           },
         })
 
-        // Write LLMUsage row
+        // Write LLMUsage row (combined across both phases)
         await prisma.lLMUsage.create({
           data: {
             userId: this.ctx.userId,
@@ -183,18 +243,18 @@ export class StepRunner {
             source: `pipeline_step_${this.stepNumber}`,
             provider,
             model,
-            inputTokens: llmResponse.tokens.input,
-            outputTokens: llmResponse.tokens.output,
-            cost: llmResponse.cost,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cost: totalCost,
           },
         })
 
         return {
           output: finalOutput,
           parsedOutput,
-          inputTokens: llmResponse.tokens.input,
-          outputTokens: llmResponse.tokens.output,
-          cost: llmResponse.cost,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          cost: totalCost,
           durationMs,
           provider,
           model,
@@ -260,4 +320,37 @@ export class StepRunner {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Builds a lean JSON-structuring prompt for two-phase steps.
+ * Phase 1 produces grounded prose research; this prompt converts it to JSON.
+ */
+function buildStructuringPrompt(stepNumber: number, research: string): string {
+  if (stepNumber === 12) {
+    return `You are given grounded research about article citation sources.
+Extract all citation sources mentioned in the research and return them as structured JSON.
+
+Research:
+${research}
+
+Return ONLY valid JSON in this exact format — no markdown, no code fences, no commentary:
+{
+  "resource_links": [
+    { "link_title": "<source title>", "link_url": "<source URL>" },
+    { "link_title": "<source title>", "link_url": "<source URL>" }
+  ]
+}
+
+Rules:
+- Include only sources that have a real URL (skip any with placeholder or missing URLs).
+- Aim for 8-12 entries.
+- Output ONLY the JSON object. Nothing else.`
+  }
+  // Generic fallback: ask the model to structure whatever JSON the research implies.
+  return `Convert the following research output into clean, structured JSON.
+Return ONLY the JSON object. No commentary, no markdown fences.
+
+Research:
+${research}`
 }

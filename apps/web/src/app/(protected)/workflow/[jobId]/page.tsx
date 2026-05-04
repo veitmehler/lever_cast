@@ -5,11 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
-  ChevronLeft, Loader2, CheckCircle2, XCircle, Clock,
-  AlertTriangle, DollarSign, Zap, FileText, Play, ThumbsUp,
+  ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2,
+  Share2, ClipboardCopy, ClipboardCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -28,6 +27,7 @@ type PipelineStep = {
   outputTokens?: number | null
   completedAt?: string | null
   errorMessage?: string | null
+  output?: string | null
 }
 
 type ErrorLog = {
@@ -63,6 +63,8 @@ type ArticleDiagram = {
   cdnUrl?: string | null
 }
 
+type CitationEntry = { link_title?: string; link_url?: string; title?: string; url?: string }
+
 type SitePage = {
   id: string
   title: string
@@ -75,6 +77,8 @@ type SitePage = {
   enrichmentError?: string | null
   excerpt?: string | null
   disclaimer?: string | null
+  bodyHtml?: string | null
+  citations?: unknown
   featuredImage?: FeaturedImage | null
   diagrams?: ArticleDiagram[]
 }
@@ -105,37 +109,21 @@ type SSEUpdate = {
   message?: string
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const STEP_NAMES: Record<number, string> = {
-  1: 'Generate Outline',
-  2: 'Keyword Research',
-  3: 'Find Supporting Keywords',
-  4: 'Optimise Outline for SEO',
-  5: 'Write Search Intent Intro',
-  6: 'Research FAQs',
-  7: 'Find FAQ Facts',
-  8: 'Find Article Facts',
-  9: 'Write Article',
-  10: 'Fact-Check Article',
-  11: 'Adjust Incorrect Facts',
-  12: 'Find Citations',
-  // Approval chain
-  13: 'Generate SEO Metadata',
-  15: 'Generate Image Prompt',
-  17: 'Generate Excerpt',
-  18: 'Generate Legal Disclaimer',
+type BrandSettings = {
+  defaultAuthorName?: string | null
+  defaultAuthorWebsite?: string | null
+  ourExperience?: string | null
 }
 
-const APPROVAL_STEPS = [13, 15, 17, 18]
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',          color: 'text-muted-foreground',                                              bg: 'bg-muted' },
-  in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-50 dark:bg-blue-900/40' },
+  pending:     { label: 'Pending',          color: 'text-muted-foreground',                                                bg: 'bg-muted' },
+  in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',     bg: 'bg-blue-50 dark:bg-blue-900/40' },
   completed:   { label: 'Needs Approval',   color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-900/40' },
   approved:    { label: 'Adding Diagrams…', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
-  enriched:    { label: 'Ready to Export',  color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-50 dark:bg-green-900/40' },
-  failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',      bg: 'bg-red-50 dark:bg-red-900/40' },
+  enriched:    { label: 'Ready to Export',  color: 'text-green-700 dark:text-green-300',   bg: 'bg-green-50 dark:bg-green-900/40' },
+  failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',       bg: 'bg-red-50 dark:bg-red-900/40' },
 }
 
 // Statuses where the pipeline is actively running (SSE should be open)
@@ -143,18 +131,90 @@ const ACTIVE_STATUSES = new Set(['pending', 'in_progress'])
 // Enrichment is running when approved (diagrams being generated in background)
 const ENRICHMENT_ACTIVE = new Set(['approved'])
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function StepIcon({ status }: { status: StepStatus | 'idle' }) {
-  if (status === 'completed') return <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-  if (status === 'failed')    return <XCircle      className="h-5 w-5 text-red-500   flex-shrink-0" />
-  if (status === 'running')   return <Loader2      className="h-5 w-5 text-blue-500  animate-spin flex-shrink-0" />
-  return <Clock className="h-5 w-5 text-muted-foreground/40 flex-shrink-0" />
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
+
+function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
+  if (!raw) return []
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const links: CitationEntry[] = Array.isArray(data)
+      ? data
+      : Array.isArray((data as Record<string, unknown>).resource_links)
+        ? (data as { resource_links: CitationEntry[] }).resource_links
+        : []
+    return links
+      .filter((c) => c.link_url ?? c.url)
+      .map((c) => ({
+        title: c.link_title ?? c.title ?? '',
+        url:   c.link_url   ?? c.url   ?? '',
+      }))
+  } catch {
+    return []
+  }
+}
+
+function buildReviewText(
+  sp: SitePage,
+  pipelineSteps: PipelineStep[],
+  brand: BrandSettings,
+): string {
+  // Resolve article body: sitePage.bodyHtml → step 11 → step 9
+  const bodySource =
+    sp.bodyHtml?.trim() ||
+    pipelineSteps.find((s) => s.stepNumber === 11 && s.status === 'completed')?.output?.trim() ||
+    pipelineSteps.find((s) => s.stepNumber === 9  && s.status === 'completed')?.output?.trim() ||
+    ''
+  const bodyText = bodySource ? stripHtml(bodySource) : '[Article body not yet available]'
+
+  const title = sp.seoTitle ?? sp.title ?? ''
+  const citations = parseCitations(sp.citations)
+
+  const citationLines = citations.length > 0
+    ? citations.map((c, i) => `- Link ${i + 1} Title: ${c.title}\n- Link ${i + 1} URL: ${c.url}`).join('\n')
+    : '[No citations found]'
+
+  return `Does this article comply with and satisfy:
+
+1. Google's "People First" principles
+2. Google's E-E-A-T framework
+3. Google's Helpful Content guidelines and rules?
+
+Article to evaluate:
+
+${title}
+
+${bodyText}
+
+Author Name: ${brand.defaultAuthorName ?? ''}
+Author Bio: ${brand.ourExperience ?? ''}
+Author Links: Website: ${brand.defaultAuthorWebsite ?? ''}
+
+Supported by the following Citations:
+
+${citationLines}`
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const { label, color, bg } = STATUS_LABELS[status] ?? {
-    label: status, color: 'text-gray-500', bg: 'bg-gray-100',
+    label: status, color: 'text-muted-foreground', bg: 'bg-muted',
   }
   const isActive = ACTIVE_STATUSES.has(status)
   return (
@@ -180,11 +240,14 @@ export default function WorkflowJobPage() {
   const [attempts, setAttempts] = useState<OutputAttempt[]>([])
   const [showAttempts, setShowAttempts] = useState(false)
 
+  // Review panel state
+  const [showReview, setShowReview] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
+
   // Live SSE state (overlays DB state while pipeline is running)
-  const [liveSteps, setLiveSteps]   = useState<PipelineStep[]>([])
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [liveStep,   setLiveStep]   = useState<number | null>(null)
-  const [liveCost,   setLiveCost]   = useState<number | null>(null)
 
   const sseRef = useRef<EventSource | null>(null)
 
@@ -208,6 +271,18 @@ export default function WorkflowJobPage() {
 
   useEffect(() => { fetchJob() }, [fetchJob])
 
+  // Fetch brand settings once for the review block
+  useEffect(() => {
+    fetch('/api/brand-settings')
+      .then((r) => r.ok ? r.json() : {})
+      .then((d) => setBrandSettings({
+        defaultAuthorName:    d.defaultAuthorName    ?? '',
+        defaultAuthorWebsite: d.defaultAuthorWebsite ?? '',
+        ourExperience:        d.ourExperience        ?? '',
+      }))
+      .catch(() => {/* silent */})
+  }, [])
+
   // ── SSE ────────────────────────────────────────────────────────────────────
 
   const startSSE = useCallback(() => {
@@ -219,10 +294,8 @@ export default function WorkflowJobPage() {
       try {
         const update: SSEUpdate = JSON.parse(e.data)
         if (update.type === 'update') {
-          if (update.steps)                         setLiveSteps(update.steps)
           if (update.status)                        setLiveStatus(update.status)
           if (update.currentStep !== undefined)     setLiveStep(update.currentStep)
-          if (update.totalCost !== undefined)       setLiveCost(update.totalCost)
         } else if (update.type === 'done') {
           es.close()
           setIsApproving(false)
@@ -250,8 +323,7 @@ export default function WorkflowJobPage() {
       const res = await fetch(`/api/articles/${jobId}/resume`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to resume')
       toast.success('Pipeline resumed')
-      // Clear live state so SSE refreshes cleanly
-      setLiveSteps([]); setLiveStatus(null); setLiveStep(null); setLiveCost(null)
+      setLiveStatus(null); setLiveStep(null)
       await fetchJob()
     } catch {
       toast.error('Failed to resume pipeline')
@@ -285,7 +357,6 @@ export default function WorkflowJobPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Export failed')
       toast.success(`${target.charAt(0).toUpperCase() + target.slice(1)} export queued`)
-      // Poll attempts every 3s until the attempt completes
       let polls = 0
       const poll = setInterval(async () => {
         await fetchAttempts()
@@ -308,7 +379,7 @@ export default function WorkflowJobPage() {
         throw new Error(data.error ?? 'Failed to re-enrich')
       }
       toast.success('Re-enrichment started — generating diagrams…')
-      setLiveSteps([]); setLiveStatus(null); setLiveStep(null)
+      setLiveStatus(null); setLiveStep(null)
       await fetchJob()
       startSSE()
     } catch (err) {
@@ -320,8 +391,7 @@ export default function WorkflowJobPage() {
 
   const handleApprove = async () => {
     setIsApproving(true)
-    // Clear live state so approval steps stream in fresh
-    setLiveSteps([]); setLiveStatus(null); setLiveStep(null)
+    setLiveStatus(null); setLiveStep(null)
     try {
       const res = await fetch(`/api/articles/${jobId}/approve`, { method: 'POST' })
       if (!res.ok) {
@@ -336,47 +406,29 @@ export default function WorkflowJobPage() {
     }
   }
 
+  const handleCopy = async () => {
+    if (!job?.sitePage) return
+    const text = buildReviewText(job.sitePage, job.pipelineSteps, brandSettings)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
+    }
+  }
+
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const displayStatus = liveStatus ?? job?.status ?? 'pending'
   const displayStep   = liveStep   ?? job?.currentStep ?? 0
-  const displayCost   = liveCost   ?? job?.totalCost   ?? 0
-
-  const displaySteps: PipelineStep[] =
-    liveSteps.length > 0 ? liveSteps : (job?.pipelineSteps ?? [])
-
-  // Always show Phase A (1-12)
-  const phaseASteps = Array.from({ length: 12 }, (_, i) => {
-    const n = i + 1
-    return (
-      displaySteps.find((s) => s.stepNumber === n) ?? {
-        stepNumber: n,
-        stepName: STEP_NAMES[n] ?? `Step ${n}`,
-        status: 'pending' as StepStatus,
-      }
-    )
-  })
-
-  // Show approval steps when job is completed/approved/enriched, or approval is in progress
-  const showApprovalSteps =
-    ['completed', 'approved', 'enriched'].includes(displayStatus) || isApproving
-
-  const approvalStepRows = showApprovalSteps
-    ? APPROVAL_STEPS.map((n) => {
-        return (
-          displaySteps.find((s) => s.stepNumber === n) ?? {
-            stepNumber: n,
-            stepName: STEP_NAMES[n] ?? `Step ${n}`,
-            status: 'pending' as StepStatus,
-          }
-        )
-      })
-    : []
 
   const isGenerating = ACTIVE_STATUSES.has(displayStatus)
   const isEnriching  = displayStatus === 'approved' && !isApproving
-  const totalSteps   = 12 + (showApprovalSteps ? APPROVAL_STEPS.length : 0)
-  const progressPct  = Math.min(100, Math.round((displayStep / totalSteps) * 100))
+  const progressPct  = Math.min(100, Math.round((displayStep / 12) * 100))
+
+  // Review is available once the article body exists (completed or beyond)
+  const reviewAvailable = ['completed', 'approved', 'enriched'].includes(displayStatus)
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
@@ -406,7 +458,7 @@ export default function WorkflowJobPage() {
 
         {/* ── Header card ───────────────────────────────────────────────── */}
         <div className="bg-card rounded-xl border border-border p-6 mb-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
@@ -417,26 +469,6 @@ export default function WorkflowJobPage() {
               <h1 className="text-xl font-bold text-card-foreground mb-2">{job.topic.topic}</h1>
               <StatusBadge status={displayStatus} />
             </div>
-
-            {/* Metrics */}
-            <div className="flex gap-6 flex-shrink-0">
-              <div className="text-center">
-                <div className="flex items-center gap-1 text-muted-foreground justify-center mb-0.5">
-                  <DollarSign className="h-3.5 w-3.5" />
-                  <span className="text-xs">Cost</span>
-                </div>
-                <p className="text-lg font-bold text-card-foreground">${displayCost.toFixed(4)}</p>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center gap-1 text-muted-foreground justify-center mb-0.5">
-                  <Zap className="h-3.5 w-3.5" />
-                  <span className="text-xs">Tokens</span>
-                </div>
-                <p className="text-lg font-bold text-card-foreground">
-                  {((job.totalTokens ?? 0) / 1000).toFixed(1)}k
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* Progress bar (generation or approval in progress) */}
@@ -444,9 +476,7 @@ export default function WorkflowJobPage() {
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm text-muted-foreground">
-                  {isApproving
-                    ? `Approval step ${displayStep}`
-                    : `Step ${displayStep} of 12`}
+                  {isApproving ? 'Running approval chain…' : `Step ${displayStep} of 12`}
                 </span>
                 <span className="text-sm text-muted-foreground">{progressPct}%</span>
               </div>
@@ -461,7 +491,7 @@ export default function WorkflowJobPage() {
 
           {/* Actions */}
           <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
-            {/* Approve button */}
+            {/* Approve button — visible when article generation completed, not yet approved */}
             {displayStatus === 'completed' && !isApproving && (
               <Button onClick={handleApprove} className="bg-purple-600 hover:bg-purple-700">
                 <ThumbsUp className="h-4 w-4 mr-1.5" />
@@ -485,7 +515,7 @@ export default function WorkflowJobPage() {
               </Button>
             )}
 
-            {/* Re-enrich button (enrichment failed or enriched but user wants fresh diagrams) */}
+            {/* Re-enrich button */}
             {(displayStatus === 'enriched' || (displayStatus === 'approved' && !isEnriching)) &&
               job.sitePage?.enrichmentStatus === 'failed' && (
               <Button size="sm" variant="outline" onClick={handleReEnrich} disabled={isReEnriching}>
@@ -507,6 +537,56 @@ export default function WorkflowJobPage() {
             )}
           </div>
         </div>
+
+        {/* ── Review Content panel (available once article body exists) ─── */}
+        {reviewAvailable && sitePage && (
+          <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowReview((v) => !v)}
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/40 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardCopy className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-card-foreground">
+                  Review Content
+                </span>
+                <span className="text-xs text-muted-foreground ml-1">
+                  — copy article + citations for AI quality review
+                </span>
+              </div>
+              {showReview
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+            </button>
+
+            {showReview && (
+              <div className="px-6 pb-6 border-t border-border">
+                <div className="flex items-center justify-between mt-4 mb-2">
+                  <p className="text-xs text-muted-foreground">
+                    Paste this into ChatGPT, Claude, or Gemini to evaluate Google compliance.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopy}
+                    className="flex-shrink-0 gap-1.5"
+                  >
+                    {copied
+                      ? <><ClipboardCheck className="h-3.5 w-3.5 text-green-500" /> Copied!</>
+                      : <><ClipboardCopy className="h-3.5 w-3.5" /> Copy all</>}
+                  </Button>
+                </div>
+                <textarea
+                  readOnly
+                  value={buildReviewText(sitePage, job.pipelineSteps, brandSettings)}
+                  rows={20}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Featured image (visible after approval) ────────────────── */}
         {sitePage?.featuredImage?.url && (
@@ -651,7 +731,6 @@ export default function WorkflowJobPage() {
             </p>
           ) : (
             <div className="flex flex-wrap gap-3">
-              {/* HTML */}
               <Button
                 size="sm" variant="outline"
                 onClick={() => handleExport('html')}
@@ -663,7 +742,6 @@ export default function WorkflowJobPage() {
                 Download HTML
               </Button>
 
-              {/* Bundle */}
               <Button
                 size="sm" variant="outline"
                 onClick={() => handleExport('bundle')}
@@ -675,7 +753,6 @@ export default function WorkflowJobPage() {
                 Download Bundle (.zip)
               </Button>
 
-              {/* WordPress — requires connection */}
               <Link href="/settings/wordpress">
                 <Button size="sm" variant="outline">
                   <FileText className="h-4 w-4 mr-1.5" />
@@ -683,7 +760,6 @@ export default function WorkflowJobPage() {
                 </Button>
               </Link>
 
-              {/* Generate Social Posts from article */}
               {sitePage?.excerpt && (
                 <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>
                   <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30">
@@ -742,33 +818,6 @@ export default function WorkflowJobPage() {
           )}
         </div>
 
-        {/* ── Pipeline steps ────────────────────────────────────────────── */}
-        <div className="bg-card rounded-xl border border-border p-6 mb-6">
-          <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider mb-4">
-            Pipeline Steps
-          </h2>
-          <div className="space-y-1">
-            {phaseASteps.map((step) => (
-              <StepRow key={step.stepNumber} step={step} />
-            ))}
-
-            {showApprovalSteps && (
-              <>
-                <div className="flex items-center gap-3 py-2 px-1">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                    Approval Chain
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                {approvalStepRows.map((step) => (
-                  <StepRow key={step.stepNumber} step={step} approval />
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-
         {/* ── Error logs ───────────────────────────────────────────────── */}
         {job.errorLogs.length > 0 && (
           <div className="bg-card rounded-xl border border-red-300 dark:border-red-800 p-6">
@@ -794,46 +843,6 @@ export default function WorkflowJobPage() {
           </div>
         )}
 
-      </div>
-    </div>
-  )
-}
-
-// ── StepRow sub-component ─────────────────────────────────────────────────────
-
-function StepRow({
-  step,
-  approval = false,
-}: {
-  step: { stepNumber: number; stepName: string; status: StepStatus; cost?: number | null; duration?: number | null; errorMessage?: string | null }
-  approval?: boolean
-}) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
-        step.status === 'running'
-          ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
-          : approval
-          ? 'hover:bg-purple-50/50 dark:hover:bg-purple-900/20'
-          : 'hover:bg-muted/60'
-      }`}
-    >
-      <StepIcon status={step.status as StepStatus | 'idle'} />
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-card-foreground">
-          {step.stepNumber}. {STEP_NAMES[step.stepNumber] ?? step.stepName}
-        </span>
-        {step.status === 'failed' && step.errorMessage && (
-          <p className="text-xs text-red-500 dark:text-red-400 mt-0.5 truncate">{step.errorMessage}</p>
-        )}
-      </div>
-      <div className="flex items-center gap-4 flex-shrink-0">
-        {step.cost != null && step.cost > 0 && (
-          <span className="text-xs text-muted-foreground">${step.cost.toFixed(5)}</span>
-        )}
-        {step.duration != null && (
-          <span className="text-xs text-muted-foreground">{(step.duration / 1000).toFixed(1)}s</span>
-        )}
       </div>
     </div>
   )

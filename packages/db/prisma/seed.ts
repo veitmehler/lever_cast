@@ -391,6 +391,135 @@ If the section is purely narrative or doesn't benefit from a visual, output exac
   },
 ]
 
+// ── GEO / Phase C expansion (Steps 101–104, 107–108) ─────────────────────────
+const GEO_ENRICHMENT_TEMPLATES = [
+  {
+    stepNumber: 101,
+    stepName: 'enrichment_question_matching',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    systemPrompt:
+      'You are an expert content strategist helping match research questions to article sections.',
+    userPrompt: `You are helping enrich an article by matching research FAQ questions to article sections.
+
+Article sections (JSON):
+{{sections}}
+
+Available FAQ questions (JSON):
+{{candidates}}
+
+Rules:
+- Match each section to the MOST topically relevant FAQ question.
+- Each FAQ question may only be used ONCE across all sections.
+- If no FAQ question is a good fit for a section, respond with null for that section.
+- Respond ONLY with valid JSON: an array of strings (the matched question text) or null, one per section, in order.
+- Do NOT include any explanation — ONLY the JSON array.
+
+Example response: ["Why is X important?", null, "How does Y work?"]`,
+  },
+  {
+    stepNumber: 102,
+    stepName: 'enrichment_keyword_to_question',
+    defaultProvider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    systemPrompt: 'You are an expert SEO specialist converting keywords into natural search questions.',
+    userPrompt: `Convert the following keyword or phrase into a clear, specific question that someone might ask when searching for information about "{{sectionHeading}}".
+
+Keyword: {{keyword}}
+
+Rules:
+- The question must be relevant to the topic.
+- Write in a natural, conversational style.
+- Do NOT add quotes or punctuation beyond the question mark.
+- Respond with ONLY the question text — nothing else.`,
+  },
+  {
+    stepNumber: 103,
+    stepName: 'enrichment_uniqueness_rephrase',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    systemPrompt: null,
+    userPrompt: `Rephrase the following question to convey the same meaning with different wording. The goal is to create a unique variant that is topically equivalent but worded differently.
+
+Original question: {{question}}
+
+Rules:
+- Keep the same meaning and intent.
+- Use different words, sentence structure, or phrasing.
+- Do NOT add quotes or extra punctuation.
+- Respond with ONLY the rephrased question — nothing else.`,
+  },
+  {
+    stepNumber: 104,
+    stepName: 'enrichment_ai_summary',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    systemPrompt:
+      'You are an expert content writer creating concise AI-optimised summaries for Generative Engine Optimisation (GEO).',
+    userPrompt: `Write a concise 40-60 word answer to the following question, based on the article section content provided.
+
+Question: {{question}}
+
+Article section content:
+{{content}}
+
+Rules:
+- Answer directly and informatively.
+- Stay between 40 and 60 words.
+- Write in third person, informational tone.
+- Do NOT use bullet points or headings.
+- Respond with ONLY the summary paragraph — nothing else.`,
+  },
+  {
+    stepNumber: 107,
+    stepName: 'enrichment_key_takeaways',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    systemPrompt:
+      'You are an expert content strategist creating "Key Takeaways" sections for Generative Engine Optimization (GEO). Your takeaways must be declarative statements packed with specific data, entities, and actionable insights.',
+    userPrompt: `Generate a "Key Takeaways" section for the following article.
+
+Article HTML:
+{{bodyHtml}}
+
+Primary keyword: {{primaryKeyword}}
+
+Rules:
+- Write exactly 3–5 bullet points.
+- Each bullet must be a declarative sentence (not a question).
+- Front-load the most important information in the first 10 words of each bullet.
+- Include specific numbers, names, laws, or locations from the article where available.
+- Each bullet should use a bold lead-in label (2–3 words), then the statement.
+- Do NOT use vague language like "important considerations" or "key factors."
+- Respond with ONLY the HTML list — no heading, no explanation.
+
+Example format:
+<ul>
+  <li><b>Infrastructure Reality</b>: While Starlink (RD$2,900/mo) has solved internet issues, electricity remains unstable; solar ROI is now under three years.</li>
+</ul>`,
+  },
+  {
+    stepNumber: 108,
+    stepName: 'enrichment_wp_category',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    systemPrompt:
+      'You are a content categorization expert. Given an article topic and a list of WordPress categories, select the single most appropriate category.',
+    userPrompt: `Select the most appropriate WordPress category for this article.
+
+Article topic: {{topic}}
+Article title: {{title}}
+
+Available categories (JSON):
+{{categories}}
+
+Rules:
+- Select exactly ONE category from the list.
+- Respond with ONLY the category ID as a number — nothing else.
+- If no category is a good fit, respond with the ID of the most general/default category.`,
+  },
+]
+
 // ── Outline Frameworks (12 genericized structures) ───────────────────────────
 const OUTLINE_FRAMEWORKS = [
   {
@@ -1097,7 +1226,7 @@ Before publishing any article, ask: "If a visitor reads only this article, will 
 async function main() {
   console.log('Seeding prompt templates...')
 
-  for (const template of [...PROMPT_TEMPLATES, ...ENRICHMENT_TEMPLATES]) {
+  for (const template of [...PROMPT_TEMPLATES, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,
@@ -1112,7 +1241,7 @@ async function main() {
     console.log(`  ✓ Step ${template.stepNumber}: ${template.stepName}`)
   }
 
-  const promptTotal = PROMPT_TEMPLATES.length + ENRICHMENT_TEMPLATES.length
+  const promptTotal = PROMPT_TEMPLATES.length + ENRICHMENT_TEMPLATES.length + GEO_ENRICHMENT_TEMPLATES.length
   console.log(`\nSeeded ${promptTotal} prompt templates.`)
 
   // Seed outline frameworks

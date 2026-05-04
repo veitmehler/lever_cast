@@ -38,6 +38,7 @@ model User {
   wordPressConnections  WordPressConnection[]
   errorLogs             ErrorLog[]
   media                 Media[]
+  sectionEnrichments    SectionEnrichment[]
 
   @@map("users")
 }
@@ -291,6 +292,7 @@ model Topic {
   outlineSpecialInstructions String?  @db.Text // per-article focus areas / special notes for the outline
   realCaseStudies            String?  @db.Text // per-article real anecdotes or case studies (optional)
   outlineFrameworkSource     String?           // diagnostic: 'user' | 'csv' | 'llm_assigned'
+  wpCategoryId               Int?              // AI-selected WP category when site linked
   articleJobs                ArticleJob[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
@@ -394,12 +396,39 @@ model SitePage {
   enrichmentStatus  String   @default("pending") // pending | in_progress | completed | failed
   enrichmentError   String?
   enrichedAt       DateTime?
+  keyTakeawaysHtml  String?  @db.Text
+  tocHtml           String?  @db.Text
   diagrams         ArticleDiagram[]
+  sectionEnrichments SectionEnrichment[]
 
   @@unique([userId, slug])
   @@index([primaryKeyword])
   @@index([userId])
   @@map("site_pages")
+}
+
+model SectionEnrichment {
+  id              String   @id @default(cuid())
+  sitePageId      String
+  sitePage        SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position        Int
+  originalH2      String
+  question        String?
+  summary         String?  @db.Text
+  questionSource  String?
+  llmProvider     String?
+  llmModel        String?
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  cost            Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([sitePageId, position])
+  @@index([userId, question])
+  @@index([sitePageId])
+  @@map("section_enrichments")
 }
 
 model ArticleDiagram {

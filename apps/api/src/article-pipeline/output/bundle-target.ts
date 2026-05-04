@@ -92,6 +92,7 @@ export class BundleTarget implements OutputTarget {
   async publish(
     payload: OutputPayload,
     _config: Record<string, unknown>,
+    _attemptId: string,
   ): Promise<OutputAttemptResult> {
     const start = Date.now()
 

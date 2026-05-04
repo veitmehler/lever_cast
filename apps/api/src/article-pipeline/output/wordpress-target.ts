@@ -97,6 +97,7 @@ export class WordPressTarget implements OutputTarget {
   async publish(
     payload: OutputPayload,
     config: Record<string, unknown>,
+    _attemptId: string,
   ): Promise<OutputAttemptResult> {
     const start = Date.now()
     const { connectionId, status, categoryId, authorId } = config as unknown as WpConfig
@@ -106,6 +107,13 @@ export class WordPressTarget implements OutputTarget {
     const conn = await prisma.wordPressConnection.findFirstOrThrow({
       where: { id: connectionId, userId: payload.userId },
     })
+
+    const topicCategory = await prisma.articleJob
+      .findFirst({
+        where: { id: payload.jobId },
+        select: { topic: { select: { wpCategoryId: true } } },
+      })
+      .then((r) => r?.topic?.wpCategoryId)
 
     const plainPassword = decrypt(conn.appPassword)
     const auth = basicAuthHeader(conn.username, plainPassword)
@@ -156,9 +164,11 @@ export class WordPressTarget implements OutputTarget {
     const postStatus = status ?? conn.defaultStatus ?? 'draft'
     const categories = categoryId
       ? [categoryId]
-      : conn.defaultCategoryId
-      ? [conn.defaultCategoryId]
-      : []
+      : topicCategory != null
+        ? [topicCategory]
+        : conn.defaultCategoryId
+          ? [conn.defaultCategoryId]
+          : []
     const author = authorId ?? conn.defaultAuthorId ?? undefined
 
     const postBody: Record<string, unknown> = {

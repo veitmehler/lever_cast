@@ -258,7 +258,8 @@ export async function articleRoutes(app: FastifyInstance) {
     }
 
     if (job.sitePage) {
-      // Wipe existing diagrams + restore original bodyHtml
+      // Wipe existing diagrams + GEO rows + restore original bodyHtml
+      await prisma.sectionEnrichment.deleteMany({ where: { sitePageId: job.sitePage.id } })
       await prisma.articleDiagram.deleteMany({ where: { sitePageId: job.sitePage.id } })
       await prisma.sitePage.update({
         where: { id: job.sitePage.id },
@@ -267,6 +268,8 @@ export async function articleRoutes(app: FastifyInstance) {
           enrichmentStatus: 'pending',
           enrichmentError: null,
           enrichedAt: null,
+          keyTakeawaysHtml: null,
+          tocHtml: null,
         },
       })
     }

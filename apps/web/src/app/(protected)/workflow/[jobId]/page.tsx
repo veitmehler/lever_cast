@@ -550,7 +550,7 @@ export default function WorkflowJobPage() {
           <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
             {/* Enrichment running indicator */}
             {isEnriching && (
-              <Button disabled className="bg-indigo-600 opacity-75">
+              <Button disabled className="bg-indigo-600 text-white opacity-75">
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                 Adding Diagrams…
               </Button>
@@ -605,14 +605,14 @@ export default function WorkflowJobPage() {
                   <Button
                     size="sm"
                     onClick={handleApprove}
-                    className="bg-purple-600 hover:bg-purple-700 gap-1.5"
+                    className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5"
                   >
                     <ThumbsUp className="h-3.5 w-3.5" />
                     Approve Article
                   </Button>
                 )}
                 {isApproving && (
-                  <Button size="sm" disabled className="bg-purple-600 opacity-75 gap-1.5">
+                  <Button size="sm" disabled className="bg-purple-600 text-white opacity-75 gap-1.5">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Approving…
                   </Button>

@@ -31,7 +31,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   in_progress: { label: 'Running',        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
   completed:   { label: 'Needs Approval', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
   approved:    { label: 'Approved',       color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
-  enriched:    { label: 'Ready',          color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  enriched:    { label: 'Ready to Publish', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  published:   { label: 'Published',        color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' },
   failed:      { label: 'Failed',         color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
 }
 
@@ -40,7 +41,8 @@ const FILTERS = [
   { value: 'in_progress', label: 'Running' },
   { value: 'completed',   label: 'Needs Approval' },
   { value: 'approved',    label: 'Approved' },
-  { value: 'enriched',    label: 'Ready' },
+  { value: 'enriched',    label: 'Ready to Publish' },
+  { value: 'published', label: 'Published' },
   { value: 'failed',      label: 'Failed' },
 ]
 

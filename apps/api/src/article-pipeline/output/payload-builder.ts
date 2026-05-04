@@ -30,8 +30,10 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
   })
 
   if (!job.sitePage) throw new Error(`No SitePage for job ${jobId}`)
-  if (job.status !== 'enriched') {
-    throw new Error(`Job ${jobId} is not enriched (status: ${job.status}) — cannot export`)
+  if (job.status !== 'published') {
+    throw new Error(
+      `Job ${jobId} must be published before export (status: ${job.status}) — publish from the workflow page first`,
+    )
   }
 
   const sp = job.sitePage

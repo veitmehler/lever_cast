@@ -253,7 +253,7 @@ export async function articleRoutes(app: FastifyInstance) {
 
     if (!['approved', 'enriched'].includes(job.status)) {
       return reply.status(400).send({
-        error: `Cannot re-enrich a job with status: ${job.status}. Job must be 'approved' or 'enriched'.`,
+        error: `Cannot re-enrich a job with status: ${job.status}. Job must be 'approved' or 'enriched' (not published).`,
       })
     }
 
@@ -288,6 +288,72 @@ export async function articleRoutes(app: FastifyInstance) {
     return reply.status(202).send({ ok: true, message: 'Re-enrichment enqueued' })
   })
 
+  // ── POST /api/articles/:jobId/publish — enriched → published (irreversible) ─
+  app.post<{ Params: { jobId: string } }>('/articles/:jobId/publish', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+      select: { id: true, status: true },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    if (job.status !== 'enriched') {
+      return reply.status(400).send({
+        error: `Cannot publish a job with status: ${job.status}. Job must be 'enriched' first.`,
+      })
+    }
+
+    await prisma.articleJob.update({
+      where: { id: jobId },
+      data: { status: 'published' },
+    })
+
+    return reply.send({ ok: true })
+  })
+
+  // ── POST /api/articles/:jobId/rewrite — re-run steps 7–12 only (completed) ─
+  app.post<{ Params: { jobId: string } }>('/articles/:jobId/rewrite', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+      select: { id: true, status: true },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    if (job.status !== 'completed') {
+      return reply.status(400).send({
+        error: `Cannot rewrite a job with status: ${job.status}. Job must be 'completed' (before approval).`,
+      })
+    }
+
+    await prisma.pipelineStep.deleteMany({
+      where: { jobId, stepNumber: { gte: 7, lte: 12 } },
+    })
+
+    await prisma.articleJob.update({
+      where: { id: jobId },
+      data: { status: 'in_progress', currentStep: 6 },
+    })
+
+    runPipelinePhaseA(jobId).catch((err) => {
+      request.log.error({ jobId, err }, '[articles] rewrite failed')
+    })
+
+    return reply.send({ ok: true, message: 'Article rewrite started' })
+  })
+
   // ── POST /api/articles/:jobId/output/:target ─────────────────────────────
   app.post<{
     Params: { jobId: string; target: string }
@@ -308,8 +374,10 @@ export async function articleRoutes(app: FastifyInstance) {
       where: { id: jobId, userId: user.id },
     })
     if (!job) return reply.status(404).send({ error: 'Article job not found' })
-    if (job.status !== 'enriched') {
-      return reply.status(400).send({ error: `Job must be enriched before exporting (current: ${job.status})` })
+    if (job.status !== 'published') {
+      return reply.status(400).send({
+        error: `Job must be published before exporting (current: ${job.status}). Click Publish on the workflow detail page first.`,
+      })
     }
 
     const config = request.body ?? {}

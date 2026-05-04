@@ -8,7 +8,7 @@ import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2, ClipboardCopy, ClipboardCheck,
+  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -86,6 +86,8 @@ type SitePage = {
   disclaimer?: string | null
   bodyHtml?: string | null
   citations?: unknown
+  /** JSON-LD from Step 16 / approval — may be null if generation failed */
+  schemaJson?: string | null
   featuredImage?: FeaturedImage | null
   diagrams?: ArticleDiagram[]
 }
@@ -129,7 +131,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',     bg: 'bg-blue-50 dark:bg-blue-900/40' },
   completed:   { label: 'Needs Approval',   color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-900/40' },
   approved:    { label: 'Adding Diagrams…', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
-  enriched:    { label: 'Ready to Export',  color: 'text-green-700 dark:text-green-300',   bg: 'bg-green-50 dark:bg-green-900/40' },
+  enriched:    { label: 'Ready to Publish',  color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-50 dark:bg-green-900/40' },
+  published:   { label: 'Published',        color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/40' },
   failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',       bg: 'bg-red-50 dark:bg-red-900/40' },
 }
 
@@ -266,6 +269,16 @@ ${bodyMarkdown}
 ${citationLines}`
 }
 
+/** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */
+function formatSchemaJsonDisplay(raw: string | null | undefined): string {
+  if (!raw?.trim()) return ''
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw.trim()
+  }
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -292,12 +305,15 @@ export default function WorkflowJobPage() {
   const [isResuming, setIsResuming] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [isReEnriching, setIsReEnriching] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isRewriting, setIsRewriting] = useState(false)
   const [exportingTarget, setExportingTarget] = useState<string | null>(null)
   const [attempts, setAttempts] = useState<OutputAttempt[]>([])
   const [showAttempts, setShowAttempts] = useState(false)
 
   // Review panel state
   const [showReview, setShowReview] = useState(false)
+  const [showSchemaBlock, setShowSchemaBlock] = useState(true)
   const [copied, setCopied] = useState(false)
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
 
@@ -399,7 +415,7 @@ export default function WorkflowJobPage() {
   }, [jobId])
 
   useEffect(() => {
-    if (job?.status === 'enriched') fetchAttempts()
+    if (job?.status === 'enriched' || job?.status === 'published') fetchAttempts()
   }, [job?.status, fetchAttempts])
 
   const handleExport = async (target: string, config: Record<string, unknown> = {}) => {
@@ -445,6 +461,42 @@ export default function WorkflowJobPage() {
     }
   }
 
+  const handleRewrite = async () => {
+    setIsRewriting(true)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/rewrite`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to start rewrite')
+      }
+      toast.success('Rewrite started — re-running fact research and writing…')
+      setLiveStatus(null); setLiveStep(null)
+      await fetchJob()
+      startSSE()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rewrite')
+    } finally {
+      setIsRewriting(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    setIsPublishing(true)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/publish`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to publish')
+      }
+      toast.success('Article published — export options are now available.')
+      await fetchJob()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to publish')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   const handleApprove = async () => {
     setIsApproving(true)
     setLiveStatus(null); setLiveStep(null)
@@ -484,7 +536,7 @@ export default function WorkflowJobPage() {
   const progressPct  = Math.min(100, Math.round((displayStep / 12) * 100))
 
   // Review is available once the article body exists (completed or beyond)
-  const reviewAvailable = ['completed', 'approved', 'enriched'].includes(displayStatus)
+  const reviewAvailable = ['completed', 'approved', 'enriched', 'published'].includes(displayStatus)
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
@@ -556,17 +608,6 @@ export default function WorkflowJobPage() {
               </Button>
             )}
 
-            {/* Re-enrich button */}
-            {(displayStatus === 'enriched' || (displayStatus === 'approved' && !isEnriching)) &&
-              job.sitePage?.enrichmentStatus === 'failed' && (
-              <Button size="sm" variant="outline" onClick={handleReEnrich} disabled={isReEnriching}>
-                {isReEnriching
-                  ? <Loader2   className="h-4 w-4 mr-1.5 animate-spin" />
-                  : <RefreshCw className="h-4 w-4 mr-1.5" />}
-                Retry Diagrams
-              </Button>
-            )}
-
             {/* Resume button */}
             {displayStatus === 'failed' && (
               <Button size="sm" variant="outline" onClick={handleResume} disabled={isResuming}>
@@ -599,25 +640,45 @@ export default function WorkflowJobPage() {
                 </span>
               </button>
 
-              {/* Approve action — only shown when reviewAvailable */}
-              <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              {/* Approve / Rewrite — only before approval chain */}
+              <div className="flex-shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {displayStatus === 'completed' && !isApproving && (
-                  <Button
-                    size="sm"
-                    onClick={handleApprove}
-                    className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5"
-                  >
-                    <ThumbsUp className="h-3.5 w-3.5" />
-                    Approve Article
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRewrite}
+                      disabled={isRewriting}
+                      className="border-orange-400 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-950/50 gap-1.5"
+                    >
+                      {isRewriting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <PenLine className="h-3.5 w-3.5" />
+                      )}
+                      Rewrite Article
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleApprove}
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/40 gap-1.5"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                      Approve Article
+                    </Button>
+                  </>
                 )}
                 {isApproving && (
-                  <Button size="sm" disabled className="bg-purple-600 text-white opacity-75 gap-1.5">
+                  <Button
+                    size="sm"
+                    disabled
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white opacity-80 gap-1.5"
+                  >
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Approving…
                   </Button>
                 )}
-                {(displayStatus === 'approved' || displayStatus === 'enriched') && (
+                {(displayStatus === 'approved' || displayStatus === 'enriched' || displayStatus === 'published') && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-900/40 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
                     <ThumbsUp className="h-3 w-3" />
                     Approved
@@ -707,11 +768,20 @@ export default function WorkflowJobPage() {
         {/* ── SEO & article metadata (visible once SitePage exists) ─────── */}
         {sitePage && (
           <div className="bg-card rounded-xl border border-border p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
-                Article Metadata
-              </h2>
+            <div className="flex items-center gap-2 mb-4 flex-wrap justify-between">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
+                  Article Metadata
+                </h2>
+              </div>
+              <Link
+                href={`/workflow/${jobId}/preview`}
+                target="_blank"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+              >
+                <Eye className="h-3.5 w-3.5" /> Preview article
+              </Link>
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
               <div>
@@ -807,24 +877,113 @@ export default function WorkflowJobPage() {
           </div>
         )}
 
-        {/* ── Export panel (gated to enriched) ─────────────────────────── */}
-        <div className="bg-card rounded-xl border border-border p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Download className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider flex-1">
-              Export
-            </h2>
-            <Link href={`/workflow/${jobId}/preview`} target="_blank"
-              className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80">
-              <Eye className="h-3.5 w-3.5" /> Preview
-            </Link>
-          </div>
+        {/* ── Schema & publish (after approval — schema from Step 16) ───────── */}
+        {sitePage && ['approved', 'enriched', 'published'].includes(displayStatus) && (
+          <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
+            <div className="flex items-center px-6 py-4 gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowSchemaBlock((v) => !v)}
+                className="flex-1 flex items-center gap-2 text-left hover:opacity-80 transition-opacity min-w-0"
+              >
+                <Code2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-semibold text-card-foreground">
+                  Schema markup
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  — JSON-LD for search engines
+                </span>
+              </button>
+              {displayStatus === 'enriched' && (
+                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleReEnrich()
+                    }}
+                    disabled={isReEnriching}
+                    className="gap-1.5"
+                  >
+                    {isReEnriching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Rerun Enrichment
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handlePublish()
+                    }}
+                    disabled={isPublishing}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    Publish
+                  </Button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowSchemaBlock((v) => !v)}
+                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                aria-label={showSchemaBlock ? 'Collapse' : 'Expand'}
+              >
+                {showSchemaBlock ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
 
-          {displayStatus !== 'enriched' ? (
-            <p className="text-sm text-muted-foreground italic">
-              🔒 Export buttons unlock once enrichment completes (status: {displayStatus}).
-            </p>
-          ) : (
+            {showSchemaBlock && (
+              <div className="px-6 pb-6 border-t border-border space-y-4 mt-0 pt-4">
+                {sitePage.schemaJson?.trim() ? (
+                  <>
+                    <pre className="w-full max-h-60 overflow-auto rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-[11px] font-mono text-foreground">
+                      {formatSchemaJsonDisplay(sitePage.schemaJson)}
+                    </pre>
+                    <a
+                      href="https://search.google.com/test/rich-results"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80"
+                    >
+                      Validate with Google Rich Results Test
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Schema markup was not saved for this article (Step 16 may have failed). You can still publish
+                      and export — fix schema in your CMS if needed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Export panel (only after Publish) ─────────────────────────── */}
+        {displayStatus === 'published' && (
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Download className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider flex-1">
+                Export
+              </h2>
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <Button
                 size="sm" variant="outline"
@@ -864,54 +1023,54 @@ export default function WorkflowJobPage() {
                 </Link>
               )}
             </div>
-          )}
 
-          {/* Attempt history */}
-          {attempts.length > 0 && (
-            <div className="mt-4 border-t border-border pt-4">
-              <button
-                type="button"
-                onClick={() => setShowAttempts((v) => !v)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showAttempts
-                  ? <ChevronUp className="h-3.5 w-3.5" />
-                  : <ChevronDown className="h-3.5 w-3.5" />}
-                Export history ({attempts.length})
-              </button>
-              {showAttempts && (
-                <div className="mt-3 space-y-2">
-                  {attempts.map((a) => (
-                    <div key={a.id} className="flex items-center gap-3 text-xs rounded-lg bg-muted px-3 py-2">
-                      <span className={`font-medium capitalize w-16 ${
-                        a.status === 'success' ? 'text-green-600 dark:text-green-400'
-                        : a.status === 'failed' ? 'text-red-500 dark:text-red-400'
-                        : 'text-yellow-600 dark:text-yellow-400'}`}>
-                        {a.status}
-                      </span>
-                      <span className="text-muted-foreground font-medium w-20 capitalize">{a.target}</span>
-                      <span className="text-muted-foreground/70">
-                        {new Date(a.startedAt).toLocaleString()}
-                      </span>
-                      {a.durationMs && (
-                        <span className="text-muted-foreground/70">{(a.durationMs / 1000).toFixed(1)}s</span>
-                      )}
-                      {a.resultUrl && (
-                        <a href={a.resultUrl} target="_blank" rel="noopener noreferrer"
-                          className="ml-auto text-primary hover:text-primary/80 flex items-center gap-1">
-                          Open <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                      {a.status === 'failed' && a.errorMessage && (
-                        <span className="ml-auto text-red-500 dark:text-red-400 truncate max-w-xs">{a.errorMessage}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            {/* Attempt history */}
+            {attempts.length > 0 && (
+              <div className="mt-4 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAttempts((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showAttempts
+                    ? <ChevronUp className="h-3.5 w-3.5" />
+                    : <ChevronDown className="h-3.5 w-3.5" />}
+                  Export history ({attempts.length})
+                </button>
+                {showAttempts && (
+                  <div className="mt-3 space-y-2">
+                    {attempts.map((a) => (
+                      <div key={a.id} className="flex items-center gap-3 text-xs rounded-lg bg-muted px-3 py-2">
+                        <span className={`font-medium capitalize w-16 ${
+                          a.status === 'success' ? 'text-green-600 dark:text-green-400'
+                          : a.status === 'failed' ? 'text-red-500 dark:text-red-400'
+                          : 'text-yellow-600 dark:text-yellow-400'}`}>
+                          {a.status}
+                        </span>
+                        <span className="text-muted-foreground font-medium w-20 capitalize">{a.target}</span>
+                        <span className="text-muted-foreground/70">
+                          {new Date(a.startedAt).toLocaleString()}
+                        </span>
+                        {a.durationMs && (
+                          <span className="text-muted-foreground/70">{(a.durationMs / 1000).toFixed(1)}s</span>
+                        )}
+                        {a.resultUrl && (
+                          <a href={a.resultUrl} target="_blank" rel="noopener noreferrer"
+                            className="ml-auto text-primary hover:text-primary/80 flex items-center gap-1">
+                            Open <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        {a.status === 'failed' && a.errorMessage && (
+                          <span className="ml-auto text-red-500 dark:text-red-400 truncate max-w-xs">{a.errorMessage}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Error logs ───────────────────────────────────────────────── */}
         {job.errorLogs.length > 0 && (

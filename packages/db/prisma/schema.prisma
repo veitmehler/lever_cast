@@ -310,7 +310,7 @@ model ArticleJob {
   topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status          String   @default("pending") // pending | in_progress | completed | approved | enriched | exported | failed
+  status          String   @default("pending") // pending | in_progress | completed | approved | enriched | published | exported | failed
   currentStep     Int      @default(0)
   enrichmentJobId String?
   totalCost       Float    @default(0)

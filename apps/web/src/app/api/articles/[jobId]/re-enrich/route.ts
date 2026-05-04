@@ -1,21 +1,9 @@
-import { auth } from '@clerk/nextjs/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { proxyToApi } from '@/lib/api-proxy'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+type Ctx = { params: Promise<{ jobId: string }> }
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> },
-) {
-  const { getToken } = await auth()
-  const token = await getToken()
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export async function POST(request: NextRequest, { params }: Ctx) {
   const { jobId } = await params
-  const res = await fetch(`${API_URL}/api/articles/${jobId}/re-enrich`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return proxyToApi(request, `/api/articles/${jobId}/re-enrich`, { method: 'POST' })
 }

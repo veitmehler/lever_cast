@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest } from 'next/server'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const DO_API_BASE = process.env.DO_API_BASE ?? 'https://api.socioply.com'
 
 export async function GET(
   _request: NextRequest,
@@ -15,8 +15,9 @@ export async function GET(
 
   const { jobId } = await params
 
-  // Proxy the SSE stream from the Fastify backend
-  const upstream = await fetch(`${API_URL}/api/articles/${jobId}/events`, {
+  // Proxy the SSE stream from the Fastify backend.
+  // Cannot use proxyToApi here because it buffers the response with arrayBuffer().
+  const upstream = await fetch(`${DO_API_BASE}/api/articles/${jobId}/events`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'text/event-stream',

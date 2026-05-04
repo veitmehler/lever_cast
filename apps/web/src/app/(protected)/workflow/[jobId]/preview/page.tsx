@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import Image from 'next/image'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_URL = process.env.DO_API_BASE ?? process.env.NEXT_PUBLIC_API_URL ?? 'https://api.socioply.com'
 
 interface ArticlePreviewData {
   title: string

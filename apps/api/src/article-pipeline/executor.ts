@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma'
 import { logger } from '../lib/logger'
 import { StepRunner } from './step-runner'
 import { DuplicateKeywordError, validatePrimaryKeywordUniqueness } from './keyword-validator'
+import { assignOutlineFramework } from './outline-assignment'
 import type { PipelineContext } from './variable-resolver'
 
 const PHASE_A_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -48,6 +49,18 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     where: { id: jobId },
     data: { status: 'in_progress', startedAt: new Date() },
   })
+
+  // Pre-flight: ensure the topic has an outline framework assigned.
+  // Runs here (in the worker) instead of in POST /api/topics so the HTTP
+  // response is fast and not subject to Vercel's serverless function timeout.
+  // Idempotent — does nothing if a framework is already set.
+  try {
+    await assignOutlineFramework(topicId)
+  } catch (err) {
+    // assignOutlineFramework already falls back to framework #1 internally;
+    // any unexpected failure here is logged and we continue with whatever the topic has.
+    logger.warn({ jobId, topicId, err }, '[executor] outline auto-assignment failed — continuing')
+  }
 
   for (const stepNumber of PHASE_A_STEPS) {
     // Skip already-completed steps (resume support)

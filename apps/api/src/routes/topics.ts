@@ -4,7 +4,6 @@ import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
-import { assignOutlineFramework } from '../article-pipeline/outline-assignment'
 
 // Accepted CSV header variations → normalised field name
 const CSV_ALIASES: Record<string, string> = {
@@ -114,10 +113,8 @@ export async function topicRoutes(app: FastifyInstance) {
       return reply.status(201).send({ topicId: topicRow.id, mode })
     }
 
-    // Auto-assign outline framework if not explicitly set (fire-and-forget before enqueue)
-    if (outlineFrameworkNumber == null) {
-      await assignOutlineFramework(topicRow.id)
-    }
+    // NOTE: Outline auto-assignment is deferred to the worker (executor.ts)
+    // so the HTTP response returns immediately instead of blocking on an LLM call.
 
     const job = await prisma.articleJob.create({
       data: { topicId: topicRow.id, userId: user.id, status: 'pending' },
@@ -210,10 +207,7 @@ export async function topicRoutes(app: FastifyInstance) {
           continue
         }
 
-        // Auto-assign if not provided in CSV
-        if (!hasExplicitFramework) {
-          await assignOutlineFramework(topicRow.id)
-        }
+        // Outline auto-assignment is deferred to the worker (executor.ts)
 
         const job = await prisma.articleJob.create({
           data: { topicId: topicRow.id, userId: user.id, status: 'pending' },

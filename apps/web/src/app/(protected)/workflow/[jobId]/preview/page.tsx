@@ -149,14 +149,11 @@ export default async function ArticlePreviewPage({
               </p>
             )}
 
-            {/* Article body */}
+            {/* Article body — .article-body is defined in globals.css and provides
+                 dark-mode-safe typography without depending on @tailwindcss/typography */}
             {data.bodyHtml ? (
               <div
-                className="prose prose-neutral dark:prose-invert max-w-none
-                  prose-headings:font-bold
-                  prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-                  prose-img:rounded-lg prose-img:w-full
-                  prose-figcaption:text-center"
+                className="article-body"
                 dangerouslySetInnerHTML={{ __html: data.bodyHtml }}
               />
             ) : (

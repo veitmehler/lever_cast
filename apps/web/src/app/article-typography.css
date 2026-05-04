@@ -1,0 +1,141 @@
+/* ── Article body typography ──────────────────────────────────────────────── */
+/* Loaded SEPARATELY from globals.css so Tailwind v4's PostCSS plugin cannot
+   reorder, layer-wrap, or strip these rules. Every property uses !important
+   to beat Tailwind's preflight reset (which zeros margins, equalises heading
+   font sizes, etc). */
+
+.article-body {
+  color: var(--card-foreground) !important;
+  line-height: 1.8 !important;
+  font-size: 1rem !important;
+}
+
+/* ── Headings ──────────────────────────────────────────────────────────────── */
+.article-body h1 {
+  display: block !important;
+  color: var(--card-foreground) !important;
+  font-size: 1.875rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  margin: 2em 0 0.75em !important;
+}
+.article-body h2 {
+  display: block !important;
+  color: var(--card-foreground) !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  margin: 2em 0 0.6em !important;
+  padding-bottom: 0.3em !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.article-body h3 {
+  display: block !important;
+  color: var(--card-foreground) !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  margin: 1.75em 0 0.5em !important;
+}
+.article-body h4,
+.article-body h5,
+.article-body h6 {
+  display: block !important;
+  color: var(--card-foreground) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  margin: 1.5em 0 0.4em !important;
+}
+
+/* ── Block elements ────────────────────────────────────────────────────────── */
+.article-body p {
+  display: block !important;
+  color: var(--card-foreground) !important;
+  margin: 0 0 1.25em !important;
+}
+.article-body ul {
+  display: block !important;
+  list-style-type: disc !important;
+  padding-left: 1.75em !important;
+  margin: 0 0 1.25em !important;
+}
+.article-body ol {
+  display: block !important;
+  list-style-type: decimal !important;
+  padding-left: 1.75em !important;
+  margin: 0 0 1.25em !important;
+}
+.article-body li {
+  display: list-item !important;
+  margin-bottom: 0.4em !important;
+  color: var(--card-foreground) !important;
+}
+.article-body blockquote {
+  display: block !important;
+  border-left: 4px solid var(--border) !important;
+  padding-left: 1em !important;
+  color: var(--muted-foreground) !important;
+  font-style: italic !important;
+  margin: 1.5em 0 !important;
+}
+
+/* ── Inline elements ───────────────────────────────────────────────────────── */
+.article-body strong { font-weight: 700 !important; color: var(--card-foreground) !important; }
+.article-body em { font-style: italic !important; }
+.article-body a { color: var(--primary) !important; text-decoration: none !important; }
+.article-body a:hover { text-decoration: underline !important; }
+
+/* ── Media ─────────────────────────────────────────────────────────────────── */
+.article-body figure { display: block !important; margin: 1.5em 0 !important; }
+.article-body figcaption {
+  display: block !important;
+  text-align: center !important;
+  font-size: 0.875rem !important;
+  color: var(--muted-foreground) !important;
+  margin-top: 0.5em !important;
+}
+.article-body img {
+  border-radius: 0.5rem !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────────── */
+.article-body table {
+  display: table !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin-bottom: 1.25em !important;
+}
+.article-body th,
+.article-body td {
+  border: 1px solid var(--border) !important;
+  padding: 0.5em 0.75em !important;
+  color: var(--card-foreground) !important;
+}
+.article-body th { background: var(--muted) !important; font-weight: 600 !important; }
+
+/* ── Code ──────────────────────────────────────────────────────────────────── */
+.article-body code {
+  background: var(--muted) !important;
+  color: var(--card-foreground) !important;
+  border-radius: 0.25rem !important;
+  padding: 0.15em 0.35em !important;
+  font-size: 0.9em !important;
+}
+.article-body pre {
+  display: block !important;
+  background: var(--muted) !important;
+  border-radius: 0.5rem !important;
+  padding: 1em !important;
+  overflow-x: auto !important;
+  margin-bottom: 1.25em !important;
+}
+
+/* ── Dividers ──────────────────────────────────────────────────────────────── */
+.article-body hr {
+  display: block !important;
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  margin: 2.5em 0 !important;
+}

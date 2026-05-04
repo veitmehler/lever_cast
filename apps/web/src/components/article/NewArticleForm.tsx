@@ -157,7 +157,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         <button
           type="button"
           onClick={() => setShowAdvanced((v) => !v)}
-          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
         >
           <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
           {showAdvanced ? 'Hide' : 'Show'} advanced options
@@ -201,7 +201,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         <Button
           type="submit"
           disabled={isSubmitting || !topic.trim()}
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-blue-600 hover:bg-blue-700 text-white"
         >
           {isSubmitting
             ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Starting pipeline…</>

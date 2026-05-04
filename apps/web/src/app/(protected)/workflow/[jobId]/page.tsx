@@ -546,24 +546,8 @@ export default function WorkflowJobPage() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions — status-specific pipeline controls (approve moved to Review Content panel) */}
           <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
-            {/* Approve button — visible when article generation completed, not yet approved */}
-            {displayStatus === 'completed' && !isApproving && (
-              <Button onClick={handleApprove} className="bg-purple-600 hover:bg-purple-700">
-                <ThumbsUp className="h-4 w-4 mr-1.5" />
-                Approve Article
-              </Button>
-            )}
-
-            {/* Approving indicator */}
-            {isApproving && (
-              <Button disabled className="bg-purple-600 opacity-75">
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Approving…
-              </Button>
-            )}
-
             {/* Enrichment running indicator */}
             {isEnriching && (
               <Button disabled className="bg-indigo-600 opacity-75">
@@ -598,27 +582,73 @@ export default function WorkflowJobPage() {
         {/* ── Review Content panel (available once article body exists) ─── */}
         {reviewAvailable && sitePage && (
           <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowReview((v) => !v)}
-              className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/40 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <ClipboardCopy className="h-4 w-4 text-muted-foreground" />
+            {/* Panel header — collapse toggle on left, approve CTA in centre-right, chevron on far right */}
+            <div className="flex items-center px-6 py-4 gap-3">
+              {/* Collapse toggle (takes up remaining space) */}
+              <button
+                type="button"
+                onClick={() => setShowReview((v) => !v)}
+                className="flex-1 flex items-center gap-2 text-left hover:opacity-80 transition-opacity min-w-0"
+              >
+                <ClipboardCopy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-semibold text-card-foreground">
                   Review Content
                 </span>
-                <span className="text-xs text-muted-foreground ml-1">
+                <span className="text-xs text-muted-foreground truncate">
                   — copy article + citations for AI quality review
                 </span>
+              </button>
+
+              {/* Approve action — only shown when reviewAvailable */}
+              <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                {displayStatus === 'completed' && !isApproving && (
+                  <Button
+                    size="sm"
+                    onClick={handleApprove}
+                    className="bg-purple-600 hover:bg-purple-700 gap-1.5"
+                  >
+                    <ThumbsUp className="h-3.5 w-3.5" />
+                    Approve Article
+                  </Button>
+                )}
+                {isApproving && (
+                  <Button size="sm" disabled className="bg-purple-600 opacity-75 gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Approving…
+                  </Button>
+                )}
+                {(displayStatus === 'approved' || displayStatus === 'enriched') && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-900/40 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
+                    <ThumbsUp className="h-3 w-3" />
+                    Approved
+                  </span>
+                )}
               </div>
-              {showReview
-                ? <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                : <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-            </button>
+
+              {/* Chevron */}
+              <button
+                type="button"
+                onClick={() => setShowReview((v) => !v)}
+                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                aria-label={showReview ? 'Collapse' : 'Expand'}
+              >
+                {showReview
+                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+            </div>
 
             {showReview && (
               <div className="px-6 pb-6 border-t border-border">
+                {/* Instructional banner — shown only when awaiting approval */}
+                {displayStatus === 'completed' && (
+                  <div className="flex items-start gap-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 px-3 py-2.5 mt-4 mb-3">
+                    <ThumbsUp className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-purple-700 dark:text-purple-300">
+                      Review the article below, then click <strong>Approve Article</strong> when you&apos;re satisfied — this starts enrichment (SEO metadata, featured image, diagrams).
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mt-4 mb-3">
                   <p className="text-xs text-muted-foreground">
                     Paste this into ChatGPT, Claude, or Gemini to evaluate Google compliance.

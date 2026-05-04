@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Save, Send, Calendar, Newspaper, MessageSquare, FileEdit } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { NewArticleForm } from '@/components/article/NewArticleForm'
 
 type PlatformKey = 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
 const PLATFORM_ORDER: PlatformKey[] = ['linkedin', 'facebook', 'instagram', 'twitter', 'threads', 'telegram']
@@ -21,8 +22,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user } = useUser()
   const [dashMode, setDashMode] = useState<DashboardMode>('social_only')
-  const [articleIdea, setArticleIdea] = useState('')
-  const [isCreatingArticle, setIsCreatingArticle] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
@@ -947,47 +946,11 @@ export default function DashboardPage() {
       {/* ── Article creation form (article modes) ───────────────────────── */}
       {dashMode !== 'social_only' && (
         <div className="mb-8 bg-card rounded-2xl border border-border p-6">
-          <h2 className="text-base font-semibold text-card-foreground mb-3">
-            {dashMode === 'article_first' ? 'Create an Article (+ social posts when ready)' : 'Create an Article'}
-          </h2>
-          <textarea
-            value={articleIdea}
-            onChange={(e) => setArticleIdea(e.target.value)}
-            placeholder="Describe the topic or idea for your article…"
-            rows={3}
-            className="w-full border border-border rounded-xl px-4 py-3 text-sm text-foreground bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mb-3"
+          <NewArticleForm
+            mode={dashMode === 'article_first' ? 'article_first' : 'article_only'}
+            variant="inline"
+            onCreated={(jobId) => router.push(`/workflow/${jobId}`)}
           />
-          <div className="flex justify-end">
-            <Button
-              onClick={async () => {
-                const trimmed = articleIdea.trim()
-                if (!trimmed) return
-                setIsCreatingArticle(true)
-                try {
-                  const res = await fetch('/api/topics', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic: trimmed, mode: dashMode }),
-                  })
-                  const data = await res.json()
-                  if (!res.ok) throw new Error(data.error ?? 'Failed to create article')
-                  toast.success('Article pipeline started!')
-                  router.push(`/workflow/${data.jobId}`)
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : 'Failed to start article')
-                } finally {
-                  setIsCreatingArticle(false)
-                }
-              }}
-              disabled={isCreatingArticle || !articleIdea.trim()}
-            >
-              {isCreatingArticle ? (
-                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Starting…</>
-              ) : (
-                <><Newspaper className="h-4 w-4 mr-1.5" />Create Article</>
-              )}
-            </Button>
-          </div>
         </div>
       )}
 

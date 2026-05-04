@@ -274,8 +274,8 @@ export default function WorkflowJobPage() {
   // Fetch brand settings once for the review block
   useEffect(() => {
     fetch('/api/brand-settings')
-      .then((r) => r.ok ? r.json() : {})
-      .then((d) => setBrandSettings({
+      .then((r) => r.ok ? r.json() : ({} as BrandSettings))
+      .then((d: BrandSettings) => setBrandSettings({
         defaultAuthorName:    d.defaultAuthorName    ?? '',
         defaultAuthorWebsite: d.defaultAuthorWebsite ?? '',
         ourExperience:        d.ourExperience        ?? '',

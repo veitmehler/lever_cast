@@ -26,12 +26,12 @@ type ArticleJob = {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:     { label: 'Pending',        color: 'bg-gray-100 text-gray-700' },
-  in_progress: { label: 'Running',        color: 'bg-blue-100 text-blue-700' },
-  completed:   { label: 'Needs Approval', color: 'bg-yellow-100 text-yellow-700' },
-  approved:    { label: 'Approved',       color: 'bg-purple-100 text-purple-700' },
-  enriched:    { label: 'Ready',          color: 'bg-green-100 text-green-700' },
-  failed:      { label: 'Failed',         color: 'bg-red-100 text-red-700' },
+  pending:     { label: 'Pending',        color: 'bg-muted text-muted-foreground' },
+  in_progress: { label: 'Running',        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  completed:   { label: 'Needs Approval', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
+  approved:    { label: 'Approved',       color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+  enriched:    { label: 'Ready',          color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  failed:      { label: 'Failed',         color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
 }
 
 const FILTERS = [
@@ -59,10 +59,10 @@ function ProgressBar({ currentStep }: { currentStep: number }) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-500">Step {currentStep}/12</span>
-        <span className="text-xs text-gray-500">{pct}%</span>
+        <span className="text-xs text-muted-foreground">Step {currentStep}/12</span>
+        <span className="text-xs text-muted-foreground">{pct}%</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-gray-200">
+      <div className="h-1.5 w-full rounded-full bg-muted">
         <div
           className="h-1.5 rounded-full bg-blue-500 transition-all"
           style={{ width: `${pct}%` }}
@@ -136,14 +136,14 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-6 mb-6 animate-in slide-in-from-top-2 duration-200">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 mb-6 animate-in slide-in-from-top-2 duration-200">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <h2 className="text-base font-semibold text-card-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-blue-500" />
             New Article
           </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             Enter a topic and the AI pipeline will generate a full article (steps 1–12, ~10 min).
           </p>
         </div>
@@ -159,7 +159,7 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Topic */}
         <div>
-          <label htmlFor="topic-input" className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="topic-input" className="block text-sm font-medium text-foreground mb-1.5">
             Topic
           </label>
           <textarea
@@ -169,17 +169,17 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
             onChange={(e) => setTopic(e.target.value)}
             placeholder="e.g. How to reduce churn in SaaS businesses using proactive customer success"
             rows={3}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
             disabled={isSubmitting}
           />
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Be specific — a detailed topic produces a better article and tighter SEO targeting.
           </p>
         </div>
 
         {/* Outline Framework */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-foreground mb-1.5">
             Outline Framework
           </label>
           <div className="relative">
@@ -187,7 +187,7 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
               value={selectedFramework ?? ''}
               onChange={(e) => setSelectedFw(e.target.value === '' ? null : parseInt(e.target.value, 10))}
               disabled={isSubmitting || frameworksLoading}
-              className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-8 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60"
+              className="w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-60"
             >
               <option value="">Auto-select (AI picks the best fit)</option>
               {frameworks.map((f) => (
@@ -199,12 +199,12 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           </div>
           {selectedFramework != null && (
-            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
               {frameworks.find((f) => f.number === selectedFramework)?.description}
             </p>
           )}
           {selectedFramework == null && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               GPT-4o-mini will pick the most appropriate framework for your topic.
             </p>
           )}
@@ -222,32 +222,32 @@ function NewArticleForm({ onClose, onCreated }: { onClose: () => void; onCreated
           </button>
 
           {showAdvanced && (
-            <div className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="mt-3 space-y-3 rounded-lg border border-border bg-muted/40 p-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Special Instructions
-                  <span className="ml-1 font-normal text-gray-400">(optional — outline focus areas or custom direction)</span>
+                  <span className="ml-1 font-normal text-muted-foreground">(optional — outline focus areas or custom direction)</span>
                 </label>
                 <textarea
                   value={specialInstructions}
                   onChange={(e) => setSpecialInst(e.target.value)}
                   rows={3}
                   placeholder="e.g. Focus on the legal risks for small businesses. Include a section on insurance."
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   disabled={isSubmitting}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Real Case Studies / Anecdotes
-                  <span className="ml-1 font-normal text-gray-400">(optional — woven into the article for credibility)</span>
+                  <span className="ml-1 font-normal text-muted-foreground">(optional — woven into the article for credibility)</span>
                 </label>
                 <textarea
                   value={realCaseStudies}
                   onChange={(e) => setRealCaseStudies(e.target.value)}
                   rows={3}
                   placeholder="e.g. Client A reduced their renewal time from 2 weeks to 3 days after implementing X."
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   disabled={isSubmitting}
                 />
               </div>
@@ -310,14 +310,14 @@ export default function WorkflowPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Article Workflow</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">Article Workflow</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               Monitor and manage your AI-generated articles
             </p>
           </div>
@@ -334,7 +334,7 @@ export default function WorkflowPage() {
             <Button
               size="sm"
               onClick={() => setShowForm((v) => !v)}
-              className={showForm ? 'bg-gray-700 hover:bg-gray-800' : 'bg-blue-600 hover:bg-blue-700'}
+              variant={showForm ? 'secondary' : 'default'}
             >
               {showForm
                 ? <><X className="h-4 w-4 mr-1.5" />Cancel</>
@@ -352,15 +352,15 @@ export default function WorkflowPage() {
         )}
 
         {/* Filter tabs */}
-        <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
           {FILTERS.map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 filter === f.value
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {f.label}
@@ -371,16 +371,16 @@ export default function WorkflowPage() {
         {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : jobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <FileText className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No article jobs yet</h3>
-            <p className="text-sm text-gray-500 mb-6">
+            <FileText className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No article jobs yet</h3>
+            <p className="text-sm text-muted-foreground mb-6">
               Click &ldquo;New Article&rdquo; above to generate your first AI article.
             </p>
-            <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Create Article
             </Button>
@@ -389,27 +389,27 @@ export default function WorkflowPage() {
           <div className="space-y-3">
             {jobs.map((job) => (
               <Link key={job.id} href={`/workflow/${job.id}`} className="block">
-                <div className="bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer">
+                <div className="bg-card rounded-lg border border-border p-5 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <StatusBadge status={job.status} />
                         {job._count.errorLogs > 0 && (
-                          <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                          <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">
                             {job._count.errorLogs} error{job._count.errorLogs !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm font-medium text-gray-900 truncate mt-1">
+                      <p className="text-sm font-medium text-card-foreground truncate mt-1">
                         {job.topic.topic}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {new Date(job.createdAt).toLocaleDateString('en-US', {
                           month: 'short', day: 'numeric', year: 'numeric',
                           hour: '2-digit', minute: '2-digit',
                         })}
                         {job.totalCost > 0 && (
-                          <span className="ml-3 text-gray-400">
+                          <span className="ml-3 text-muted-foreground/70">
                             ${job.totalCost.toFixed(4)}
                           </span>
                         )}
@@ -421,7 +421,7 @@ export default function WorkflowPage() {
                           <ProgressBar currentStep={job.currentStep} />
                         </div>
                       )}
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                   </div>
                 </div>

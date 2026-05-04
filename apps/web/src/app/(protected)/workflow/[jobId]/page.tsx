@@ -130,12 +130,12 @@ const STEP_NAMES: Record<number, string> = {
 const APPROVAL_STEPS = [13, 15, 17, 18]
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',          color: 'text-gray-500',   bg: 'bg-gray-100' },
-  in_progress: { label: 'Generating…',      color: 'text-blue-700',   bg: 'bg-blue-50' },
-  completed:   { label: 'Needs Approval',   color: 'text-yellow-700', bg: 'bg-yellow-50' },
-  approved:    { label: 'Adding Diagrams…', color: 'text-purple-700', bg: 'bg-purple-50' },
-  enriched:    { label: 'Ready to Export',  color: 'text-green-700',  bg: 'bg-green-50' },
-  failed:      { label: 'Failed',           color: 'text-red-700',    bg: 'bg-red-50' },
+  pending:     { label: 'Pending',          color: 'text-muted-foreground',                                              bg: 'bg-muted' },
+  in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',   bg: 'bg-blue-50 dark:bg-blue-900/40' },
+  completed:   { label: 'Needs Approval',   color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-900/40' },
+  approved:    { label: 'Adding Diagrams…', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
+  enriched:    { label: 'Ready to Export',  color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-50 dark:bg-green-900/40' },
+  failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',      bg: 'bg-red-50 dark:bg-red-900/40' },
 }
 
 // Statuses where the pipeline is actively running (SSE should be open)
@@ -149,7 +149,7 @@ function StepIcon({ status }: { status: StepStatus | 'idle' }) {
   if (status === 'completed') return <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
   if (status === 'failed')    return <XCircle      className="h-5 w-5 text-red-500   flex-shrink-0" />
   if (status === 'running')   return <Loader2      className="h-5 w-5 text-blue-500  animate-spin flex-shrink-0" />
-  return <Clock className="h-5 w-5 text-gray-300 flex-shrink-0" />
+  return <Clock className="h-5 w-5 text-muted-foreground/40 flex-shrink-0" />
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -383,7 +383,7 @@ export default function WorkflowJobPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -392,47 +392,47 @@ export default function WorkflowJobPage() {
   const sitePage = job.sitePage
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* Back link */}
         <Link
           href="/workflow"
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           Back to Workflow
         </Link>
 
         {/* ── Header card ───────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-6 mb-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-gray-400" />
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Article Pipeline
                 </span>
               </div>
-              <h1 className="text-xl font-bold text-gray-900 mb-2">{job.topic.topic}</h1>
+              <h1 className="text-xl font-bold text-card-foreground mb-2">{job.topic.topic}</h1>
               <StatusBadge status={displayStatus} />
             </div>
 
             {/* Metrics */}
             <div className="flex gap-6 flex-shrink-0">
               <div className="text-center">
-                <div className="flex items-center gap-1 text-gray-400 justify-center mb-0.5">
+                <div className="flex items-center gap-1 text-muted-foreground justify-center mb-0.5">
                   <DollarSign className="h-3.5 w-3.5" />
                   <span className="text-xs">Cost</span>
                 </div>
-                <p className="text-lg font-bold text-gray-900">${displayCost.toFixed(4)}</p>
+                <p className="text-lg font-bold text-card-foreground">${displayCost.toFixed(4)}</p>
               </div>
               <div className="text-center">
-                <div className="flex items-center gap-1 text-gray-400 justify-center mb-0.5">
+                <div className="flex items-center gap-1 text-muted-foreground justify-center mb-0.5">
                   <Zap className="h-3.5 w-3.5" />
                   <span className="text-xs">Tokens</span>
                 </div>
-                <p className="text-lg font-bold text-gray-900">
+                <p className="text-lg font-bold text-card-foreground">
                   {((job.totalTokens ?? 0) / 1000).toFixed(1)}k
                 </p>
               </div>
@@ -441,16 +441,16 @@ export default function WorkflowJobPage() {
 
           {/* Progress bar (generation or approval in progress) */}
           {(isGenerating || isApproving) && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-muted-foreground">
                   {isApproving
                     ? `Approval step ${displayStep}`
                     : `Step ${displayStep} of 12`}
                 </span>
-                <span className="text-sm text-gray-400">{progressPct}%</span>
+                <span className="text-sm text-muted-foreground">{progressPct}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-gray-100">
+              <div className="h-2 w-full rounded-full bg-muted">
                 <div
                   className="h-2 rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
@@ -460,7 +460,7 @@ export default function WorkflowJobPage() {
           )}
 
           {/* Actions */}
-          <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+          <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
             {/* Approve button */}
             {displayStatus === 'completed' && !isApproving && (
               <Button onClick={handleApprove} className="bg-purple-600 hover:bg-purple-700">
@@ -510,14 +510,14 @@ export default function WorkflowJobPage() {
 
         {/* ── Featured image (visible after approval) ────────────────── */}
         {sitePage?.featuredImage?.url && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <ImageIcon className="h-4 w-4 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
                 Featured Image
               </h2>
             </div>
-            <div className="relative w-full aspect-square max-w-sm rounded-lg overflow-hidden border border-gray-100">
+            <div className="relative w-full aspect-square max-w-sm rounded-lg overflow-hidden border border-border">
               <Image
                 src={sitePage.featuredImage.url}
                 alt={sitePage.featuredImage.altText ?? sitePage.title}
@@ -531,54 +531,54 @@ export default function WorkflowJobPage() {
 
         {/* ── SEO & article metadata (visible once SitePage exists) ─────── */}
         {sitePage && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <Search className="h-4 w-4 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
                 Article Metadata
               </h2>
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
               <div>
-                <dt className="text-xs text-gray-400 uppercase tracking-wide">SEO Title</dt>
-                <dd className="text-sm text-gray-900 mt-0.5 font-medium">
+                <dt className="text-xs text-muted-foreground uppercase tracking-wide">SEO Title</dt>
+                <dd className="text-sm text-card-foreground mt-0.5 font-medium">
                   {sitePage.seoTitle ?? sitePage.title}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-400 uppercase tracking-wide">URL Slug</dt>
-                <dd className="text-sm text-gray-700 mt-0.5 font-mono bg-gray-50 rounded px-2 py-0.5 inline-block">
+                <dt className="text-xs text-muted-foreground uppercase tracking-wide">URL Slug</dt>
+                <dd className="text-sm text-card-foreground mt-0.5 font-mono bg-muted rounded px-2 py-0.5 inline-block">
                   /{sitePage.slug}
                 </dd>
               </div>
               {sitePage.primaryKeyword && (
                 <div>
-                  <dt className="text-xs text-gray-400 uppercase tracking-wide">Primary Keyword</dt>
-                  <dd className="text-sm text-gray-900 mt-0.5 inline-flex items-center gap-1">
-                    <Tag className="h-3 w-3 text-gray-400" />
+                  <dt className="text-xs text-muted-foreground uppercase tracking-wide">Primary Keyword</dt>
+                  <dd className="text-sm text-card-foreground mt-0.5 inline-flex items-center gap-1">
+                    <Tag className="h-3 w-3 text-muted-foreground" />
                     {sitePage.primaryKeyword}
                   </dd>
                 </div>
               )}
               {sitePage.readingTime && (
                 <div>
-                  <dt className="text-xs text-gray-400 uppercase tracking-wide">Reading Time</dt>
-                  <dd className="text-sm text-gray-900 mt-0.5 inline-flex items-center gap-1">
-                    <BookOpen className="h-3 w-3 text-gray-400" />
+                  <dt className="text-xs text-muted-foreground uppercase tracking-wide">Reading Time</dt>
+                  <dd className="text-sm text-card-foreground mt-0.5 inline-flex items-center gap-1">
+                    <BookOpen className="h-3 w-3 text-muted-foreground" />
                     {sitePage.readingTime} min
                   </dd>
                 </div>
               )}
               {sitePage.seoDescription && (
                 <div className="col-span-2">
-                  <dt className="text-xs text-gray-400 uppercase tracking-wide">Meta Description</dt>
-                  <dd className="text-sm text-gray-700 mt-0.5">{sitePage.seoDescription}</dd>
+                  <dt className="text-xs text-muted-foreground uppercase tracking-wide">Meta Description</dt>
+                  <dd className="text-sm text-muted-foreground mt-0.5">{sitePage.seoDescription}</dd>
                 </div>
               )}
               {sitePage.excerpt && (
                 <div className="col-span-2">
-                  <dt className="text-xs text-gray-400 uppercase tracking-wide">Excerpt</dt>
-                  <dd className="text-sm text-gray-700 mt-0.5 italic">&ldquo;{sitePage.excerpt}&rdquo;</dd>
+                  <dt className="text-xs text-muted-foreground uppercase tracking-wide">Excerpt</dt>
+                  <dd className="text-sm text-muted-foreground mt-0.5 italic">&ldquo;{sitePage.excerpt}&rdquo;</dd>
                 </div>
               )}
             </dl>
@@ -587,11 +587,11 @@ export default function WorkflowJobPage() {
 
         {/* ── Enrichment status banner ─────────────────────────────────── */}
         {isEnriching && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-indigo-600 animate-spin flex-shrink-0" />
+          <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 mb-6 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 animate-spin flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-indigo-800">Generating diagrams…</p>
-              <p className="text-xs text-indigo-600 mt-0.5">
+              <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Generating diagrams…</p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
                 Claude is creating Mermaid diagrams for each section. This takes 30 s – 2 min.
               </p>
             </div>
@@ -600,18 +600,18 @@ export default function WorkflowJobPage() {
 
         {/* ── Diagrams (visible after enrichment) ──────────────────────── */}
         {sitePage?.diagrams && sitePage.diagrams.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-4 w-4 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
                 Diagrams ({sitePage.diagrams.length})
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {sitePage.diagrams.map((diagram) => (
-                <div key={diagram.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                <div key={diagram.id} className="border border-border rounded-lg overflow-hidden">
                   {diagram.cdnUrl && (
-                    <div className="relative w-full aspect-video bg-gray-50">
+                    <div className="relative w-full aspect-video bg-muted">
                       <Image
                         src={diagram.cdnUrl}
                         alt={diagram.sectionTitle}
@@ -621,8 +621,8 @@ export default function WorkflowJobPage() {
                       />
                     </div>
                   )}
-                  <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
-                    <p className="text-xs font-medium text-gray-700 truncate">
+                  <div className="px-3 py-2 bg-muted border-t border-border">
+                    <p className="text-xs font-medium text-card-foreground truncate">
                       {diagram.position}. {diagram.sectionTitle}
                     </p>
                   </div>
@@ -633,20 +633,20 @@ export default function WorkflowJobPage() {
         )}
 
         {/* ── Export panel (gated to enriched) ─────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Download className="h-4 w-4 text-gray-400" />
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider flex-1">
+            <Download className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider flex-1">
               Export
             </h2>
             <Link href={`/workflow/${jobId}/preview`} target="_blank"
-              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+              className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80">
               <Eye className="h-3.5 w-3.5" /> Preview
             </Link>
           </div>
 
           {displayStatus !== 'enriched' ? (
-            <p className="text-sm text-gray-400 italic">
+            <p className="text-sm text-muted-foreground italic">
               🔒 Export buttons unlock once enrichment completes (status: {displayStatus}).
             </p>
           ) : (
@@ -686,7 +686,7 @@ export default function WorkflowJobPage() {
               {/* Generate Social Posts from article */}
               {sitePage?.excerpt && (
                 <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>
-                  <Button size="sm" variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+                  <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30">
                     <Share2 className="h-4 w-4 mr-1.5" />
                     Generate Social Posts
                   </Button>
@@ -697,11 +697,11 @@ export default function WorkflowJobPage() {
 
           {/* Attempt history */}
           {attempts.length > 0 && (
-            <div className="mt-4 border-t border-gray-100 pt-4">
+            <div className="mt-4 border-t border-border pt-4">
               <button
                 type="button"
                 onClick={() => setShowAttempts((v) => !v)}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showAttempts
                   ? <ChevronUp className="h-3.5 w-3.5" />
@@ -711,28 +711,28 @@ export default function WorkflowJobPage() {
               {showAttempts && (
                 <div className="mt-3 space-y-2">
                   {attempts.map((a) => (
-                    <div key={a.id} className="flex items-center gap-3 text-xs rounded-lg bg-gray-50 px-3 py-2">
+                    <div key={a.id} className="flex items-center gap-3 text-xs rounded-lg bg-muted px-3 py-2">
                       <span className={`font-medium capitalize w-16 ${
-                        a.status === 'success' ? 'text-green-600'
-                        : a.status === 'failed' ? 'text-red-500'
-                        : 'text-yellow-600'}`}>
+                        a.status === 'success' ? 'text-green-600 dark:text-green-400'
+                        : a.status === 'failed' ? 'text-red-500 dark:text-red-400'
+                        : 'text-yellow-600 dark:text-yellow-400'}`}>
                         {a.status}
                       </span>
-                      <span className="text-gray-500 font-medium w-20 capitalize">{a.target}</span>
-                      <span className="text-gray-400">
+                      <span className="text-muted-foreground font-medium w-20 capitalize">{a.target}</span>
+                      <span className="text-muted-foreground/70">
                         {new Date(a.startedAt).toLocaleString()}
                       </span>
                       {a.durationMs && (
-                        <span className="text-gray-400">{(a.durationMs / 1000).toFixed(1)}s</span>
+                        <span className="text-muted-foreground/70">{(a.durationMs / 1000).toFixed(1)}s</span>
                       )}
                       {a.resultUrl && (
                         <a href={a.resultUrl} target="_blank" rel="noopener noreferrer"
-                          className="ml-auto text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                          className="ml-auto text-primary hover:text-primary/80 flex items-center gap-1">
                           Open <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
                       {a.status === 'failed' && a.errorMessage && (
-                        <span className="ml-auto text-red-500 truncate max-w-xs">{a.errorMessage}</span>
+                        <span className="ml-auto text-red-500 dark:text-red-400 truncate max-w-xs">{a.errorMessage}</span>
                       )}
                     </div>
                   ))}
@@ -743,8 +743,8 @@ export default function WorkflowJobPage() {
         </div>
 
         {/* ── Pipeline steps ────────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">
+        <div className="bg-card rounded-xl border border-border p-6 mb-6">
+          <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider mb-4">
             Pipeline Steps
           </h2>
           <div className="space-y-1">
@@ -755,11 +755,11 @@ export default function WorkflowJobPage() {
             {showApprovalSteps && (
               <>
                 <div className="flex items-center gap-3 py-2 px-1">
-                  <div className="h-px flex-1 bg-gray-100" />
-                  <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                     Approval Chain
                   </span>
-                  <div className="h-px flex-1 bg-gray-100" />
+                  <div className="h-px flex-1 bg-border" />
                 </div>
                 {approvalStepRows.map((step) => (
                   <StepRow key={step.stepNumber} step={step} approval />
@@ -771,23 +771,23 @@ export default function WorkflowJobPage() {
 
         {/* ── Error logs ───────────────────────────────────────────────── */}
         {job.errorLogs.length > 0 && (
-          <div className="bg-white rounded-xl border border-red-200 p-6">
+          <div className="bg-card rounded-xl border border-red-300 dark:border-red-800 p-6">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="h-5 w-5 text-red-500" />
-              <h2 className="text-sm font-semibold text-red-700 uppercase tracking-wider">
+              <h2 className="text-sm font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">
                 Errors ({job.errorLogs.length})
               </h2>
             </div>
             <div className="space-y-3">
               {job.errorLogs.map((err) => (
-                <div key={err.id} className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+                <div key={err.id} className="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-red-600 uppercase">{err.errorType}</span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">{err.errorType}</span>
+                    <span className="text-xs text-muted-foreground">
                       {new Date(err.createdAt).toLocaleTimeString()}
                     </span>
                   </div>
-                  <p className="text-sm text-red-700">{err.errorMessage}</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">{err.errorMessage}</p>
                 </div>
               ))}
             </div>
@@ -812,27 +812,27 @@ function StepRow({
     <div
       className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
         step.status === 'running'
-          ? 'bg-blue-50 border border-blue-100'
+          ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
           : approval
-          ? 'hover:bg-purple-50/50'
-          : 'hover:bg-gray-50'
+          ? 'hover:bg-purple-50/50 dark:hover:bg-purple-900/20'
+          : 'hover:bg-muted/60'
       }`}
     >
       <StepIcon status={step.status as StepStatus | 'idle'} />
       <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-card-foreground">
           {step.stepNumber}. {STEP_NAMES[step.stepNumber] ?? step.stepName}
         </span>
         {step.status === 'failed' && step.errorMessage && (
-          <p className="text-xs text-red-500 mt-0.5 truncate">{step.errorMessage}</p>
+          <p className="text-xs text-red-500 dark:text-red-400 mt-0.5 truncate">{step.errorMessage}</p>
         )}
       </div>
       <div className="flex items-center gap-4 flex-shrink-0">
         {step.cost != null && step.cost > 0 && (
-          <span className="text-xs text-gray-400">${step.cost.toFixed(5)}</span>
+          <span className="text-xs text-muted-foreground">${step.cost.toFixed(5)}</span>
         )}
         {step.duration != null && (
-          <span className="text-xs text-gray-400">{(step.duration / 1000).toFixed(1)}s</span>
+          <span className="text-xs text-muted-foreground">{(step.duration / 1000).toFixed(1)}s</span>
         )}
       </div>
     </div>

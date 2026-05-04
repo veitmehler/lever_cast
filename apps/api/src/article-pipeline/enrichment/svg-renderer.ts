@@ -14,6 +14,10 @@ import { randomUUID } from 'node:crypto'
 
 const MMDC_TIMEOUT_MS = 30_000
 const PUPPETEER_CONFIG = '/app/puppeteer-config.json'
+// Forces htmlLabels:false so Mermaid emits native SVG <text> elements rather
+// than HTML <foreignObject>.  resvg-js can render <text> but not <foreignObject>,
+// so without this config the rasterized PNGs come out as boxes-without-text.
+const MERMAID_CONFIG = '/app/mermaid-config.json'
 
 export class MermaidRenderError extends Error {
   constructor(message: string, public readonly stderr: string) {
@@ -50,6 +54,7 @@ function runMmdc(inFile: string, outFile: string): Promise<void> {
       '-b', 'white',
       '--width', '1200',
       '--puppeteerConfigFile', PUPPETEER_CONFIG,
+      '--configFile', MERMAID_CONFIG,
     ]
 
     const proc = spawn('mmdc', args, {

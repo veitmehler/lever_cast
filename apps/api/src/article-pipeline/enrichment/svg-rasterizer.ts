@@ -2,8 +2,13 @@
  * SVG → PNG rasterizer using @resvg/resvg-js.
  *
  * Pure-Node native binding — no libvips required.
- * Better Mermaid SVG fidelity than Sharp (handles foreignObject text).
  * 5–10× faster than Sharp for SVG→PNG specifically.
+ *
+ * NOTE: resvg is a pure-SVG renderer and cannot render <foreignObject> content
+ * (which requires an HTML/CSS layout engine).  Mermaid's defaults emit text
+ * inside <foreignObject>, which would rasterize as empty boxes.  We force
+ * `htmlLabels: false` in mermaid-config.json so labels are emitted as native
+ * SVG <text> elements that resvg renders correctly.
  */
 
 import { Resvg } from '@resvg/resvg-js'

@@ -14,8 +14,8 @@ export function cleanTextOutput(raw: string): string {
   let text = raw.trim()
   // Remove BOM
   text = text.replace(/^\uFEFF/, '')
-  // Strip ```json / ``` fences
-  text = text.replace(/^```(?:json|markdown|html|text|xml)?\s*/i, '').replace(/```\s*$/, '').trim()
+  // Strip ``` fences with any optional language tag (e.g. ```mermaid, ```json, etc.)
+  text = text.replace(/^```\w*\s*/i, '').replace(/```\s*$/, '').trim()
   // Strip wrapping quotes
   if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
     text = text.slice(1, -1).trim()

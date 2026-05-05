@@ -11,7 +11,7 @@ import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
 import { decrypt } from '../../lib/encryption'
-import { uploadBufferWithKey } from '../../lib/storage'
+import { uploadBufferWithKey, deleteS3Prefix } from '../../lib/storage'
 import {
   extractH2Sections,
   buildEnrichedHtml,
@@ -96,6 +96,10 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   await prisma.articleDiagram.deleteMany({ where: { sitePageId: sitePage.id } })
   // Clear enrichment errors so the UI only shows errors from this run.
   await prisma.errorLog.deleteMany({ where: { jobId, errorType: { startsWith: 'enrichment_' } } })
+  // Delete all S3 diagram objects so SKIPped sections don't show stale files from previous runs.
+  await deleteS3Prefix(`articles/${job.userId}/${jobId}/diagrams/`).catch((err) =>
+    logger.warn({ jobId, err }, '[enrichment] S3 diagram prefix delete failed — continuing'),
+  )
 
   const stepRows = await prisma.pipelineStep.findMany({
     where: { jobId, status: 'completed', stepNumber: { in: [2, 6] } },

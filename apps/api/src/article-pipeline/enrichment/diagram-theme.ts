@@ -25,6 +25,10 @@ const DEFAULTS: DiagramTheme = {
 }
 
 const DARK_LINE = '#6C7086'
+/** Ambient text for a white canvas (labels outside fills: axis ticks, edge labels, notes). */
+const LIGHT_AMBIENT_TEXT = '#1F2937'
+/** Ambient text for the dark canvas. */
+const DARK_AMBIENT_TEXT = '#E5E7EB'
 
 export function themeFromBrand(brand: DiagramBrandThemeInput | null | undefined): DiagramTheme {
   const b = brand ?? {}
@@ -32,29 +36,39 @@ export function themeFromBrand(brand: DiagramBrandThemeInput | null | undefined)
     primaryColor: pickHex(b.diagramPrimaryColor, DEFAULTS.primaryColor),
     secondaryColor: pickHex(b.diagramSecondaryColor, DEFAULTS.secondaryColor),
     lineColor: pickHex(b.diagramLineColor, DEFAULTS.lineColor),
-    fontFamily: typeof b.diagramFontFamily === 'string' && b.diagramFontFamily.trim().length > 0
-      ? b.diagramFontFamily.trim()
-      : DEFAULTS.fontFamily,
+    fontFamily:
+      typeof b.diagramFontFamily === 'string' && b.diagramFontFamily.trim().length > 0
+        ? b.diagramFontFamily.trim()
+        : DEFAULTS.fontFamily,
   }
 }
 
 /**
- * Light article SVG: `theme: base`, custom fills only — omit text colors so Mermaid
- * picks contrasting labels per diagram type.
+ * Light article SVG: `theme: base`, fills + luminance-paired text colors.
+ * `textColor` covers ambient labels (axis, edge, note text) on the white canvas.
+ * `primaryTextColor` / `secondaryTextColor` / `tertiaryTextColor` cover text
+ * rendered *inside* filled shapes — auto-chosen as black or white based on WCAG contrast.
  */
 export function buildDiagramInitDirective(theme: DiagramTheme): string {
   const primaryBorderColor = darkenHex(theme.primaryColor, 15)
   const secondaryBorderColor = darkenHex(theme.secondaryColor, 15)
+  const primaryTextColor = pickContrastingText(theme.primaryColor)
+  const secondaryTextColor = pickContrastingText(theme.secondaryColor)
 
   const initObj = {
     theme: 'base',
     themeVariables: {
       primaryColor: theme.primaryColor,
       primaryBorderColor,
+      primaryTextColor,
       secondaryColor: theme.secondaryColor,
       secondaryBorderColor,
+      secondaryTextColor,
       tertiaryColor: theme.secondaryColor,
+      tertiaryBorderColor: secondaryBorderColor,
+      tertiaryTextColor: secondaryTextColor,
       lineColor: theme.lineColor,
+      textColor: LIGHT_AMBIENT_TEXT,
       fontFamily: theme.fontFamily,
     },
     flowchart: { htmlLabels: false },
@@ -66,17 +80,30 @@ export function buildDiagramInitDirective(theme: DiagramTheme): string {
   return `%%{init: ${JSON.stringify(initObj)}}%%`
 }
 
-/** Social / dark PNG variant: `theme: dark` with lightened brand accents. */
+/** Social / dark PNG variant: `theme: dark`, lightened fills + luminance-paired text. */
 export function buildDarkDiagramInitDirective(theme: DiagramTheme): string {
+  const lightPrimary = lightenHex(theme.primaryColor, 15)
+  const lightSecondary = lightenHex(theme.secondaryColor, 15)
+  const primaryBorderColor = lightenHex(theme.primaryColor, 25)
+  const secondaryBorderColor = lightenHex(theme.secondaryColor, 25)
+  const primaryTextColor = pickContrastingText(lightPrimary)
+  const secondaryTextColor = pickContrastingText(lightSecondary)
+
   const initObj = {
     theme: 'dark',
     themeVariables: {
-      primaryColor: lightenHex(theme.primaryColor, 15),
-      primaryBorderColor: lightenHex(theme.primaryColor, 25),
-      secondaryColor: lightenHex(theme.secondaryColor, 15),
-      secondaryBorderColor: lightenHex(theme.secondaryColor, 25),
-      tertiaryColor: lightenHex(theme.secondaryColor, 15),
+      primaryColor: lightPrimary,
+      primaryBorderColor,
+      primaryTextColor,
+      secondaryColor: lightSecondary,
+      secondaryBorderColor,
+      secondaryTextColor,
+      tertiaryColor: lightSecondary,
+      tertiaryBorderColor: secondaryBorderColor,
+      tertiaryTextColor: secondaryTextColor,
       lineColor: DARK_LINE,
+      textColor: DARK_AMBIENT_TEXT,
+      background: DIAGRAM_DARK_BACKGROUND,
       fontFamily: theme.fontFamily,
     },
     flowchart: { htmlLabels: false },
@@ -86,6 +113,32 @@ export function buildDarkDiagramInitDirective(theme: DiagramTheme): string {
   }
 
   return `%%{init: ${JSON.stringify(initObj)}}%%`
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Return `'#FFFFFF'` or `'#000000'` — whichever yields higher contrast against `hexBg`.
+ * Uses WCAG 2.x relative luminance so mid-tone fills (blues, purples) always get
+ * a readable label color instead of the near-identical RGB-invert Mermaid defaults to.
+ */
+function pickContrastingText(hexBg: string): string {
+  const [r, g, b] = hexToRgb(hexBg)
+  const linear = (c: number) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  const L = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+  return L > 0.5 ? '#000000' : '#FFFFFF'
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = normalizeHex(hex).replace('#', '')
+  return [
+    Number.parseInt(n.slice(0, 2), 16),
+    Number.parseInt(n.slice(2, 4), 16),
+    Number.parseInt(n.slice(4, 6), 16),
+  ]
 }
 
 function pickHex(raw: string | null | undefined, fallback: string): string {
@@ -98,9 +151,7 @@ function pickHex(raw: string | null | undefined, fallback: string): string {
 
 function normalizeHex(hex: string): string {
   if (hex.length === 4 && hex.startsWith('#')) {
-    const r = hex[1]
-    const g = hex[2]
-    const b = hex[3]
+    const [, r, g, b] = hex
     return `#${r}${r}${g}${g}${b}${b}`.toUpperCase()
   }
   return hex.length === 7 ? hex.toUpperCase() : hex
@@ -115,8 +166,7 @@ function darkenHex(hex: string, percentTowardBlack: number): string {
   const r = Math.max(0, (num >> 16) - step)
   const g = Math.max(0, ((num >> 8) & 0xff) - step)
   const b = Math.max(0, (num & 0xff) - step)
-  const out = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
-  return out.toUpperCase()
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0').toUpperCase()}`
 }
 
 function lightenHex(hex: string, percentTowardWhite: number): string {
@@ -128,6 +178,5 @@ function lightenHex(hex: string, percentTowardWhite: number): string {
   const r = Math.min(255, (num >> 16) + step)
   const g = Math.min(255, ((num >> 8) & 0xff) + step)
   const b = Math.min(255, (num & 0xff) + step)
-  const out = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
-  return out.toUpperCase()
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0').toUpperCase()}`
 }

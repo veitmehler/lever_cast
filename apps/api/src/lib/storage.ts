@@ -16,7 +16,13 @@
  *   until all imageUrl values are updated by scripts/migrate-images.ts.
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3'
 
 function getS3Client(): S3Client {
   const accessKeyId = process.env.ACCESS_KEY_ID
@@ -152,6 +158,39 @@ export async function uploadBufferWithKey(
     }),
   )
   return { url: `${getCdnBase()}/${key}`, path: key }
+}
+
+/**
+ * Delete all S3 objects whose keys start with `prefix`.
+ * Processes up to 1000 objects per ListObjectsV2 page (S3 max per DeleteObjects call).
+ * Safe to call even if no objects exist under the prefix.
+ */
+export async function deleteS3Prefix(prefix: string): Promise<void> {
+  const s3 = getS3Client()
+  const bucket = getBucket()
+  let continuationToken: string | undefined
+
+  do {
+    const list = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    )
+
+    const keys = (list.Contents ?? []).map((o) => ({ Key: o.Key! }))
+    if (keys.length > 0) {
+      await s3.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: keys, Quiet: true },
+        }),
+      )
+    }
+
+    continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined
+  } while (continuationToken)
 }
 
 /**

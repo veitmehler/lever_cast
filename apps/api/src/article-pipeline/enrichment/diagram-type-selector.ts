@@ -33,7 +33,9 @@ const TYPE_GUIDANCE = `Available diagram types and when to use each:
 const SYSTEM_PROMPT =
   'You select the most appropriate Mermaid.js diagram type for one article section. ' +
   'Output ONLY the diagram type name — exactly as listed below, nothing else — no punctuation, no quotes. ' +
-  'If no diagram fits the section at all, output exactly: SKIP\n\n' +
+  'There are more sections than diagram types, so repetition is expected and normal. ' +
+  'Never output SKIP just because all types have already been used — always pick the best fit. ' +
+  'Output SKIP only when the section is purely a call-to-action, FAQ list, or contains no information a diagram could add (e.g. a conclusion with no data or process).\n\n' +
   TYPE_GUIDANCE
 
 export interface TypeSelectionResult {
@@ -52,9 +54,10 @@ export async function selectDiagramType(opts: {
 }): Promise<TypeSelectionResult> {
   const adapter = getLLMAdapter(PROVIDER)
 
+  const recentlyUsed = opts.alreadyUsed.slice(-3)
   const usedList =
-    opts.alreadyUsed.length > 0
-      ? `\nTypes already used in this article — prefer types not yet used, but repetition is acceptable; just avoid using the same type as the immediately preceding section:\n${opts.alreadyUsed.join(', ')}\n`
+    recentlyUsed.length > 0
+      ? `\nTypes used in the last ${recentlyUsed.length} section(s) — avoid repeating the immediately preceding type if another fits, but repetition is fine:\n${recentlyUsed.join(', ')}\n`
       : ''
 
   const userPrompt =

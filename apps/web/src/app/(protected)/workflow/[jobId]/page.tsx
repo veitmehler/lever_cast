@@ -61,6 +61,7 @@ type ArticleDiagram = {
   caption?: string | null
   pngS3Key?: string | null
   cdnUrl?: string | null
+  svgCdnUrl?: string | null
 }
 
 type CitationEntry = {
@@ -855,14 +856,15 @@ export default function WorkflowJobPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {sitePage.diagrams.map((diagram) => (
                 <div key={diagram.id} className="border border-border rounded-lg overflow-hidden">
-                  {diagram.cdnUrl && (
+                  {(diagram.svgCdnUrl ?? diagram.cdnUrl) && (
                     <div className="relative w-full aspect-video bg-muted">
                       <Image
-                        src={diagram.cdnUrl}
+                        src={(diagram.svgCdnUrl ?? diagram.cdnUrl) as string}
                         alt={diagram.sectionTitle}
                         fill
                         className="object-contain p-2"
                         sizes="(max-width: 640px) 100vw, 50vw"
+                        unoptimized={!!diagram.svgCdnUrl}
                       />
                     </div>
                   )}

@@ -25,6 +25,7 @@ import {
 import { generateMermaidDiagram } from './mermaid-generator'
 import { renderMermaidToSvg } from './svg-renderer'
 import { rasterizeSvg } from './svg-rasterizer'
+import { sanitizeSvg } from './svg-sanitizer'
 import { parseFaqQuestions, parseSecondaryKeywords, pickKeywordForSection } from './faq-parse'
 import { matchQuestionsToSections } from './geo-question-matcher'
 import { generateQuestionFromKeyword, rephraseForUniqueness } from './geo-question-generator'
@@ -387,7 +388,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
 
         await saveDiagramAndInsert({
           jobId,
-          sitePage,
+          sitePage: { id: sitePage.id, userId: job.userId },
           section,
           mermaidSyntax: gen2.mermaidSyntax,
           svgContent,
@@ -400,7 +401,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
 
       await saveDiagramAndInsert({
         jobId,
-        sitePage,
+        sitePage: { id: sitePage.id, userId: job.userId },
         section,
         mermaidSyntax: gen1.mermaidSyntax,
         svgContent,
@@ -526,7 +527,7 @@ async function maybeWpCategory(jobId: string): Promise<void> {
 
 interface SaveDiagramOpts {
   jobId: string
-  sitePage: { id: string; userId?: string }
+  sitePage: { id: string; userId: string }
   section: { position: number; anchor: string; heading: string; afterH2Offset: number }
   mermaidSyntax: string
   svgContent: string
@@ -537,11 +538,17 @@ interface SaveDiagramOpts {
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert } = opts
 
-  const { png, width, height } = rasterizeSvg(svgContent, 1200)
+  const cleanSvg = sanitizeSvg(svgContent)
 
-  const s3Key = `diagrams/${jobId}/${section.position}.png`
-  await uploadBufferWithKey(s3Key, png, 'image/png')
-  const pngUrl = getCdnUrl(s3Key)
+  // SVG — primary format embedded in article HTML
+  const svgKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}.svg`
+  await uploadBufferWithKey(svgKey, Buffer.from(cleanSvg, 'utf8'), 'image/svg+xml')
+  const svgUrl = getCdnUrl(svgKey)
+
+  // PNG — fallback for bundle/email exports
+  const { png, width, height } = rasterizeSvg(cleanSvg, 1200)
+  const pngKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}.png`
+  await uploadBufferWithKey(pngKey, png, 'image/png')
 
   await prisma.articleDiagram.upsert({
     where: { sitePageId_position: { sitePageId: sitePage.id, position: section.position } },
@@ -552,8 +559,9 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       sectionTitle: section.heading,
       caption: buildCaption(section.heading),
       mermaidSyntax,
-      svgContent,
-      pngS3Key: s3Key,
+      svgContent: cleanSvg,
+      svgS3Key: svgKey,
+      pngS3Key: pngKey,
       pngWidth: width,
       pngHeight: height,
       pngGeneratedAt: new Date(),
@@ -565,8 +573,9 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     },
     update: {
       mermaidSyntax,
-      svgContent,
-      pngS3Key: s3Key,
+      svgContent: cleanSvg,
+      svgS3Key: svgKey,
+      pngS3Key: pngKey,
       pngWidth: width,
       pngHeight: height,
       pngGeneratedAt: new Date(),
@@ -578,16 +587,18 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     },
   })
 
+  // Article HTML references the SVG — browsers render it natively and it's
+  // AI-crawlable text. PNG is kept for bundle/email fallback only.
   figuresToInsert.push({
     afterH2Offset: section.afterH2Offset,
     figureHtml: buildFigureHtml({
-      imgUrl: pngUrl,
+      imgUrl: svgUrl,
       alt: section.heading,
       caption: buildCaption(section.heading),
     }),
   })
 
-  logger.info({ jobId, position: section.position, pngUrl }, '[enrichment] diagram saved')
+  logger.info({ jobId, position: section.position, svgUrl }, '[enrichment] diagram saved')
 }
 
 async function finishEnrichment(

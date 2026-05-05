@@ -24,7 +24,10 @@ export function rasterizeSvg(svg: string, targetWidth = 1200): RasterizeResult {
     fitTo: { mode: 'width', value: targetWidth },
     background: '#ffffff',
     font: {
-      defaultFontFamily: 'Arial, Helvetica, sans-serif',
+      // Must be a single concrete family name — not a CSS comma-separated fallback.
+      // font-liberation (Alpine package) installs Liberation Sans, the open-source
+      // metric-compatible equivalent of Arial.
+      defaultFontFamily: 'Liberation Sans',
       loadSystemFonts: true,
     },
   })

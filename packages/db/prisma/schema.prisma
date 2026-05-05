@@ -441,6 +441,7 @@ model ArticleDiagram {
   caption        String?
   mermaidSyntax  String   @db.Text
   svgContent     String   @db.Text
+  svgS3Key       String?
   pngS3Key       String?
   pngWidth       Int?
   pngHeight      Int?

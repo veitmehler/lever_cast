@@ -18,14 +18,10 @@ const PUPPETEER_CONFIG = '/app/puppeteer-config.json'
 const MERMAID_CONFIG = '/app/mermaid-config.json'
 
 /**
- * %%{init}%% directive prepended to every Mermaid string.
- *
- * mmdc v11+ ignores --configFile for the htmlLabels flag (likely a regression).
- * Injecting the init directive at the syntax level forces the setting regardless
- * of CLI version, ensuring native SVG <text> elements are emitted rather than
- * <foreignObject> blocks that resvg-js cannot rasterize.
+ * Default init when no brand theme is injected (backwards compatible).
+ * Prefer `buildDiagramInitDirective()` from `diagram-theme.ts` for production.
  */
-const INIT_DIRECTIVE =
+export const DEFAULT_MERMAID_INIT_DIRECTIVE =
   `%%{init: {"theme": "default", ` +
   `"themeVariables": {"fontFamily": "Arial, Helvetica, sans-serif"}, ` +
   `"flowchart": {"htmlLabels": false}, ` +
@@ -41,15 +37,17 @@ export class MermaidRenderError extends Error {
   }
 }
 
-export async function renderMermaidToSvg(mermaidSyntax: string): Promise<string> {
+export async function renderMermaidToSvg(
+  mermaidSyntax: string,
+  initDirective: string = DEFAULT_MERMAID_INIT_DIRECTIVE,
+): Promise<string> {
   const id = randomUUID()
-  const inFile  = join(tmpdir(), `mermaid-in-${id}.mmd`)
+  const inFile = join(tmpdir(), `mermaid-in-${id}.mmd`)
   const outFile = join(tmpdir(), `mermaid-out-${id}.svg`)
 
-  // Prepend the init directive unless the caller already included one.
   const withInit = mermaidSyntax.trimStart().startsWith('%%{init')
     ? mermaidSyntax
-    : INIT_DIRECTIVE + '\n' + mermaidSyntax
+    : initDirective + '\n' + mermaidSyntax
 
   await writeFile(inFile, withInit, 'utf8')
 

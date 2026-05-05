@@ -38,6 +38,12 @@ export async function GET() {
         organizationPhone: null,
         organizationAddress: null,
         socialMediaLinks: null,
+        diagramPrimaryColor: null,
+        diagramPrimaryTextColor: null,
+        diagramSecondaryColor: null,
+        diagramLineColor: null,
+        diagramTextColor: null,
+        diagramFontFamily: null,
       },
     )
   } catch (err) {
@@ -70,6 +76,12 @@ export async function PATCH(request: NextRequest) {
       'organizationEmail',
       'organizationPhone',
       'organizationAddress',
+      'diagramPrimaryColor',
+      'diagramPrimaryTextColor',
+      'diagramSecondaryColor',
+      'diagramLineColor',
+      'diagramTextColor',
+      'diagramFontFamily',
     ] as const
 
     type StringField = typeof stringFields[number]

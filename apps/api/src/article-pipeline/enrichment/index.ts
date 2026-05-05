@@ -26,6 +26,8 @@ import { generateMermaidDiagram } from './mermaid-generator'
 import { renderMermaidToSvg } from './svg-renderer'
 import { rasterizeSvg } from './svg-rasterizer'
 import { sanitizeSvg } from './svg-sanitizer'
+import { selectDiagramType } from './diagram-type-selector'
+import { buildDiagramInitDirective, themeFromBrand } from './diagram-theme'
 import { parseFaqQuestions, parseSecondaryKeywords, pickKeywordForSection } from './faq-parse'
 import { matchQuestionsToSections } from './geo-question-matcher'
 import { generateQuestionFromKeyword, rephraseForUniqueness } from './geo-question-generator'
@@ -33,6 +35,7 @@ import { generateAiSummary } from './geo-summary-generator'
 import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restructurer'
 import { generateKeyTakeaways } from './key-takeaways-generator'
 import { selectWordPressCategory } from './wp-category-selector'
+import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
 
 const CDN_BASE = process.env.CDN_BASE ?? ''
 
@@ -318,71 +321,124 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   let failCount = 0
   const figuresToInsert: Array<{ afterH2Offset: number; figureHtml: string }> = []
 
-  for (const section of sections) {
-    logger.info(
-      { jobId, position: section.position, heading: section.heading.slice(0, 60) },
-      '[enrichment] processing section (mermaid)',
-    )
+  const brandStyle = await prisma.brandSettings.findUnique({
+    where: { userId: job.userId },
+    select: {
+      diagramPrimaryColor: true,
+      diagramPrimaryTextColor: true,
+      diagramSecondaryColor: true,
+      diagramLineColor: true,
+      diagramTextColor: true,
+      diagramFontFamily: true,
+    },
+  })
+  const diagramInitDirective = buildDiagramInitDirective(themeFromBrand(brandStyle ?? undefined))
 
-    try {
-      const gen1 = await generateMermaidDiagram({
-        sectionTitle: section.heading,
-        sectionHtml: section.sectionHtml,
-        articleTopic: topic.topic,
-        primaryKeyword,
-        jobId,
-        position: section.position,
-      })
+  const usedDiagramTypes: string[] = []
 
-      totalCost += gen1.cost
-      totalInputTokens += gen1.inputTokens
-      totalOutputTokens += gen1.outputTokens
+  try {
+    await getDiagramRasterBrowser()
 
-      if (gen1.mermaidSyntax === null) {
-        logger.info({ jobId, position: section.position }, '[enrichment] section skipped by LLM')
-        continue
-      }
+    for (const section of sections) {
+      logger.info(
+        { jobId, position: section.position, heading: section.heading.slice(0, 60) },
+        '[enrichment] processing section (mermaid)',
+      )
 
-      let svgContent: string
       try {
-        svgContent = await renderMermaidToSvg(gen1.mermaidSyntax)
-      } catch (renderErr) {
-        const errMsg = renderErr instanceof Error ? renderErr.message : String(renderErr)
-        logger.warn({ jobId, position: section.position, errMsg }, '[enrichment] render failed — retrying')
+        const typePick = await selectDiagramType({
+          sectionTitle: section.heading,
+          contentSnippet: stripTags(section.sectionHtml),
+          alreadyUsed: [...usedDiagramTypes],
+          jobId,
+          position: section.position,
+        })
+        totalCost += typePick.cost
+        totalInputTokens += typePick.inputTokens
+        totalOutputTokens += typePick.outputTokens
 
-        const gen2 = await generateMermaidDiagram({
+        if (typePick.diagramType === null) {
+          logger.info({ jobId, position: section.position }, '[enrichment] section skipped by diagram-type selector')
+          continue
+        }
+
+        const diagramType = typePick.diagramType
+
+        const gen1 = await generateMermaidDiagram({
           sectionTitle: section.heading,
           sectionHtml: section.sectionHtml,
           articleTopic: topic.topic,
           primaryKeyword,
+          diagramType,
           jobId,
           position: section.position,
-          retryContext: errMsg,
         })
 
-        totalCost += gen2.cost
-        totalInputTokens += gen2.inputTokens
-        totalOutputTokens += gen2.outputTokens
+        totalCost += gen1.cost
+        totalInputTokens += gen1.inputTokens
+        totalOutputTokens += gen1.outputTokens
 
-        if (gen2.mermaidSyntax === null) {
+        if (gen1.mermaidSyntax === null) {
+          logger.info({ jobId, position: section.position }, '[enrichment] section skipped by LLM')
           continue
         }
 
+        let svgContent: string
         try {
-          svgContent = await renderMermaidToSvg(gen2.mermaidSyntax)
-        } catch (retryRenderErr) {
-          const retryMsg = retryRenderErr instanceof Error ? retryRenderErr.message : String(retryRenderErr)
-          logger.warn({ jobId, position: section.position, retryMsg }, '[enrichment] render failed after retry')
-          await prisma.errorLog.create({
-            data: {
-              jobId,
-              userId: job.userId,
-              errorType: 'enrichment_render_failed',
-              errorMessage: `Section "${section.heading}": mmdc render failed after retry: ${retryMsg}`,
-              context: { position: section.position },
-            },
+          svgContent = await renderMermaidToSvg(gen1.mermaidSyntax, diagramInitDirective)
+        } catch (renderErr) {
+          const errMsg = renderErr instanceof Error ? renderErr.message : String(renderErr)
+          logger.warn({ jobId, position: section.position, errMsg }, '[enrichment] render failed — retrying')
+
+          const gen2 = await generateMermaidDiagram({
+            sectionTitle: section.heading,
+            sectionHtml: section.sectionHtml,
+            articleTopic: topic.topic,
+            primaryKeyword,
+            diagramType,
+            jobId,
+            position: section.position,
+            retryContext: errMsg,
           })
-          failCount++
+
+          totalCost += gen2.cost
+          totalInputTokens += gen2.inputTokens
+          totalOutputTokens += gen2.outputTokens
+
+          if (gen2.mermaidSyntax === null) {
+            continue
+          }
+
+          try {
+            svgContent = await renderMermaidToSvg(gen2.mermaidSyntax, diagramInitDirective)
+          } catch (retryRenderErr) {
+            const retryMsg =
+              retryRenderErr instanceof Error ? retryRenderErr.message : String(retryRenderErr)
+            logger.warn({ jobId, position: section.position, retryMsg }, '[enrichment] render failed after retry')
+            await prisma.errorLog.create({
+              data: {
+                jobId,
+                userId: job.userId,
+                errorType: 'enrichment_render_failed',
+                errorMessage: `Section "${section.heading}": mmdc render failed after retry: ${retryMsg}`,
+                context: { position: section.position },
+              },
+            })
+            failCount++
+            continue
+          }
+
+          await saveDiagramAndInsert({
+            jobId,
+            sitePage: { id: sitePage.id, userId: job.userId },
+            section,
+            mermaidSyntax: gen2.mermaidSyntax,
+            svgContent,
+            gen: gen2,
+            figuresToInsert,
+          })
+          usedDiagramTypes.push(diagramType)
+          successCount++
           continue
         }
 
@@ -390,43 +446,34 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           jobId,
           sitePage: { id: sitePage.id, userId: job.userId },
           section,
-          mermaidSyntax: gen2.mermaidSyntax,
+          mermaidSyntax: gen1.mermaidSyntax,
           svgContent,
-          gen: gen2,
+          gen: gen1,
           figuresToInsert,
         })
+        usedDiagramTypes.push(diagramType)
         successCount++
-        continue
+      } catch (sectionErr) {
+        const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)
+        logger.error({ jobId, position: section.position, err: sectionErr }, '[enrichment] section error')
+        Sentry.captureException(sectionErr, {
+          tags: { phase: 'enrichment', jobId },
+          extra: { position: section.position, heading: section.heading },
+        })
+        await prisma.errorLog.create({
+          data: {
+            jobId,
+            userId: job.userId,
+            errorType: 'enrichment_section_error',
+            errorMessage: `Section "${section.heading}": ${errMsg}`,
+            context: { position: section.position },
+          },
+        })
+        failCount++
       }
-
-      await saveDiagramAndInsert({
-        jobId,
-        sitePage: { id: sitePage.id, userId: job.userId },
-        section,
-        mermaidSyntax: gen1.mermaidSyntax,
-        svgContent,
-        gen: gen1,
-        figuresToInsert,
-      })
-      successCount++
-    } catch (sectionErr) {
-      const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)
-      logger.error({ jobId, position: section.position, err: sectionErr }, '[enrichment] section error')
-      Sentry.captureException(sectionErr, {
-        tags: { phase: 'enrichment', jobId },
-        extra: { position: section.position, heading: section.heading },
-      })
-      await prisma.errorLog.create({
-        data: {
-          jobId,
-          userId: job.userId,
-          errorType: 'enrichment_section_error',
-          errorMessage: `Section "${section.heading}": ${errMsg}`,
-          context: { position: section.position },
-        },
-      })
-      failCount++
     }
+  } finally {
+    await closeDiagramRasterBrowser()
   }
 
   if (successCount === 0 && sections.length > 0 && failCount === sections.length) {
@@ -546,7 +593,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   const svgUrl = getCdnUrl(svgKey)
 
   // PNG — fallback for bundle/email exports
-  const { png, width, height } = rasterizeSvg(cleanSvg, 1200)
+  const { png, width, height } = await rasterizeSvg(cleanSvg, 1200)
   const pngKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}.png`
   await uploadBufferWithKey(pngKey, png, 'image/png')
 

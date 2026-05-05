@@ -572,6 +572,14 @@ model BrandSettings {
   organizationAddress  String? @db.Text
   socialMediaLinks     Json?   // [{ platform: string, url: string }]
 
+  // Mermaid diagrams (article enrichment — theme injected into %%{init}%% )
+  diagramPrimaryColor     String?
+  diagramPrimaryTextColor String?
+  diagramSecondaryColor   String?
+  diagramLineColor        String?
+  diagramTextColor        String?
+  diagramFontFamily       String?
+
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

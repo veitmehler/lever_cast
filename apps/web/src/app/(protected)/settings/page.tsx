@@ -84,6 +84,14 @@ export default function SettingsPage() {
   const [organizationAddress, setOrganizationAddress]   = useState('')
   const [socialMediaLinks, setSocialMediaLinks]         = useState<Array<{ platform: string; url: string }>>([])
 
+  const [diagramPrimaryColor, setDiagramPrimaryColor]       = useState('')
+  const [diagramPrimaryTextColor, setDiagramPrimaryTextColor] = useState('')
+  const [diagramSecondaryColor, setDiagramSecondaryColor]   = useState('')
+  const [diagramLineColor, setDiagramLineColor]             = useState('')
+  const [diagramTextColor, setDiagramTextColor]             = useState('')
+  const [diagramFontFamily, setDiagramFontFamily]           = useState('')
+  const [isSavingDiagramStyle, setIsSavingDiagramStyle]     = useState(false)
+
   const [isSavingBrand, setIsSavingBrand]               = useState(false)
 
   // Fetch settings and Telegram key on mount
@@ -124,6 +132,12 @@ export default function SettingsPage() {
           if (brand.organizationPhone)   setOrganizationPhone(brand.organizationPhone)
           if (brand.organizationAddress) setOrganizationAddress(brand.organizationAddress)
           if (Array.isArray(brand.socialMediaLinks)) setSocialMediaLinks(brand.socialMediaLinks)
+          setDiagramPrimaryColor(brand.diagramPrimaryColor ?? '')
+          setDiagramPrimaryTextColor(brand.diagramPrimaryTextColor ?? '')
+          setDiagramSecondaryColor(brand.diagramSecondaryColor ?? '')
+          setDiagramLineColor(brand.diagramLineColor ?? '')
+          setDiagramTextColor(brand.diagramTextColor ?? '')
+          setDiagramFontFamily(brand.diagramFontFamily ?? '')
         }
       } catch (error) {
         console.error('Error fetching settings:', error)
@@ -495,6 +509,12 @@ export default function SettingsPage() {
           organizationPhone: organizationPhone || null,
           organizationAddress: organizationAddress || null,
           socialMediaLinks: socialMediaLinks.filter((l) => l.platform && l.url),
+          diagramPrimaryColor: diagramPrimaryColor.trim() || null,
+          diagramPrimaryTextColor: diagramPrimaryTextColor.trim() || null,
+          diagramSecondaryColor: diagramSecondaryColor.trim() || null,
+          diagramLineColor: diagramLineColor.trim() || null,
+          diagramTextColor: diagramTextColor.trim() || null,
+          diagramFontFamily: diagramFontFamily.trim() || null,
         }),
       })
       if (res.ok) {
@@ -507,6 +527,34 @@ export default function SettingsPage() {
       toast.error('Failed to save brand profile')
     } finally {
       setIsSavingBrand(false)
+    }
+  }
+
+  const handleSaveDiagramStyle = async () => {
+    setIsSavingDiagramStyle(true)
+    try {
+      const res = await fetch('/api/brand-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          diagramPrimaryColor: diagramPrimaryColor.trim() || null,
+          diagramPrimaryTextColor: diagramPrimaryTextColor.trim() || null,
+          diagramSecondaryColor: diagramSecondaryColor.trim() || null,
+          diagramLineColor: diagramLineColor.trim() || null,
+          diagramTextColor: diagramTextColor.trim() || null,
+          diagramFontFamily: diagramFontFamily.trim() || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Diagram style saved')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to save diagram style')
+      }
+    } catch {
+      toast.error('Failed to save diagram style')
+    } finally {
+      setIsSavingDiagramStyle(false)
     }
   }
 
@@ -954,6 +1002,149 @@ export default function SettingsPage() {
                   : <><Save className="w-4 h-4 mr-2" />Save Brand Profile</>}
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Mermaid diagram styling (article enrichment) */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Diagram style</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Colors and font for Mermaid diagrams inserted during article enrichment.
+            Leave blank to use built-in defaults (blue / violet / gray).
+            Secondary color is also used as the tertiary accent for a two-tone look.
+          </p>
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">Primary (node fill)</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={diagramPrimaryColor || '#3B82F6'}
+                    onChange={(e) => setDiagramPrimaryColor(e.target.value.toUpperCase())}
+                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                    aria-label="Primary diagram color"
+                  />
+                  <input
+                    type="text"
+                    value={diagramPrimaryColor}
+                    onChange={(e) => setDiagramPrimaryColor(e.target.value)}
+                    placeholder="#3B82F6"
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">Primary text (on nodes)</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={diagramPrimaryTextColor || '#FFFFFF'}
+                    onChange={(e) => setDiagramPrimaryTextColor(e.target.value.toUpperCase())}
+                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                    aria-label="Primary text color"
+                  />
+                  <input
+                    type="text"
+                    value={diagramPrimaryTextColor}
+                    onChange={(e) => setDiagramPrimaryTextColor(e.target.value)}
+                    placeholder="#FFFFFF"
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">Secondary (accent)</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={diagramSecondaryColor || '#8B5CF6'}
+                    onChange={(e) => setDiagramSecondaryColor(e.target.value.toUpperCase())}
+                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                    aria-label="Secondary diagram color"
+                  />
+                  <input
+                    type="text"
+                    value={diagramSecondaryColor}
+                    onChange={(e) => setDiagramSecondaryColor(e.target.value)}
+                    placeholder="#8B5CF6"
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">Connector lines</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={diagramLineColor || '#6B7280'}
+                    onChange={(e) => setDiagramLineColor(e.target.value.toUpperCase())}
+                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                    aria-label="Line color"
+                  />
+                  <input
+                    type="text"
+                    value={diagramLineColor}
+                    onChange={(e) => setDiagramLineColor(e.target.value)}
+                    placeholder="#6B7280"
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">Body / label text color</label>
+              <div className="flex gap-2 items-center max-w-md">
+                <input
+                  type="color"
+                  value={diagramTextColor || '#1F2937'}
+                  onChange={(e) => setDiagramTextColor(e.target.value.toUpperCase())}
+                  className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                  aria-label="Diagram text color"
+                />
+                <input
+                  type="text"
+                  value={diagramTextColor}
+                  onChange={(e) => setDiagramTextColor(e.target.value)}
+                  placeholder="#1F2937"
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">Font family</label>
+              <select
+                value={diagramFontFamily}
+                onChange={(e) => setDiagramFontFamily(e.target.value)}
+                className="w-full max-w-lg rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <option value="">Server default</option>
+                <option value="Arial, Helvetica, sans-serif">Arial, Helvetica, sans-serif</option>
+                <option value="Georgia, serif">Georgia, serif</option>
+                <option value="Inter, sans-serif">Inter, sans-serif</option>
+                <option value="Roboto, sans-serif">Roboto, sans-serif</option>
+                <option value="Open Sans, sans-serif">&quot;Open Sans&quot;, sans-serif</option>
+                <option value="Lato, sans-serif">Lato, sans-serif</option>
+                <option value="Source Sans 3, sans-serif">&quot;Source Sans 3&quot;, sans-serif</option>
+                <option value="Nunito, sans-serif">Nunito, sans-serif</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose &quot;Server default&quot; to use the built-in font.
+              </p>
+            </div>
+            <Button onClick={handleSaveDiagramStyle} disabled={isSavingDiagramStyle}>
+              {isSavingDiagramStyle ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save diagram style
+                </>
+              )}
+            </Button>
           </div>
         </div>
 

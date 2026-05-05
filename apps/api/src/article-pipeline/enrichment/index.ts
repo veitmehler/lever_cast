@@ -68,7 +68,9 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     throw new Error(`No SitePage found for job ${jobId} — approval must run first`)
   }
 
-  const bodyHtml = sitePage.bodyHtml ?? sitePage.originalBodyHtml ?? ''
+  // Always start from the pre-enrichment backup so re-runs don't accumulate
+  // stale <figure> tags from previous runs on top of new ones.
+  const bodyHtml = sitePage.originalBodyHtml ?? sitePage.bodyHtml ?? ''
   if (!bodyHtml) {
     throw new Error(`SitePage has no bodyHtml for job ${jobId}`)
   }
@@ -88,7 +90,11 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     data: { enrichmentStatus: 'in_progress', keyTakeawaysHtml: null, tocHtml: null },
   })
 
+  // Wipe previous-run artefacts so re-runs are idempotent regardless of trigger.
   await prisma.sectionEnrichment.deleteMany({ where: { sitePageId: sitePage.id } })
+  await prisma.articleDiagram.deleteMany({ where: { sitePageId: sitePage.id } })
+  // Clear enrichment errors so the UI only shows errors from this run.
+  await prisma.errorLog.deleteMany({ where: { jobId, errorType: { startsWith: 'enrichment_' } } })
 
   const stepRows = await prisma.pipelineStep.findMany({
     where: { jobId, status: 'completed', stepNumber: { in: [2, 6] } },

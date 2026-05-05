@@ -259,7 +259,9 @@ export async function articleRoutes(app: FastifyInstance) {
     }
 
     if (job.sitePage) {
-      // Wipe existing diagrams + GEO rows + restore original bodyHtml
+      // Wipe existing diagrams + GEO rows + restore original bodyHtml.
+      // The worker also does this idempotently at run-start, but clearing here
+      // gives immediate UI feedback before the job is even dequeued.
       await prisma.sectionEnrichment.deleteMany({ where: { sitePageId: job.sitePage.id } })
       await prisma.articleDiagram.deleteMany({ where: { sitePageId: job.sitePage.id } })
       await prisma.sitePage.update({
@@ -274,6 +276,9 @@ export async function articleRoutes(app: FastifyInstance) {
         },
       })
     }
+    // Clear enrichment errors immediately so the Errors panel is empty while
+    // the new run is queued — the worker will also clear them at run start.
+    await prisma.errorLog.deleteMany({ where: { jobId, errorType: { startsWith: 'enrichment_' } } })
 
     await prisma.articleJob.update({
       where: { id: jobId },

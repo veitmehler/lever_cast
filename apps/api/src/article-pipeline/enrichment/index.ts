@@ -27,7 +27,8 @@ import { renderMermaidToSvg } from './svg-renderer'
 import { rasterizeSvg } from './svg-rasterizer'
 import { sanitizeSvg } from './svg-sanitizer'
 import { selectDiagramType } from './diagram-type-selector'
-import { buildDiagramInitDirective, themeFromBrand } from './diagram-theme'
+import { buildDiagramInitDirective, buildDarkDiagramInitDirective, themeFromBrand, DIAGRAM_DARK_BACKGROUND } from './diagram-theme'
+import { postprocessDiagramPng } from './png-postprocess'
 import { parseFaqQuestions, parseSecondaryKeywords, pickKeywordForSection } from './faq-parse'
 import { matchQuestionsToSections } from './geo-question-matcher'
 import { generateQuestionFromKeyword, rephraseForUniqueness } from './geo-question-generator'
@@ -331,14 +332,14 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     where: { userId: job.userId },
     select: {
       diagramPrimaryColor: true,
-      diagramPrimaryTextColor: true,
       diagramSecondaryColor: true,
       diagramLineColor: true,
-      diagramTextColor: true,
       diagramFontFamily: true,
     },
   })
-  const diagramInitDirective = buildDiagramInitDirective(themeFromBrand(brandStyle ?? undefined))
+  const theme = themeFromBrand(brandStyle ?? undefined)
+  const diagramInitDirective = buildDiagramInitDirective(theme)
+  const darkDiagramInitDirective = buildDarkDiagramInitDirective(theme)
 
   const usedDiagramTypes: string[] = []
 
@@ -442,6 +443,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             svgContent,
             gen: gen2,
             figuresToInsert,
+            darkDiagramInitDirective,
           })
           usedDiagramTypes.push(diagramType)
           successCount++
@@ -456,6 +458,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           svgContent,
           gen: gen1,
           figuresToInsert,
+          darkDiagramInitDirective,
         })
         usedDiagramTypes.push(diagramType)
         successCount++
@@ -586,10 +589,15 @@ interface SaveDiagramOpts {
   svgContent: string
   gen: { inputTokens: number; outputTokens: number; cost: number; provider: string; model: string }
   figuresToInsert: Array<{ afterH2Offset: number; figureHtml: string }>
+  darkDiagramInitDirective: string
 }
 
+/** Match screenshot + crop background (mmdc `-b white`). */
+const DIAGRAM_LIGHT_RASTER_BG = '#FFFFFF'
+
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
-  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert } = opts
+  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective } =
+    opts
 
   const cleanSvg = sanitizeSvg(svgContent)
 
@@ -598,10 +606,27 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   await uploadBufferWithKey(svgKey, Buffer.from(cleanSvg, 'utf8'), 'image/svg+xml')
   const svgUrl = getCdnUrl(svgKey)
 
-  // PNG — fallback for bundle/email exports
-  const { png, width, height } = await rasterizeSvg(cleanSvg, 1200)
+  // PNG — light theme, tight crop + square pad (social / email fallback)
+  const rawLight = await rasterizeSvg(cleanSvg, 1200, DIAGRAM_LIGHT_RASTER_BG)
+  const light = await postprocessDiagramPng(rawLight.png, DIAGRAM_LIGHT_RASTER_BG)
   const pngKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}.png`
-  await uploadBufferWithKey(pngKey, png, 'image/png')
+  await uploadBufferWithKey(pngKey, light.png, 'image/png')
+
+  let pngDarkKey: string | null = null
+  let darkW: number | null = null
+  let darkH: number | null = null
+  try {
+    const darkSvg = await renderMermaidToSvg(mermaidSyntax, darkDiagramInitDirective, DIAGRAM_DARK_BACKGROUND)
+    const darkClean = sanitizeSvg(darkSvg)
+    const rawDark = await rasterizeSvg(darkClean, 1200, DIAGRAM_DARK_BACKGROUND)
+    const dark = await postprocessDiagramPng(rawDark.png, DIAGRAM_DARK_BACKGROUND)
+    pngDarkKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}-dark.png`
+    await uploadBufferWithKey(pngDarkKey, dark.png, 'image/png')
+    darkW = dark.width
+    darkH = dark.height
+  } catch (err) {
+    logger.warn({ jobId, position: section.position, err }, '[enrichment] dark PNG render failed — skipping')
+  }
 
   await prisma.articleDiagram.upsert({
     where: { sitePageId_position: { sitePageId: sitePage.id, position: section.position } },
@@ -615,8 +640,11 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       svgContent: cleanSvg,
       svgS3Key: svgKey,
       pngS3Key: pngKey,
-      pngWidth: width,
-      pngHeight: height,
+      pngWidth: light.width,
+      pngHeight: light.height,
+      pngDarkS3Key: pngDarkKey,
+      pngDarkWidth: darkW,
+      pngDarkHeight: darkH,
       pngGeneratedAt: new Date(),
       llmProvider: gen.provider,
       llmModel: gen.model,
@@ -629,8 +657,11 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       svgContent: cleanSvg,
       svgS3Key: svgKey,
       pngS3Key: pngKey,
-      pngWidth: width,
-      pngHeight: height,
+      pngWidth: light.width,
+      pngHeight: light.height,
+      pngDarkS3Key: pngDarkKey,
+      pngDarkWidth: darkW,
+      pngDarkHeight: darkH,
       pngGeneratedAt: new Date(),
       llmProvider: gen.provider,
       llmModel: gen.model,

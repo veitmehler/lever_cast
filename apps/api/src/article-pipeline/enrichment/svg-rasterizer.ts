@@ -18,7 +18,11 @@ export interface RasterizeResult {
   height: number
 }
 
-export async function rasterizeSvg(svg: string, targetWidth = 1200): Promise<RasterizeResult> {
+export async function rasterizeSvg(
+  svg: string,
+  targetWidth = 1200,
+  background = '#ffffff',
+): Promise<RasterizeResult> {
   const browser = await getDiagramRasterBrowser()
   const page = await browser.newPage()
 
@@ -33,7 +37,7 @@ export async function rasterizeSvg(svg: string, targetWidth = 1200): Promise<Ras
       deviceScaleFactor: scale,
     })
 
-    const html = buildHtmlWrapper(svg, dims.width, dims.height)
+    const html = buildHtmlWrapper(svg, dims.width, dims.height, background)
     const tmpFile = join(tmpdir(), `raster-${randomUUID()}.html`)
     await writeFile(tmpFile, html, 'utf8')
 
@@ -62,14 +66,14 @@ export async function rasterizeSvg(svg: string, targetWidth = 1200): Promise<Ras
   }
 }
 
-function buildHtmlWrapper(svg: string, width: number, height: number): string {
+function buildHtmlWrapper(svg: string, width: number, height: number, background: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{background:#ffffff;width:${width}px;height:${height}px;overflow:hidden;}
+html,body{background:${background};width:${width}px;height:${height}px;overflow:hidden;}
 svg{display:block;max-width:100%;max-height:100%}
 </style>
 </head>

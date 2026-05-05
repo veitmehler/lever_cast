@@ -48,6 +48,8 @@ function typeInstructions(diagramType: string): string {
 const SYSTEM_PROMPT_BASE =
   'You generate Mermaid.js diagrams that visually summarize a section of an article. ' +
   'You output ONLY valid Mermaid syntax — no explanation, no code fences, no markdown. ' +
+  'Do not add inline style directives, themeVariables, embedded init directives (%%{...}%%), classDef blocks, or other color overrides — ' +
+  'theming is applied externally so labels stay readable. ' +
   'If the section is purely narrative or no diagram fits despite the required type, output exactly: SKIP'
 
 function buildUserPrompt(opts: {

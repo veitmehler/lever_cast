@@ -62,6 +62,7 @@ type ArticleDiagram = {
   pngS3Key?: string | null
   cdnUrl?: string | null
   svgCdnUrl?: string | null
+  darkCdnUrl?: string | null
 }
 
 type CitationEntry = {

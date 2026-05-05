@@ -85,10 +85,8 @@ export default function SettingsPage() {
   const [socialMediaLinks, setSocialMediaLinks]         = useState<Array<{ platform: string; url: string }>>([])
 
   const [diagramPrimaryColor, setDiagramPrimaryColor]       = useState('')
-  const [diagramPrimaryTextColor, setDiagramPrimaryTextColor] = useState('')
   const [diagramSecondaryColor, setDiagramSecondaryColor]   = useState('')
   const [diagramLineColor, setDiagramLineColor]             = useState('')
-  const [diagramTextColor, setDiagramTextColor]             = useState('')
   const [diagramFontFamily, setDiagramFontFamily]           = useState('')
   const [isSavingDiagramStyle, setIsSavingDiagramStyle]     = useState(false)
 
@@ -133,10 +131,8 @@ export default function SettingsPage() {
           if (brand.organizationAddress) setOrganizationAddress(brand.organizationAddress)
           if (Array.isArray(brand.socialMediaLinks)) setSocialMediaLinks(brand.socialMediaLinks)
           setDiagramPrimaryColor(brand.diagramPrimaryColor ?? '')
-          setDiagramPrimaryTextColor(brand.diagramPrimaryTextColor ?? '')
           setDiagramSecondaryColor(brand.diagramSecondaryColor ?? '')
           setDiagramLineColor(brand.diagramLineColor ?? '')
-          setDiagramTextColor(brand.diagramTextColor ?? '')
           setDiagramFontFamily(brand.diagramFontFamily ?? '')
         }
       } catch (error) {
@@ -510,10 +506,8 @@ export default function SettingsPage() {
           organizationAddress: organizationAddress || null,
           socialMediaLinks: socialMediaLinks.filter((l) => l.platform && l.url),
           diagramPrimaryColor: diagramPrimaryColor.trim() || null,
-          diagramPrimaryTextColor: diagramPrimaryTextColor.trim() || null,
           diagramSecondaryColor: diagramSecondaryColor.trim() || null,
           diagramLineColor: diagramLineColor.trim() || null,
-          diagramTextColor: diagramTextColor.trim() || null,
           diagramFontFamily: diagramFontFamily.trim() || null,
         }),
       })
@@ -538,10 +532,8 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           diagramPrimaryColor: diagramPrimaryColor.trim() || null,
-          diagramPrimaryTextColor: diagramPrimaryTextColor.trim() || null,
           diagramSecondaryColor: diagramSecondaryColor.trim() || null,
           diagramLineColor: diagramLineColor.trim() || null,
-          diagramTextColor: diagramTextColor.trim() || null,
           diagramFontFamily: diagramFontFamily.trim() || null,
         }),
       })
@@ -1009,8 +1001,8 @@ export default function SettingsPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-2">Diagram style</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            Colors and font for Mermaid diagrams inserted during article enrichment.
-            Leave blank to use built-in defaults (blue / violet / gray).
+            Node and line colors for Mermaid diagrams during article enrichment; label text contrast is chosen
+            automatically by the renderer. Leave blank to use built-in defaults (blue / violet / gray).
             Secondary color is also used as the tertiary accent for a two-tone look.
           </p>
           <div className="space-y-5">
@@ -1030,25 +1022,6 @@ export default function SettingsPage() {
                     value={diagramPrimaryColor}
                     onChange={(e) => setDiagramPrimaryColor(e.target.value)}
                     placeholder="#3B82F6"
-                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-card-foreground mb-1">Primary text (on nodes)</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={diagramPrimaryTextColor || '#FFFFFF'}
-                    onChange={(e) => setDiagramPrimaryTextColor(e.target.value.toUpperCase())}
-                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
-                    aria-label="Primary text color"
-                  />
-                  <input
-                    type="text"
-                    value={diagramPrimaryTextColor}
-                    onChange={(e) => setDiagramPrimaryTextColor(e.target.value)}
-                    placeholder="#FFFFFF"
                     className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
@@ -1090,25 +1063,6 @@ export default function SettingsPage() {
                     className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-1">Body / label text color</label>
-              <div className="flex gap-2 items-center max-w-md">
-                <input
-                  type="color"
-                  value={diagramTextColor || '#1F2937'}
-                  onChange={(e) => setDiagramTextColor(e.target.value.toUpperCase())}
-                  className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
-                  aria-label="Diagram text color"
-                />
-                <input
-                  type="text"
-                  value={diagramTextColor}
-                  onChange={(e) => setDiagramTextColor(e.target.value)}
-                  placeholder="#1F2937"
-                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-                />
               </div>
             </div>
             <div>

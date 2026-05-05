@@ -23,6 +23,7 @@ interface ArticlePreviewData {
     sectionTitle: string
     caption?: string | null
     cdnUrl?: string | null
+    darkCdnUrl?: string | null
   }>
 }
 

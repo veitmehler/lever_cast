@@ -40,6 +40,7 @@ export class MermaidRenderError extends Error {
 export async function renderMermaidToSvg(
   mermaidSyntax: string,
   initDirective: string = DEFAULT_MERMAID_INIT_DIRECTIVE,
+  background: string = 'white',
 ): Promise<string> {
   const id = randomUUID()
   const inFile = join(tmpdir(), `mermaid-in-${id}.mmd`)
@@ -52,7 +53,7 @@ export async function renderMermaidToSvg(
   await writeFile(inFile, withInit, 'utf8')
 
   try {
-    await runMmdc(inFile, outFile)
+    await runMmdc(inFile, outFile, background)
     const svg = await readFile(outFile, 'utf8')
     return svg
   } finally {
@@ -63,13 +64,13 @@ export async function renderMermaidToSvg(
   }
 }
 
-function runMmdc(inFile: string, outFile: string): Promise<void> {
+function runMmdc(inFile: string, outFile: string, background: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       '-i', inFile,
       '-o', outFile,
       '-t', 'default',
-      '-b', 'white',
+      '-b', background,
       '--width', '1200',
       '--puppeteerConfigFile', PUPPETEER_CONFIG,
       '--configFile', MERMAID_CONFIG,

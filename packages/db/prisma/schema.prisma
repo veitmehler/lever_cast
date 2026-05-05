@@ -445,6 +445,9 @@ model ArticleDiagram {
   pngS3Key       String?
   pngWidth       Int?
   pngHeight      Int?
+  pngDarkS3Key   String?
+  pngDarkWidth   Int?
+  pngDarkHeight  Int?
   pngGeneratedAt DateTime?
   llmProvider    String
   llmModel       String

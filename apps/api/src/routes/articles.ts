@@ -57,7 +57,15 @@ export async function articleRoutes(app: FastifyInstance) {
           include: {
             featuredImage: { select: { id: true, url: true, altText: true } },
             diagrams: {
-              select: { id: true, position: true, sectionTitle: true, caption: true, svgS3Key: true, pngS3Key: true },
+              select: {
+                id: true,
+                position: true,
+                sectionTitle: true,
+                caption: true,
+                svgS3Key: true,
+                pngS3Key: true,
+                pngDarkS3Key: true,
+              },
               orderBy: { position: 'asc' },
             },
           },
@@ -80,6 +88,7 @@ export async function articleRoutes(app: FastifyInstance) {
               ...d,
               cdnUrl: d.pngS3Key ? `${cdnBase}/${d.pngS3Key}` : null,
               svgCdnUrl: d.svgS3Key ? `${cdnBase}/${d.svgS3Key}` : null,
+              darkCdnUrl: d.pngDarkS3Key ? `${cdnBase}/${d.pngDarkS3Key}` : null,
             })),
           }
         : null,

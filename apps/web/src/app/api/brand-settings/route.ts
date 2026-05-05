@@ -39,10 +39,8 @@ export async function GET() {
         organizationAddress: null,
         socialMediaLinks: null,
         diagramPrimaryColor: null,
-        diagramPrimaryTextColor: null,
         diagramSecondaryColor: null,
         diagramLineColor: null,
-        diagramTextColor: null,
         diagramFontFamily: null,
       },
     )
@@ -77,10 +75,8 @@ export async function PATCH(request: NextRequest) {
       'organizationPhone',
       'organizationAddress',
       'diagramPrimaryColor',
-      'diagramPrimaryTextColor',
       'diagramSecondaryColor',
       'diagramLineColor',
-      'diagramTextColor',
       'diagramFontFamily',
     ] as const
 

@@ -15,12 +15,9 @@ export const DIAGRAM_VALID_TYPES = [
   'flowchart',
   'sequenceDiagram',
   'mindmap',
-  'timeline',
   'pie',
   'stateDiagram-v2',
-  'gantt',
   'classDiagram',
-  'quadrantChart',
 ] as const
 
 export type MermaidDiagramType = typeof DIAGRAM_VALID_TYPES[number]
@@ -29,12 +26,9 @@ const TYPE_GUIDANCE = `Available diagram types and when to use each:
 - flowchart: Processes, decision logic, cause-and-effect chains, step-by-step workflows
 - sequenceDiagram: Interactions between actors/entities, communication protocols, request/response flows
 - mindmap: Concept relationships, topic breakdowns, brainstorming maps, category overviews
-- timeline: Chronological events, recovery phases, historical progression, milestones
-- pie: Proportions, distributions, percentage breakdowns (only when section contains numeric data)
+- pie: Proportions, distributions, percentage breakdowns (only when section contains clear numeric data)
 - stateDiagram-v2: State transitions, lifecycle stages, condition changes, status workflows
-- gantt: Schedules, parallel activities, treatment plans with time durations, project phases
-- classDiagram: Hierarchies, taxonomies, type relationships, has-a / is-a structures
-- quadrantChart: 2-axis comparisons, risk vs. reward, cost vs. benefit matrices`
+- classDiagram: Hierarchies, taxonomies, type relationships, has-a / is-a structures`
 
 const SYSTEM_PROMPT =
   'You select the most appropriate Mermaid.js diagram type for one article section. ' +
@@ -60,7 +54,7 @@ export async function selectDiagramType(opts: {
 
   const usedList =
     opts.alreadyUsed.length > 0
-      ? `\nTypes already used in this article — avoid repeating one of these unless no other type is appropriate:\n${opts.alreadyUsed.join(', ')}\n`
+      ? `\nTypes already used in this article — prefer types not yet used, but repetition is acceptable; just avoid using the same type as the immediately preceding section:\n${opts.alreadyUsed.join(', ')}\n`
       : ''
 
   const userPrompt =
@@ -128,12 +122,9 @@ function pickMatchingType(token: string): MermaidDiagramType | null {
   }
   if (token.includes('sequence')) return 'sequenceDiagram'
   if (token.includes('mindmap')) return 'mindmap'
-  if (token.includes('timeline')) return 'timeline'
   if (token.includes('pie')) return 'pie'
   if (token.includes('state')) return 'stateDiagram-v2'
-  if (token.includes('gantt')) return 'gantt'
   if (token.includes('class')) return 'classDiagram'
-  if (token.includes('quadrant')) return 'quadrantChart'
   if (token.includes('flow') || token === 'graph') return 'flowchart'
   return null
 }

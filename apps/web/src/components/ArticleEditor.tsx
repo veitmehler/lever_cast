@@ -407,14 +407,14 @@ function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEn
   }
 
   return (
-    <ul className="list-disc ml-6 py-3 pr-4 space-y-1 text-sm">
+    <ul className="list-disc pl-6 py-3 pr-4 space-y-1 text-sm">
       {groups.map((g, i) => (
         <li key={i}>
           <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(g.h2.text)}>
             {toTitleCase(g.h2.text)}
           </button>
           {g.h3s.length > 0 && (
-            <ul className="list-disc ml-5 mt-1 space-y-0.5">
+            <ul className="list-disc pl-5 mt-1 space-y-0.5">
               {g.h3s.map((s, j) => (
                 <li key={j}>
                   <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(s.text)}>

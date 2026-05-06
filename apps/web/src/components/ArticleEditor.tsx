@@ -16,6 +16,22 @@ import { ArticleDiagram } from '@/components/tiptap/ArticleDiagram'
 import { IslandMarker } from '@/components/tiptap/IslandMarker'
 import { restorePreservedArticleBlocks, stripPreservedArticleBlocks } from '@/lib/article-html-islands'
 
+/**
+ * Strips a leading <p> whose text begins with a markdown heading sigil (# …).
+ * Happens when old articles were approved before the server-side cleanup was deployed.
+ */
+function stripOrphanedMarkdownHeading(html: string): string {
+  if (typeof document === 'undefined') return html
+  const tpl = document.implementation.createHTMLDocument('')
+  const div = tpl.createElement('div')
+  div.innerHTML = html
+  const first = div.firstElementChild
+  if (first && first.tagName === 'P' && /^#{1,6}\s/.test(first.textContent?.trim() ?? '')) {
+    first.remove()
+  }
+  return div.innerHTML
+}
+
 const extensions = [
   StarterKit.configure({
     heading: { levels: [2, 3, 4] },
@@ -77,7 +93,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
   const editor = useEditor({
     extensions,
     immediatelyRender: false,
-    editable: mounted,
+    editable: false,
     content: '',
     editorProps: {
       attributes: {
@@ -86,9 +102,15 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
     },
   })
 
+  // TipTap initialises as non-editable; flip to editable once the client has mounted.
   useEffect(() => {
     if (!editor || !mounted) return
-    editor.commands.setContent(editorHtml || '<p></p>', { emitUpdate: false })
+    editor.setEditable(true)
+  }, [editor, mounted])
+
+  useEffect(() => {
+    if (!editor || !mounted) return
+    editor.commands.setContent(stripOrphanedMarkdownHeading(editorHtml) || '<p></p>', { emitUpdate: false })
   }, [editor, mounted, editorHtml])
 
   useEffect(() => {
@@ -186,6 +208,27 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
                 <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={3} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
               </div>
             </section>
+
+            {/* Fixed article blocks — read-only panels rendered outside TipTap */}
+            {mounted && Object.keys(islands).length > 0 && (
+              <div className="mb-6 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fixed blocks (read-only)</p>
+                {Object.entries(islands)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([id, { html, label }]) => (
+                    <details key={id} className="border border-border rounded-xl overflow-hidden" open>
+                      <summary className="flex items-center gap-2 px-4 py-2.5 bg-muted/50 cursor-pointer text-sm font-semibold text-card-foreground select-none">
+                        <span className="mr-auto">{label}</span>
+                        <span className="text-xs text-muted-foreground font-normal">click to collapse</span>
+                      </summary>
+                      <div
+                        className="article-body px-4 py-4"
+                        dangerouslySetInnerHTML={{ __html: html }}
+                      />
+                    </details>
+                  ))}
+              </div>
+            )}
 
             {/* TipTap */}
             {!mounted ? (

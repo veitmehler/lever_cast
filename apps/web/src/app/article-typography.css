@@ -236,9 +236,8 @@
   color: var(--muted-foreground) !important;
 }
 .article-editor .socioply-island-marker::before {
-  content: attr(data-island-label) !important;
+  content: "↑ " attr(data-island-label) " — shown above (read-only)" !important;
   display: block !important;
   font-weight: 600 !important;
-  margin-bottom: 0.25rem !important;
   color: var(--card-foreground) !important;
 }

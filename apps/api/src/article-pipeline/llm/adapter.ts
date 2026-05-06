@@ -15,6 +15,8 @@ export interface LLMCallOptions {
   useGenerativeSearch?: boolean
   /** Force JSON output mode (Gemini: responseMimeType = 'application/json'). */
   jsonMode?: boolean
+  /** OpenAI reasoning models (e.g. GPT-5.2 Codex) — omit temperature when set */
+  reasoningEffort?: 'low' | 'medium' | 'high'
 }
 
 export interface LLMAdapter {

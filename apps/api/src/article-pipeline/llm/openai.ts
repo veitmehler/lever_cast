@@ -47,9 +47,11 @@ export class OpenAIAdapter implements LLMAdapter {
       const response = await client.chat.completions.create({
         model,
         messages,
-        temperature,
+        ...(options.reasoningEffort
+          ? { reasoning_effort: options.reasoningEffort }
+          : { temperature }),
         ...(maxTokens ? { max_tokens: maxTokens } : {}),
-      })
+      } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
 
       const text = response.choices[0]?.message?.content ?? ''
       if (!text.trim()) throw new LLMError('OpenAI returned empty response')

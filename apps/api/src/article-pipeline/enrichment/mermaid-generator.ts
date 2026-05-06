@@ -1,16 +1,42 @@
 /**
- * Mermaid diagram generator — Claude produces valid Mermaid for one section.
+ * Mermaid diagram generator — LLM produces valid Mermaid for one section.
  * Diagram type is chosen beforehand by GPT-4o-mini (`diagram-type-selector.ts`).
  */
 
 import { getLLMAdapter } from '../llm/factory'
+import type { LLMCallOptions } from '../llm/adapter'
 import { cleanTextOutput } from '../output-cleaner'
 import { logger } from '../../lib/logger'
 
-const PROVIDER = 'anthropic'
-const MODEL = 'claude-sonnet-4-5-20250929'
-const TEMPERATURE = 0.3
+/** UI / queue preference for which LLM generates Mermaid syntax */
+export const DIAGRAM_MODEL_KEYS = ['claude', 'gpt-codex'] as const
+export type DiagramModelPreference = (typeof DIAGRAM_MODEL_KEYS)[number]
+
+type ModelRuntimeConfig = {
+  provider: 'anthropic' | 'openai'
+  model: string
+  temperature?: number
+  reasoningEffort?: 'low' | 'medium' | 'high'
+}
+
+const MODEL_CONFIGS: Record<DiagramModelPreference, ModelRuntimeConfig> = {
+  claude: {
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5-20250929',
+    temperature: 0.3,
+  },
+  'gpt-codex': {
+    provider: 'openai',
+    model: 'gpt-5.2-codex',
+    reasoningEffort: 'medium',
+  },
+}
+
 const MAX_TOKENS = 1_024
+
+function resolveDiagramModel(raw?: string): DiagramModelPreference {
+  return raw === 'gpt-codex' ? 'gpt-codex' : 'claude'
+}
 
 const VERBOSE = process.env.VERBOSE_LLM_LOGS === 'true'
 const TRUNCATE = Number.parseInt(process.env.VERBOSE_LLM_LOGS_TRUNCATE ?? '3000', 10)
@@ -45,12 +71,22 @@ function typeInstructions(diagramType: string): string {
   }
 }
 
-const SYSTEM_PROMPT_BASE =
+const SYSTEM_PROMPT_CORE =
   'You generate Mermaid.js diagrams that visually summarize a section of an article. ' +
-  'You output ONLY valid Mermaid syntax — no explanation, no code fences, no markdown. ' +
+  'You output ONLY valid Mermaid syntax — no explanation, no markdown. ' +
   'Do not add inline style directives, themeVariables, embedded init directives (%%{...}%%), classDef blocks, or other color overrides — ' +
   'theming is applied externally so labels stay readable. ' +
   'If the section is purely narrative or no diagram fits despite the required type, output exactly: SKIP'
+
+const SYSTEM_PROMPT_SUFFIX_GPT =
+  ' Repeat: output ONLY raw Mermaid diagram lines as plain text — never wrap the output in markdown code fences or ``` blocks.'
+
+function buildSystemPrompt(preference: DiagramModelPreference): string {
+  if (preference === 'gpt-codex') {
+    return SYSTEM_PROMPT_CORE + SYSTEM_PROMPT_SUFFIX_GPT
+  }
+  return SYSTEM_PROMPT_CORE + ' No code fences.'
+}
 
 /**
  * Extract the human-readable labels/concepts from Mermaid syntax so the next
@@ -137,11 +173,15 @@ export async function generateMermaidDiagram(opts: {
   jobId: string
   position: number
   diagramType: string
+  diagramModel?: string
   priorConceptsContext?: string
   retryContext?: string
 }): Promise<DiagramResult> {
-  const adapter = getLLMAdapter(PROVIDER)
-  const systemPrompt = SYSTEM_PROMPT_BASE
+  const preference = resolveDiagramModel(opts.diagramModel)
+  const cfg = MODEL_CONFIGS[preference]
+
+  const adapter = getLLMAdapter(cfg.provider)
+  const systemPrompt = buildSystemPrompt(preference)
   const userPrompt = buildUserPrompt(opts)
 
   if (VERBOSE) {
@@ -149,8 +189,8 @@ export async function generateMermaidDiagram(opts: {
       {
         jobId: opts.jobId,
         position: opts.position,
-        provider: PROVIDER,
-        model: MODEL,
+        provider: cfg.provider,
+        model: cfg.model,
         diagramType: opts.diagramType,
         systemPrompt: trunc(systemPrompt),
         userPrompt: trunc(userPrompt),
@@ -159,21 +199,28 @@ export async function generateMermaidDiagram(opts: {
     )
   }
 
-  const response = await adapter.call({
+  const callOpts: LLMCallOptions = {
     systemPrompt,
     userPrompt,
-    model: MODEL,
-    temperature: TEMPERATURE,
+    model: cfg.model,
     maxTokens: MAX_TOKENS,
-  })
+  }
+
+  if (cfg.reasoningEffort) {
+    callOpts.reasoningEffort = cfg.reasoningEffort
+  } else if (cfg.temperature !== undefined) {
+    callOpts.temperature = cfg.temperature
+  }
+
+  const response = await adapter.call(callOpts)
 
   if (VERBOSE) {
     logger.info(
       {
         jobId: opts.jobId,
         position: opts.position,
-        provider: PROVIDER,
-        model: MODEL,
+        provider: response.provider,
+        model: response.model,
         inputTokens: response.tokens.input,
         outputTokens: response.tokens.output,
         cost: response.cost,
@@ -195,8 +242,8 @@ export async function generateMermaidDiagram(opts: {
       inputTokens: response.tokens.input,
       outputTokens: response.tokens.output,
       cost: response.cost,
-      provider: PROVIDER,
-      model: MODEL,
+      provider: response.provider,
+      model: response.model,
     }
   }
 
@@ -205,7 +252,7 @@ export async function generateMermaidDiagram(opts: {
     inputTokens: response.tokens.input,
     outputTokens: response.tokens.output,
     cost: response.cost,
-    provider: PROVIDER,
-    model: MODEL,
+    provider: response.provider,
+    model: response.model,
   }
 }

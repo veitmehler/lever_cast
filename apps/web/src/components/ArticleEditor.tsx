@@ -407,26 +407,30 @@ function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEn
   }
 
   return (
-    <ul className="list-disc pl-6 py-3 pr-4 space-y-1 text-sm">
+    <div className="px-4 py-3 text-sm space-y-1.5">
       {groups.map((g, i) => (
-        <li key={i}>
-          <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(g.h2.text)}>
-            {toTitleCase(g.h2.text)}
-          </button>
+        <div key={i}>
+          <div className="flex items-start gap-2">
+            <span className="text-muted-foreground select-none mt-0.5">•</span>
+            <button type="button" className="text-left text-primary hover:underline flex-1" onClick={() => onClickEntry(g.h2.text)}>
+              {toTitleCase(g.h2.text)}
+            </button>
+          </div>
           {g.h3s.length > 0 && (
-            <ul className="list-disc pl-5 mt-1 space-y-0.5">
+            <div className="mt-1 ml-6 space-y-0.5">
               {g.h3s.map((s, j) => (
-                <li key={j}>
-                  <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(s.text)}>
+                <div key={j} className="flex items-start gap-2">
+                  <span className="text-muted-foreground select-none mt-0.5">◦</span>
+                  <button type="button" className="text-left text-primary hover:underline flex-1" onClick={() => onClickEntry(s.text)}>
                     {toTitleCase(s.text)}
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   )
 }
 

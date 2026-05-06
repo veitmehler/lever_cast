@@ -1,0 +1,316 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
+import TextAlign from '@tiptap/extension-text-align'
+import Link from '@tiptap/extension-link'
+import { Bold, Heading2, Heading3, Heading4, Italic, Link2Icon, List, ListOrdered, Redo2, Save, Undo2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import '@/app/article-typography.css'
+import { ArticleDiagram } from '@/components/tiptap/ArticleDiagram'
+import { IslandMarker } from '@/components/tiptap/IslandMarker'
+import { restorePreservedArticleBlocks, stripPreservedArticleBlocks } from '@/lib/article-html-islands'
+
+const extensions = [
+  StarterKit.configure({
+    heading: { levels: [2, 3, 4] },
+  }),
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  Placeholder.configure({ placeholder: 'Edit your article…' }),
+  Link.configure({
+    openOnClick: false,
+    autolink: true,
+    defaultProtocol: 'https',
+    HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
+  }),
+  ArticleDiagram,
+  IslandMarker,
+]
+
+export type ArticleEditorCitation = { link_title: string; link_url: string }
+
+export type ArticleEditorInitial = {
+  title: string
+  slug: string
+  bodyHtml: string
+  seoTitle: string
+  seoDescription: string
+  excerpt: string
+  readingTime?: number | null
+  primaryKeyword?: string
+}
+
+type ArticleEditorProps = {
+  jobId: string
+  initial: ArticleEditorInitial
+  featuredImage?: { url: string; altText?: string | null } | null
+  citations: ArticleEditorCitation[]
+  disclaimer: string
+}
+
+export function ArticleEditor({ jobId, initial, featuredImage, citations, disclaimer }: ArticleEditorProps) {
+  const [mounted, setMounted] = useState(false)
+  const [seoTitle, setSeoTitle] = useState(initial.seoTitle)
+  const [seoDescription, setSeoDescription] = useState(initial.seoDescription)
+  const [excerpt, setExcerpt] = useState(initial.excerpt)
+  const [saving, setSaving] = useState(false)
+
+  const islandsRef = useRef<Record<string, { html: string; label: string }>>({})
+
+  useEffect(() => setMounted(true), [])
+
+  const { editorHtml, islands } = useMemo(() => {
+    if (!mounted)
+      return { editorHtml: initial.bodyHtml, islands: {} as Record<string, { html: string; label: string }> }
+    return stripPreservedArticleBlocks(initial.bodyHtml)
+  }, [mounted, initial.bodyHtml])
+
+  useEffect(() => {
+    islandsRef.current = islands
+  }, [islands])
+
+  const editor = useEditor({
+    extensions,
+    immediatelyRender: false,
+    editable: mounted,
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'article-body focus:outline-none min-h-[24rem] max-w-none px-1 py-2',
+      },
+    },
+  })
+
+  useEffect(() => {
+    if (!editor || !mounted) return
+    editor.commands.setContent(editorHtml || '<p></p>', { emitUpdate: false })
+  }, [editor, mounted, editorHtml])
+
+  useEffect(() => {
+    setSeoTitle(initial.seoTitle)
+    setSeoDescription(initial.seoDescription)
+    setExcerpt(initial.excerpt)
+  }, [initial.seoTitle, initial.seoDescription, initial.excerpt])
+
+  const validCitations = citations.filter((c) => c.link_url)
+
+  const handleSave = async () => {
+    if (!editor) return
+    setSaving(true)
+    try {
+      const mergedHtml = restorePreservedArticleBlocks(editor.getHTML(), islandsRef.current)
+      const res = await fetch(`/api/articles/${jobId}/content`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bodyHtml: mergedHtml,
+          seoTitle: seoTitle.trim(),
+          seoDescription: seoDescription.trim(),
+          excerpt: excerpt.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Save failed')
+      }
+      toast.success('Article saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-background py-10 px-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Google snippet preview — live */}
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-8 font-sans">
+          <div className="text-xs text-green-700 dark:text-green-400 mb-1 truncate">
+            {initial.slug || 'your-site.com/article-slug'}
+          </div>
+          <div className="text-lg font-semibold text-blue-800 dark:text-blue-200 leading-tight mb-1">{seoTitle || 'Meta title'}</div>
+          <div className="text-sm text-muted-foreground leading-relaxed">{seoDescription || 'Meta description'}</div>
+        </div>
+
+        <article className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+          {featuredImage?.url && (
+            <div className="relative w-full" style={{ paddingTop: '52%' }}>
+              <Image
+                src={featuredImage.url}
+                alt={featuredImage.altText ?? initial.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 800px) 100vw, 768px"
+                priority
+              />
+            </div>
+          )}
+
+          <div className="px-8 py-10">
+            <h1 className="text-3xl font-bold text-card-foreground leading-tight mb-4">{seoTitle || initial.title}</h1>
+
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-6">
+              {initial.readingTime != null ? <span>{initial.readingTime} min read</span> : null}
+              {initial.primaryKeyword ? (
+                <span className="bg-primary/10 text-primary rounded-full px-2.5 py-0.5 text-xs font-medium">{initial.primaryKeyword}</span>
+              ) : null}
+            </div>
+
+            <section className="space-y-4 mb-8 border border-border rounded-xl p-4 bg-muted/30">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Edit metadata</h2>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Meta title</label>
+                <input
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Meta description</label>
+                <textarea
+                  value={seoDescription}
+                  onChange={(e) => setSeoDescription(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">Excerpt</label>
+                <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={3} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+              </div>
+            </section>
+
+            {/* TipTap */}
+            {!mounted ? (
+              <div className="article-body rounded-xl bg-muted animate-pulse min-h-[360px]" />
+            ) : (
+              <div className="article-editor border border-border rounded-xl bg-background overflow-hidden">
+                <div className="flex flex-wrap gap-1 p-2 border-b border-border bg-muted/40">
+                  {editor && (
+                    <>
+                      <ToolbarIcon
+                        pressed={editor.isActive('bold')}
+                        onClick={() => editor.chain().focus().toggleBold().run()}
+                        label="Bold"
+                      >
+                        <Bold className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon pressed={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
+                        <Italic className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <div className="w-px h-6 bg-border mx-1 self-center" />
+                      <ToolbarIcon pressed={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="H2">
+                        <Heading2 className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon pressed={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} label="H3">
+                        <Heading3 className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon pressed={editor.isActive('heading', { level: 4 })} onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} label="H4">
+                        <Heading4 className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <div className="w-px h-6 bg-border mx-1 self-center" />
+                      <ToolbarIcon pressed={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Bullet list">
+                        <List className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon pressed={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} label="Ordered list">
+                        <ListOrdered className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon
+                        pressed={editor.isActive('link')}
+                        onClick={() => {
+                          const prev = editor.getAttributes('link').href as string | undefined
+                          const href = window.prompt('Link URL', prev ?? 'https://')
+                          if (href === null) return
+                          if (href === '') {
+                            editor.chain().focus().extendMarkRange('link').unsetLink().run()
+                            return
+                          }
+                          editor.chain().focus().extendMarkRange('link').setLink({ href }).run()
+                        }}
+                        label="Link"
+                      >
+                        <Link2Icon className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <div className="w-px h-6 bg-border mx-1 self-center" />
+                      <ToolbarIcon pressed={false} onClick={() => editor.chain().focus().undo().run()} label="Undo">
+                        <Undo2 className="h-4 w-4" />
+                      </ToolbarIcon>
+                      <ToolbarIcon pressed={false} onClick={() => editor.chain().focus().redo().run()} label="Redo">
+                        <Redo2 className="h-4 w-4" />
+                      </ToolbarIcon>
+                    </>
+                  )}
+                </div>
+                <EditorContent editor={editor} className="px-4 py-3" />
+              </div>
+            )}
+
+            <div className="flex justify-end mt-6">
+              <Button type="button" onClick={() => void handleSave()} disabled={saving || !mounted || !editor}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving…' : 'Save changes'}
+              </Button>
+            </div>
+
+            {validCitations.length > 0 && (
+              <section className="mt-10 border-t border-border pt-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">References</h2>
+                <ol className="space-y-1.5 list-decimal pl-5">
+                  {validCitations.map((c, i) => (
+                    <li key={i} className="text-sm text-muted-foreground">
+                      <a href={c.link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        {c.link_title || c.link_url}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {disclaimer ? (
+              <footer className="mt-8 bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">{disclaimer}</footer>
+            ) : null}
+          </div>
+        </article>
+
+        <div className="mt-6 text-center">
+          <a href={`/workflow/${jobId}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            ← Back to job
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ToolbarIcon({
+  children,
+  onClick,
+  pressed,
+  label,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  pressed: boolean
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`rounded-md p-2 transition-colors hover:bg-accent ${pressed ? 'bg-accent ring-1 ring-primary/30' : ''}`}
+    >
+      {children}
+    </button>
+  )
+}

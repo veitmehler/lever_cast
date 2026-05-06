@@ -34,6 +34,24 @@ figure.article-diagram figcaption{margin-top:.5rem;font-size:.875rem;color:#6b72
 .snippet-preview .seo-desc{font-size:.875rem;color:#4d5156;line-height:1.5}
 `.trim()
 
+function buildArticleTypographyCss(t: OutputPayload['articleTypography']): string {
+  if (!t) return ''
+  const parts: string[] = []
+  if (t.fontFamily?.trim()) {
+    parts.push(`font-family:${t.fontFamily.replace(/[;}<>]/g, '').trim()}`)
+  }
+  if (t.fontWeight?.trim()) {
+    const w = t.fontWeight.replace(/[^0-9a-z-]/gi, '').trim().slice(0, 8)
+    if (w) parts.push(`font-weight:${w}`)
+  }
+  if (t.fontSizeBase?.trim()) {
+    const s = t.fontSizeBase.replace(/[;}<>]/g, '').trim().slice(0, 24)
+    if (s) parts.push(`font-size:${s}`)
+  }
+  if (parts.length === 0) return ''
+  return `.page{${parts.join(';')}}`
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -83,6 +101,8 @@ export function buildHtmlBody(
   <div class="seo-desc">${escapeHtml(payload.seoDescription)}</div>
 </div>`
 
+  const typo = buildArticleTypographyCss(payload.articleTypography)
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -95,6 +115,7 @@ export function buildHtmlBody(
   ${payload.featuredImage ? `<meta property="og:image" content="${escapeHtml(payload.featuredImage.cdnUrl)}" />` : ''}
   <link rel="canonical" href="${escapeHtml(payload.slug)}" />
   <style>${ARTICLE_CSS}</style>
+  ${typo ? `<style>${typo}</style>` : ''}
 </head>
 <body>
 <div class="page">

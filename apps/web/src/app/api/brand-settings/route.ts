@@ -42,6 +42,9 @@ export async function GET() {
         diagramSecondaryColor: null,
         diagramLineColor: null,
         diagramFontFamily: null,
+        articleFontFamily: null,
+        articleFontWeight: null,
+        articleFontSizeBase: null,
       },
     )
   } catch (err) {
@@ -78,9 +81,10 @@ export async function PATCH(request: NextRequest) {
       'diagramSecondaryColor',
       'diagramLineColor',
       'diagramFontFamily',
+      'articleFontFamily',
+      'articleFontWeight',
+      'articleFontSizeBase',
     ] as const
-
-    type StringField = typeof stringFields[number]
 
     const data: Prisma.BrandSettingsUpdateInput = {}
 

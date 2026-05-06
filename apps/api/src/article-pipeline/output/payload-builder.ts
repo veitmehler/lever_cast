@@ -26,6 +26,17 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
           diagrams: { orderBy: { position: 'asc' } },
         },
       },
+      user: {
+        select: {
+          brandSettings: {
+            select: {
+              articleFontFamily: true,
+              articleFontWeight: true,
+              articleFontSizeBase: true,
+            },
+          },
+        },
+      },
     },
   })
 
@@ -87,6 +98,16 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
       height: d.pngHeight,
     }))
 
+  const brand = job.user.brandSettings
+  const articleTypography =
+    brand && (brand.articleFontFamily ?? brand.articleFontWeight ?? brand.articleFontSizeBase)
+      ? {
+          fontFamily: brand.articleFontFamily ?? null,
+          fontWeight: brand.articleFontWeight ?? null,
+          fontSizeBase: brand.articleFontSizeBase ?? null,
+        }
+      : null
+
   return {
     jobId,
     userId: job.userId,
@@ -106,5 +127,6 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
       readingTime: sp.readingTime,
       publishedAt: sp.publishedAt,
     },
+    articleTypography,
   }
 }

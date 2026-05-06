@@ -583,6 +583,11 @@ model BrandSettings {
   diagramTextColor        String?
   diagramFontFamily       String?
 
+  // Article typography (standalone HTML export only — not WordPress)
+  articleFontFamily     String?
+  articleFontWeight     String?
+  articleFontSizeBase   String?
+
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

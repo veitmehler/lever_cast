@@ -1,11 +1,18 @@
 import { createHash } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
 import { getBoss, QUEUES } from '../queues/index'
 import { VALID_TARGETS } from '../article-pipeline/output/registry'
+
+function calculateReadingTimeFromHtml(html: string): number {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const words = text.split(' ').filter(Boolean).length
+  return Math.max(1, Math.ceil(words / 200))
+}
 
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
@@ -96,6 +103,60 @@ export async function articleRoutes(app: FastifyInstance) {
 
     return reply.send({ job: enrichedJob })
   })
+
+  // ── PATCH /api/articles/:jobId/content — editable preview saves ────────────
+  app.patch<{ Params: { jobId: string } }>(
+    '/articles/:jobId/content',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const sitePageRow = await prisma.sitePage.findFirst({
+        where: { jobId, userId: user.id },
+        select: { id: true },
+      })
+      if (!sitePageRow) return reply.status(404).send({ error: 'Article job not found' })
+
+      const body = request.body as Record<string, unknown>
+      const update: Prisma.SitePageUpdateInput = {}
+      let hasField = false
+
+      if (typeof body.bodyHtml === 'string') {
+        update.bodyHtml = body.bodyHtml
+        update.readingTime = calculateReadingTimeFromHtml(body.bodyHtml)
+        hasField = true
+      }
+      if (typeof body.seoTitle === 'string') {
+        const t = body.seoTitle.trim()
+        update.seoTitle = t
+        update.title = t
+        hasField = true
+      }
+      if (typeof body.seoDescription === 'string') {
+        update.seoDescription = body.seoDescription.trim() || null
+        hasField = true
+      }
+      if (typeof body.excerpt === 'string') {
+        update.excerpt = body.excerpt.trim() || null
+        hasField = true
+      }
+
+      if (!hasField) {
+        return reply.status(400).send({ error: 'No valid fields to update' })
+      }
+
+      await prisma.sitePage.update({
+        where: { id: sitePageRow.id },
+        data: update,
+      })
+
+      return reply.send({ ok: true })
+    },
+  )
 
   // ── GET /api/articles/:jobId/events — SSE status stream ──────────────────
   app.get<{ Params: { jobId: string } }>('/articles/:jobId/events', async (request, reply) => {

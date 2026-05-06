@@ -184,7 +184,7 @@ export function buildTocHtml(entries: TocEntry[]): string {
   }
   inner += '</ul>'
 
-  return `<nav class="article-toc" aria-label="Table of Contents">\n  <details open>\n    <summary>Table of Contents</summary>\n    ${inner}\n  </details>\n</nav>`
+  return `<nav class="article-toc" aria-label="Table of Contents">\n  <details>\n    <summary>Table of Contents</summary>\n    ${inner}\n  </details>\n</nav>`
 }
 
 /**

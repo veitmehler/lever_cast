@@ -97,6 +97,11 @@ function truncateExcerpt(text: string): string {
   return cleaned.length > 150 ? `${cleaned.slice(0, 147)}...` : cleaned
 }
 
+/** Strip a leading markdown doc title (step 11 often starts with `# Corrected Article` etc.) */
+export function cleanStepOutput(text: string): string {
+  return text.replace(/^#+\s+[^\r\n]+\s*\r?\n+/, '').trimStart()
+}
+
 // ── Main approval flow ─────────────────────────────────────────────────────────
 
 export async function approveArticleJob(jobId: string): Promise<void> {
@@ -134,11 +139,11 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   }
 
   // ── Confirm we have the minimum steps needed ───────────────────────────────
-  const step9 = ctx.completedSteps.get(9) ?? ''
-  const step11 = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
-  if (!step11) {
+  const step11Raw = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
+  if (!step11Raw) {
     throw new Error('Missing step 11 (article body) — cannot approve')
   }
+  const step11 = cleanStepOutput(step11Raw)
 
   // ── Step 13: generate_seo_metadata ────────────────────────────────────────
   logger.info({ jobId }, '[approval] step 13 — generate_seo_metadata')

@@ -37,6 +37,13 @@ export interface OutputPayload {
     readingTime?: number | null
     publishedAt?: Date | null
   }
+
+  /** From BrandSettings — injected into standalone HTML `<style>` only */
+  articleTypography?: {
+    fontFamily?: string | null
+    fontWeight?: string | null
+    fontSizeBase?: string | null
+  } | null
 }
 
 export interface OutputAttemptResult {

@@ -90,6 +90,11 @@ export default function SettingsPage() {
   const [diagramFontFamily, setDiagramFontFamily]           = useState('')
   const [isSavingDiagramStyle, setIsSavingDiagramStyle]     = useState(false)
 
+  const [articleFontFamily, setArticleFontFamily] = useState('')
+  const [articleFontWeight, setArticleFontWeight] = useState('400')
+  const [articleFontSizeBase, setArticleFontSizeBase] = useState('16px')
+  const [isSavingArticleFonts, setIsSavingArticleFonts] = useState(false)
+
   const [isSavingBrand, setIsSavingBrand]               = useState(false)
 
   // Fetch settings and Telegram key on mount
@@ -134,6 +139,9 @@ export default function SettingsPage() {
           setDiagramSecondaryColor(brand.diagramSecondaryColor ?? '')
           setDiagramLineColor(brand.diagramLineColor ?? '')
           setDiagramFontFamily(brand.diagramFontFamily ?? '')
+          setArticleFontFamily(brand.articleFontFamily ?? '')
+          setArticleFontWeight(brand.articleFontWeight ?? '400')
+          setArticleFontSizeBase(brand.articleFontSizeBase ?? '16px')
         }
       } catch (error) {
         console.error('Error fetching settings:', error)
@@ -547,6 +555,31 @@ export default function SettingsPage() {
       toast.error('Failed to save diagram style')
     } finally {
       setIsSavingDiagramStyle(false)
+    }
+  }
+
+  const handleSaveArticleTypography = async () => {
+    setIsSavingArticleFonts(true)
+    try {
+      const res = await fetch('/api/brand-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          articleFontFamily: articleFontFamily.trim() || null,
+          articleFontWeight: articleFontWeight.trim() || null,
+          articleFontSizeBase: articleFontSizeBase.trim() || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Article typography saved')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to save article typography')
+      }
+    } catch {
+      toast.error('Failed to save article typography')
+    } finally {
+      setIsSavingArticleFonts(false)
     }
   }
 
@@ -1096,6 +1129,86 @@ export default function SettingsPage() {
                 <>
                   <Save className="w-4 h-4 mr-2" />
                   Save diagram style
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Standalone HTML article typography */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Article typography (HTML export)</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            These settings apply to the downloadable standalone <code className="text-xs bg-muted px-1 rounded">article.html</code> export only.
+            WordPress publishes use your theme&apos;s typography.
+          </p>
+          <div className="space-y-5 max-w-lg">
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">Font family</label>
+              <input
+                type="text"
+                value={articleFontFamily}
+                onChange={(e) => setArticleFontFamily(e.target.value)}
+                placeholder='e.g. "Inter", system-ui, sans-serif'
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Quick picks:{' '}
+                <button type="button" className="underline text-primary" onClick={() => setArticleFontFamily('Georgia, serif')}>
+                  Georgia
+                </button>
+                {' · '}
+                <button type="button" className="underline text-primary" onClick={() => setArticleFontFamily('Inter, sans-serif')}>
+                  Inter
+                </button>
+                {' · '}
+                <button type="button" className="underline text-primary" onClick={() => setArticleFontFamily('Merriweather, serif')}>
+                  Merriweather
+                </button>
+                {' · '}
+                <button type="button" className="underline text-primary" onClick={() => setArticleFontFamily('Roboto, sans-serif')}>
+                  Roboto
+                </button>
+                {' · '}
+                <button type="button" className="underline text-primary" onClick={() => setArticleFontFamily('"Open Sans", sans-serif')}>
+                  Open Sans
+                </button>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">Font weight (body)</label>
+              <select
+                value={articleFontWeight}
+                onChange={(e) => setArticleFontWeight(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="400">400 — Normal</option>
+                <option value="500">500 — Medium</option>
+                <option value="600">600 — Semi-bold</option>
+                <option value="700">700 — Bold</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">Base font size</label>
+              <input
+                type="text"
+                value={articleFontSizeBase}
+                onChange={(e) => setArticleFontSizeBase(e.target.value)}
+                placeholder="16px"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Use a CSS length (e.g. 16px, 1rem, 112.5%).</p>
+            </div>
+            <Button onClick={() => void handleSaveArticleTypography()} disabled={isSavingArticleFonts}>
+              {isSavingArticleFonts ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save article typography
                 </>
               )}
             </Button>

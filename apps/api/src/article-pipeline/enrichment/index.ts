@@ -56,11 +56,8 @@ function buildCaption(sectionTitle: string): string {
   return `Diagram: ${sectionTitle}`
 }
 
-export async function runArticleEnrichment(
-  jobId: string,
-  opts?: { diagramModel?: string },
-): Promise<void> {
-  logger.info({ jobId, diagramModel: opts?.diagramModel }, '[enrichment] starting')
+export async function runArticleEnrichment(jobId: string): Promise<void> {
+  logger.info({ jobId }, '[enrichment] starting')
 
   const job = await prisma.articleJob.findUniqueOrThrow({
     where: { id: jobId },
@@ -417,7 +414,6 @@ export async function runArticleEnrichment(
           primaryKeyword,
           diagramType,
           priorConceptsContext,
-          diagramModel: opts?.diagramModel,
           jobId,
           position: section.position,
         })
@@ -445,7 +441,6 @@ export async function runArticleEnrichment(
             primaryKeyword,
             diagramType,
             priorConceptsContext,
-            diagramModel: opts?.diagramModel,
             jobId,
             position: section.position,
             retryContext: errMsg,

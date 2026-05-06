@@ -6,19 +6,17 @@ import { prisma } from '../lib/prisma'
 
 export interface ArticleEnrichmentJobData {
   jobId: string
-  /** Re-enrich UI picks diagram LLM; absent on first enrichment (defaults to Claude) */
-  diagramModel?: string
 }
 
 export async function articleEnrichmentHandler(
   jobs: PgBoss.Job<ArticleEnrichmentJobData>[],
 ): Promise<void> {
   for (const job of jobs) {
-    const { jobId, diagramModel } = job.data
+    const { jobId } = job.data
     logger.info({ jobId, pgBossJobId: job.id }, '[article-enrichment] starting enrichment')
 
     try {
-      await runArticleEnrichment(jobId, { diagramModel })
+      await runArticleEnrichment(jobId)
     } catch (err) {
       logger.error({ jobId, err }, '[article-enrichment] enrichment failed')
       Sentry.captureException(err, { tags: { queue: 'article-enrichment', jobId } })

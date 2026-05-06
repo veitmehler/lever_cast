@@ -307,8 +307,6 @@ export default function WorkflowJobPage() {
   const [isResuming, setIsResuming] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [isReEnriching, setIsReEnriching] = useState(false)
-  /** LLM backend for diagram Mermaid generation — re-enrich only */
-  const [diagramModel, setDiagramModel] = useState<'claude' | 'gpt-codex'>('claude')
   const [isPublishing, setIsPublishing] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
   const [exportingTarget, setExportingTarget] = useState<string | null>(null)
@@ -449,11 +447,7 @@ export default function WorkflowJobPage() {
   const handleReEnrich = async () => {
     setIsReEnriching(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/re-enrich`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ diagramModel }),
-      })
+      const res = await fetch(`/api/articles/${jobId}/re-enrich`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to re-enrich')
@@ -905,18 +899,6 @@ export default function WorkflowJobPage() {
               </button>
               {displayStatus === 'enriched' && (
                 <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                    <span>Diagram AI</span>
-                    <select
-                      value={diagramModel}
-                      onChange={(e) => setDiagramModel(e.target.value as 'claude' | 'gpt-codex')}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-card-foreground min-w-[10rem]"
-                    >
-                      <option value="claude">Claude Sonnet 4.5</option>
-                      <option value="gpt-codex">GPT-5.2 Codex (medium)</option>
-                    </select>
-                  </label>
                   <Button
                     size="sm"
                     variant="outline"

@@ -7,19 +7,6 @@ import { approveArticleJob } from '../article-pipeline/approval-service'
 import { getBoss, QUEUES } from '../queues/index'
 import { VALID_TARGETS } from '../article-pipeline/output/registry'
 
-const VALID_RE_ENRICH_DIAGRAM_MODELS = ['claude', 'gpt-codex'] as const
-type ReEnrichDiagramModel = (typeof VALID_RE_ENRICH_DIAGRAM_MODELS)[number]
-
-function parseReEnrichDiagramModel(body: unknown): ReEnrichDiagramModel {
-  if (body && typeof body === 'object' && 'diagramModel' in body) {
-    const v = (body as { diagramModel?: unknown }).diagramModel
-    if (typeof v === 'string' && VALID_RE_ENRICH_DIAGRAM_MODELS.includes(v as ReEnrichDiagramModel)) {
-      return v as ReEnrichDiagramModel
-    }
-  }
-  return 'claude'
-}
-
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
   app.get('/articles', async (request, reply) => {
@@ -260,70 +247,61 @@ export async function articleRoutes(app: FastifyInstance) {
   })
 
   // ── POST /api/articles/:jobId/re-enrich — retry enrichment from scratch ──
-  app.post<{ Params: { jobId: string }; Body?: { diagramModel?: string } }>(
-    '/articles/:jobId/re-enrich',
-    async (request, reply) => {
-      const clerkId = await requireAuth(request, reply)
-      if (!clerkId) return
+  app.post<{ Params: { jobId: string } }>('/articles/:jobId/re-enrich', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
 
-      const user = await prisma.user.findUnique({ where: { clerkId } })
-      if (!user) return reply.status(404).send({ error: 'User not found' })
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
 
-      const { jobId } = request.params
-      const diagramModel = parseReEnrichDiagramModel(request.body)
-      const job = await prisma.articleJob.findFirst({
-        where: { id: jobId, userId: user.id },
-        include: { sitePage: true },
+    const { jobId } = request.params
+    const job = await prisma.articleJob.findFirst({
+      where: { id: jobId, userId: user.id },
+      include: { sitePage: true },
+    })
+    if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+    if (!['approved', 'enriched'].includes(job.status)) {
+      return reply.status(400).send({
+        error: `Cannot re-enrich a job with status: ${job.status}. Job must be 'approved' or 'enriched' (not published).`,
       })
-      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+    }
 
-      if (!['approved', 'enriched'].includes(job.status)) {
-        return reply.status(400).send({
-          error: `Cannot re-enrich a job with status: ${job.status}. Job must be 'approved' or 'enriched' (not published).`,
-        })
-      }
-
-      if (job.sitePage) {
-        // Wipe existing diagrams + GEO rows + restore original bodyHtml.
-        // The worker also does this idempotently at run-start, but clearing here
-        // gives immediate UI feedback before the job is even dequeued.
-        await prisma.sectionEnrichment.deleteMany({ where: { sitePageId: job.sitePage.id } })
-        await prisma.articleDiagram.deleteMany({ where: { sitePageId: job.sitePage.id } })
-        await prisma.sitePage.update({
-          where: { id: job.sitePage.id },
-          data: {
-            bodyHtml: job.sitePage.originalBodyHtml,
-            enrichmentStatus: 'pending',
-            enrichmentError: null,
-            enrichedAt: null,
-            keyTakeawaysHtml: null,
-            tocHtml: null,
-          },
-        })
-      }
-      // Clear enrichment errors immediately so the Errors panel is empty while
-      // the new run is queued — the worker will also clear them at run start.
-      await prisma.errorLog.deleteMany({
-        where: { jobId, errorType: { startsWith: 'enrichment_' } },
+    if (job.sitePage) {
+      // Wipe existing diagrams + GEO rows + restore original bodyHtml.
+      // The worker also does this idempotently at run-start, but clearing here
+      // gives immediate UI feedback before the job is even dequeued.
+      await prisma.sectionEnrichment.deleteMany({ where: { sitePageId: job.sitePage.id } })
+      await prisma.articleDiagram.deleteMany({ where: { sitePageId: job.sitePage.id } })
+      await prisma.sitePage.update({
+        where: { id: job.sitePage.id },
+        data: {
+          bodyHtml: job.sitePage.originalBodyHtml,
+          enrichmentStatus: 'pending',
+          enrichmentError: null,
+          enrichedAt: null,
+          keyTakeawaysHtml: null,
+          tocHtml: null,
+        },
       })
+    }
+    // Clear enrichment errors immediately so the Errors panel is empty while
+    // the new run is queued — the worker will also clear them at run start.
+    await prisma.errorLog.deleteMany({ where: { jobId, errorType: { startsWith: 'enrichment_' } } })
 
-      await prisma.articleJob.update({
-        where: { id: jobId },
-        data: { status: 'approved', enrichedAt: null },
-      })
+    await prisma.articleJob.update({
+      where: { id: jobId },
+      data: { status: 'approved', enrichedAt: null },
+    })
 
-      const boss = await getBoss()
-      const enrichmentBossId = await boss.send(QUEUES.ARTICLE_ENRICHMENT, { jobId, diagramModel })
-      if (enrichmentBossId) {
-        await prisma.articleJob.update({
-          where: { id: jobId },
-          data: { enrichmentJobId: enrichmentBossId },
-        })
-      }
+    const boss = await getBoss()
+    const enrichmentBossId = await boss.send(QUEUES.ARTICLE_ENRICHMENT, { jobId })
+    if (enrichmentBossId) {
+      await prisma.articleJob.update({ where: { id: jobId }, data: { enrichmentJobId: enrichmentBossId } })
+    }
 
-      return reply.status(202).send({ ok: true, message: 'Re-enrichment enqueued' })
-    },
-  )
+    return reply.status(202).send({ ok: true, message: 'Re-enrichment enqueued' })
+  })
 
   // ── POST /api/articles/:jobId/publish — enriched → published (irreversible) ─
   app.post<{ Params: { jobId: string } }>('/articles/:jobId/publish', async (request, reply) => {

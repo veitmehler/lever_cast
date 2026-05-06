@@ -251,19 +251,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
                     <span className="mr-auto">Table of Contents</span>
                     <span className="text-xs text-muted-foreground font-normal">live · updates as you edit</span>
                   </summary>
-                  <ul className="px-4 py-3 space-y-1 text-sm">
-                    {tocEntries.map((e, i) => (
-                      <li key={i} className={e.level === 3 ? 'pl-4' : ''}>
-                        <button
-                          type="button"
-                          className="text-left text-primary hover:underline w-full truncate"
-                          onClick={() => scrollToHeading(editorWrapperRef.current, e.text)}
-                        >
-                          {e.text}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <LiveTocList entries={tocEntries} onClickEntry={(text) => scrollToHeading(editorWrapperRef.current, text)} />
                 </details>
               </nav>
             )}
@@ -390,6 +378,41 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
         </div>
       </div>
     </div>
+  )
+}
+
+/** Nested TOC list — H2 items at top level, H3 items in a nested <ul>. */
+function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEntry: (text: string) => void }) {
+  const groups: { h2: TocEntry; h3s: TocEntry[] }[] = []
+  for (const e of entries) {
+    if (e.level === 2) {
+      groups.push({ h2: e, h3s: [] })
+    } else if (groups.length > 0) {
+      groups[groups.length - 1].h3s.push(e)
+    }
+  }
+
+  return (
+    <ul className="px-4 py-3 text-sm list-disc pl-8 space-y-1">
+      {groups.map((g, i) => (
+        <li key={i}>
+          <button type="button" className="text-left text-primary hover:underline truncate" onClick={() => onClickEntry(g.h2.text)}>
+            {g.h2.text}
+          </button>
+          {g.h3s.length > 0 && (
+            <ul className="list-[circle] pl-5 mt-1 space-y-0.5">
+              {g.h3s.map((s, j) => (
+                <li key={j}>
+                  <button type="button" className="text-left text-primary hover:underline truncate" onClick={() => onClickEntry(s.text)}>
+                    {s.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }
 

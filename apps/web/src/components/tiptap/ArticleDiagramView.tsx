@@ -1,38 +1,54 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 
 /**
+ * Find the nearest preceding H2 heading text for this node position.
+ * Walks backwards from the node's position in the ProseMirror document.
+ */
+function findPrecedingH2Text(editor: NodeViewProps['editor'], getPos: NodeViewProps['getPos']): string {
+  const pos = typeof getPos === 'function' ? getPos() : undefined
+  if (pos == null) return ''
+
+  let found = ''
+  editor.state.doc.nodesBetween(0, pos, (node) => {
+    if (node.type.name === 'heading' && node.attrs.level === 2) {
+      found = node.textContent.trim()
+    }
+  })
+  return found
+}
+
+/**
  * React NodeView for article diagrams.
  *
- * Renders the diagram image with:
- *   - An inline editable figcaption (styled exactly like the published version)
- *   - A compact editor-only alt-text input
- *
- * `updateAttributes` writes changes back to the ProseMirror node so that
- * `editor.getHTML()` serialises the updated caption/alt when the user saves.
+ * - Caption auto-derives from the preceding H2 as "Diagram: {heading}".
+ *   It updates live as the user edits headings, and is NOT user-editable.
+ * - Alt text mirrors the caption.
+ * - On save, `renderHTML` serialises the derived caption and alt from node attrs.
  */
-export function ArticleDiagramView({ node, updateAttributes, selected }: NodeViewProps) {
+export function ArticleDiagramView({ node, editor, getPos, updateAttributes, selected }: NodeViewProps) {
   const src = node.attrs.src as string | null
-  const [caption, setCaption] = useState<string>((node.attrs.caption as string | null) ?? '')
-  const [alt, setAlt] = useState<string>((node.attrs.alt as string | null) ?? '')
-  const captionRef = useRef<HTMLTextAreaElement>(null)
+  const [caption, setCaption] = useState('')
 
-  // Sync if the node attrs are updated externally (e.g. initial load / undo).
-  useEffect(() => setCaption((node.attrs.caption as string | null) ?? ''), [node.attrs.caption])
-  useEffect(() => setAlt((node.attrs.alt as string | null) ?? ''), [node.attrs.alt])
+  const derive = useCallback(() => {
+    const h2 = findPrecedingH2Text(editor, getPos)
+    const text = h2 ? `Diagram: ${h2}` : ''
+    setCaption(text)
+    updateAttributes({ caption: text, alt: text })
+  }, [editor, getPos, updateAttributes])
 
-  // Auto-resize the caption textarea to fit its content.
+  // Derive on mount.
+  useEffect(() => { derive() }, [derive])
+
+  // Re-derive whenever the document changes (heading edits, reorders, etc.).
   useEffect(() => {
-    const el = captionRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [caption])
-
-  const stopPropagation = (e: React.MouseEvent | React.KeyboardEvent) => e.stopPropagation()
+    const handler = () => derive()
+    editor.on('update', handler)
+    return () => { editor.off('update', handler) }
+  }, [editor, derive])
 
   return (
     <NodeViewWrapper
@@ -43,41 +59,16 @@ export function ArticleDiagramView({ node, updateAttributes, selected }: NodeVie
       {src && (
         <img
           src={src}
-          alt={alt}
+          alt={caption}
           loading="lazy"
           style={{ display: 'block', margin: '0 auto', borderRadius: '0.75rem' }}
         />
       )}
-
-      {/* Inline editable figcaption */}
-      <textarea
-        ref={captionRef}
-        className="diagram-caption-input"
-        placeholder="Add a caption…"
-        value={caption}
-        rows={1}
-        onChange={(e) => setCaption(e.target.value)}
-        onBlur={(e) => updateAttributes({ caption: e.currentTarget.value.trim() })}
-        onMouseDown={stopPropagation}
-        onClick={stopPropagation}
-        onKeyDown={stopPropagation}
-      />
-
-      {/* Editor-only alt-text field */}
-      <div className="diagram-alt-row" onMouseDown={stopPropagation} onClick={stopPropagation}>
-        <span className="diagram-alt-label">Alt</span>
-        <input
-          type="text"
-          className="diagram-alt-input"
-          placeholder="Describe the image for screen readers…"
-          value={alt}
-          onChange={(e) => setAlt(e.target.value)}
-          onBlur={(e) => updateAttributes({ alt: e.currentTarget.value.trim() })}
-          onMouseDown={stopPropagation}
-          onClick={stopPropagation}
-          onKeyDown={stopPropagation}
-        />
-      </div>
+      {caption && (
+        <figcaption style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--muted-foreground)', marginTop: '0.4rem' }}>
+          {caption}
+        </figcaption>
+      )}
     </NodeViewWrapper>
   )
 }

@@ -417,11 +417,10 @@ function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEn
             </button>
           </div>
           {g.h3s.length > 0 && (
-            <div className="mt-1 ml-6 space-y-0.5">
+            <div className="mt-1 space-y-0.5">
               {g.h3s.map((s, j) => (
-                <div key={j} className="flex items-start gap-2">
-                  <span className="text-muted-foreground select-none mt-0.5">◦</span>
-                  <button type="button" className="text-left text-primary hover:underline flex-1" onClick={() => onClickEntry(s.text)}>
+                <div key={j} className="pl-8">
+                  <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(s.text)}>
                     {toTitleCase(s.text)}
                   </button>
                 </div>

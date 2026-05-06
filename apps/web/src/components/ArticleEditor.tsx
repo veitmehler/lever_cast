@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import '@/app/article-typography.css'
 import { ArticleDiagram } from '@/components/tiptap/ArticleDiagram'
+import { GeoSummary } from '@/components/tiptap/GeoSummary'
 import { IslandMarker } from '@/components/tiptap/IslandMarker'
 import { restorePreservedArticleBlocks, stripPreservedArticleBlocks } from '@/lib/article-html-islands'
 
@@ -45,6 +46,7 @@ const extensions = [
     HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
   }),
   ArticleDiagram,
+  GeoSummary,
   IslandMarker,
 ]
 

@@ -3,12 +3,12 @@
  * We replace these with placeholders in the editable HTML and splice them back on save.
  */
 
-const SELECTORS = ['nav.article-toc', '.key-takeaways', '.geo-summary'] as const
+// .geo-summary is handled inline by the GeoSummary TipTap node — do NOT extract it here.
+const SELECTORS = ['nav.article-toc', '.key-takeaways'] as const
 
 function islandLabel(el: Element): string {
   if (el.matches('nav.article-toc')) return 'Table of contents'
   if (el.matches('.key-takeaways')) return 'Key takeaways'
-  if (el.matches('.geo-summary')) return 'Featured answer'
   return 'Preserved block'
 }
 

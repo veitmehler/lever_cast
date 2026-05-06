@@ -184,7 +184,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
 
   return (
     <div className="min-h-screen bg-background py-10 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-7xl mx-auto w-full">
         {/* Google snippet preview — live */}
         <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-8 font-sans">
           <div className="text-xs text-green-700 dark:text-green-400 mb-1 truncate">

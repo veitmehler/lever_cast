@@ -52,22 +52,57 @@ const SYSTEM_PROMPT_BASE =
   'theming is applied externally so labels stay readable. ' +
   'If the section is purely narrative or no diagram fits despite the required type, output exactly: SKIP'
 
+/**
+ * Extract the human-readable labels/concepts from Mermaid syntax so the next
+ * call knows which ideas have already been visualised. We pull text from
+ * square-bracket node labels `[…]`, parenthesis nodes `(…)`, quoted strings
+ * `"…"`, and bare identifier words (state/mindmap names).
+ */
+export function extractMermaidConcepts(syntax: string): string {
+  const captured: string[] = []
+
+  // Bracketed / quoted labels: [label], (label), ((label)), "label"
+  const labelRe = /\[([^\]]{1,60})\]|\(+([^)]{1,60})\)+|"([^"]{1,60})"/g
+  let m: RegExpExecArray | null
+  while ((m = labelRe.exec(syntax)) !== null) {
+    const text = (m[1] ?? m[2] ?? m[3] ?? '').trim()
+    if (text) captured.push(text)
+  }
+
+  // Bare identifiers on their own line (common in stateDiagram, mindmap)
+  // e.g. "    OptimalFunction --> StressAccumulation"  → grab the words before/after "-->"
+  const bareRe = /^\s{0,8}([A-Z][A-Za-z]{2,}(?:[A-Z][A-Za-z]+)*)\s*(?:-->|:|\[|\(|$)/gm
+  while ((m = bareRe.exec(syntax)) !== null) {
+    const word = m[1].trim()
+    if (word && word.length < 40) captured.push(word)
+  }
+
+  const unique = [...new Set(captured)].slice(0, 14)
+  return unique.join(', ')
+}
+
 function buildUserPrompt(opts: {
   articleTopic: string
   primaryKeyword: string
   sectionTitle: string
   sectionHtml: string
   diagramType: string
+  priorConceptsContext?: string
   retryContext?: string
 }): string {
   const htmlSnippet = opts.sectionHtml.slice(0, MAX_SECTION_HTML)
+
+  const priorLine = opts.priorConceptsContext
+    ? `\nConcepts already visualised in earlier diagrams — do NOT repeat these; focus on ideas not yet shown:\n${opts.priorConceptsContext}\n`
+    : ''
 
   const base =
     `Diagram type (mandatory): ${opts.diagramType}\n` +
     `${typeInstructions(opts.diagramType)}\n\n` +
     `Article topic: ${opts.articleTopic}\n` +
     `Primary keyword: ${opts.primaryKeyword}\n\n` +
-    `Section heading: ${opts.sectionTitle}\n\n` +
+    `Section heading: ${opts.sectionTitle}\n` +
+    `${priorLine}\n` +
     `Section HTML:\n${htmlSnippet}\n\n` +
     'Produce a single diagram of the specified type that adds visual clarity. ' +
     'Do not exceed 12 nodes/items. Use plain English labels.\n\n' +
@@ -102,6 +137,7 @@ export async function generateMermaidDiagram(opts: {
   jobId: string
   position: number
   diagramType: string
+  priorConceptsContext?: string
   retryContext?: string
 }): Promise<DiagramResult> {
   const adapter = getLLMAdapter(PROVIDER)

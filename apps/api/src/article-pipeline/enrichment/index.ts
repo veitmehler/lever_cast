@@ -22,7 +22,7 @@ import {
   findFirstH2Index,
   stripTags,
 } from './html-parser'
-import { generateMermaidDiagram } from './mermaid-generator'
+import { generateMermaidDiagram, extractMermaidConcepts } from './mermaid-generator'
 import { renderMermaidToSvg } from './svg-renderer'
 import { rasterizeSvg } from './svg-rasterizer'
 import { sanitizeSvg } from './svg-sanitizer'
@@ -346,6 +346,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   const darkDiagramInitDirective = buildDarkDiagramInitDirective(theme)
 
   const usedDiagramTypes: string[] = []
+  // Rolling window of concept labels from the last 2 successful diagrams.
+  const priorConceptWindows: string[] = []
 
   try {
     await getDiagramRasterBrowser()
@@ -357,7 +359,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
       )
 
       try {
-        const typePick = await selectDiagramType({
+        let typePick = await selectDiagramType({
           sectionTitle: section.heading,
           contentSnippet: stripTags(section.sectionHtml),
           alreadyUsed: [...usedDiagramTypes],
@@ -368,6 +370,31 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
         totalInputTokens += typePick.inputTokens
         totalOutputTokens += typePick.outputTokens
 
+        // Code-enforced diversity: if the LLM picked the same type as the last
+        // used one, re-query once with a hard exclusion so back-to-back dupes
+        // are broken without relying on prompt-only soft hints.
+        const lastUsed = usedDiagramTypes.at(-1)
+        if (typePick.diagramType !== null && typePick.diagramType === lastUsed) {
+          logger.info(
+            { jobId, position: section.position, type: typePick.diagramType },
+            '[enrichment] type same as previous — re-querying with exclusion',
+          )
+          const retry = await selectDiagramType({
+            sectionTitle: section.heading,
+            contentSnippet: stripTags(section.sectionHtml),
+            alreadyUsed: [...usedDiagramTypes],
+            excludeType: typePick.diagramType,
+            jobId,
+            position: section.position,
+          })
+          totalCost += retry.cost
+          totalInputTokens += retry.inputTokens
+          totalOutputTokens += retry.outputTokens
+          // Use the retry result if it yielded a different (non-null) type; otherwise
+          // keep the original so the section still gets a diagram.
+          if (retry.diagramType !== null) typePick = retry
+        }
+
         if (typePick.diagramType === null) {
           logger.info({ jobId, position: section.position }, '[enrichment] section skipped by diagram-type selector')
           continue
@@ -375,12 +402,18 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
 
         const diagramType = typePick.diagramType
 
+        // Build prior-concepts hint: concat labels from the last 2 diagrams.
+        const priorConceptsContext = priorConceptWindows.length > 0
+          ? priorConceptWindows.join(', ')
+          : undefined
+
         const gen1 = await generateMermaidDiagram({
           sectionTitle: section.heading,
           sectionHtml: section.sectionHtml,
           articleTopic: topic.topic,
           primaryKeyword,
           diagramType,
+          priorConceptsContext,
           jobId,
           position: section.position,
         })
@@ -407,6 +440,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             articleTopic: topic.topic,
             primaryKeyword,
             diagramType,
+            priorConceptsContext,
             jobId,
             position: section.position,
             retryContext: errMsg,
@@ -450,6 +484,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             darkDiagramInitDirective,
           })
           usedDiagramTypes.push(diagramType)
+          priorConceptWindows.push(extractMermaidConcepts(gen2.mermaidSyntax))
+          if (priorConceptWindows.length > 2) priorConceptWindows.shift()
           successCount++
           continue
         }
@@ -465,6 +501,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           darkDiagramInitDirective,
         })
         usedDiagramTypes.push(diagramType)
+        priorConceptWindows.push(extractMermaidConcepts(gen1.mermaidSyntax))
+        if (priorConceptWindows.length > 2) priorConceptWindows.shift()
         successCount++
       } catch (sectionErr) {
         const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)

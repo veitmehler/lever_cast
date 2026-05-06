@@ -51,6 +51,7 @@ export async function selectDiagramType(opts: {
   alreadyUsed: string[]
   jobId: string
   position: number
+  excludeType?: string
 }): Promise<TypeSelectionResult> {
   const adapter = getLLMAdapter(PROVIDER)
 
@@ -60,10 +61,14 @@ export async function selectDiagramType(opts: {
       ? `\nTypes used in the last ${recentlyUsed.length} section(s) — avoid repeating the immediately preceding type if another fits, but repetition is fine:\n${recentlyUsed.join(', ')}\n`
       : ''
 
+  const excludeLine = opts.excludeType
+    ? `\nDO NOT select: ${opts.excludeType} — it was just used and must be skipped this time.\n`
+    : ''
+
   const userPrompt =
     `Section heading: ${opts.sectionTitle}\n` +
     `Content snippet:\n${opts.contentSnippet.slice(0, 500)}\n` +
-    `${usedList}\n` +
+    `${usedList}${excludeLine}\n` +
     'Respond with ONE line: the diagram type name from the list, or SKIP.'
 
   const response = await adapter.call({

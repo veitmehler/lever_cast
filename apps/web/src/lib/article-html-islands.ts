@@ -4,12 +4,22 @@
  */
 
 // .geo-summary is handled inline by the GeoSummary TipTap node — do NOT extract it here.
-const SELECTORS = ['nav.article-toc', '.key-takeaways'] as const
+// nav.article-toc is rendered as a live client-side component — do NOT extract it here.
+const SELECTORS = ['.key-takeaways'] as const
 
 function islandLabel(el: Element): string {
-  if (el.matches('nav.article-toc')) return 'Table of contents'
   if (el.matches('.key-takeaways')) return 'Key takeaways'
   return 'Preserved block'
+}
+
+/**
+ * Strips the static <nav class="article-toc"> block from HTML before loading
+ * into TipTap. The TOC is re-rendered live in the editor and regenerated
+ * server-side on save, so we never want it inside the editable document.
+ */
+export function stripTocFromHtml(html: string): string {
+  // Handles both self-closing and multi-line nav.article-toc blocks.
+  return html.replace(/<nav[^>]*\barticle-toc\b[^>]*>[\s\S]*?<\/nav>/gi, '')
 }
 
 /** Escape literal string for regex */

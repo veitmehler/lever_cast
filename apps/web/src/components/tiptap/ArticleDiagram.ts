@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { ArticleDiagramView } from './ArticleDiagramView'
 
 export const ArticleDiagram = Node.create({
   name: 'articleDiagram',
@@ -51,5 +53,9 @@ export const ArticleDiagram = Node.create({
       ],
       ...(caps ? [['figcaption', {}, caps] as const] : []),
     ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ArticleDiagramView)
   },
 })

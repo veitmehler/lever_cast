@@ -7,11 +7,40 @@ import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
 import { getBoss, QUEUES } from '../queues/index'
 import { VALID_TARGETS } from '../article-pipeline/output/registry'
+import {
+  injectHeadingIds,
+  extractHeadingsForToc,
+  buildTocHtml,
+  findFirstH2Index,
+} from '../article-pipeline/enrichment/html-parser'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   const words = text.split(' ').filter(Boolean).length
   return Math.max(1, Math.ceil(words / 200))
+}
+
+/**
+ * Strips the existing static TOC (if any), rebuilds it from the current
+ * headings, and re-injects it at the same position (before the first <h2>).
+ * This keeps the export-ready bodyHtml in sync after preview edits.
+ */
+function regenerateToc(html: string): string {
+  // 1. Remove existing TOC block.
+  const stripped = html.replace(/<nav[^>]*\barticle-toc\b[^>]*>[\s\S]*?<\/nav>/gi, '')
+
+  // 2. Inject/refresh heading IDs.
+  const withIds = injectHeadingIds(stripped)
+
+  // 3. Build new TOC from updated headings.
+  const entries = extractHeadingsForToc(withIds)
+  const tocHtml = buildTocHtml(entries)
+  if (!tocHtml) return withIds
+
+  // 4. Insert before the first <h2> (preserving position relative to key takeaways).
+  const firstH2 = findFirstH2Index(withIds)
+  if (firstH2 <= 0) return tocHtml + '\n' + withIds
+  return withIds.slice(0, firstH2) + tocHtml + '\n' + withIds.slice(firstH2)
 }
 
 export async function articleRoutes(app: FastifyInstance) {
@@ -126,8 +155,9 @@ export async function articleRoutes(app: FastifyInstance) {
       let hasField = false
 
       if (typeof body.bodyHtml === 'string') {
-        update.bodyHtml = body.bodyHtml
-        update.readingTime = calculateReadingTimeFromHtml(body.bodyHtml)
+        const bodyWithToc = regenerateToc(body.bodyHtml)
+        update.bodyHtml = bodyWithToc
+        update.readingTime = calculateReadingTimeFromHtml(bodyWithToc)
         hasField = true
       }
       if (typeof body.seoTitle === 'string') {

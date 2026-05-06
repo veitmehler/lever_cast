@@ -15,7 +15,33 @@ import '@/app/article-typography.css'
 import { ArticleDiagram } from '@/components/tiptap/ArticleDiagram'
 import { GeoSummary } from '@/components/tiptap/GeoSummary'
 import { IslandMarker } from '@/components/tiptap/IslandMarker'
-import { restorePreservedArticleBlocks, stripPreservedArticleBlocks } from '@/lib/article-html-islands'
+import { restorePreservedArticleBlocks, stripPreservedArticleBlocks, stripTocFromHtml } from '@/lib/article-html-islands'
+
+type TocEntry = { level: 2 | 3; text: string }
+
+/** Extract h2/h3 entries from the live TipTap editor JSON. */
+function extractTocEntries(editor: import('@tiptap/react').Editor): TocEntry[] {
+  const entries: TocEntry[] = []
+  editor.state.doc.forEach((node) => {
+    if (node.type.name === 'heading' && (node.attrs.level === 2 || node.attrs.level === 3)) {
+      const text = node.textContent.trim()
+      if (text) entries.push({ level: node.attrs.level as 2 | 3, text })
+    }
+  })
+  return entries
+}
+
+/** Scroll to the first heading in the editor that matches the given text. */
+function scrollToHeading(editorEl: HTMLElement | null, text: string) {
+  if (!editorEl) return
+  const headings = editorEl.querySelectorAll<HTMLElement>('h2, h3')
+  for (const h of headings) {
+    if (h.textContent?.trim() === text) {
+      h.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      break
+    }
+  }
+}
 
 /**
  * Strips a leading <p> whose text begins with a markdown heading sigil (# …).
@@ -77,15 +103,19 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
   const [seoDescription, setSeoDescription] = useState(initial.seoDescription)
   const [excerpt, setExcerpt] = useState(initial.excerpt)
   const [saving, setSaving] = useState(false)
+  const [tocEntries, setTocEntries] = useState<TocEntry[]>([])
 
   const islandsRef = useRef<Record<string, { html: string; label: string }>>({})
+  const editorWrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => setMounted(true), [])
 
   const { editorHtml, islands } = useMemo(() => {
     if (!mounted)
       return { editorHtml: initial.bodyHtml, islands: {} as Record<string, { html: string; label: string }> }
-    return stripPreservedArticleBlocks(initial.bodyHtml)
+    const { editorHtml: stripped, islands: extractedIslands } = stripPreservedArticleBlocks(initial.bodyHtml)
+    // Remove the static TOC — it's rendered live and regenerated server-side on save.
+    return { editorHtml: stripTocFromHtml(stripped), islands: extractedIslands }
   }, [mounted, initial.bodyHtml])
 
   useEffect(() => {
@@ -102,6 +132,8 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
         class: 'article-body focus:outline-none min-h-[24rem] max-w-none px-1 py-2',
       },
     },
+    onUpdate: ({ editor: e }) => setTocEntries(extractTocEntries(e)),
+    onCreate: ({ editor: e }) => setTocEntries(extractTocEntries(e)),
   })
 
   // TipTap initialises as non-editable; flip to editable once the client has mounted.
@@ -211,10 +243,34 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
               </div>
             </section>
 
-            {/* Fixed article blocks — read-only panels rendered outside TipTap */}
+            {/* Live Table of Contents — rebuilt from editor headings on every edit */}
+            {mounted && tocEntries.length > 0 && (
+              <nav className="mb-4 border border-border rounded-xl overflow-hidden">
+                <details open>
+                  <summary className="flex items-center gap-2 px-4 py-2.5 bg-muted/50 cursor-pointer text-sm font-semibold text-card-foreground select-none">
+                    <span className="mr-auto">Table of Contents</span>
+                    <span className="text-xs text-muted-foreground font-normal">live · updates as you edit</span>
+                  </summary>
+                  <ul className="px-4 py-3 space-y-1 text-sm">
+                    {tocEntries.map((e, i) => (
+                      <li key={i} className={e.level === 3 ? 'pl-4' : ''}>
+                        <button
+                          type="button"
+                          className="text-left text-primary hover:underline w-full truncate"
+                          onClick={() => scrollToHeading(editorWrapperRef.current, e.text)}
+                        >
+                          {e.text}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </nav>
+            )}
+
+            {/* Key Takeaways — read-only panel rendered outside TipTap */}
             {mounted && Object.keys(islands).length > 0 && (
               <div className="mb-6 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fixed blocks (read-only)</p>
                 {Object.entries(islands)
                   .sort(([a], [b]) => a.localeCompare(b))
                   .map(([id, { html, label }]) => (
@@ -293,7 +349,9 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
                     </>
                   )}
                 </div>
-                <EditorContent editor={editor} className="px-4 py-3" />
+                <div ref={editorWrapperRef}>
+                  <EditorContent editor={editor} className="px-4 py-3" />
+                </div>
               </div>
             )}
 

@@ -102,6 +102,27 @@ export function cleanStepOutput(text: string): string {
   return text.replace(/^#+\s+[^\r\n]+\s*\r?\n+/, '').trimStart()
 }
 
+/**
+ * Ensures every H2 that is phrased as a question ends with a `?`.
+ * Detection: the visible text starts with a common English interrogative word.
+ * Only appends `?` when the heading has no terminal punctuation at all.
+ */
+export function normalizeH2Questions(html: string): string {
+  const QUESTION_START =
+    /^(how|why|what|when|where|which|who|is|are|can|does|do|will|should|could|would|has|have|did)\b/i
+  const TERMINAL_PUNCT = /[?!.]$/
+
+  return html.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (match, attrs: string, inner: string) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim()
+    if (!QUESTION_START.test(text) || TERMINAL_PUNCT.test(text)) return match
+
+    // Inject `?` just before any trailing closing HTML tags, or at the end of inner.
+    const fixedInner = inner.trimEnd().replace(/(<\/[a-z][^>]*>(?:\s*<\/[a-z][^>]*>)*)$/i, '?$1')
+    const finalInner = fixedInner === inner.trimEnd() ? inner.trimEnd() + '?' : fixedInner
+    return `<h2${attrs}>${finalInner}</h2>`
+  })
+}
+
 // ── Main approval flow ─────────────────────────────────────────────────────────
 
 export async function approveArticleJob(jobId: string): Promise<void> {
@@ -143,7 +164,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   if (!step11Raw) {
     throw new Error('Missing step 11 (article body) — cannot approve')
   }
-  const step11 = cleanStepOutput(step11Raw)
+  const step11 = normalizeH2Questions(cleanStepOutput(step11Raw))
 
   // ── Step 13: generate_seo_metadata ────────────────────────────────────────
   logger.info({ jobId }, '[approval] step 13 — generate_seo_metadata')

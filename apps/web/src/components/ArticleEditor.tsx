@@ -381,6 +381,20 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
   )
 }
 
+const LOWERCASE_WORDS = new Set(['a','an','the','and','but','or','nor','for','so','yet','at','by','in','of','on','to','up','as','is'])
+
+/** CSS `text-transform: capitalize` equivalent in JS for consistent TOC labels. */
+function toTitleCase(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((word, i) => {
+      const clean = word.replace(/[^a-zA-Z0-9''-]/g, '')
+      if (i !== 0 && LOWERCASE_WORDS.has(clean.toLowerCase())) return word.toLowerCase()
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+}
+
 /** Nested TOC list — H2 items at top level, H3 items in a nested <ul>. */
 function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEntry: (text: string) => void }) {
   const groups: { h2: TocEntry; h3s: TocEntry[] }[] = []
@@ -393,18 +407,18 @@ function LiveTocList({ entries, onClickEntry }: { entries: TocEntry[]; onClickEn
   }
 
   return (
-    <ul className="px-4 py-3 text-sm list-disc pl-8 space-y-1">
+    <ul className="list-disc ml-6 py-3 pr-4 space-y-1 text-sm">
       {groups.map((g, i) => (
         <li key={i}>
-          <button type="button" className="text-left text-primary hover:underline truncate" onClick={() => onClickEntry(g.h2.text)}>
-            {g.h2.text}
+          <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(g.h2.text)}>
+            {toTitleCase(g.h2.text)}
           </button>
           {g.h3s.length > 0 && (
-            <ul className="list-[circle] pl-5 mt-1 space-y-0.5">
+            <ul className="list-disc ml-5 mt-1 space-y-0.5">
               {g.h3s.map((s, j) => (
                 <li key={j}>
-                  <button type="button" className="text-left text-primary hover:underline truncate" onClick={() => onClickEntry(s.text)}>
-                    {s.text}
+                  <button type="button" className="text-left text-primary hover:underline" onClick={() => onClickEntry(s.text)}>
+                    {toTitleCase(s.text)}
                   </button>
                 </li>
               ))}

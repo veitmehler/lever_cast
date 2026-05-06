@@ -152,6 +152,19 @@ export function extractHeadingsForToc(html: string): TocEntry[] {
   return entries
 }
 
+const LOWERCASE_WORDS = new Set(['a','an','the','and','but','or','nor','for','so','yet','at','by','in','of','on','to','up','as','is'])
+
+function toTitleCase(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((word, i) => {
+      const clean = word.replace(/[^a-zA-Z0-9''-]/g, '')
+      if (i !== 0 && LOWERCASE_WORDS.has(clean.toLowerCase())) return word.toLowerCase()
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+}
+
 /**
  * Nested TOC: each h2 is a top-level item; following h3s go in a nested ul until next h2.
  */
@@ -165,7 +178,7 @@ export function buildTocHtml(entries: TocEntry[]): string {
       i++
       continue
     }
-    inner += `  <li><a href="#${escapeAttr(e.anchor)}">${escapeHtml(e.text)}</a>`
+    inner += `  <li><a href="#${escapeAttr(e.anchor)}">${escapeHtml(toTitleCase(e.text))}</a>`
     const sub: TocEntry[] = []
     let j = i + 1
     while (j < entries.length && entries[j].level === 3) {
@@ -175,7 +188,7 @@ export function buildTocHtml(entries: TocEntry[]): string {
     if (sub.length > 0) {
       inner += '\n    <ul>\n'
       for (const s of sub) {
-        inner += `      <li><a href="#${escapeAttr(s.anchor)}">${escapeHtml(s.text)}</a></li>\n`
+        inner += `      <li><a href="#${escapeAttr(s.anchor)}">${escapeHtml(toTitleCase(s.text))}</a></li>\n`
       }
       inner += '    </ul>\n  '
     }

@@ -1230,13 +1230,9 @@ async function main() {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,
-      update: {
-        stepName: template.stepName,
-        defaultProvider: template.defaultProvider,
-        defaultModel: template.defaultModel,
-        systemPrompt: template.systemPrompt,
-        userPrompt: template.userPrompt,
-      },
+      // Never overwrite admin edits or production prompt content on re-seed.
+      // To bulk-update prompts, run: pnpm --filter @socioply/db reseed:v3
+      update: {},
     })
     console.log(`  ✓ Step ${template.stepNumber}: ${template.stepName}`)
   }

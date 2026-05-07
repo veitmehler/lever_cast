@@ -75,6 +75,26 @@ const PROVIDER_OPTIONS = [
   { value: 'openrouter', label: 'OpenRouter' },
 ]
 
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  gemini: [
+    { value: 'gemini-2.5-flash',                label: 'Gemini 2.5 Flash' },
+    { value: 'gemini-2.5-pro',                  label: 'Gemini 2.5 Pro' },
+    { value: 'gemini-2.0-flash',                label: 'Gemini 2.0 Flash' },
+  ],
+  anthropic: [
+    { value: 'claude-sonnet-4-5-20250929',      label: 'Claude Sonnet 4.5 (2025-09-29)' },
+    { value: 'claude-sonnet-4-5',               label: 'Claude Sonnet 4.5' },
+    { value: 'claude-haiku-3-5-20241022',       label: 'Claude Haiku 3.5 (2024-10-22)' },
+    { value: 'claude-opus-4-7',                 label: 'Claude Opus 4.7' },
+  ],
+  openai: [
+    { value: 'gpt-4o-mini',                     label: 'GPT-4o Mini' },
+    { value: 'gpt-4o',                           label: 'GPT-4o' },
+    { value: 'o3-mini',                          label: 'o3-mini' },
+  ],
+  openrouter: [],
+}
+
 // Extract {{var}} tokens that actually appear in a given text
 function usedVarsIn(text: string): Set<string> {
   const matches = text.match(/\{\{([^}]+)\}\}/g) ?? []
@@ -89,6 +109,18 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
   const [model,        setModel]        = useState(template.defaultModel)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
+
+  const modelOptions = MODEL_OPTIONS[provider] ?? []
+  // If the current model isn't in the dropdown list it's a custom/legacy value — allow it
+  const isCustomModel = model !== '' && !modelOptions.some((o) => o.value === model)
+
+  function handleProviderChange(newProvider: string) {
+    setProvider(newProvider)
+    const options = MODEL_OPTIONS[newProvider] ?? []
+    if (options.length > 0 && !options.some((o) => o.value === model)) {
+      setModel(options[0].value)
+    }
+  }
 
   const isDirty =
     systemPrompt !== (template.systemPrompt ?? '') ||
@@ -185,7 +217,7 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
                 <label className="block text-xs font-medium text-muted-foreground mb-1.5">Provider</label>
                 <select
                   value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
+                  onChange={(e) => handleProviderChange(e.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
                 >
                   {PROVIDER_OPTIONS.map((o) => (
@@ -195,13 +227,41 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1.5">Model</label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g. claude-sonnet-4-5-20250929"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
-                />
+                {modelOptions.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <select
+                      value={isCustomModel ? '__custom__' : model}
+                      onChange={(e) => {
+                        if (e.target.value !== '__custom__') setModel(e.target.value)
+                      }}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                    >
+                      {modelOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                      {isCustomModel && (
+                        <option value="__custom__">{model} (custom)</option>
+                      )}
+                    </select>
+                    {isCustomModel && (
+                      <input
+                        type="text"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        placeholder="Custom model identifier"
+                        className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="e.g. openrouter/anthropic/claude-3.5-sonnet"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                  />
+                )}
               </div>
             </div>
           </div>

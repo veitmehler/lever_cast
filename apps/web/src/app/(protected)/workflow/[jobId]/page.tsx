@@ -56,6 +56,8 @@ type FeaturedImage = {
 type CitationEntry = {
   link_title?: string
   link_url?: string
+  linkTitle?: string
+  linkUrl?: string
   title?: string
   url?: string
   sourceTitle?: string  // legacy prompt format (pre-v3 reseed)
@@ -102,6 +104,8 @@ type ArticleJob = {
   approvedAt?: string | null
   topic: { topic: string; mode: string; slug?: string | null }
   pipelineSteps: PipelineStep[]
+  /** Some API payloads use `steps` — normalize in fetchJob into pipelineSteps */
+  steps?: PipelineStep[]
   sitePage?: SitePage | null
   errorLogs: ErrorLog[]
 }
@@ -225,12 +229,21 @@ function htmlToMarkdownWithDiagrams(
   return markdown.replace(/\n{3,}/g, '\n\n').trim()
 }
 
+function stripJsonMarkdownFences(text: string): string {
+  const t = text.trim()
+  const fenced = t.match(/^```(?:json)?\s*([\s\S]*?)```\s*$/i)
+  return fenced ? fenced[1].trim() : t
+}
+
 function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
   if (!raw) return []
   try {
     // Handle double-encoded strings (e.g. JSON stored as a JSON string)
-    let data: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (typeof data === 'string') data = JSON.parse(data)
+    let data: unknown =
+      typeof raw === 'string' ? JSON.parse(stripJsonMarkdownFences(raw)) : raw
+    if (typeof data === 'string') {
+      data = JSON.parse(stripJsonMarkdownFences(data))
+    }
 
     // Extract the links array — support all known shapes:
     //   { resource_links: [...] }  ← step 12 structuring prompt format
@@ -246,10 +259,15 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
           : []
 
     return links
-      .filter((c) => (c.link_url ?? c.url ?? c.sourceUrl ?? '').length > 0)
+      .filter(
+        (c) =>
+          (c.link_url ?? c.linkUrl ?? c.url ?? c.sourceUrl ?? '').length > 0,
+      )
       .map((c) => ({
-        title: c.link_title ?? c.title ?? c.sourceTitle ?? '',
-        url:   c.link_url   ?? c.url   ?? c.sourceUrl   ?? '',
+        title:
+          c.link_title ?? c.linkTitle ?? c.title ?? c.sourceTitle ?? '',
+        url:
+          c.link_url ?? c.linkUrl ?? c.url ?? c.sourceUrl ?? '',
       }))
   } catch {
     return []
@@ -258,18 +276,22 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
 
 /**
  * Resolve citations with a three-level fallback:
- *   1. sitePage.citations (populated after approval)
+ *   1. sitePage.citations (populated after approval), when SitePage exists
  *   2. step 12 pipeline output (available from the moment step 12 completes)
  *   3. Any other completed step whose output contains resource_links JSON
  */
 function resolveCitations(
-  sp: SitePage,
+  sp: SitePage | null | undefined,
   pipelineSteps: PipelineStep[],
 ): Array<{ title: string; url: string }> {
-  const fromSitePage = parseCitations(sp.citations)
-  if (fromSitePage.length > 0) return fromSitePage
+  if (sp) {
+    const fromSitePage = parseCitations(sp.citations)
+    if (fromSitePage.length > 0) return fromSitePage
+  }
 
-  const step12 = pipelineSteps.find((s) => s.stepNumber === 12 && s.status === 'completed')
+  const step12 = pipelineSteps.find(
+    (s) => Number(s.stepNumber) === 12 && s.status === 'completed',
+  )
   const fromStep12 = parseCitations(step12?.output)
   if (fromStep12.length > 0) return fromStep12
 
@@ -466,7 +488,11 @@ export default function WorkflowJobPage() {
         throw new Error('Failed to load job')
       }
       const data = await res.json()
-      setJob(data.job)
+      const j = data.job as ArticleJob
+      setJob({
+        ...j,
+        pipelineSteps: j.pipelineSteps ?? j.steps ?? [],
+      })
     } catch {
       toast.error('Failed to load article job')
     } finally {
@@ -717,7 +743,7 @@ export default function WorkflowJobPage() {
   if (!job) return null
 
   const sitePage = job.sitePage
-  const hasCitations = sitePage ? resolveCitations(sitePage, job.pipelineSteps).length > 0 : false
+  const hasCitations = resolveCitations(sitePage, job.pipelineSteps).length > 0
 
   return (
     <div className="min-h-screen bg-background">

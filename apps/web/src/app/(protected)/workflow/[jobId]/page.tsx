@@ -184,14 +184,25 @@ function htmlToMarkdown(html: string): string {
 function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
   if (!raw) return []
   try {
-    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+    // Handle double-encoded strings (e.g. JSON stored as a JSON string)
+    let data: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (typeof data === 'string') data = JSON.parse(data)
+
+    // Extract the links array — support all known shapes:
+    //   { resource_links: [...] }  ← step 12 structuring prompt format
+    //   [...]                      ← bare array
+    //   { links: [...] }           ← occasional LLM variation
+    const obj = data as Record<string, unknown>
     const links: CitationEntry[] = Array.isArray(data)
-      ? data
-      : Array.isArray((data as Record<string, unknown>).resource_links)
-        ? (data as { resource_links: CitationEntry[] }).resource_links
-        : []
+      ? (data as CitationEntry[])
+      : Array.isArray(obj.resource_links)
+        ? (obj.resource_links as CitationEntry[])
+        : Array.isArray(obj.links)
+          ? (obj.links as CitationEntry[])
+          : []
+
     return links
-      .filter((c) => c.link_url ?? c.url ?? c.sourceUrl)
+      .filter((c) => (c.link_url ?? c.url ?? c.sourceUrl ?? '').length > 0)
       .map((c) => ({
         title: c.link_title ?? c.title ?? c.sourceTitle ?? '',
         url:   c.link_url   ?? c.url   ?? c.sourceUrl   ?? '',
@@ -202,10 +213,10 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
 }
 
 /**
- * Resolve citations with a two-level fallback:
+ * Resolve citations with a three-level fallback:
  *   1. sitePage.citations (populated after approval)
  *   2. step 12 pipeline output (available from the moment step 12 completes)
- * This ensures citations are shown even before the user clicks Approve.
+ *   3. Any other completed step whose output contains resource_links JSON
  */
 function resolveCitations(
   sp: SitePage,
@@ -213,9 +224,19 @@ function resolveCitations(
 ): Array<{ title: string; url: string }> {
   const fromSitePage = parseCitations(sp.citations)
   if (fromSitePage.length > 0) return fromSitePage
-  return parseCitations(
-    pipelineSteps.find((s) => s.stepNumber === 12 && s.status === 'completed')?.output,
-  )
+
+  const step12 = pipelineSteps.find((s) => s.stepNumber === 12 && s.status === 'completed')
+  const fromStep12 = parseCitations(step12?.output)
+  if (fromStep12.length > 0) return fromStep12
+
+  // Fallback: scan all completed step outputs for resource_links
+  for (const step of pipelineSteps) {
+    if (step.status !== 'completed' || !step.output) continue
+    const found = parseCitations(step.output)
+    if (found.length > 0) return found
+  }
+
+  return []
 }
 
 function buildReviewText(
@@ -284,7 +305,7 @@ function buildFinalReviewText(
   const diagramSection = diagrams
     .map((d) => {
       const header = `### Diagram ${d.position}: ${d.sectionTitle}`
-      const svg = d.svgCdnUrl ? (diagramSvgs[d.svgCdnUrl] ?? null) : null
+      const svg = diagramSvgs[d.id] ?? null
       return svg ? `${header}\n\n${svg}` : `${header}\n\n[SVG not yet loaded]`
     })
     .join('\n\n---\n\n')
@@ -381,17 +402,18 @@ export default function WorkflowJobPage() {
       .catch(() => {/* silent */})
   }, [])
 
-  // Fetch SVG content for diagrams once the job has diagrams available
+  // Fetch SVG content via API proxy (avoids CDN CORS restrictions).
+  // Keyed by diagram id so buildFinalReviewText can look them up.
   useEffect(() => {
     const diagrams = job?.sitePage?.diagrams
     if (!diagrams?.length) return
-    const urls = diagrams.map((d) => d.svgCdnUrl).filter(Boolean) as string[]
-    if (urls.length === 0) return
+    const eligible = diagrams.filter((d) => d.svgCdnUrl)
+    if (eligible.length === 0) return
     void Promise.all(
-      urls.map(async (url) => {
+      eligible.map(async (d) => {
         try {
-          const res = await fetch(url)
-          if (res.ok) return [url, await res.text()] as const
+          const res = await fetch(`/api/articles/${jobId}/diagram-svg/${d.id}`)
+          if (res.ok) return [d.id, await res.text()] as const
         } catch { /* skip */ }
         return null
       }),
@@ -400,7 +422,7 @@ export default function WorkflowJobPage() {
       for (const r of results) { if (r) map[r[0]] = r[1] }
       setDiagramSvgs(map)
     })
-  }, [job?.sitePage?.diagrams])
+  }, [job?.sitePage?.diagrams, jobId])
 
   // ── SSE ────────────────────────────────────────────────────────────────────
 

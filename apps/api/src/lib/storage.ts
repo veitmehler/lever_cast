@@ -22,6 +22,7 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3'
 
 function getS3Client(): S3Client {
@@ -191,6 +192,23 @@ export async function deleteS3Prefix(prefix: string): Promise<void> {
 
     continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined
   } while (continuationToken)
+}
+
+/**
+ * Read an object from S3 by its key and return its body as a Buffer.
+ * Used server-side to proxy private/CORS-restricted objects to the browser.
+ */
+export async function readS3Object(key: string): Promise<{ body: Buffer; contentType: string }> {
+  const s3 = getS3Client()
+  const result = await s3.send(
+    new GetObjectCommand({ Bucket: getBucket(), Key: key }),
+  )
+  if (!result.Body) throw new Error(`S3 object empty: ${key}`)
+  const bytes = await result.Body.transformToByteArray()
+  return {
+    body: Buffer.from(bytes),
+    contentType: result.ContentType ?? 'application/octet-stream',
+  }
 }
 
 /**

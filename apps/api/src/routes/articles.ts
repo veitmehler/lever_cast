@@ -13,6 +13,7 @@ import {
   buildTocHtml,
   findFirstH2Index,
 } from '../article-pipeline/enrichment/html-parser'
+import { readS3Object } from '../lib/storage'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -579,4 +580,39 @@ export async function articleRoutes(app: FastifyInstance) {
 
     return reply.send({ ok: true, message: 'Pipeline rerun started' })
   })
+
+  // ── GET /api/articles/:jobId/diagram-svg/:diagramId — proxy SVG from S3 ─
+  // Avoids browser CORS restrictions when fetching SVG text content for
+  // embedding in the Gemini review copy/paste area.
+  app.get<{ Params: { jobId: string; diagramId: string } }>(
+    '/articles/:jobId/diagram-svg/:diagramId',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId, diagramId } = request.params
+
+      const diagram = await prisma.articleDiagram.findFirst({
+        where: { id: diagramId, sitePage: { jobId, userId: user.id } },
+        select: { svgS3Key: true },
+      })
+
+      if (!diagram) return reply.status(404).send({ error: 'Diagram not found' })
+      if (!diagram.svgS3Key) return reply.status(404).send({ error: 'SVG not available' })
+
+      try {
+        const { body, contentType } = await readS3Object(diagram.svgS3Key)
+        return reply
+          .header('Content-Type', contentType.includes('svg') ? 'image/svg+xml' : contentType)
+          .header('Cache-Control', 'public, max-age=86400')
+          .send(body)
+      } catch (err) {
+        request.log.error({ jobId, diagramId, err }, '[articles] diagram-svg proxy failed')
+        return reply.status(502).send({ error: 'Failed to fetch SVG from storage' })
+      }
+    },
+  )
 }

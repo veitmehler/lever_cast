@@ -39,38 +39,52 @@ function ProviderBadge({ provider }: { provider: string }) {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  generate_outline:               'Outline',
-  keyword_research:               'Keyword Research',
-  find_supporting_keywords:       'Supporting Keywords',
-  optimize_outline_seo:           'Optimize Outline (SEO)',
-  write_search_intent_intro:      'Search Intent Intro',
-  research_faqs:                  'Research FAQs',
-  find_faq_facts:                 'FAQ Facts',
-  find_article_facts:             'Article Facts',
-  write_article:                  'Write Article',
-  fact_check_article:             'Fact Check',
-  adjust_incorrect_facts:         'Adjust Incorrect Facts',
-  find_citations:                 'Find Citations',
-  generate_seo_metadata:          'SEO Metadata',
-  select_category:                'WP Category (pipeline)',
-  generate_image_prompt:          'Image Prompt (LLM)',
-  generate_schema_markup:         'Schema Markup',
-  generate_excerpt:               'Excerpt',
-  generate_legal_disclaimer:      'Legal Disclaimer',
-  image_generation_model:         'Featured Image Model (Fal.ai)',
-  enrichment_generate_diagram:    'Mermaid Diagram',
-  enrichment_question_matching:   'GEO — Question Matching',
-  enrichment_keyword_to_question: 'GEO — Keyword → Question',
-  enrichment_uniqueness_rephrase: 'GEO — Rephrase for Uniqueness',
-  enrichment_ai_summary:          'GEO — AI Section Summary',
-  enrichment_wp_category:         'WP Category (enrichment)',
+  // Phase A
+  generate_outline:               '1. Generate Outline',
+  keyword_research:               '2. Keyword Research',
+  find_supporting_keywords:       '3. Supporting Keywords',
+  optimize_outline_seo:           '4. Optimise Outline for SEO',
+  write_search_intent_intro:      '5. Search Intent Introduction',
+  research_faqs:                  '6. Research FAQs',
+  find_faq_facts:                 '7. FAQ Facts',
+  find_article_facts:             '8. Article Facts',
+  write_article:                  '9. Write Article',
+  fact_check_article:             '10. Fact Check',
+  adjust_incorrect_facts:         '11. Adjust Incorrect Facts',
+  find_citations:                 '12. Find Citations',
+  // Phase B
+  generate_seo_metadata:          '13. SEO Metadata',
+  generate_image_prompt:          '15. Image Prompt (LLM)',
+  image_generation_model:         '15b. Featured Image — Fal.ai Model',
+  generate_schema_markup:         '16. Schema Markup',
+  generate_excerpt:               '17. Excerpt',
+  generate_legal_disclaimer:      '18. Legal Disclaimer',
+  // Phase C — Enrichment
+  enrichment_question_matching:   '101. GEO Question Matching',
+  enrichment_keyword_to_question: '102. GEO Keyword → Question',
+  enrichment_uniqueness_rephrase: '103. GEO Rephrase for Uniqueness',
+  enrichment_ai_summary:          '104. GEO AI Section Summary',
+  enrichment_key_takeaways:       '107. Key Takeaways & TOC',
+  enrichment_generate_diagram:    '20. Mermaid Diagram (prompt slot)',
+  enrichment_wp_category:         '108. WP Category (conditional, runs last)',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
-  { label: 'Phase A — Pre-approval (Steps 1–12)',    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
-  { label: 'Phase B — Approval Chain (Steps 13–18)', steps: [13, 14, 15, 16, 17, 18] },
-  { label: 'Phase C — Enrichment',                   steps: [20, 101, 102, 103, 104, 108] },
-  { label: 'Image Generation',                       steps: [150] },
+  {
+    label: 'Phase A — Pre-approval Pipeline',
+    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  },
+  {
+    // Actual execution order: 13 → 15 → Fal.ai (150) → 16 → 17 → 18
+    // Step 14 (select_category) is not part of the pipeline — not seeded
+    label: 'Phase B — Approval Chain',
+    steps: [13, 15, 150, 16, 17, 18],
+  },
+  {
+    // Actual execution order: 101 → 102 → 103 → 104 → 107 → diagram loop (20) → 108
+    label: 'Phase C — Enrichment',
+    steps: [101, 102, 103, 104, 107, 20, 108],
+  },
 ]
 
 export default function AdminPromptsPage() {

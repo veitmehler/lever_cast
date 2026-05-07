@@ -210,6 +210,9 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     case 'current_date':
       return new Date().toISOString()
 
+    case 'min_citation_year':
+      return String(new Date().getFullYear() - 10)
+
     // ── Article pipeline V2 variables ─────────────────────────────────────────
 
     case 'outline_framework': {

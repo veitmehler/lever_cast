@@ -3,6 +3,7 @@ import { logger } from '../lib/logger'
 import { StepRunner } from './step-runner'
 import { DuplicateKeywordError, validatePrimaryKeywordUniqueness } from './keyword-validator'
 import { assignOutlineFramework } from './outline-assignment'
+import { sanitizeKeywordJson, sanitizeKeywordText } from './keyword-sanitizer'
 import type { PipelineContext } from './variable-resolver'
 
 const PHASE_A_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -81,7 +82,14 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
         await executeStep2WithValidation(jobId, stepNumber, ctx)
       } else {
         const result = await new StepRunner(jobId, stepNumber, ctx).execute()
-        ctx.completedSteps.set(stepNumber, result.output)
+
+        // Strip local-intent keyword modifiers ("near me" etc.) from plain-text keyword steps
+        let stepOutput = result.output
+        if (stepNumber === 3 || stepNumber === 6) {
+          stepOutput = sanitizeKeywordText(stepOutput, stepNumber, jobId)
+        }
+
+        ctx.completedSteps.set(stepNumber, stepOutput)
         if (result.parsedOutput !== undefined) {
           ctx.parsedSteps.set(stepNumber, result.parsedOutput)
         }
@@ -173,12 +181,16 @@ async function executeStep2WithValidation(
     })
 
     const result = await new StepRunner(jobId, stepNumber, ctx).execute()
-    ctx.completedSteps.set(stepNumber, result.output)
-    if (result.parsedOutput !== undefined) {
-      ctx.parsedSteps.set(stepNumber, result.parsedOutput)
+
+    // Sanitize local-intent modifiers ("near me" etc.) from all keyword values
+    const rawParsed = result.parsedOutput as Record<string, unknown> | undefined
+    const sanitizedParsed = rawParsed ? sanitizeKeywordJson(rawParsed, jobId) : undefined
+    ctx.completedSteps.set(stepNumber, sanitizedParsed ? JSON.stringify(sanitizedParsed) : result.output)
+    if (sanitizedParsed !== undefined) {
+      ctx.parsedSteps.set(stepNumber, sanitizedParsed)
     }
 
-    const parsed = result.parsedOutput as Record<string, unknown> | undefined
+    const parsed = sanitizedParsed
     const primaryKeyword = extractPrimaryKeyword(parsed)
 
     if (!primaryKeyword) {

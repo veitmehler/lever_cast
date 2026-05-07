@@ -69,6 +69,17 @@ const STEP_LABELS: Record<string, string> = {
   enrichment_wp_category:         '25. WP Category (conditional, runs last)',
 }
 
+/** Maps DB stepNumber → visual display number shown in the badge. */
+const VISUAL_STEP_NUMBER: Record<number, string> = {
+  // Phase A
+  1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
+  7: '7', 8: '8', 9: '9', 10: '10', 11: '11', 12: '12',
+  // Phase B
+  13: '13', 15: '15', 150: '15b', 16: '16', 17: '17', 18: '18',
+  // Phase C (continues from 18)
+  101: '19', 102: '20', 103: '21', 104: '22', 107: '23', 20: '24', 108: '25',
+}
+
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   {
     label: 'Phase A — Pre-approval Pipeline',
@@ -179,7 +190,7 @@ export default function AdminPromptsPage() {
                         className="group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 hover:border-border/80 hover:shadow-sm transition-all"
                       >
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                          {t.stepNumber}
+                          {VISUAL_STEP_NUMBER[t.stepNumber] ?? t.stepNumber}
                         </div>
 
                         <div className="flex-1 min-w-0">

@@ -366,7 +366,10 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
             )}
 
             {disclaimer ? (
-              <footer className="mt-8 bg-muted border border-border rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">{disclaimer}</footer>
+              <footer className="mt-8 bg-muted border border-border rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Article Disclaimer</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{disclaimer}</p>
+              </footer>
             ) : null}
           </div>
         </article>

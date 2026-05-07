@@ -181,6 +181,50 @@ function htmlToMarkdown(html: string): string {
     .trim()
 }
 
+/**
+ * Like htmlToMarkdown but substitutes <figure class="article-diagram"> blocks
+ * with inline SVG content at the correct position. Each figure's <img src> is
+ * used to look up the pre-fetched SVG string in svgBySrc.
+ * Falls back to a caption-only placeholder when the SVG hasn't loaded yet.
+ */
+function htmlToMarkdownWithDiagrams(
+  html: string,
+  svgBySrc: Record<string, string>,
+): string {
+  // Replace each article-diagram figure with a placeholder token before
+  // running the standard markdown conversion (which strips all tags).
+  const tokens: string[] = []
+  const withPlaceholders = html.replace(
+    /<figure\s[^>]*class="[^"]*article-diagram[^"]*"[^>]*>([\s\S]*?)<\/figure>/gi,
+    (fullMatch, inner) => {
+      // Extract src from the <img> inside the figure
+      const srcMatch = inner.match(/\bsrc="([^"]+)"/)
+      const captionMatch = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i)
+      const src = srcMatch?.[1] ?? ''
+      const captionText = captionMatch
+        ? captionMatch[1].replace(/<[^>]+>/g, '').trim()
+        : ''
+      const svg = svgBySrc[src]
+      const replacement = svg
+        ? `\n\n${captionText ? `**${captionText}**\n\n` : ''}${svg}\n\n`
+        : `\n\n${captionText ? `*[Diagram: ${captionText}]*` : '*[Diagram]*'}\n\n`
+      const token = `@@DIAGRAM_${tokens.length}@@`
+      tokens.push(replacement)
+      return token
+    },
+  )
+
+  // Run the normal markdown pipeline (placeholder tokens pass through intact)
+  let markdown = htmlToMarkdown(withPlaceholders)
+
+  // Substitute tokens back with their SVG / caption content
+  for (let i = 0; i < tokens.length; i++) {
+    markdown = markdown.replace(`@@DIAGRAM_${i}@@`, tokens[i])
+  }
+
+  return markdown.replace(/\n{3,}/g, '\n\n').trim()
+}
+
 function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
   if (!raw) return []
   try {
@@ -289,8 +333,10 @@ ${citationLines}`
 }
 
 /**
- * Like buildReviewText but appends inline SVG content for each diagram.
- * SVG strings are fetched client-side and passed in via diagramSvgs map.
+ * Like buildReviewText but inlines SVG content at the exact position each
+ * diagram <figure> occupies in the article body. diagramSvgs is keyed by
+ * diagram id; svgBySrc maps CDN src URLs to the same SVG text so the inline
+ * substitutor can match <img src> attributes inside each <figure>.
  */
 function buildFinalReviewText(
   sp: SitePage,
@@ -298,19 +344,59 @@ function buildFinalReviewText(
   brand: BrandSettings,
   diagramSvgs: Record<string, string>,
 ): string {
-  const base = buildReviewText(sp, pipelineSteps, brand)
   const diagrams = sp.diagrams ?? []
-  if (diagrams.length === 0) return base
 
-  const diagramSection = diagrams
-    .map((d) => {
-      const header = `### Diagram ${d.position}: ${d.sectionTitle}`
-      const svg = diagramSvgs[d.id] ?? null
-      return svg ? `${header}\n\n${svg}` : `${header}\n\n[SVG not yet loaded]`
-    })
-    .join('\n\n---\n\n')
+  // Build a src→svg lookup so htmlToMarkdownWithDiagrams can match <img src>
+  const svgBySrc: Record<string, string> = {}
+  for (const d of diagrams) {
+    if (d.svgCdnUrl && diagramSvgs[d.id]) {
+      svgBySrc[d.svgCdnUrl] = diagramSvgs[d.id]
+    }
+  }
 
-  return `${base}\n\n---\n\n## Diagrams\n\n${diagramSection}`
+  const bodySource =
+    sp.bodyHtml?.trim() ||
+    pipelineSteps.find((s) => s.stepNumber === 11 && s.status === 'completed')?.output?.trim() ||
+    pipelineSteps.find((s) => s.stepNumber === 9  && s.status === 'completed')?.output?.trim() ||
+    ''
+
+  const bodyMarkdown = bodySource
+    ? htmlToMarkdownWithDiagrams(bodySource, svgBySrc)
+    : '[Article body not yet available]'
+
+  const title = sp.seoTitle ?? sp.title ?? ''
+  const citations = resolveCitations(sp, pipelineSteps)
+  const citationLines = citations.length > 0
+    ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
+    : '[No citations available for this article]'
+
+  return `# Evaluation Request
+
+Does this article comply with and satisfy:
+
+1. Google's "People First" principles
+2. Google's E-E-A-T framework
+3. Google's Helpful Content guidelines and rules?
+
+---
+
+# ${title}
+
+${bodyMarkdown}
+
+---
+
+## Author
+
+**Name:** ${brand.defaultAuthorName ?? ''}
+**Bio:** ${brand.ourExperience ?? ''}
+**Website:** ${brand.defaultAuthorWebsite ?? ''}
+
+---
+
+## Citations
+
+${citationLines}`
 }
 
 /** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */

@@ -581,6 +581,51 @@ export async function articleRoutes(app: FastifyInstance) {
     return reply.send({ ok: true, message: 'Pipeline rerun started' })
   })
 
+  // ── GET /api/articles/:jobId/citations-debug — inspect raw citation data ─
+  // Temporary diagnostic endpoint. Returns the raw db citations field, the
+  // step-12 pipeline output, and a sample of inline <a> hrefs from bodyHtml.
+  // Safe to keep in production — read-only, auth-gated, reveals no secrets.
+  app.get<{ Params: { jobId: string } }>(
+    '/articles/:jobId/citations-debug',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+        include: {
+          sitePage: { select: { citations: true, bodyHtml: true } },
+          pipelineSteps: {
+            where: { stepNumber: 12 },
+            select: { stepNumber: true, status: true, output: true },
+          },
+        },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+      // Extract a sample of external hrefs from bodyHtml for cross-checking
+      const bodyHtml = job.sitePage?.bodyHtml ?? ''
+      const hrefMatches = [...bodyHtml.matchAll(/<a\s[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)]
+      const inlineLinks = hrefMatches.slice(0, 20).map((m) => ({
+        url: m[1],
+        text: m[2].replace(/<[^>]+>/g, '').trim().slice(0, 80),
+      }))
+
+      return reply.send({
+        sitePage: {
+          citations: job.sitePage?.citations ?? null,
+          inlineLinksFromBody: inlineLinks,
+          inlineLinkCount: hrefMatches.length,
+        },
+        step12: job.pipelineSteps[0] ?? null,
+      })
+    },
+  )
+
   // ── GET /api/articles/:jobId/diagram-svg/:diagramId — proxy SVG from S3 ─
   // Avoids browser CORS restrictions when fetching SVG text content for
   // embedding in the Gemini review copy/paste area.

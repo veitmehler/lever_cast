@@ -133,18 +133,32 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: stri
   ],
   openrouter: [],
   'fal-ai': [
-    // ── Flux Pro (flagship) ───────────────────────────────────────────────
-    { value: 'fal-ai/flux-pro',           label: 'FLUX Pro (flagship)',            group: 'FLUX Pro' },
-    { value: 'fal-ai/flux-pro/v1.1',      label: 'FLUX Pro v1.1',                  group: 'FLUX Pro' },
-    { value: 'fal-ai/flux-pro/v1.1-ultra',label: 'FLUX Pro v1.1 Ultra',            group: 'FLUX Pro' },
-    // ── Flux Dev / Schnell ────────────────────────────────────────────────
-    { value: 'fal-ai/flux/dev',           label: 'FLUX Dev',                       group: 'FLUX Dev / Schnell' },
-    { value: 'fal-ai/flux/schnell',       label: 'FLUX Schnell (fast)',             group: 'FLUX Dev / Schnell' },
-    // ── Specialised ───────────────────────────────────────────────────────
-    { value: 'fal-ai/flux-realism',       label: 'FLUX Realism',                   group: 'Specialised' },
-    { value: 'fal-ai/flux-cinematic',     label: 'FLUX Cinematic',                 group: 'Specialised' },
-    { value: 'fal-ai/stable-diffusion-xl', label: 'Stable Diffusion XL',            group: 'Specialised' },
-    { value: 'fal-ai/recraft-v3',         label: 'Recraft v3',                     group: 'Specialised' },
+    // ── FLUX 2 (latest flagship — Black Forest Labs) ──────────────────────
+    { value: 'fal-ai/flux-2-pro',                              label: 'FLUX 2 Pro (latest flagship)',        group: 'FLUX 2' },
+    // ── FLUX 1.x Pro ─────────────────────────────────────────────────────
+    { value: 'fal-ai/flux-pro/v1.1-ultra',                     label: 'FLUX 1.1 Pro Ultra (2K)',            group: 'FLUX 1.x Pro' },
+    { value: 'fal-ai/flux-pro/v1.1',                           label: 'FLUX 1.1 Pro',                       group: 'FLUX 1.x Pro' },
+    { value: 'fal-ai/flux-pro',                                label: 'FLUX Pro (stable)',                  group: 'FLUX 1.x Pro' },
+    // ── FLUX Dev / Schnell ────────────────────────────────────────────────
+    { value: 'fal-ai/flux/dev',                                label: 'FLUX Dev',                           group: 'FLUX Dev / Schnell' },
+    { value: 'fal-ai/flux/schnell',                            label: 'FLUX Schnell (fast, 1-4 steps)',      group: 'FLUX Dev / Schnell' },
+    // ── Google (Nano Banana / Imagen) ─────────────────────────────────────
+    { value: 'fal-ai/nano-banana-2',                           label: 'Nano Banana 2 (Google, fast)',       group: 'Google' },
+    { value: 'fal-ai/nano-banana-pro',                         label: 'Nano Banana Pro (Gemini 3)',         group: 'Google' },
+    { value: 'fal-ai/nano-banana',                             label: 'Nano Banana (Imagen 3)',             group: 'Google' },
+    // ── OpenAI GPT-Image ──────────────────────────────────────────────────
+    { value: 'fal-ai/gpt-image-1.5',                           label: 'GPT-Image 1.5 (OpenAI)',             group: 'OpenAI' },
+    { value: 'fal-ai/gpt-image-1/text-to-image',               label: 'GPT-Image 1 (OpenAI)',               group: 'OpenAI' },
+    // ── Ideogram ──────────────────────────────────────────────────────────
+    { value: 'fal-ai/ideogram/v3',                             label: 'Ideogram V3 (typography / posters)', group: 'Ideogram' },
+    // ── ByteDance ─────────────────────────────────────────────────────────
+    { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image',   label: 'Seedream 4.5 (ByteDance)',           group: 'ByteDance' },
+    // ── xAI Grok ─────────────────────────────────────────────────────────
+    { value: 'xai/grok-imagine-image',                         label: 'Grok Imagine (xAI)',                 group: 'xAI' },
+    // ── Specialised / Legacy ──────────────────────────────────────────────
+    { value: 'fal-ai/flux-realism',                            label: 'FLUX Realism',                       group: 'Specialised' },
+    { value: 'fal-ai/recraft-v3',                              label: 'Recraft v3',                         group: 'Specialised' },
+    { value: 'fal-ai/stable-diffusion-xl',                     label: 'Stable Diffusion XL',                group: 'Specialised' },
   ],
 }
 

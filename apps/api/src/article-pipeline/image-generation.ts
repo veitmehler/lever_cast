@@ -7,10 +7,22 @@
 import { fal } from '@fal-ai/client'
 import { getSystemApiKey } from '../lib/system-keys'
 import { logger } from '../lib/logger'
+import { loadPromptTemplate } from './enrichment/prompt-template'
 
-const FAL_MODEL = 'fal-ai/flux-pro'
+const DEFAULT_FAL_MODEL = 'fal-ai/flux-pro'
 const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 5_000
+
+/** Read the configured Fal.ai model from the DB (step 150), falling back to the default. */
+async function resolveImageModel(): Promise<string> {
+  try {
+    const t = await loadPromptTemplate(150)
+    if (t?.defaultModel && t.defaultModel.startsWith('fal-ai/')) return t.defaultModel
+  } catch {
+    // non-fatal — use default
+  }
+  return DEFAULT_FAL_MODEL
+}
 
 interface FalResult {
   data?: { images?: Array<{ url: string } | string>; image?: { url: string } | string; url?: string }
@@ -32,13 +44,15 @@ function extractImageUrl(result: FalResult): string | null {
   return null
 }
 
-/** Generate a featured image with Fal.ai flux-pro and return the remote image URL. */
+/** Generate a featured image with Fal.ai and return the remote image URL. */
 export async function generateFeaturedImage(
   imagePrompt: string,
   jobId: string,
 ): Promise<string> {
   const apiKey = await getSystemApiKey('fal-ai')
   if (!apiKey) throw new Error('No Fal.ai system API key configured')
+
+  const falModel = await resolveImageModel()
 
   // Truncate prompt to avoid API limits
   const prompt = imagePrompt.slice(0, 2_000)
@@ -48,10 +62,10 @@ export async function generateFeaturedImage(
     try {
       fal.config({ credentials: apiKey })
 
-      const result = await fal.subscribe(FAL_MODEL, {
+      const result = await fal.subscribe(falModel, {
         input: {
           prompt,
-          image_size: 'square_hd',
+          image_size: 'landscape_16_9',
           num_inference_steps: 28,
           guidance_scale: 3.5,
         },
@@ -62,7 +76,7 @@ export async function generateFeaturedImage(
       const imageUrl = extractImageUrl(result as FalResult)
       if (!imageUrl) throw new Error('Fal.ai returned no image URL in response')
 
-      logger.info({ jobId, attempt, model: FAL_MODEL }, '[image-gen] featured image generated')
+      logger.info({ jobId, attempt, model: falModel }, '[image-gen] featured image generated')
       return imageUrl
     } catch (err) {
       lastErr = err

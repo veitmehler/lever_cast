@@ -52,16 +52,25 @@ const STEP_LABELS: Record<string, string> = {
   adjust_incorrect_facts:         'Adjust Incorrect Facts',
   find_citations:                 'Find Citations',
   generate_seo_metadata:          'SEO Metadata',
-  generate_image_prompt:          'Image Prompt',
+  select_category:                'WP Category (pipeline)',
+  generate_image_prompt:          'Image Prompt (LLM)',
+  generate_schema_markup:         'Schema Markup',
   generate_excerpt:               'Excerpt',
   generate_legal_disclaimer:      'Legal Disclaimer',
-  enrichment_generate_diagram:    'Mermaid Diagram (Enrichment)',
+  image_generation_model:         'Featured Image Model (Fal.ai)',
+  enrichment_generate_diagram:    'Mermaid Diagram',
+  enrichment_question_matching:   'GEO — Question Matching',
+  enrichment_keyword_to_question: 'GEO — Keyword → Question',
+  enrichment_uniqueness_rephrase: 'GEO — Rephrase for Uniqueness',
+  enrichment_ai_summary:          'GEO — AI Section Summary',
+  enrichment_wp_category:         'WP Category (enrichment)',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
-  { label: 'Phase A — Pre-approval (Steps 1–12)',   steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
-  { label: 'Phase B — Approval Chain (Steps 13–18)', steps: [13, 15, 17, 18] },
-  { label: 'Phase C — Enrichment',                   steps: [20] },
+  { label: 'Phase A — Pre-approval (Steps 1–12)',    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+  { label: 'Phase B — Approval Chain (Steps 13–18)', steps: [13, 14, 15, 16, 17, 18] },
+  { label: 'Phase C — Enrichment',                   steps: [20, 101, 102, 103, 104, 108] },
+  { label: 'Image Generation',                       steps: [150] },
 ]
 
 export default function AdminPromptsPage() {

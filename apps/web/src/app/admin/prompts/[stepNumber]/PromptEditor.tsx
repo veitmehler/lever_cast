@@ -62,17 +62,29 @@ const STEP_LABELS: Record<number, string> = {
   11: 'Step 11 — Adjust Facts',
   12: 'Step 12 — Citations',
   13: 'Step 13 — SEO Metadata',
-  15: 'Step 15 — Image Prompt',
+  14: 'Step 14 — WP Category (pipeline)',
+  15: 'Step 15 — Image Prompt (LLM)',
+  16: 'Step 16 — Schema Markup',
   17: 'Step 17 — Excerpt',
   18: 'Step 18 — Legal Disclaimer',
-  20: 'Step 20 — Mermaid Diagram',
+  20: 'Step 20 — Mermaid Diagram (Enrichment)',
+  101: 'Step 101 — GEO Question Matching',
+  102: 'Step 102 — GEO Keyword → Question',
+  103: 'Step 103 — GEO Rephrase for Uniqueness',
+  104: 'Step 104 — GEO AI Section Summary',
+  108: 'Step 108 — WP Category (Enrichment)',
+  150: 'Image Generation — Fal.ai Model',
 }
+
+/** Steps that only configure a model, not a prompt. */
+const MODEL_ONLY_STEPS = new Set([150])
 
 const PROVIDER_OPTIONS = [
   { value: 'gemini',     label: 'Gemini (Google)' },
   { value: 'anthropic',  label: 'Anthropic (Claude)' },
   { value: 'openai',     label: 'OpenAI (GPT)' },
   { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'fal-ai',     label: 'Fal.ai (Image Generation)' },
 ]
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: string }[]> = {
@@ -120,6 +132,20 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: stri
     { value: 'gpt-4o-mini',                     label: 'GPT-4o Mini',                       group: 'GPT-4o' },
   ],
   openrouter: [],
+  'fal-ai': [
+    // ── Flux Pro (flagship) ───────────────────────────────────────────────
+    { value: 'fal-ai/flux-pro',           label: 'FLUX Pro (flagship)',            group: 'FLUX Pro' },
+    { value: 'fal-ai/flux-pro/v1.1',      label: 'FLUX Pro v1.1',                  group: 'FLUX Pro' },
+    { value: 'fal-ai/flux-pro/v1.1-ultra',label: 'FLUX Pro v1.1 Ultra',            group: 'FLUX Pro' },
+    // ── Flux Dev / Schnell ────────────────────────────────────────────────
+    { value: 'fal-ai/flux/dev',           label: 'FLUX Dev',                       group: 'FLUX Dev / Schnell' },
+    { value: 'fal-ai/flux/schnell',       label: 'FLUX Schnell (fast)',             group: 'FLUX Dev / Schnell' },
+    // ── Specialised ───────────────────────────────────────────────────────
+    { value: 'fal-ai/flux-realism',       label: 'FLUX Realism',                   group: 'Specialised' },
+    { value: 'fal-ai/flux-cinematic',     label: 'FLUX Cinematic',                 group: 'Specialised' },
+    { value: 'fal-ai/stable-diffusion-xl', label: 'Stable Diffusion XL',            group: 'Specialised' },
+    { value: 'fal-ai/recraft-v3',         label: 'Recraft v3',                     group: 'Specialised' },
+  ],
 }
 
 // Extract {{var}} tokens that actually appear in a given text
@@ -136,6 +162,8 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
   const [model,        setModel]        = useState(template.defaultModel)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
+
+  const isModelOnlyStep = MODEL_ONLY_STEPS.has(template.stepNumber)
 
   const modelOptions = MODEL_OPTIONS[provider] ?? []
   // If the current model isn't in the dropdown list it's a custom/legacy value — allow it
@@ -233,7 +261,7 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+      <div className={`grid grid-cols-1 gap-6 ${isModelOnlyStep ? '' : 'lg:grid-cols-[1fr_280px]'}`}>
         {/* ── Left: prompts + model settings ─────────────────────────── */}
         <div className="space-y-5">
           {/* Provider + model row */}
@@ -317,38 +345,55 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
             </div>
           </div>
 
-          {/* System prompt */}
-          <div className="bg-card rounded-xl border border-border p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">System prompt</h2>
-              <span className="text-xs text-muted-foreground">{systemPrompt.length} chars</span>
+          {/* Prompts — hidden for model-only steps */}
+          {isModelOnlyStep ? (
+            <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 p-5 flex gap-3">
+              <Info className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
+              <div className="text-sm text-amber-800 dark:text-amber-300">
+                <p className="font-semibold mb-1">Prompt-free step — model selection only</p>
+                <p className="text-xs leading-relaxed">
+                  The image prompt is generated automatically by <strong>Step 15</strong> using the article
+                  topic and summary. Only the <strong>Fal.ai model</strong> selected above controls which
+                  image generation model renders that prompt.
+                </p>
+              </div>
             </div>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              rows={5}
-              placeholder="Optional system prompt…"
-              className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
-            />
-          </div>
+          ) : (
+            <>
+              {/* System prompt */}
+              <div className="bg-card rounded-xl border border-border p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-foreground">System prompt</h2>
+                  <span className="text-xs text-muted-foreground">{systemPrompt.length} chars</span>
+                </div>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={5}
+                  placeholder="Optional system prompt…"
+                  className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
+                />
+              </div>
 
-          {/* User prompt */}
-          <div className="bg-card rounded-xl border border-border p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">User prompt</h2>
-              <span className="text-xs text-muted-foreground">{userPrompt.length} chars</span>
-            </div>
-            <textarea
-              value={userPrompt}
-              onChange={(e) => setUserPrompt(e.target.value)}
-              rows={20}
-              className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
-            />
-          </div>
+              {/* User prompt */}
+              <div className="bg-card rounded-xl border border-border p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-foreground">User prompt</h2>
+                  <span className="text-xs text-muted-foreground">{userPrompt.length} chars</span>
+                </div>
+                <textarea
+                  value={userPrompt}
+                  onChange={(e) => setUserPrompt(e.target.value)}
+                  rows={20}
+                  className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 resize-y leading-relaxed"
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        {/* ── Right: variable reference panel ─────────────────────────── */}
-        <div className="space-y-4">
+        {/* ── Right: variable reference panel (hidden for model-only steps) ─────────────────────────── */}
+        <div className={`space-y-4 ${isModelOnlyStep ? 'hidden lg:hidden' : ''}`}>
           {/* Info */}
           <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/20 p-4 text-xs text-indigo-400 flex gap-2">
             <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />

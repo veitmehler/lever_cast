@@ -343,7 +343,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
               </div>
             )}
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-6 mb-6">
               <Button type="button" onClick={() => void handleSave()} disabled={saving || !mounted || !editor}>
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving…' : 'Save changes'}
@@ -366,7 +366,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
             )}
 
             {disclaimer ? (
-              <footer className="mt-8 bg-muted border border-border rounded-xl p-4">
+              <footer className="mt-8 mb-8 bg-muted border border-border rounded-xl p-4">
                 <h3 className="text-sm font-semibold text-foreground mb-2">Article Disclaimer</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{disclaimer}</p>
               </footer>

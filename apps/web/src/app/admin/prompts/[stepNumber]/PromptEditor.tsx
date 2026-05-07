@@ -75,22 +75,49 @@ const PROVIDER_OPTIONS = [
   { value: 'openrouter', label: 'OpenRouter' },
 ]
 
-const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: string }[]> = {
   gemini: [
-    { value: 'gemini-2.5-flash',                label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-pro',                  label: 'Gemini 2.5 Pro' },
-    { value: 'gemini-2.0-flash',                label: 'Gemini 2.0 Flash' },
+    // ── Gemini 3 (latest) ──────────────────────────────────────────────────
+    { value: 'gemini-3.1-pro-preview',          label: 'Gemini 3.1 Pro Preview',           group: 'Gemini 3' },
+    { value: 'gemini-3-flash-preview',          label: 'Gemini 3 Flash Preview',            group: 'Gemini 3' },
+    { value: 'gemini-3.1-flash-lite',           label: 'Gemini 3.1 Flash-Lite (Stable)',    group: 'Gemini 3' },
+    { value: 'gemini-3.1-flash-lite-preview',   label: 'Gemini 3.1 Flash-Lite Preview',     group: 'Gemini 3' },
+    // ── Gemini 2.5 ────────────────────────────────────────────────────────
+    { value: 'gemini-2.5-pro',                  label: 'Gemini 2.5 Pro',                    group: 'Gemini 2.5' },
+    { value: 'gemini-2.5-flash',                label: 'Gemini 2.5 Flash',                  group: 'Gemini 2.5' },
+    { value: 'gemini-2.5-flash-lite',           label: 'Gemini 2.5 Flash-Lite',             group: 'Gemini 2.5' },
+    // ── Gemini 2.0 (deprecated — avoid new use) ───────────────────────────
+    { value: 'gemini-2.0-flash',                label: 'Gemini 2.0 Flash (deprecated)',     group: 'Gemini 2.0' },
+    { value: 'gemini-2.0-flash-lite',           label: 'Gemini 2.0 Flash-Lite (deprecated)', group: 'Gemini 2.0' },
   ],
   anthropic: [
-    { value: 'claude-sonnet-4-5-20250929',      label: 'Claude Sonnet 4.5 (2025-09-29)' },
-    { value: 'claude-sonnet-4-5',               label: 'Claude Sonnet 4.5' },
-    { value: 'claude-haiku-3-5-20241022',       label: 'Claude Haiku 3.5 (2024-10-22)' },
-    { value: 'claude-opus-4-7',                 label: 'Claude Opus 4.7' },
+    // ── Latest ────────────────────────────────────────────────────────────
+    { value: 'claude-opus-4-7',                 label: 'Claude Opus 4.7 (latest)',          group: 'Latest' },
+    { value: 'claude-sonnet-4-6',               label: 'Claude Sonnet 4.6 (latest)',        group: 'Latest' },
+    { value: 'claude-haiku-4-5',                label: 'Claude Haiku 4.5 (latest)',         group: 'Latest' },
+    // ── Claude 4 (previous) ───────────────────────────────────────────────
+    { value: 'claude-opus-4-6',                 label: 'Claude Opus 4.6',                   group: 'Claude 4' },
+    { value: 'claude-opus-4-5',                 label: 'Claude Opus 4.5',                   group: 'Claude 4' },
+    { value: 'claude-opus-4-1',                 label: 'Claude Opus 4.1',                   group: 'Claude 4' },
+    { value: 'claude-sonnet-4-5-20250929',      label: 'Claude Sonnet 4.5 (2025-09-29)',    group: 'Claude 4' },
+    { value: 'claude-sonnet-4-5',               label: 'Claude Sonnet 4.5 (alias)',         group: 'Claude 4' },
+    // ── Claude 3 ──────────────────────────────────────────────────────────
+    { value: 'claude-haiku-3-5-20241022',       label: 'Claude Haiku 3.5 (2024-10-22)',     group: 'Claude 3' },
   ],
   openai: [
-    { value: 'gpt-4o-mini',                     label: 'GPT-4o Mini' },
-    { value: 'gpt-4o',                           label: 'GPT-4o' },
-    { value: 'o3-mini',                          label: 'o3-mini' },
+    // ── GPT-5 family ──────────────────────────────────────────────────────
+    { value: 'gpt-5.5',                         label: 'GPT-5.5 (flagship)',                group: 'GPT-5' },
+    { value: 'gpt-5.4',                         label: 'GPT-5.4',                           group: 'GPT-5' },
+    { value: 'gpt-5.4-mini',                    label: 'GPT-5.4 Mini',                      group: 'GPT-5' },
+    { value: 'gpt-5.4-nano',                    label: 'GPT-5.4 Nano',                      group: 'GPT-5' },
+    { value: 'gpt-5-mini',                      label: 'GPT-5 Mini',                        group: 'GPT-5' },
+    { value: 'gpt-5-nano',                      label: 'GPT-5 Nano',                        group: 'GPT-5' },
+    // ── Reasoning ─────────────────────────────────────────────────────────
+    { value: 'o3',                              label: 'o3 (reasoning)',                    group: 'Reasoning' },
+    { value: 'o4-mini',                         label: 'o4-mini (reasoning, deprecating)',  group: 'Reasoning' },
+    // ── GPT-4o (legacy) ───────────────────────────────────────────────────
+    { value: 'gpt-4o',                          label: 'GPT-4o',                            group: 'GPT-4o' },
+    { value: 'gpt-4o-mini',                     label: 'GPT-4o Mini',                       group: 'GPT-4o' },
   ],
   openrouter: [],
 }
@@ -236,12 +263,36 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
                       }}
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
                     >
-                      {modelOptions.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                      {isCustomModel && (
-                        <option value="__custom__">{model} (custom)</option>
-                      )}
+                      {/* Render grouped options using optgroup */}
+                      {(() => {
+                        const groups: Record<string, typeof modelOptions> = {}
+                        const ungrouped: typeof modelOptions = []
+                        for (const o of modelOptions) {
+                          if (o.group) {
+                            if (!groups[o.group]) groups[o.group] = []
+                            groups[o.group].push(o)
+                          } else {
+                            ungrouped.push(o)
+                          }
+                        }
+                        return (
+                          <>
+                            {ungrouped.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                            {Object.entries(groups).map(([groupName, opts]) => (
+                              <optgroup key={groupName} label={groupName}>
+                                {opts.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                            {isCustomModel && (
+                              <option value="__custom__">{model} (custom/legacy)</option>
+                            )}
+                          </>
+                        )
+                      })()}
                     </select>
                     {isCustomModel && (
                       <input

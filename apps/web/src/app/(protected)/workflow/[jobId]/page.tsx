@@ -62,6 +62,14 @@ type CitationEntry = {
   sourceUrl?: string    // legacy prompt format (pre-v3 reseed)
 }
 
+type ArticleDiagram = {
+  id: string
+  position: number
+  sectionTitle: string
+  caption?: string | null
+  svgCdnUrl?: string | null
+}
+
 type SitePage = {
   id: string
   title: string
@@ -79,6 +87,7 @@ type SitePage = {
   /** JSON-LD from Step 16 / approval — may be null if generation failed */
   schemaJson?: string | null
   featuredImage?: FeaturedImage | null
+  diagrams?: ArticleDiagram[]
 }
 
 type ArticleJob = {
@@ -258,6 +267,31 @@ ${bodyMarkdown}
 ${citationLines}`
 }
 
+/**
+ * Like buildReviewText but appends inline SVG content for each diagram.
+ * SVG strings are fetched client-side and passed in via diagramSvgs map.
+ */
+function buildFinalReviewText(
+  sp: SitePage,
+  pipelineSteps: PipelineStep[],
+  brand: BrandSettings,
+  diagramSvgs: Record<string, string>,
+): string {
+  const base = buildReviewText(sp, pipelineSteps, brand)
+  const diagrams = sp.diagrams ?? []
+  if (diagrams.length === 0) return base
+
+  const diagramSection = diagrams
+    .map((d) => {
+      const header = `### Diagram ${d.position}: ${d.sectionTitle}`
+      const svg = d.svgCdnUrl ? (diagramSvgs[d.svgCdnUrl] ?? null) : null
+      return svg ? `${header}\n\n${svg}` : `${header}\n\n[SVG not yet loaded]`
+    })
+    .join('\n\n---\n\n')
+
+  return `${base}\n\n---\n\n## Diagrams\n\n${diagramSection}`
+}
+
 /** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */
 function formatSchemaJsonDisplay(raw: string | null | undefined): string {
   if (!raw?.trim()) return ''
@@ -307,6 +341,7 @@ export default function WorkflowJobPage() {
   const [copiedFinal, setCopiedFinal] = useState(false)
   const [showFinalArticleReview, setShowFinalArticleReview] = useState(true)
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
+  const [diagramSvgs, setDiagramSvgs] = useState<Record<string, string>>({})
 
   // Live SSE state (overlays DB state while pipeline is running)
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
@@ -345,6 +380,27 @@ export default function WorkflowJobPage() {
       }))
       .catch(() => {/* silent */})
   }, [])
+
+  // Fetch SVG content for diagrams once the job has diagrams available
+  useEffect(() => {
+    const diagrams = job?.sitePage?.diagrams
+    if (!diagrams?.length) return
+    const urls = diagrams.map((d) => d.svgCdnUrl).filter(Boolean) as string[]
+    if (urls.length === 0) return
+    void Promise.all(
+      urls.map(async (url) => {
+        try {
+          const res = await fetch(url)
+          if (res.ok) return [url, await res.text()] as const
+        } catch { /* skip */ }
+        return null
+      }),
+    ).then((results) => {
+      const map: Record<string, string> = {}
+      for (const r of results) { if (r) map[r[0]] = r[1] }
+      setDiagramSvgs(map)
+    })
+  }, [job?.sitePage?.diagrams])
 
   // ── SSE ────────────────────────────────────────────────────────────────────
 
@@ -519,7 +575,7 @@ export default function WorkflowJobPage() {
 
   const handleCopyFinal = async () => {
     if (!job?.sitePage) return
-    const text = buildReviewText(job.sitePage, job.pipelineSteps, brandSettings)
+    const text = buildFinalReviewText(job.sitePage, job.pipelineSteps, brandSettings, diagramSvgs)
     try {
       await navigator.clipboard.writeText(text)
       setCopiedFinal(true)
@@ -887,30 +943,34 @@ export default function WorkflowJobPage() {
             </div>
 
             {showSchemaBlock && (
-              <div className="px-6 pb-6 border-t border-border space-y-4 mt-0 pt-4">
+              <div className="px-6 border-t border-border space-y-4 mt-0 pt-4 pb-0">
                 {sitePage.schemaJson?.trim() ? (
                   <>
                     <pre className="w-full max-h-60 overflow-auto rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-[11px] font-mono text-foreground">
                       {formatSchemaJsonDisplay(sitePage.schemaJson)}
                     </pre>
-                    <Button variant="default" size="default" className="w-full sm:w-auto shadow-sm" asChild>
-                      <a
-                        href="https://search.google.com/test/rich-results"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Validate with Google Rich Results Test
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
+                    <div className="pb-6">
+                      <Button variant="default" size="default" className="w-full sm:w-auto shadow-sm" asChild>
+                        <a
+                          href="https://search.google.com/test/rich-results"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Validate with Google Rich Results Test
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
                   </>
                 ) : (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      Schema markup was not saved for this article (Step 16 may have failed). You can still publish
-                      and export — fix schema in your CMS if needed.
-                    </p>
+                  <div className="pb-6">
+                    <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        Schema markup was not saved for this article (Step 16 may have failed). You can still publish
+                        and export — fix schema in your CMS if needed.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -933,19 +993,6 @@ export default function WorkflowJobPage() {
                   — enriched copy, preview editor, publish
                 </span>
               </button>
-              {displayStatus === 'enriched' && (
-                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    onClick={() => void handlePublish()}
-                    disabled={isPublishing}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-md"
-                  >
-                    {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Publish
-                  </Button>
-                </div>
-              )}
               <button
                 type="button"
                 onClick={() => setShowFinalArticleReview((v) => !v)}
@@ -1002,17 +1049,28 @@ export default function WorkflowJobPage() {
                 )}
                 <textarea
                   readOnly
-                  value={buildReviewText(sitePage, job.pipelineSteps, brandSettings)}
+                  value={buildFinalReviewText(sitePage, job.pipelineSteps, brandSettings, diagramSvgs)}
                   rows={20}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                 />
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-4 mb-6 flex flex-wrap gap-3">
                   <Button variant="default" size="default" className="gap-1.5 shadow-sm" asChild>
                     <Link href={`/workflow/${jobId}/preview`} target="_blank" rel="noopener noreferrer">
                       <PenLine className="h-4 w-4" />
                       Open article preview & editor
                     </Link>
                   </Button>
+                  {displayStatus === 'enriched' && (
+                    <Button
+                      size="default"
+                      onClick={() => void handlePublish()}
+                      disabled={isPublishing}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-md"
+                    >
+                      {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Publish
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

@@ -3,10 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
-  Image as ImageIcon, Search, Tag, BookOpen, RefreshCw, BarChart3,
+  Search, Tag, BookOpen, RefreshCw,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
   Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2,
 } from 'lucide-react'
@@ -54,17 +53,6 @@ type FeaturedImage = {
   altText?: string | null
 }
 
-type ArticleDiagram = {
-  id: string
-  position: number
-  sectionTitle: string
-  caption?: string | null
-  pngS3Key?: string | null
-  cdnUrl?: string | null
-  svgCdnUrl?: string | null
-  darkCdnUrl?: string | null
-}
-
 type CitationEntry = {
   link_title?: string
   link_url?: string
@@ -91,7 +79,6 @@ type SitePage = {
   /** JSON-LD from Step 16 / approval — may be null if generation failed */
   schemaJson?: string | null
   featuredImage?: FeaturedImage | null
-  diagrams?: ArticleDiagram[]
 }
 
 type ArticleJob = {
@@ -317,6 +304,8 @@ export default function WorkflowJobPage() {
   const [showReview, setShowReview] = useState(false)
   const [showSchemaBlock, setShowSchemaBlock] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [copiedFinal, setCopiedFinal] = useState(false)
+  const [showFinalArticleReview, setShowFinalArticleReview] = useState(true)
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
 
   // Live SSE state (overlays DB state while pipeline is running)
@@ -528,6 +517,18 @@ export default function WorkflowJobPage() {
     }
   }
 
+  const handleCopyFinal = async () => {
+    if (!job?.sitePage) return
+    const text = buildReviewText(job.sitePage, job.pipelineSteps, brandSettings)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedFinal(true)
+      setTimeout(() => setCopiedFinal(false), 2500)
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
+    }
+  }
+
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const displayStatus = liveStatus ?? job?.status ?? 'pending'
@@ -712,9 +713,18 @@ export default function WorkflowJobPage() {
                     </p>
                   </div>
                 )}
-                <div className="flex items-center justify-between mt-4 mb-3">
+                <div className="flex items-center justify-between mt-4 mb-3 flex-wrap gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Paste this into ChatGPT, Claude, or Gemini to evaluate Google compliance.
+                    Paste article into{' '}
+                    <a
+                      href="https://gemini.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Gemini
+                    </a>{' '}
+                    to evaluate content quality.
                   </p>
                   <Button
                     size="sm"
@@ -743,27 +753,6 @@ export default function WorkflowJobPage() {
                 />
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── Featured image (visible after approval) ────────────────── */}
-        {sitePage?.featuredImage?.url && (
-          <div className="bg-card rounded-xl border border-border p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <ImageIcon className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
-                Featured Image
-              </h2>
-            </div>
-            <div className="relative w-full aspect-square max-w-sm rounded-lg overflow-hidden border border-border">
-              <Image
-                src={sitePage.featuredImage.url}
-                alt={sitePage.featuredImage.altText ?? sitePage.title}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, 384px"
-              />
-            </div>
           </div>
         )}
 
@@ -845,41 +834,6 @@ export default function WorkflowJobPage() {
           </div>
         )}
 
-        {/* ── Diagrams (visible after enrichment) ──────────────────────── */}
-        {sitePage?.diagrams && sitePage.diagrams.length > 0 && (
-          <div className="bg-card rounded-xl border border-border p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">
-                Diagrams ({sitePage.diagrams.length})
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {sitePage.diagrams.map((diagram) => (
-                <div key={diagram.id} className="border border-border rounded-lg overflow-hidden">
-                  {(diagram.svgCdnUrl ?? diagram.cdnUrl) && (
-                    <div className="relative w-full aspect-video bg-muted">
-                      <Image
-                        src={(diagram.svgCdnUrl ?? diagram.cdnUrl) as string}
-                        alt={diagram.sectionTitle}
-                        fill
-                        className="object-contain p-2"
-                        sizes="(max-width: 640px) 100vw, 50vw"
-                        unoptimized={!!diagram.svgCdnUrl}
-                      />
-                    </div>
-                  )}
-                  <div className="px-3 py-2 bg-muted border-t border-border">
-                    <p className="text-xs font-medium text-card-foreground truncate">
-                      {diagram.position}. {diagram.sectionTitle}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* ── Schema & publish (after approval — schema from Step 16) ───────── */}
         {sitePage && ['approved', 'enriched', 'published'].includes(displayStatus) && (
           <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
@@ -916,20 +870,6 @@ export default function WorkflowJobPage() {
                     )}
                     Rerun Enrichment
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handlePublish()
-                    }}
-                    disabled={isPublishing}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                  >
-                    {isPublishing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : null}
-                    Publish
-                  </Button>
                 </div>
               )}
               <button
@@ -953,15 +893,16 @@ export default function WorkflowJobPage() {
                     <pre className="w-full max-h-60 overflow-auto rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-[11px] font-mono text-foreground">
                       {formatSchemaJsonDisplay(sitePage.schemaJson)}
                     </pre>
-                    <a
-                      href="https://search.google.com/test/rich-results"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80"
-                    >
-                      Validate with Google Rich Results Test
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <Button variant="default" size="default" className="w-full sm:w-auto shadow-sm" asChild>
+                      <a
+                        href="https://search.google.com/test/rich-results"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Validate with Google Rich Results Test
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
                   </>
                 ) : (
                   <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
@@ -972,6 +913,107 @@ export default function WorkflowJobPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Final article review (enriched / published): copy, preview editor, publish ───────── */}
+        {sitePage && ['enriched', 'published'].includes(displayStatus) && (
+          <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
+            <div className="flex items-center px-6 py-4 gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowFinalArticleReview((v) => !v)}
+                className="flex-1 flex items-center gap-2 text-left hover:opacity-80 transition-opacity min-w-0"
+              >
+                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-semibold text-card-foreground">Final article review</span>
+                <span className="text-xs text-muted-foreground truncate">
+                  — enriched copy, preview editor, publish
+                </span>
+              </button>
+              {displayStatus === 'enriched' && (
+                <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    onClick={() => void handlePublish()}
+                    disabled={isPublishing}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-md"
+                  >
+                    {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Publish
+                  </Button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowFinalArticleReview((v) => !v)}
+                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                aria-label={showFinalArticleReview ? 'Collapse' : 'Expand'}
+              >
+                {showFinalArticleReview ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+
+            {showFinalArticleReview && (
+              <div className="px-6 pb-6 border-t border-border">
+                <div className="flex items-center justify-between mt-4 mb-3 flex-wrap gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Paste article into{' '}
+                    <a
+                      href="https://gemini.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Gemini
+                    </a>{' '}
+                    to evaluate content quality.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleCopyFinal()}
+                    className="flex-shrink-0 gap-1.5"
+                  >
+                    {copiedFinal ? (
+                      <>
+                        <ClipboardCheck className="h-3.5 w-3.5 text-green-500" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardCopy className="h-3.5 w-3.5" /> Copy all
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {!hasCitations && (
+                  <div className="flex items-start gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2.5 mb-3">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                      No citations found for this article. Citations are searched in Step 12 — check that the step completed successfully.
+                    </p>
+                  </div>
+                )}
+                <textarea
+                  readOnly
+                  value={buildReviewText(sitePage, job.pipelineSteps, brandSettings)}
+                  rows={20}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button variant="default" size="default" className="gap-1.5 shadow-sm" asChild>
+                    <Link href={`/workflow/${jobId}/preview`} target="_blank" rel="noopener noreferrer">
+                      <PenLine className="h-4 w-4" />
+                      Open article preview & editor
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </div>

@@ -69,14 +69,14 @@ const STEP_LABELS: Record<number, string> = {
   16:  'Phase B · Step 16 — Schema Markup',
   17:  'Phase B · Step 17 — Excerpt',
   18:  'Phase B · Step 18 — Legal Disclaimer',
-  // Phase C — Enrichment (runs in order: 101→102→103→104→107→diagram loop/20→108)
-  101: 'Phase C · Step 101 — GEO Question Matching',
-  102: 'Phase C · Step 102 — GEO Keyword → Question',
-  103: 'Phase C · Step 103 — GEO Rephrase for Uniqueness',
-  104: 'Phase C · Step 104 — GEO AI Section Summary',
-  107: 'Phase C · Step 107 — Key Takeaways & TOC',
-  20:  'Phase C · Step 20 — Mermaid Diagram (prompt slot)',
-  108: 'Phase C · Step 108 — WP Category (conditional, runs last)',
+  // Phase C — Enrichment (visual numbering continues from Phase B step 18)
+  101: 'Phase C · Step 19 — GEO Question Matching',
+  102: 'Phase C · Step 20 — GEO Keyword → Question',
+  103: 'Phase C · Step 21 — GEO Rephrase for Uniqueness',
+  104: 'Phase C · Step 22 — GEO AI Section Summary',
+  107: 'Phase C · Step 23 — Key Takeaways & TOC',
+  20:  'Phase C · Step 24 — Mermaid Diagram (prompt slot)',
+  108: 'Phase C · Step 25 — WP Category (conditional, runs last)',
 }
 
 /** Steps that only configure a model, not a prompt. */

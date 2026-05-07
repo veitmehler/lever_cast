@@ -59,14 +59,14 @@ const STEP_LABELS: Record<string, string> = {
   generate_schema_markup:         '16. Schema Markup',
   generate_excerpt:               '17. Excerpt',
   generate_legal_disclaimer:      '18. Legal Disclaimer',
-  // Phase C — Enrichment
-  enrichment_question_matching:   '101. GEO Question Matching',
-  enrichment_keyword_to_question: '102. GEO Keyword → Question',
-  enrichment_uniqueness_rephrase: '103. GEO Rephrase for Uniqueness',
-  enrichment_ai_summary:          '104. GEO AI Section Summary',
-  enrichment_key_takeaways:       '107. Key Takeaways & TOC',
-  enrichment_generate_diagram:    '20. Mermaid Diagram (prompt slot)',
-  enrichment_wp_category:         '108. WP Category (conditional, runs last)',
+  // Phase C — Enrichment (visual sequence continues from Phase B step 18)
+  enrichment_question_matching:   '19. GEO Question Matching',
+  enrichment_keyword_to_question: '20. GEO Keyword → Question',
+  enrichment_uniqueness_rephrase: '21. GEO Rephrase for Uniqueness',
+  enrichment_ai_summary:          '22. GEO AI Section Summary',
+  enrichment_key_takeaways:       '23. Key Takeaways & TOC',
+  enrichment_generate_diagram:    '24. Mermaid Diagram (prompt slot)',
+  enrichment_wp_category:         '25. WP Category (conditional, runs last)',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [

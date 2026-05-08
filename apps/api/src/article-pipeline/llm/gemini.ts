@@ -6,9 +6,23 @@ import { LLMError } from './adapter'
 
 const DEFAULT_MODEL = 'gemini-2.5-flash'
 
+/** Maximum time to wait for a single Gemini API call (search or standard). */
+const GEMINI_FETCH_TIMEOUT_MS = 180_000 // 3 minutes
+
 function parseGeminiError(err: unknown): LLMError {
   const msg = err instanceof Error ? err.message : String(err)
   const lower = msg.toLowerCase()
+
+  // Timeout / abort (covers AbortSignal.timeout, fetch failed, AbortError)
+  if (
+    lower.includes('abort') ||
+    lower.includes('timed out') ||
+    lower.includes('fetch failed') ||
+    lower.includes('etimedout') ||
+    lower.includes('econnreset')
+  ) {
+    return new LLMError(msg, { quotaType: 'timeout', retryAfterSeconds: 5 })
+  }
 
   // Daily quota exhausted
   if (lower.includes('quota') || lower.includes('resource_exhausted')) {
@@ -82,7 +96,7 @@ export class GeminiAdapter implements LLMAdapter {
       },
     })
 
-    const result = await genModel.generateContent(options.userPrompt)
+    const result = await genModel.generateContent(options.userPrompt, { timeout: GEMINI_FETCH_TIMEOUT_MS })
     const response = result.response
 
     if (response.promptFeedback?.blockReason) {
@@ -127,6 +141,7 @@ export class GeminiAdapter implements LLMAdapter {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(GEMINI_FETCH_TIMEOUT_MS),
     })
 
     if (!res.ok) {

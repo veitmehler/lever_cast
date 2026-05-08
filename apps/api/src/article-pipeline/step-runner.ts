@@ -31,9 +31,13 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + `… [+${s.length - n} chars]` : s
 }
 
-const MAX_RETRIES = 3
+const MAX_RETRIES = 5
 const BASE_RETRY_DELAY_MS = 1000
 const BACKOFF_MULTIPLIER = 2
+
+/** Stable fallback model used when the configured Gemini search model exhausts all retries. */
+const GEMINI_SEARCH_FALLBACK_MODEL = 'gemini-2.5-pro'
+const FALLBACK_RETRIES = 3
 
 export interface StepRunResult {
   output: string
@@ -287,7 +291,158 @@ export class StepRunner {
       }
     }
 
-    // All retries exhausted — record failure
+    // ── Fallback: retry with stable GA model if the primary Gemini search model failed ──────────────
+    // Only activates when (a) provider is gemini, (b) the step uses search grounding, and
+    // (c) the configured model is not already the fallback (avoids infinite recursion).
+    if (provider === 'gemini' && useSearch && model !== GEMINI_SEARCH_FALLBACK_MODEL) {
+      logger.warn(
+        {
+          jobId: this.jobId,
+          step: this.stepNumber,
+          primaryModel: model,
+          fallbackModel: GEMINI_SEARCH_FALLBACK_MODEL,
+          primaryAttempts: attempt,
+        },
+        '[step-runner] primary model exhausted retries — falling back to stable model',
+      )
+
+      for (let fbAttempt = 1; fbAttempt <= FALLBACK_RETRIES; fbAttempt++) {
+        try {
+          const adapter = getLLMAdapter(provider)
+
+          // ── Fallback Phase 1: search-grounded call with fallback model ──────
+          let searchResearch: string | undefined
+          let phase1Tokens = { input: 0, output: 0, total: 0 }
+          let phase1Cost = 0
+          if (isTwoPhase) {
+            const searchResponse = await adapter.call({
+              systemPrompt,
+              userPrompt,
+              model: GEMINI_SEARCH_FALLBACK_MODEL,
+              maxTokens: JSON_STEP_MAX_TOKENS,
+              useGenerativeSearch: true,
+            })
+            searchResearch = searchResponse.content
+            phase1Tokens = searchResponse.tokens
+            phase1Cost = searchResponse.cost
+            logger.info(
+              { jobId: this.jobId, step: this.stepNumber, researchLength: searchResearch.length },
+              '[step-runner] fallback phase-1 search complete; proceeding to phase-2',
+            )
+          }
+
+          // ── Fallback Phase 2 (or standard call) ─────────────────────────────
+          const fbPhase2UserPrompt = isTwoPhase && searchResearch
+            ? buildStructuringPrompt(this.stepNumber, searchResearch)
+            : userPrompt
+          const fbPhase2SystemPrompt = isTwoPhase ? null : systemPrompt
+
+          const llmResponse = await adapter.call({
+            systemPrompt: fbPhase2SystemPrompt,
+            userPrompt: fbPhase2UserPrompt,
+            model: GEMINI_SEARCH_FALLBACK_MODEL,
+            maxTokens: isJsonStep ? JSON_STEP_MAX_TOKENS : undefined,
+            useGenerativeSearch: isTwoPhase ? false : useSearch,
+            jsonMode: isTwoPhase ? true : false,
+          })
+
+          const rawOutput = llmResponse.content
+          let finalOutput: string
+          let parsedOutput: unknown | undefined
+
+          if (isJsonStep) {
+            const { data, log } = cleanAndParseJSON(rawOutput)
+            parsedOutput = data
+            finalOutput = JSON.stringify(data)
+            if (log.fixes.length) {
+              logger.info(
+                { jobId: this.jobId, step: this.stepNumber, fixes: log.fixes },
+                '[step-runner] JSON fixes applied (fallback)',
+              )
+            }
+          } else {
+            finalOutput = cleanTextOutput(rawOutput)
+          }
+
+          const durationMs = Date.now() - startTime
+          const totalInputTokens  = llmResponse.tokens.input  + phase1Tokens.input
+          const totalOutputTokens = llmResponse.tokens.output + phase1Tokens.output
+          const totalTokens       = llmResponse.tokens.total  + phase1Tokens.total
+          const totalCost         = llmResponse.cost           + phase1Cost
+
+          await prisma.pipelineStep.update({
+            where: { jobId_stepNumber: { jobId: this.jobId, stepNumber: this.stepNumber } },
+            data: {
+              status: 'completed',
+              output: finalOutput,
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              totalTokens,
+              cost: totalCost,
+              duration: durationMs,
+              retryCount: attempt + fbAttempt - 1,
+              completedAt: new Date(),
+            },
+          })
+
+          await prisma.lLMUsage.create({
+            data: {
+              userId: this.ctx.userId,
+              jobId: this.jobId,
+              source: `pipeline_step_${this.stepNumber}`,
+              provider,
+              model: GEMINI_SEARCH_FALLBACK_MODEL,
+              inputTokens: totalInputTokens,
+              outputTokens: totalOutputTokens,
+              cost: totalCost,
+            },
+          })
+
+          logger.info(
+            { jobId: this.jobId, step: this.stepNumber, model: GEMINI_SEARCH_FALLBACK_MODEL, fbAttempt },
+            '[step-runner] fallback model succeeded',
+          )
+
+          return {
+            output: finalOutput,
+            parsedOutput,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cost: totalCost,
+            durationMs,
+            provider,
+            model: GEMINI_SEARCH_FALLBACK_MODEL,
+          }
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err))
+          const llmErr = err instanceof LLMError ? err : null
+
+          logger.warn(
+            {
+              jobId: this.jobId,
+              step: this.stepNumber,
+              fbAttempt,
+              quotaType: llmErr?.quotaType,
+              err: lastError.message,
+            },
+            '[step-runner] fallback LLM call failed',
+          )
+
+          // Daily quota on fallback → stop immediately
+          if (llmErr?.quotaType === 'daily') break
+
+          if (fbAttempt < FALLBACK_RETRIES) {
+            const sleepMs = llmErr?.retryAfterSeconds
+              ? llmErr.retryAfterSeconds * 1000
+              : BASE_RETRY_DELAY_MS * Math.pow(BACKOFF_MULTIPLIER, fbAttempt - 1)
+            logger.info({ jobId: this.jobId, step: this.stepNumber, sleepMs }, '[step-runner] fallback retrying after delay')
+            await sleep(sleepMs)
+          }
+        }
+      }
+    }
+
+    // All retries (primary + fallback) exhausted — record failure
     const durationMs = Date.now() - startTime
     const errorMessage = lastError?.message ?? 'Unknown error'
     const quotaType =

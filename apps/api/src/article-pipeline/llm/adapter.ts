@@ -24,7 +24,7 @@ export interface LLMAdapter {
 }
 
 export class LLMError extends Error {
-  quotaType?: 'daily' | 'rate_limit' | 'overloaded' | 'unknown'
+  quotaType?: 'daily' | 'rate_limit' | 'overloaded' | 'timeout' | 'unknown'
   retryAfterSeconds?: number
   quotaLimit?: string
 

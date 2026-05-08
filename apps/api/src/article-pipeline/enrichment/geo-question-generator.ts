@@ -56,7 +56,8 @@ export async function generateQuestionFromKeyword(opts: {
       maxTokens: 256,
     }),
   )
-  const question = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
+  const rawQ = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
+  const question = rawQ.toLowerCase() === 'null' ? opts.sectionHeading : rawQ
   return {
     question,
     inputTokens: run.tokens.input,
@@ -87,7 +88,8 @@ export async function rephraseForUniqueness(opts: {
       maxTokens: 256,
     }),
   )
-  const question = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
+  const rawQ = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
+  const question = rawQ.toLowerCase() === 'null' ? opts.question : rawQ
   return {
     question,
     inputTokens: run.tokens.input,

@@ -31,19 +31,30 @@ function findPrecedingH2Text(editor: NodeViewProps['editor'], getPos: NodeViewPr
  */
 export function ArticleDiagramView({ node, editor, getPos, updateAttributes, selected }: NodeViewProps) {
   const src = node.attrs.src as string | null
-  const [caption, setCaption] = useState('')
+  const storedCaption = ((node.attrs.caption as string | undefined) ?? '').trim()
+  const [caption, setCaption] = useState(storedCaption)
 
   const derive = useCallback(() => {
     const h2 = findPrecedingH2Text(editor, getPos)
+    const altText = h2 ? `Diagram: ${h2}` : storedCaption
+
+    if (storedCaption) {
+      // Respect the LLM-generated caption; only keep alt text live from H2
+      setCaption(storedCaption)
+      updateAttributes({ alt: altText })
+      return
+    }
+
+    // Fallback: no stored caption — derive display caption from H2
     const text = h2 ? `Diagram: ${h2}` : ''
     setCaption(text)
     updateAttributes({ caption: text, alt: text })
-  }, [editor, getPos, updateAttributes])
+  }, [editor, getPos, updateAttributes, storedCaption])
 
   // Derive on mount.
   useEffect(() => { derive() }, [derive])
 
-  // Re-derive whenever the document changes (heading edits, reorders, etc.).
+  // Re-derive alt text whenever the document changes (heading edits, reorders, etc.).
   useEffect(() => {
     const handler = () => derive()
     editor.on('update', handler)

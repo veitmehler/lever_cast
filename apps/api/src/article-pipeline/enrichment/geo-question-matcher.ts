@@ -77,7 +77,8 @@ export async function matchQuestionsToSections(opts: {
     matches = parsed.map((x: unknown) => {
       if (x === null || x === undefined) return null
       const s = typeof x === 'string' ? x.trim() : String(x).trim()
-      return s.length ? s : null
+      if (!s.length || s.toLowerCase() === 'null') return null
+      return s
     })
   } catch (err) {
     logger.warn({ jobId: opts.jobId, err, raw: raw.slice(0, 400) }, '[geo-101] JSON parse failed')

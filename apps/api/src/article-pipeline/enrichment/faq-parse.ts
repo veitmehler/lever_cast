@@ -24,7 +24,7 @@ export function parseSecondaryKeywords(step2Output: string): string[] {
   try {
     const j = JSON.parse(step2Output) as Record<string, unknown>
     const raw = j.secondary_keywords ?? j['Secondary Keywords']
-    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean)
+    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(s => Boolean(s) && s.toLowerCase() !== 'null')
   } catch {
     /* ignore */
   }

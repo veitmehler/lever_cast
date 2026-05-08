@@ -35,7 +35,8 @@ export function restructureHtmlWithGeo(
   for (let idx = n - 1; idx >= 0; idx--) {
     const pos = idx + 1
     const geo = geoByPosition.get(pos)
-    if (!geo?.question?.trim()) continue
+    const q = geo?.question?.trim()
+    if (!q || q.toLowerCase() === 'null') continue
 
     const secsNow = extractH2Sections(result)
     const cur = secsNow[idx]
@@ -47,14 +48,14 @@ export function restructureHtmlWithGeo(
     const afterFirstH2 = cur.sectionHtml.slice(h2Match[0].length)
     const demotedRest = demoteH3ToH4(afterFirstH2)
     const anchor = `${cur.anchor}-${pos}`
-    const qEsc = escapeHtml(geo.question.trim())
+    const qEsc = escapeHtml(q)
     const summaryBlock =
       geo.summary?.trim()
         ? `\n<div class="geo-summary" data-question="${qEsc}"><p>${escapeHtml(geo.summary.trim())}</p></div>\n`
         : '\n'
 
     const newSection =
-      `<h2 id="geo-${slugify(geo.question)}-${pos}">${geo.question.trim()}</h2>${summaryBlock}` +
+      `<h2 id="geo-${slugify(q)}-${pos}">${q}</h2>${summaryBlock}` +
       `<h3 id="sec-${anchor}">${titleInner}</h3>` +
       demotedRest
 

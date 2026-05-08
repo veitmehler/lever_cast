@@ -35,6 +35,7 @@ import { generateQuestionFromKeyword, rephraseForUniqueness } from './geo-questi
 import { generateAiSummary } from './geo-summary-generator'
 import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restructurer'
 import { generateKeyTakeaways } from './key-takeaways-generator'
+import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
 import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
 
@@ -52,9 +53,6 @@ function getCdnUrl(s3Key: string): string {
   return `${CDN_BASE.replace(/\/$/, '')}/${s3Key}`
 }
 
-function buildCaption(sectionTitle: string): string {
-  return `Diagram: ${sectionTitle}`
-}
 
 export async function runArticleEnrichment(jobId: string): Promise<void> {
   logger.info({ jobId }, '[enrichment] starting')
@@ -473,6 +471,17 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             continue
           }
 
+          const captionResult2 = await generateDiagramCaption({
+            articleTopic: topic.topic,
+            sectionTitle: section.heading,
+            diagramType,
+            mermaidSyntax: gen2.mermaidSyntax,
+            jobId,
+            position: section.position,
+          })
+          totalCost += captionResult2.cost
+          totalInputTokens += captionResult2.inputTokens
+          totalOutputTokens += captionResult2.outputTokens
           await saveDiagramAndInsert({
             jobId,
             sitePage: { id: sitePage.id, userId: job.userId },
@@ -482,6 +491,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             gen: gen2,
             figuresToInsert,
             darkDiagramInitDirective,
+            caption: captionResult2.caption,
           })
           usedDiagramTypes.push(diagramType)
           priorConceptWindows.push(extractMermaidConcepts(gen2.mermaidSyntax))
@@ -490,6 +500,17 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           continue
         }
 
+        const captionResult1 = await generateDiagramCaption({
+          articleTopic: topic.topic,
+          sectionTitle: section.heading,
+          diagramType,
+          mermaidSyntax: gen1.mermaidSyntax,
+          jobId,
+          position: section.position,
+        })
+        totalCost += captionResult1.cost
+        totalInputTokens += captionResult1.inputTokens
+        totalOutputTokens += captionResult1.outputTokens
         await saveDiagramAndInsert({
           jobId,
           sitePage: { id: sitePage.id, userId: job.userId },
@@ -499,6 +520,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           gen: gen1,
           figuresToInsert,
           darkDiagramInitDirective,
+          caption: captionResult1.caption,
         })
         usedDiagramTypes.push(diagramType)
         priorConceptWindows.push(extractMermaidConcepts(gen1.mermaidSyntax))
@@ -632,13 +654,14 @@ interface SaveDiagramOpts {
   gen: { inputTokens: number; outputTokens: number; cost: number; provider: string; model: string }
   figuresToInsert: Array<{ afterH2Offset: number; figureHtml: string }>
   darkDiagramInitDirective: string
+  caption: string
 }
 
 /** Match screenshot + crop background (mmdc `-b white`). */
 const DIAGRAM_LIGHT_RASTER_BG = '#FFFFFF'
 
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
-  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective } =
+  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, caption } =
     opts
 
   const cleanSvg = sanitizeSvg(svgContent)
@@ -677,7 +700,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       position: section.position,
       sectionAnchor: section.anchor,
       sectionTitle: section.heading,
-      caption: buildCaption(section.heading),
+      caption,
       mermaidSyntax,
       svgContent: cleanSvg,
       svgS3Key: svgKey,
@@ -695,6 +718,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       cost: gen.cost,
     },
     update: {
+      caption,
       mermaidSyntax,
       svgContent: cleanSvg,
       svgS3Key: svgKey,
@@ -720,7 +744,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     figureHtml: buildFigureHtml({
       imgUrl: svgUrl,
       alt: section.heading,
-      caption: buildCaption(section.heading),
+      caption,
     }),
   })
 

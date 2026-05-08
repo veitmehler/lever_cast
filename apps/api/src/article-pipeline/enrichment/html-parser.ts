@@ -96,7 +96,7 @@ export function buildFigureHtml(opts: {
   const cap = opts.caption
     ? `<figcaption>${escapeHtml(opts.caption)}</figcaption>`
     : ''
-  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(opts.alt)}" loading="lazy" />\n  ${cap}\n</figure>`
+  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(opts.alt)}" loading="lazy" style="max-width:100%;height:auto" />\n  ${cap}\n</figure>`
 }
 
 function escapeHtml(str: string): string {

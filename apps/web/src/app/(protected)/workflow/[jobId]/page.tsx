@@ -394,6 +394,10 @@ function buildFinalReviewText(
     ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
     : '[No citations available for this article]'
 
+  const disclaimerSection = sp.disclaimer?.trim()
+    ? `\n---\n\n## Article Disclaimer\n\n${sp.disclaimer.trim()}`
+    : ''
+
   return `# Evaluation Request
 
 Does this article comply with and satisfy:
@@ -421,7 +425,7 @@ ${bodyMarkdown}
 
 ## Citations
 
-${citationLines}`
+${citationLines}${disclaimerSection}`
 }
 
 /** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */
@@ -499,7 +503,8 @@ export default function WorkflowJobPage() {
     }
   }, [job?.status, liveStatus])
 
-  const sseRef = useRef<EventSource | null>(null)
+  const sseRef             = useRef<EventSource | null>(null)
+  const reconnectTimerRef  = useRef<number | null>(null)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -584,7 +589,22 @@ export default function WorkflowJobPage() {
         }
       } catch { /* ignore */ }
     }
-    es.onerror = () => { es.close() }
+
+    // On connection error, close this instance and schedule a reconnect so
+    // the UI never freezes mid-pipeline. The native EventSource auto-reconnect
+    // is disabled once we call close(), so we schedule it manually.
+    es.onerror = () => {
+      es.close()
+      reconnectTimerRef.current = window.setTimeout(() => {
+        // Only reconnect if the job is still actively running
+        setJob((prev) => {
+          if (prev && (ACTIVE_STATUSES.has(prev.status) || ENRICHMENT_ACTIVE.has(prev.status))) {
+            startSSE()
+          }
+          return prev
+        })
+      }, 3000)
+    }
   }, [jobId, fetchJob])
 
   // Start SSE when job is actively running OR in enrichment
@@ -593,7 +613,13 @@ export default function WorkflowJobPage() {
     if (ACTIVE_STATUSES.has(job.status) || ENRICHMENT_ACTIVE.has(job.status)) {
       startSSE()
     }
-    return () => { sseRef.current?.close() }
+    return () => {
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      sseRef.current?.close()
+    }
   }, [job?.id, job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lightweight fallback poll: re-fetch the full job every 8 s while Phase A is

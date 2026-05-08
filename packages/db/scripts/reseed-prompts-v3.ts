@@ -1357,11 +1357,39 @@ No explanation.`,
 ]
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+//
+// Default behaviour: CREATE missing rows only. Existing rows are NEVER touched.
+//
+// To intentionally overwrite one or more steps, pass their numbers as arguments:
+//   pnpm tsx scripts/reseed-prompts-v3.ts --force 16 17
+//
+// To overwrite ALL steps (dangerous — use only in a fresh DB):
+//   pnpm tsx scripts/reseed-prompts-v3.ts --force-all
 
 async function main() {
-  console.log('reseed-prompts-v3: starting...')
-  console.log(`Updating ${PROMPTS.length} prompt templates`)
+  const args = process.argv.slice(2)
+  const forceAll = args.includes('--force-all')
+  const forceIdx = args.indexOf('--force')
+  const forceSteps = new Set<number>(
+    forceIdx !== -1
+      ? args.slice(forceIdx + 1).map(Number).filter((n) => !isNaN(n))
+      : [],
+  )
+
+  if (forceAll) {
+    console.warn('⚠️  --force-all: ALL existing prompts will be overwritten.')
+  } else if (forceSteps.size > 0) {
+    console.warn(`⚠️  --force: steps [${[...forceSteps].join(', ')}] will be overwritten if they exist.`)
+  } else {
+    console.log('ℹ️  Safe mode: only missing prompts will be created. Pass --force <steps> to overwrite.')
+  }
+
+  console.log(`Processing ${PROMPTS.length} prompt templates`)
   console.log('─'.repeat(60))
+
+  let created = 0
+  let skipped = 0
+  let updated = 0
 
   for (const p of PROMPTS) {
     const existing = await prisma.promptTemplate.findUnique({
@@ -1369,7 +1397,14 @@ async function main() {
       select: { id: true, stepName: true },
     })
 
+    const shouldOverwrite = forceAll || forceSteps.has(p.stepNumber)
+
     if (existing) {
+      if (!shouldOverwrite) {
+        console.log(`  ─ Step ${p.stepNumber} (${p.stepName}) — EXISTS, skipped (safe mode)`)
+        skipped++
+        continue
+      }
       await prisma.promptTemplate.update({
         where: { stepNumber: p.stepNumber },
         data: {
@@ -1380,7 +1415,8 @@ async function main() {
           userPrompt: p.userPrompt,
         },
       })
-      console.log(`  ✓ Step ${p.stepNumber} (${p.stepName}) — updated`)
+      console.log(`  ✓ Step ${p.stepNumber} (${p.stepName}) — OVERWRITTEN (forced)`)
+      updated++
     } else {
       await prisma.promptTemplate.create({
         data: {
@@ -1393,12 +1429,17 @@ async function main() {
           isActive: true,
         },
       })
-      console.log(`  ✓ Step ${p.stepNumber} (${p.stepName}) — CREATED (was missing)`)
+      console.log(`  ✓ Step ${p.stepNumber} (${p.stepName}) — CREATED`)
+      created++
     }
   }
 
   console.log('─'.repeat(60))
-  console.log('reseed-prompts-v3: done.')
+  console.log(`Done. Created: ${created}  Skipped (safe): ${skipped}  Overwritten: ${updated}`)
+  if (skipped > 0 && !forceAll) {
+    console.log('  → To overwrite specific steps: pnpm tsx scripts/reseed-prompts-v3.ts --force <step numbers>')
+    console.log('  → To overwrite all:            pnpm tsx scripts/reseed-prompts-v3.ts --force-all')
+  }
 }
 
 main()

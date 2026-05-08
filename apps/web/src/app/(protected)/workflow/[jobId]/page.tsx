@@ -463,8 +463,10 @@ export default function WorkflowJobPage() {
   const [attempts, setAttempts] = useState<OutputAttempt[]>([])
   const [showAttempts, setShowAttempts] = useState(false)
 
-  // Review panel state
-  const [showReview, setShowReview] = useState(false)
+  // Review panel: default expanded while awaiting approval (completed), collapsed after approve.
+  const [reviewPanelExpandedOverride, setReviewPanelExpandedOverride] = useState<boolean | undefined>(undefined)
+
+  const prevDisplayStatusForReviewRef = useRef<string | null>(null)
   const [showSchemaBlock, setShowSchemaBlock] = useState(true)
   const [copied, setCopied] = useState(false)
   const [copiedFinal, setCopiedFinal] = useState(false)
@@ -475,6 +477,23 @@ export default function WorkflowJobPage() {
   // Live SSE state (overlays DB state while pipeline is running)
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [liveStep,   setLiveStep]   = useState<number | null>(null)
+
+  useEffect(() => {
+    setReviewPanelExpandedOverride(undefined)
+    prevDisplayStatusForReviewRef.current = null
+  }, [jobId])
+
+  useEffect(() => {
+    const displayStatusNow = liveStatus ?? job?.status ?? 'pending'
+    const prev = prevDisplayStatusForReviewRef.current
+    prevDisplayStatusForReviewRef.current = displayStatusNow
+    if (
+      prev === 'completed' &&
+      ['approved', 'enriched', 'published'].includes(displayStatusNow)
+    ) {
+      setReviewPanelExpandedOverride(undefined)
+    }
+  }, [job?.status, liveStatus])
 
   const sseRef = useRef<EventSource | null>(null)
 
@@ -731,7 +750,10 @@ export default function WorkflowJobPage() {
   // Review is available once the article body exists (completed or beyond)
   const reviewAvailable = ['completed', 'approved', 'enriched', 'published'].includes(displayStatus)
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  const defaultReviewPanelExpanded = displayStatus === 'completed'
+  const reviewPanelExpanded = reviewPanelExpandedOverride ?? defaultReviewPanelExpanded
+  const toggleReviewPanel = () =>
+    setReviewPanelExpandedOverride((prev) => !(prev ?? defaultReviewPanelExpanded))
 
   if (isLoading) {
     return (
@@ -817,11 +839,11 @@ export default function WorkflowJobPage() {
         {reviewAvailable && sitePage && (
           <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
             {/* Panel header — collapse toggle on left, approve CTA in centre-right, chevron on far right */}
-            <div className="flex items-center px-6 py-4 gap-3">
+            <div className="flex flex-wrap items-center px-6 py-4 gap-3 gap-y-3">
               {/* Collapse toggle (takes up remaining space) */}
               <button
                 type="button"
-                onClick={() => setShowReview((v) => !v)}
+                onClick={toggleReviewPanel}
                 className="flex-1 flex items-center gap-2 text-left hover:opacity-80 transition-opacity min-w-0"
               >
                 <ClipboardCopy className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -852,22 +874,22 @@ export default function WorkflowJobPage() {
                       Rewrite Article
                     </Button>
                     <Button
-                      size="sm"
+                      size="lg"
                       onClick={handleApprove}
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/40 gap-1.5"
+                      className="shrink-0 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-base font-semibold shadow-xl shadow-purple-500/45 ring-[3px] ring-purple-400/55 hover:ring-purple-300/70 gap-2 min-h-11 px-7"
                     >
-                      <ThumbsUp className="h-3.5 w-3.5" />
+                      <ThumbsUp className="size-5 shrink-0" />
                       Approve Article
                     </Button>
                   </>
                 )}
                 {isApproving && (
                   <Button
-                    size="sm"
+                    size="lg"
                     disabled
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white opacity-80 gap-1.5"
+                    className="shrink-0 min-h-11 px-7 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-base font-semibold opacity-90 shadow-xl shadow-purple-500/45 ring-[3px] ring-purple-400/55 gap-2"
                   >
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="size-5 animate-spin shrink-0" />
                     Approving…
                   </Button>
                 )}
@@ -882,17 +904,17 @@ export default function WorkflowJobPage() {
               {/* Chevron */}
               <button
                 type="button"
-                onClick={() => setShowReview((v) => !v)}
+                onClick={toggleReviewPanel}
                 className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                aria-label={showReview ? 'Collapse' : 'Expand'}
+                aria-label={reviewPanelExpanded ? 'Collapse' : 'Expand'}
               >
-                {showReview
+                {reviewPanelExpanded
                   ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
                   : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
               </button>
             </div>
 
-            {showReview && (
+            {reviewPanelExpanded && (
               <div className="px-6 pb-6 border-t border-border">
                 {/* Instructional banner — shown only when awaiting approval */}
                 {displayStatus === 'completed' && (

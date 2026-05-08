@@ -121,7 +121,10 @@ export async function topicRoutes(app: FastifyInstance) {
     })
 
     const boss = await getBoss()
-    await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id })
+    await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id }, {
+      expireInSeconds: 3600,
+      singletonKey: job.id,
+    })
 
     logger.info({ topicId: topicRow.id, jobId: job.id, mode }, '[topics] article job enqueued')
     return reply.status(202).send({ topicId: topicRow.id, jobId: job.id, mode })
@@ -212,7 +215,10 @@ export async function topicRoutes(app: FastifyInstance) {
         const job = await prisma.articleJob.create({
           data: { topicId: topicRow.id, userId: user.id, status: 'pending' },
         })
-        await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id })
+        await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id }, {
+          expireInSeconds: 3600,
+          singletonKey: job.id,
+        })
         results.push({ row: i + 1, topicId: topicRow.id, jobId: job.id, mode })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

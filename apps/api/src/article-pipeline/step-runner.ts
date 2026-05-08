@@ -78,6 +78,25 @@ export class StepRunner {
     const isJsonStep = JSON_STEPS.has(this.stepNumber)
     const isTwoPhase = SEARCH_JSON_STEPS.has(this.stepNumber)
 
+    // Guard: if this step is already completed (parallel execution race), skip it
+    const existingStep = await prisma.pipelineStep.findUnique({
+      where: { jobId_stepNumber: { jobId: this.jobId, stepNumber: this.stepNumber } },
+      select: { status: true, output: true },
+    })
+    if (existingStep?.status === 'completed') {
+      logger.warn({ jobId: this.jobId, step: this.stepNumber },
+        '[step-runner] step already completed — skipping (parallel execution guard)')
+      return {
+        output: existingStep.output ?? '',
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
+        durationMs: 0,
+        provider: 'cached',
+        model: 'cached',
+      }
+    }
+
     // Create/update the PipelineStep row to 'running'
     await prisma.pipelineStep.upsert({
       where: { jobId_stepNumber: { jobId: this.jobId, stepNumber: this.stepNumber } },

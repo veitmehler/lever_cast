@@ -45,11 +45,16 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     }
   }
 
-  // Mark job as in_progress
-  await prisma.articleJob.update({
-    where: { id: jobId },
+  // Atomically claim the job — only proceed if it is not already in_progress.
+  // This prevents a parallel pg-boss re-pick from running Phase A twice.
+  const claimed = await prisma.articleJob.updateMany({
+    where: { id: jobId, status: { notIn: ['in_progress'] } },
     data: { status: 'in_progress', startedAt: new Date() },
   })
+  if (claimed.count === 0) {
+    logger.warn({ jobId }, '[executor] job already in_progress — aborting duplicate execution')
+    return
+  }
 
   // Pre-flight: ensure the topic has an outline framework assigned.
   // Runs here (in the worker) instead of in POST /api/topics so the HTTP

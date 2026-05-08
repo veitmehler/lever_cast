@@ -60,6 +60,8 @@ type CitationEntry = {
   linkUrl?: string
   title?: string
   url?: string
+  href?: string
+  link_href?: string
   sourceTitle?: string  // legacy prompt format (pre-v3 reseed)
   sourceUrl?: string    // legacy prompt format (pre-v3 reseed)
 }
@@ -258,16 +260,14 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
           ? (obj.links as CitationEntry[])
           : []
 
+    const pickUrl = (c: CitationEntry) =>
+      c.link_url ?? c.linkUrl ?? c.url ?? c.sourceUrl ?? c.href ?? c.link_href ?? ''
+
     return links
-      .filter(
-        (c) =>
-          (c.link_url ?? c.linkUrl ?? c.url ?? c.sourceUrl ?? '').length > 0,
-      )
+      .filter((c) => pickUrl(c).length > 0)
       .map((c) => ({
-        title:
-          c.link_title ?? c.linkTitle ?? c.title ?? c.sourceTitle ?? '',
-        url:
-          c.link_url ?? c.linkUrl ?? c.url ?? c.sourceUrl ?? '',
+        title: c.link_title ?? c.linkTitle ?? c.title ?? c.sourceTitle ?? '',
+        url: pickUrl(c),
       }))
   } catch {
     return []

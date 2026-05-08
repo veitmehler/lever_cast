@@ -48,8 +48,10 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
   const [showAdvanced, setShowAdvanced]       = useState(false)
   const [specialInstructions, setSpecialInst] = useState('')
   const [realCaseStudies, setRealCaseStudies] = useState('')
-  const [publishingDate, setPublishingDate]   = useState(todayDateString)
+  const [publishingDate, setPublishingDate]   = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { setPublishingDate(todayDateString()) }, [])
 
   const heading =
     mode === 'article_first'
@@ -226,7 +228,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         <Button
           type="submit"
           disabled={isSubmitting || !topic.trim()}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {isSubmitting
             ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Starting pipeline…</>

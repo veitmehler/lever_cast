@@ -2,6 +2,12 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import { PollRefresh } from './PollRefresh'
+
+/** Total number of prompt-template steps in the full pipeline (Phase A + B). */
+const TOTAL_PIPELINE_STEPS = 25
+
+const ACTIVE_JOB_STATUSES = new Set(['pending', 'in_progress', 'completed', 'approved'])
 
 const CDN_BASE = process.env.CDN_BASE ?? process.env.NEXT_PUBLIC_CDN_BASE ?? ''
 
@@ -56,9 +62,9 @@ export default async function ArticleJobDetailPage({
   if (!job) notFound()
 
   const totalCost = job.llmUsage.reduce((s, r) => s + r.cost, 0)
-  const maxStep = job.pipelineSteps.length > 0
-    ? Math.max(...job.pipelineSteps.map((s) => s.stepNumber))
-    : 18
+  const isActive =
+    ACTIVE_JOB_STATUSES.has(job.status) ||
+    (job.sitePage?.enrichmentStatus === 'in_progress')
 
   const enrichmentCost =
     (job.sitePage?.diagrams?.reduce((s, d) => s + d.cost, 0) ?? 0) +
@@ -66,6 +72,8 @@ export default async function ArticleJobDetailPage({
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <PollRefresh active={isActive} />
+
       <div className="flex items-center gap-3">
         <Link href="/admin/articles" className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="h-5 w-5" />
@@ -78,12 +86,12 @@ export default async function ArticleJobDetailPage({
             {job.user.email} · Job {job.id} · ${totalCost.toFixed(4)}
           </p>
         </div>
-        <StatusBadge status={job.status} />
+        <StatusBadge status={job.status} enrichmentStatus={job.sitePage?.enrichmentStatus ?? null} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <InfoCard label="Mode" value={job.topic.mode} />
-        <InfoCard label="Step" value={`${job.currentStep} / ${maxStep}`} />
+        <InfoCard label="Step" value={`${job.currentStep} / ${TOTAL_PIPELINE_STEPS}`} />
         <InfoCard label="Total Cost" value={`$${totalCost.toFixed(4)}`} />
         <InfoCard label="Total Tokens" value={job.totalTokens.toLocaleString()} />
       </div>
@@ -336,19 +344,48 @@ export default async function ArticleJobDetailPage({
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: 'bg-muted text-muted-foreground',
-    in_progress: 'bg-blue-500/20 text-blue-400',
-    completed: 'bg-green-500/20 text-green-400',
-    approved: 'bg-emerald-500/20 text-emerald-400',
-    enriched: 'bg-purple-500/20 text-purple-400',
-    exported: 'bg-indigo-500/20 text-indigo-400',
-    failed: 'bg-red-500/20 text-red-400',
+function StatusBadge({
+  status,
+  enrichmentStatus,
+}: {
+  status: string
+  enrichmentStatus?: string | null
+}) {
+  let label: string
+  let cls: string
+
+  if (status === 'in_progress' || status === 'pending') {
+    label = 'Writing Article…'
+    cls = 'bg-blue-500/20 text-blue-400'
+  } else if (
+    (status === 'completed' || status === 'approved') &&
+    enrichmentStatus === 'in_progress'
+  ) {
+    label = 'Enrichment Processing…'
+    cls = 'bg-blue-500/20 text-blue-400'
+  } else if (status === 'completed') {
+    label = 'Initial Written'
+    cls = 'bg-yellow-500/20 text-yellow-400'
+  } else if (status === 'approved' && enrichmentStatus !== 'completed') {
+    label = 'Approved'
+    cls = 'bg-emerald-500/20 text-emerald-400'
+  } else if (status === 'enriched' || (status === 'approved' && enrichmentStatus === 'completed')) {
+    label = 'Awaiting Review'
+    cls = 'bg-purple-500/20 text-purple-400'
+  } else if (status === 'published') {
+    label = 'Published'
+    cls = 'bg-green-500/20 text-green-400'
+  } else if (status === 'failed') {
+    label = 'Failed'
+    cls = 'bg-red-500/20 text-red-400'
+  } else {
+    label = status
+    cls = 'bg-muted text-muted-foreground'
   }
+
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-muted text-muted-foreground'}`}>
-      {status}
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+      {label}
     </span>
   )
 }

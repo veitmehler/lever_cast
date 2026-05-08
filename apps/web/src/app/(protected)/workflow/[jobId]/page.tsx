@@ -571,8 +571,12 @@ export default function WorkflowJobPage() {
       try {
         const update: SSEUpdate = JSON.parse(e.data)
         if (update.type === 'update') {
-          if (update.status)                        setLiveStatus(update.status)
-          if (update.currentStep !== undefined)     setLiveStep(update.currentStep)
+          if (update.status)                    setLiveStatus(update.status)
+          if (update.currentStep !== undefined) setLiveStep(update.currentStep)
+          // Keep pipelineSteps list in sync without waiting for a full fetchJob()
+          if (update.steps && update.steps.length > 0) {
+            setJob((prev) => prev ? { ...prev, pipelineSteps: update.steps! } : prev)
+          }
         } else if (update.type === 'done') {
           es.close()
           setIsApproving(false)
@@ -591,6 +595,17 @@ export default function WorkflowJobPage() {
     }
     return () => { sseRef.current?.close() }
   }, [job?.id, job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lightweight fallback poll: re-fetch the full job every 8 s while Phase A is
+  // running. SSE handles step-level updates in real time; this poll ensures the
+  // final completed state (and any fields SSE doesn't carry) is reflected without
+  // the user needing to manually reload.
+  useEffect(() => {
+    const status = job?.status
+    if (!status || !ACTIVE_STATUSES.has(status)) return
+    const id = setInterval(fetchJob, 8000)
+    return () => clearInterval(id)
+  }, [job?.status, fetchJob])
 
   // ── Actions ────────────────────────────────────────────────────────────────
 

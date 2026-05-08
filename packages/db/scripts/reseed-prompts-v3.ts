@@ -1304,6 +1304,31 @@ Return only the numeric category ID:`,
 
   // ── Step 16 — generate_schema_markup ─────────────────────────────────────
   {
+    stepNumber: 104,
+    stepName: 'enrichment_ai_summary',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    systemPrompt:
+      'You are an expert content writer creating concise AI-optimised summaries for Generative Engine Optimisation (GEO). ' +
+      "You always provide direct, factual answers. You never say \"the article does not contain\" or \"this section doesn't mention\" — " +
+      'you synthesise an authoritative answer from the context provided and your domain knowledge.',
+    userPrompt: `Write a concise 40-60 word answer to the following question.
+
+Question: {{question}}
+
+Article section content (for context):
+{{content}}
+
+Rules:
+- Answer the question directly and factually.
+- Use the article section as your primary source. If the section does not fully address the question, supplement with established domain knowledge that is consistent with the article's topic and perspective.
+- NEVER say "the article does not contain", "this section doesn't mention", or any variant. Always give a direct answer.
+- Stay between 40 and 60 words.
+- Write in third person, informational tone.
+- Do NOT use bullet points or headings.
+- Respond with ONLY the summary paragraph — nothing else.`,
+  },
+  {
     stepNumber: 16,
     stepName: 'generate_schema_markup',
     defaultProvider: 'openai',

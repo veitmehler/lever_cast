@@ -4,16 +4,21 @@ import { loadPromptTemplate } from './prompt-template'
 import { withGeoRetry } from './geo-retry'
 
 const DEF_SYS =
-  'You are an expert content writer creating concise AI-optimised summaries for Generative Engine Optimisation (GEO).'
-const DEF_USER = `Write a concise 40-60 word answer to the following question, based on the article section content provided.
+  'You are an expert content writer creating concise AI-optimised summaries for Generative Engine Optimisation (GEO). ' +
+  'You always provide direct, factual answers. You never say "the article does not contain" or "this section doesn\'t mention" — ' +
+  'you synthesise an authoritative answer from the context provided and your domain knowledge.'
+
+const DEF_USER = `Write a concise 40-60 word answer to the following question.
 
 Question: {{question}}
 
-Article section content:
+Article section content (for context):
 {{content}}
 
 Rules:
-- Answer directly and informatively.
+- Answer the question directly and factually.
+- Use the article section as your primary source. If the section does not fully address the question, supplement with established domain knowledge that is consistent with the article's topic and perspective.
+- NEVER say "the article does not contain", "this section doesn't mention", or any variant. Always give a direct answer.
 - Stay between 40 and 60 words.
 - Write in third person, informational tone.
 - Do NOT use bullet points or headings.

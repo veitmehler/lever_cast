@@ -1321,6 +1321,8 @@ Article Description: {{seo_description}}
 Author: {{author_name}}
 Author Website: {{author_website}}
 Published Date: {{published_date}}
+Last Modified Date: {{modified_date}}
+Featured Image URL: {{featured_image_url}}
 URL: {{article_url}}
 Article Content: {{article}}
 Article Citations: {{citation_urls}}
@@ -1334,10 +1336,13 @@ Social Media Links:
 
 Requirements:
 - Use @type: "Article" as the main type
-- Include all relevant properties: headline, description, author (as Person with name and url), datePublished, url
-- Add publisher information as Organization with name, logo, url, email, telephone, address, and sameAs (social media links array)
+- Include all relevant properties: headline, description, author (as Person with name and url), datePublished, dateModified, url
+- Set datePublished to the "Published Date" value above (full ISO 8601 format with timezone, e.g. "2026-05-08T14:30:00.000Z")
+- Set dateModified to the "Last Modified Date" value above (same format)
+- Include an "image" property on the Article using the "Featured Image URL" value above (only if the URL is non-empty)
+- Add publisher information as Organization (NOT LocalBusiness) with name, url, email, telephone, address, and sameAs (social media links array)
+- For address, use PostalAddress type. Use ISO 3166-1 alpha-2 codes for addressCountry (e.g. "US", "AU", "GB") — never a full country name
 - Include mainEntityOfPage pointing to the WebPage
-- Ensure all dates are in ISO 8601 format
 - Include the article citation URLs in the citation property
 - Return valid JSON-LD that can be directly inserted into a <script type="application/ld+json"> tag
 - Do not include any markdown formatting, code blocks, or explanations - just the JSON object

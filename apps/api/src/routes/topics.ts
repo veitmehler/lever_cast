@@ -50,6 +50,7 @@ function normaliseCsvRow(raw: Record<string, string>): Record<string, string> {
 interface CreateTopicBody {
   topic: string
   scheduledDate?: string
+  publishingDate?: string
   mode?: 'social_only' | 'article_first' | 'article_only'
   excludedKeywords?: string[]
   defaultOutputTargets?: string[]
@@ -75,6 +76,7 @@ export async function topicRoutes(app: FastifyInstance) {
     const {
       topic,
       scheduledDate,
+      publishingDate,
       mode = 'social_only',
       excludedKeywords = [],
       defaultOutputTargets = [],
@@ -95,6 +97,7 @@ export async function topicRoutes(app: FastifyInstance) {
         userId: user.id,
         topic: topic.trim(),
         scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+        publishingDate: publishingDate ? new Date(publishingDate) : new Date(),
         mode,
         excludedKeywords,
         defaultOutputTargets,

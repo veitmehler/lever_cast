@@ -34,6 +34,11 @@ export interface NewArticleFormProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+function todayDateString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: NewArticleFormProps) {
   const [topic, setTopic]                     = useState('')
   const [isSubmitting, setIsSubmitting]       = useState(false)
@@ -43,6 +48,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
   const [showAdvanced, setShowAdvanced]       = useState(false)
   const [specialInstructions, setSpecialInst] = useState('')
   const [realCaseStudies, setRealCaseStudies] = useState('')
+  const [publishingDate, setPublishingDate]   = useState(todayDateString)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const heading =
@@ -77,6 +83,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         body: JSON.stringify({
           topic: trimmed,
           mode,
+          publishingDate:             publishingDate || todayDateString(),
           outlineFrameworkNumber:     selectedFramework ?? null,
           outlineSpecialInstructions: specialInstructions.trim() || null,
           realCaseStudies:            realCaseStudies.trim() || null,
@@ -116,6 +123,24 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         />
         <p className="text-xs text-muted-foreground mt-1">
           Be specific — a detailed topic produces a better article and tighter SEO targeting.
+        </p>
+      </div>
+
+      {/* Publishing Date */}
+      <div>
+        <label htmlFor="new-article-publishing-date" className="block text-sm font-medium text-foreground mb-1.5">
+          Publishing Date
+        </label>
+        <input
+          id="new-article-publishing-date"
+          type="date"
+          value={publishingDate}
+          onChange={(e) => setPublishingDate(e.target.value)}
+          disabled={isSubmitting}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-60"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Used in the article&apos;s schema markup (<code>datePublished</code>). Defaults to today.
         </p>
       </div>
 

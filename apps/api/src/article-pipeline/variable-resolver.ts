@@ -312,13 +312,23 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       return links.map((l) => `${l.platform}: ${l.url}`).join('\n')
     }
 
-    case 'published_date': {
+    case 'published_date':
+    case 'modified_date': {
       const topic = await prisma.topic.findUnique({
         where: { id: ctx.topicId },
         select: { publishingDate: true },
       })
-      if (!topic?.publishingDate) return ''
-      return topic.publishingDate.toISOString().split('T')[0] // YYYY-MM-DD
+      // Default to today when no publishing date is set; return full ISO 8601 with timezone
+      const date = topic?.publishingDate ?? new Date()
+      return date.toISOString()
+    }
+
+    case 'featured_image_url': {
+      const sp = await prisma.sitePage.findUnique({
+        where: { jobId: ctx.jobId },
+        select: { featuredImage: { select: { url: true } } },
+      })
+      return sp?.featuredImage?.url ?? ''
     }
 
     case 'article_url': {

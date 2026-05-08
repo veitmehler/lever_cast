@@ -468,6 +468,7 @@ export default function WorkflowJobPage() {
 
   const prevDisplayStatusForReviewRef = useRef<string | null>(null)
   const [showSchemaBlock, setShowSchemaBlock] = useState(true)
+  const [copiedSchema, setCopiedSchema] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copiedFinal, setCopiedFinal] = useState(false)
   const [showFinalArticleReview, setShowFinalArticleReview] = useState(true)
@@ -711,6 +712,18 @@ export default function WorkflowJobPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start approval')
       setIsApproving(false)
+    }
+  }
+
+  const handleCopySchema = async () => {
+    const schema = formatSchemaJsonDisplay(job?.sitePage?.schemaJson)
+    if (!schema) return
+    try {
+      await navigator.clipboard.writeText(schema)
+      setCopiedSchema(true)
+      setTimeout(() => setCopiedSchema(false), 2500)
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
     }
   }
 
@@ -1061,8 +1074,20 @@ export default function WorkflowJobPage() {
                   — JSON-LD for search engines
                 </span>
               </button>
-              {displayStatus === 'enriched' && (
-                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                {sitePage?.schemaJson?.trim() && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); void handleCopySchema() }}
+                    className="gap-1.5"
+                  >
+                    {copiedSchema
+                      ? <><ClipboardCheck className="h-3.5 w-3.5 text-green-500" /> Copied!</>
+                      : <><ClipboardCopy className="h-3.5 w-3.5" /> Copy JSON-LD</>}
+                  </Button>
+                )}
+                {displayStatus === 'enriched' && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -1080,8 +1105,8 @@ export default function WorkflowJobPage() {
                     )}
                     Rerun Enrichment
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setShowSchemaBlock((v) => !v)}

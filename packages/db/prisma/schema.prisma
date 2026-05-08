@@ -564,16 +564,19 @@ model BrandSettings {
   ourExperience        String? @db.Text // firm / author experience blurb
   articleGoal          String? @db.Text // strategic goal of each article
   specialInstructions  String? @db.Text // global special instructions injected into every article
-  defaultAuthorName    String?
-  defaultAuthorWebsite String?
+  defaultAuthorName      String?
+  defaultAuthorWebsite   String?
+  defaultAuthorLinkedIn  String? // personal LinkedIn URL for schema + author profile
 
   // Organization / schema markup fields (used in Wave 4)
-  organizationName     String?
-  organizationWebsite  String?
-  organizationEmail    String?
-  organizationPhone    String?
-  organizationAddress  String? @db.Text
-  socialMediaLinks     Json?   // [{ platform: string, url: string }]
+  organizationName        String?
+  organizationWebsite     String?
+  organizationEmail       String?
+  organizationPhone       String?
+  organizationAddress     String? @db.Text
+  organizationCountryCode String? @db.VarChar(2) // ISO 3166-1 alpha-2, e.g. US
+  googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD
+  socialMediaLinks          Json?   // [{ platform: string, url: string }]
 
   // Mermaid diagrams (article enrichment — theme injected into %%{init}%% )
   diagramPrimaryColor     String?

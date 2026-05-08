@@ -263,6 +263,11 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       return bs?.defaultAuthorWebsite ?? ''
     }
 
+    case 'author_linkedin': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.defaultAuthorLinkedIn ?? ''
+    }
+
     case 'outline_special_instructions': {
       const topic = await prisma.topic.findUnique({
         where: { id: ctx.topicId },
@@ -302,6 +307,16 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     case 'organization_address': {
       const bs = await getBrandSettings(ctx)
       return bs?.organizationAddress ?? ''
+    }
+
+    case 'organization_country_code': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationCountryCode ?? ''
+    }
+
+    case 'google_business_profile_url': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.googleBusinessProfileUrl ?? ''
     }
 
     case 'social_media_links': {

@@ -41,7 +41,12 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'article_slug',       description: 'Parsed slug from Step 13',                      steps: [] },
   { name: 'article_excerpt',    description: 'SitePage.excerpt (Step 17)',                    steps: [] },
   { name: 'current_date',       description: 'Current ISO date/time',                         steps: [] },
-  { name: 'published_date',     description: 'Topic.publishingDate or current date',          steps: [] },
+  { name: 'published_date',     description: 'Topic.publishingDate or current date (ISO 8601)', steps: [] },
+  { name: 'modified_date',    description: 'Same as published_date for schema dateModified',      steps: [] },
+  { name: 'featured_image_url', description: 'SitePage featured image CDN URL (after approval)',    steps: [] },
+  { name: 'author_linkedin',    description: 'BrandSettings.defaultAuthorLinkedIn',                 steps: [] },
+  { name: 'organization_country_code', description: 'BrandSettings ISO 3166-1 alpha-2 (e.g. US)',    steps: [] },
+  { name: 'google_business_profile_url', description: 'BrandSettings GBP / g.page URL',          steps: [] },
   // Enrichment-specific
   { name: 'article_topic',      description: '[Enrichment] Article topic string',             steps: [20] },
   { name: 'section_title',      description: '[Enrichment] H2 section heading',               steps: [20] },

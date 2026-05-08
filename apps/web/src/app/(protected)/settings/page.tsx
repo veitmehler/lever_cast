@@ -75,6 +75,7 @@ export default function SettingsPage() {
   const [brandSpecialInstructions, setBrandSpecialInst] = useState('')
   const [defaultAuthorName, setDefaultAuthorName]       = useState('')
   const [defaultAuthorWebsite, setDefaultAuthorWebsite] = useState('')
+  const [defaultAuthorLinkedIn, setDefaultAuthorLinkedIn] = useState('')
 
   // Article Brand Profile — organization / schema markup fields
   const [organizationName, setOrganizationName]         = useState('')
@@ -82,6 +83,8 @@ export default function SettingsPage() {
   const [organizationEmail, setOrganizationEmail]       = useState('')
   const [organizationPhone, setOrganizationPhone]       = useState('')
   const [organizationAddress, setOrganizationAddress]   = useState('')
+  const [organizationCountryCode, setOrganizationCountryCode] = useState('')
+  const [googleBusinessProfileUrl, setGoogleBusinessProfileUrl] = useState('')
   const [socialMediaLinks, setSocialMediaLinks]         = useState<Array<{ platform: string; url: string }>>([])
 
   const [diagramPrimaryColor, setDiagramPrimaryColor]       = useState('')
@@ -128,12 +131,15 @@ export default function SettingsPage() {
           if (brand.specialInstructions)  setBrandSpecialInst(brand.specialInstructions)
           if (brand.defaultAuthorName)    setDefaultAuthorName(brand.defaultAuthorName)
           if (brand.defaultAuthorWebsite) setDefaultAuthorWebsite(brand.defaultAuthorWebsite)
+          if (brand.defaultAuthorLinkedIn) setDefaultAuthorLinkedIn(brand.defaultAuthorLinkedIn)
           // Organization fields
           if (brand.organizationName)    setOrganizationName(brand.organizationName)
           if (brand.organizationWebsite) setOrganizationWebsite(brand.organizationWebsite)
           if (brand.organizationEmail)   setOrganizationEmail(brand.organizationEmail)
           if (brand.organizationPhone)   setOrganizationPhone(brand.organizationPhone)
           if (brand.organizationAddress) setOrganizationAddress(brand.organizationAddress)
+          if (brand.organizationCountryCode) setOrganizationCountryCode(brand.organizationCountryCode)
+          if (brand.googleBusinessProfileUrl) setGoogleBusinessProfileUrl(brand.googleBusinessProfileUrl)
           if (Array.isArray(brand.socialMediaLinks)) setSocialMediaLinks(brand.socialMediaLinks)
           setDiagramPrimaryColor(brand.diagramPrimaryColor ?? '')
           setDiagramSecondaryColor(brand.diagramSecondaryColor ?? '')
@@ -507,11 +513,14 @@ export default function SettingsPage() {
           specialInstructions: brandSpecialInstructions || null,
           defaultAuthorName: defaultAuthorName || null,
           defaultAuthorWebsite: defaultAuthorWebsite || null,
+          defaultAuthorLinkedIn: defaultAuthorLinkedIn.trim() || null,
           organizationName: organizationName || null,
           organizationWebsite: organizationWebsite || null,
           organizationEmail: organizationEmail || null,
           organizationPhone: organizationPhone || null,
           organizationAddress: organizationAddress || null,
+          organizationCountryCode: organizationCountryCode.trim().toUpperCase().slice(0, 2) || null,
+          googleBusinessProfileUrl: googleBusinessProfileUrl.trim() || null,
           socialMediaLinks: socialMediaLinks.filter((l) => l.platform && l.url),
           diagramPrimaryColor: diagramPrimaryColor.trim() || null,
           diagramSecondaryColor: diagramSecondaryColor.trim() || null,
@@ -877,6 +886,21 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Author LinkedIn
+                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_linkedin}}'}</code></span>
+              </label>
+              <input
+                type="url"
+                value={defaultAuthorLinkedIn}
+                onChange={(e) => setDefaultAuthorLinkedIn(e.target.value)}
+                placeholder="https://linkedin.com/in/jane-smith"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Used in JSON-LD (<code className="font-mono">sameAs</code>) and in workflow copy for review.</p>
+            </div>
+
             {/* Organization / Schema Markup sub-section */}
             <div className="pt-2">
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
@@ -961,6 +985,41 @@ export default function SettingsPage() {
                     rows={2}
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Country code (ISO 3166-1 alpha-2)
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_country_code}}'}</code></span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="text"
+                      maxLength={2}
+                      value={organizationCountryCode}
+                      onChange={(e) =>
+                        setOrganizationCountryCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 2))
+                      }
+                      placeholder="US"
+                      className="w-full max-w-[5rem] rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground uppercase placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Used for <code className="font-mono text-xs">addressCountry</code> in schema PostalAddress.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-card-foreground mb-1">
+                      Google Business Profile URL
+                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{google_business_profile_url}}'}</code></span>
+                    </label>
+                    <input
+                      type="url"
+                      value={googleBusinessProfileUrl}
+                      onChange={(e) => setGoogleBusinessProfileUrl(e.target.value)}
+                      placeholder="https://g.page/your-business"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Used as <code className="font-mono text-xs">sameAs</code> and <code className="font-mono text-xs">hasMap</code> on the publisher Organization.</p>
+                  </div>
                 </div>
 
                 {/* Social media links */}

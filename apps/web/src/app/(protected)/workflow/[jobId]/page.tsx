@@ -125,6 +125,7 @@ type SSEUpdate = {
 type BrandSettings = {
   defaultAuthorName?: string | null
   defaultAuthorWebsite?: string | null
+  defaultAuthorLinkedIn?: string | null
   ourExperience?: string | null
 }
 
@@ -346,6 +347,7 @@ ${bodyMarkdown}
 **Name:** ${brand.defaultAuthorName ?? ''}
 **Bio:** ${brand.ourExperience ?? ''}
 **Website:** ${brand.defaultAuthorWebsite ?? ''}
+**LinkedIn:** ${brand.defaultAuthorLinkedIn?.trim() ?? ''}
 
 ---
 
@@ -413,6 +415,7 @@ ${bodyMarkdown}
 **Name:** ${brand.defaultAuthorName ?? ''}
 **Bio:** ${brand.ourExperience ?? ''}
 **Website:** ${brand.defaultAuthorWebsite ?? ''}
+**LinkedIn:** ${brand.defaultAuthorLinkedIn?.trim() ?? ''}
 
 ---
 
@@ -529,6 +532,7 @@ export default function WorkflowJobPage() {
       .then((d: BrandSettings) => setBrandSettings({
         defaultAuthorName:    d.defaultAuthorName    ?? '',
         defaultAuthorWebsite: d.defaultAuthorWebsite ?? '',
+        defaultAuthorLinkedIn: d.defaultAuthorLinkedIn ?? '',
         ourExperience:        d.ourExperience        ?? '',
       }))
       .catch(() => {/* silent */})

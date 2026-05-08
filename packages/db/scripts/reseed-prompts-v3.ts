@@ -1320,6 +1320,7 @@ Article Title: {{article_title}}
 Article Description: {{seo_description}}
 Author: {{author_name}}
 Author Website: {{author_website}}
+Author LinkedIn: {{author_linkedin}}
 Published Date: {{published_date}}
 Last Modified Date: {{modified_date}}
 Featured Image URL: {{featured_image_url}}
@@ -1331,26 +1332,27 @@ Organization Website: {{organization_website}}
 Organization Email: {{organization_email}}
 Organization Phone: {{organization_phone}}
 Organization Address: {{organization_address}}
+Organization Country Code: {{organization_country_code}}
+Google Business Profile URL: {{google_business_profile_url}}
 Social Media Links:
 {{social_media_links}}
 
 Requirements:
 - Use @type: "Article" as the main type
-- Include all relevant properties: headline, description, author (as Person with name and url), datePublished, dateModified, url
-- Set datePublished to the "Published Date" value above (full ISO 8601 format with timezone, e.g. "2026-05-08T14:30:00.000Z")
-- Set dateModified to the "Last Modified Date" value above (same format)
-- Include an "image" property on the Article using the "Featured Image URL" value above (only if the URL is non-empty)
-- Add publisher information as Organization (NOT LocalBusiness) with name, url, email, telephone, address, and sameAs (social media links array)
-- For address, use PostalAddress type. Use ISO 3166-1 alpha-2 codes for addressCountry (e.g. "US", "AU", "GB") — never a full country name
-- Include mainEntityOfPage pointing to the WebPage
-- Include the article citation URLs in the citation property
-- Return valid JSON-LD that can be directly inserted into a <script type="application/ld+json"> tag
-- Do not include any markdown formatting, code blocks, or explanations - just the JSON object
+- Include headline, description, url, author (Person with name and url), datePublished, dateModified (full ISO 8601 with timezone, e.g. "2026-05-08T14:30:00.000Z")
+- Include an "image" property on the Article when "Featured Image URL" is non-empty
+- Author: when "Author LinkedIn" is non-empty, add the author's LinkedIn URL to the Person sameAs array (or as sameAs string if a single value)
+- Publisher: use @type "Organization" only (NOT LocalBusiness). Include name, url, email, telephone, address as PostalAddress
+- PostalAddress: set addressCountry to "Organization Country Code" when non-empty; otherwise infer from the address text — must always be ISO 3166-1 alpha-2 (e.g. "US", never "United States")
+- When "Google Business Profile URL" is non-empty: append it to publisher sameAs AND set publisher hasMap to the same URL (g.page links resolve to Google Maps — valid for both)
+- Merge social profile URLs into publisher sameAs; deduplicate URLs
+- mainEntityOfPage pointing to WebPage for the Article url
+- Include article citation URLs in the citation property
+- Return ONLY valid JSON (no markdown fences, no commentary) suitable for <script type="application/ld+json">
 
 # TASK:
-Generate comprehensive, accurate Schema.org JSON-LD markup for the following article. Return ONLY valid JSON-LD without markdown formatting or code blocks.
-MUST be under the CreativeWork type and as subtype Article, and include the citation links as citation property.
-No explanation. No commentary.`,
+Generate Schema.org JSON-LD for this article.
+No explanation.`,
   },
 ]
 

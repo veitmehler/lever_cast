@@ -32,11 +32,14 @@ export async function GET() {
         specialInstructions: null,
         defaultAuthorName: null,
         defaultAuthorWebsite: null,
+        defaultAuthorLinkedIn: null,
         organizationName: null,
         organizationWebsite: null,
         organizationEmail: null,
         organizationPhone: null,
         organizationAddress: null,
+        organizationCountryCode: null,
+        googleBusinessProfileUrl: null,
         socialMediaLinks: null,
         diagramPrimaryColor: null,
         diagramSecondaryColor: null,
@@ -72,11 +75,14 @@ export async function PATCH(request: NextRequest) {
       'specialInstructions',
       'defaultAuthorName',
       'defaultAuthorWebsite',
+      'defaultAuthorLinkedIn',
       'organizationName',
       'organizationWebsite',
       'organizationEmail',
       'organizationPhone',
       'organizationAddress',
+      'organizationCountryCode',
+      'googleBusinessProfileUrl',
       'diagramPrimaryColor',
       'diagramSecondaryColor',
       'diagramLineColor',
@@ -92,6 +98,11 @@ export async function PATCH(request: NextRequest) {
       if (field in body) {
         data[field] = body[field] ? String(body[field]).trim() : null
       }
+    }
+
+    if (data.organizationCountryCode != null && typeof data.organizationCountryCode === 'string') {
+      const code = data.organizationCountryCode.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 2)
+      data.organizationCountryCode = code.length === 2 ? code : null
     }
 
     // socialMediaLinks is a JSON array: [{ platform: string, url: string }]

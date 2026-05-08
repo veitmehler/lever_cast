@@ -35,7 +35,8 @@ export function restructureHtmlWithGeo(
   for (let idx = n - 1; idx >= 0; idx--) {
     const pos = idx + 1
     const geo = geoByPosition.get(pos)
-    const q = geo?.question?.trim()
+    if (!geo) continue
+    const q = geo.question?.trim()
     if (!q || q.toLowerCase() === 'null') continue
 
     const secsNow = extractH2Sections(result)

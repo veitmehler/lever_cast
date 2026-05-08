@@ -3,6 +3,26 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
+const CDN_BASE = process.env.CDN_BASE ?? process.env.NEXT_PUBLIC_CDN_BASE ?? ''
+
+function cdnUrl(s3Key: string | null | undefined): string | null {
+  if (!s3Key) return null
+  return `${CDN_BASE.replace(/\/$/, '')}/${s3Key}`
+}
+
+function extractDiagramType(mermaidSyntax: string): string {
+  const firstLine = mermaidSyntax.trim().split('\n')[0].trim().toLowerCase()
+  if (firstLine.startsWith('flowchart') || firstLine.startsWith('graph')) return 'flowchart'
+  if (firstLine.startsWith('mindmap'))       return 'mindmap'
+  if (firstLine.startsWith('sequencediagram')) return 'sequenceDiagram'
+  if (firstLine.startsWith('statediagram'))  return 'stateDiagram'
+  if (firstLine.startsWith('classdiagram'))  return 'classDiagram'
+  if (firstLine.startsWith('pie'))           return 'pie'
+  if (firstLine.startsWith('gantt'))         return 'gantt'
+  if (firstLine.startsWith('erdiagram'))     return 'erDiagram'
+  return firstLine.split(/\s/)[0] || 'unknown'
+}
+
 export default async function ArticleJobDetailPage({
   params,
 }: {
@@ -21,7 +41,12 @@ export default async function ArticleJobDetailPage({
           promptTemplate: { select: { stepName: true, defaultProvider: true, defaultModel: true } },
         },
       },
-      sitePage: { include: { diagrams: { orderBy: { position: 'asc' } } } },
+      sitePage: {
+        include: {
+          diagrams: { orderBy: { position: 'asc' } },
+          sectionEnrichments: { orderBy: { position: 'asc' } },
+        },
+      },
       outputAttempts: { orderBy: { startedAt: 'desc' } },
       errorLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
       llmUsage: { orderBy: { createdAt: 'asc' } },
@@ -31,6 +56,13 @@ export default async function ArticleJobDetailPage({
   if (!job) notFound()
 
   const totalCost = job.llmUsage.reduce((s, r) => s + r.cost, 0)
+  const maxStep = job.pipelineSteps.length > 0
+    ? Math.max(...job.pipelineSteps.map((s) => s.stepNumber))
+    : 18
+
+  const enrichmentCost =
+    (job.sitePage?.diagrams?.reduce((s, d) => s + d.cost, 0) ?? 0) +
+    (job.sitePage?.sectionEnrichments?.reduce((s, e) => s + e.cost, 0) ?? 0)
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -51,7 +83,7 @@ export default async function ArticleJobDetailPage({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <InfoCard label="Mode" value={job.topic.mode} />
-        <InfoCard label="Step" value={`${job.currentStep} / 18`} />
+        <InfoCard label="Step" value={`${job.currentStep} / ${maxStep}`} />
         <InfoCard label="Total Cost" value={`$${totalCost.toFixed(4)}`} />
         <InfoCard label="Total Tokens" value={job.totalTokens.toLocaleString()} />
       </div>
@@ -74,9 +106,13 @@ export default async function ArticleJobDetailPage({
                   : undefined
             }
           />
+          {enrichmentCost > 0 && (
+            <Row label="Enrichment Cost" value={`$${enrichmentCost.toFixed(4)}`} />
+          )}
         </div>
       )}
 
+      {/* ── Pipeline Steps (Phase A + B) ─────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
           Pipeline Steps ({job.pipelineSteps.length})
@@ -119,6 +155,115 @@ export default async function ArticleJobDetailPage({
           </div>
         )}
       </div>
+
+      {/* ── GEO Section Enrichments (Phase C — questions + summaries) ──────── */}
+      {(job.sitePage?.sectionEnrichments?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
+            GEO Section Enrichments ({job.sitePage!.sectionEnrichments.length})
+          </h2>
+          <div className="divide-y divide-border">
+            {job.sitePage!.sectionEnrichments.map((enr) => (
+              <div key={enr.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-6 shrink-0 text-xs text-muted-foreground font-mono mt-0.5">{enr.position}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">{enr.originalH2}</p>
+                      {enr.question && (
+                        <p className="text-sm font-medium text-foreground mt-0.5">{enr.question}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    {enr.questionSource && (
+                      <span className={`rounded-full px-2 py-0.5 font-medium ${
+                        enr.questionSource === 'faq_match'
+                          ? 'bg-green-500/20 text-green-400'
+                          : enr.questionSource === 'keyword_gen'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-orange-500/20 text-orange-400'
+                      }`}>
+                        {enr.questionSource}
+                      </span>
+                    )}
+                    <span className="text-muted-foreground">{enr.inputTokens}↑ {enr.outputTokens}↓</span>
+                    <span className="font-mono text-foreground">${enr.cost.toFixed(5)}</span>
+                  </div>
+                </div>
+                {enr.llmProvider && (
+                  <p className="text-xs text-muted-foreground pl-8 mb-1">{enr.llmProvider}/{enr.llmModel}</p>
+                )}
+                {enr.summary && (
+                  <details className="mt-1 pl-8">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Summary ({enr.summary.length.toLocaleString()} chars)
+                    </summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted/30 p-2 text-xs text-foreground whitespace-pre-wrap break-words">
+                      {enr.summary}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Diagrams (Phase C — mermaid renders) ────────────────────────────── */}
+      {(job.sitePage?.diagrams?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
+            Diagrams ({job.sitePage!.diagrams.length})
+          </h2>
+          <div className="divide-y divide-border">
+            {job.sitePage!.diagrams.map((diag) => {
+              const svgLink  = cdnUrl(diag.svgS3Key)
+              const pngLink  = cdnUrl(diag.pngS3Key)
+              const darkLink = cdnUrl(diag.pngDarkS3Key)
+              const diagramType = extractDiagramType(diag.mermaidSyntax)
+              return (
+                <div key={diag.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 shrink-0 text-xs text-muted-foreground font-mono">{diag.position}</span>
+                      <span className="text-sm font-medium text-foreground truncate">{diag.sectionTitle}</span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">{diagramType}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 text-xs">
+                      <span className="text-muted-foreground">{diag.inputTokens}↑ {diag.outputTokens}↓</span>
+                      <span className="font-mono text-foreground">${diag.cost.toFixed(5)}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-8 mb-1">{diag.llmProvider}/{diag.llmModel}</p>
+                  <div className="flex items-center gap-3 pl-8 mb-1">
+                    {svgLink && (
+                      <a href={svgLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">SVG →</a>
+                    )}
+                    {pngLink && (
+                      <a href={pngLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">PNG →</a>
+                    )}
+                    {darkLink && (
+                      <a href={darkLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">PNG dark →</a>
+                    )}
+                    {diag.pngWidth && diag.pngHeight && (
+                      <span className="text-xs text-muted-foreground">{diag.pngWidth}×{diag.pngHeight}</span>
+                    )}
+                  </div>
+                  <details className="mt-1 pl-8">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Mermaid syntax ({diag.mermaidSyntax.length.toLocaleString()} chars)
+                    </summary>
+                    <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/30 p-2 text-xs text-foreground whitespace-pre-wrap break-words">
+                      {diag.mermaidSyntax}
+                    </pre>
+                  </details>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {job.errorLogs.length > 0 && (
         <div className="rounded-lg border border-red-500/30 bg-card overflow-hidden">

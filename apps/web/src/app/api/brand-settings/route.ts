@@ -37,6 +37,12 @@ export async function GET() {
         organizationWebsite: null,
         organizationEmail: null,
         organizationPhone: null,
+        addressLine1: null,
+        addressLine2: null,
+        addressLocality: null,
+        addressRegion: null,
+        postalCode: null,
+        addressCountryName: null,
         organizationAddress: null,
         organizationCountryCode: null,
         googleBusinessProfileUrl: null,
@@ -80,6 +86,14 @@ export async function PATCH(request: NextRequest) {
       'organizationWebsite',
       'organizationEmail',
       'organizationPhone',
+      // Structured address sub-fields
+      'addressLine1',
+      'addressLine2',
+      'addressLocality',
+      'addressRegion',
+      'postalCode',
+      'addressCountryName',
+      // Combined legacy + fallback string (computed below if sub-fields provided)
       'organizationAddress',
       'organizationCountryCode',
       'googleBusinessProfileUrl',
@@ -100,6 +114,20 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Auto-compute combined organizationAddress from structured sub-fields when provided
+    if ('addressLine1' in body || 'addressLocality' in body || 'postalCode' in body) {
+      const parts = [
+        data.addressLine1,
+        data.addressLine2,
+        data.addressLocality,
+        data.addressRegion,
+        data.postalCode,
+        data.addressCountryName,
+      ].filter((p): p is string => typeof p === 'string' && p.length > 0)
+      data.organizationAddress = parts.length > 0 ? parts.join(', ') : null
+    }
+
+    // Normalise country code to ISO 3166-1 alpha-2
     if (data.organizationCountryCode != null && typeof data.organizationCountryCode === 'string') {
       const code = data.organizationCountryCode.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 2)
       data.organizationCountryCode = code.length === 2 ? code : null

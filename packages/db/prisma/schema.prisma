@@ -573,8 +573,15 @@ model BrandSettings {
   organizationWebsite     String?
   organizationEmail       String?
   organizationPhone       String?
-  organizationAddress     String? @db.Text
-  organizationCountryCode String? @db.VarChar(2) // ISO 3166-1 alpha-2, e.g. US
+  // Structured address — sub-fields (new); combined string kept for backward compat
+  addressLine1        String?
+  addressLine2        String?
+  addressLocality     String? // city
+  addressRegion       String? // state / province
+  postalCode          String?
+  addressCountryName  String? // full country name, e.g. "Australia"
+  organizationAddress     String? @db.Text // computed combined string (legacy + fallback)
+  organizationCountryCode String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD
   socialMediaLinks          Json?   // [{ platform: string, url: string }]
 

@@ -306,6 +306,18 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
 
     case 'organization_address': {
       const bs = await getBrandSettings(ctx)
+      // Prefer structured sub-fields; fall back to the legacy combined string
+      if (bs?.addressLine1) {
+        const parts = [
+          bs.addressLine1,
+          bs.addressLine2,
+          bs.addressLocality,
+          bs.addressRegion,
+          bs.postalCode,
+          bs.addressCountryName,
+        ].filter(Boolean)
+        return parts.join(', ')
+      }
       return bs?.organizationAddress ?? ''
     }
 

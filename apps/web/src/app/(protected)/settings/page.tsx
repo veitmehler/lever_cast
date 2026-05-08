@@ -6,6 +6,106 @@ import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
 
+// ISO 3166-1 alpha-2 country list used for the address country dropdown.
+// Value = ISO code (stored in DB); label = full country name (shown in address string).
+const COUNTRIES = [
+  { code: 'AF', name: 'Afghanistan' }, { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' }, { code: 'AD', name: 'Andorra' },
+  { code: 'AO', name: 'Angola' }, { code: 'AG', name: 'Antigua and Barbuda' },
+  { code: 'AR', name: 'Argentina' }, { code: 'AM', name: 'Armenia' },
+  { code: 'AU', name: 'Australia' }, { code: 'AT', name: 'Austria' },
+  { code: 'AZ', name: 'Azerbaijan' }, { code: 'BS', name: 'Bahamas' },
+  { code: 'BH', name: 'Bahrain' }, { code: 'BD', name: 'Bangladesh' },
+  { code: 'BB', name: 'Barbados' }, { code: 'BY', name: 'Belarus' },
+  { code: 'BE', name: 'Belgium' }, { code: 'BZ', name: 'Belize' },
+  { code: 'BJ', name: 'Benin' }, { code: 'BT', name: 'Bhutan' },
+  { code: 'BO', name: 'Bolivia' }, { code: 'BA', name: 'Bosnia and Herzegovina' },
+  { code: 'BW', name: 'Botswana' }, { code: 'BR', name: 'Brazil' },
+  { code: 'BN', name: 'Brunei' }, { code: 'BG', name: 'Bulgaria' },
+  { code: 'BF', name: 'Burkina Faso' }, { code: 'BI', name: 'Burundi' },
+  { code: 'CV', name: 'Cabo Verde' }, { code: 'KH', name: 'Cambodia' },
+  { code: 'CM', name: 'Cameroon' }, { code: 'CA', name: 'Canada' },
+  { code: 'CF', name: 'Central African Republic' }, { code: 'TD', name: 'Chad' },
+  { code: 'CL', name: 'Chile' }, { code: 'CN', name: 'China' },
+  { code: 'CO', name: 'Colombia' }, { code: 'KM', name: 'Comoros' },
+  { code: 'CG', name: 'Congo' }, { code: 'CR', name: 'Costa Rica' },
+  { code: 'HR', name: 'Croatia' }, { code: 'CU', name: 'Cuba' },
+  { code: 'CY', name: 'Cyprus' }, { code: 'CZ', name: 'Czech Republic' },
+  { code: 'DK', name: 'Denmark' }, { code: 'DJ', name: 'Djibouti' },
+  { code: 'DM', name: 'Dominica' }, { code: 'DO', name: 'Dominican Republic' },
+  { code: 'EC', name: 'Ecuador' }, { code: 'EG', name: 'Egypt' },
+  { code: 'SV', name: 'El Salvador' }, { code: 'GQ', name: 'Equatorial Guinea' },
+  { code: 'ER', name: 'Eritrea' }, { code: 'EE', name: 'Estonia' },
+  { code: 'SZ', name: 'Eswatini' }, { code: 'ET', name: 'Ethiopia' },
+  { code: 'FJ', name: 'Fiji' }, { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' }, { code: 'GA', name: 'Gabon' },
+  { code: 'GM', name: 'Gambia' }, { code: 'GE', name: 'Georgia' },
+  { code: 'DE', name: 'Germany' }, { code: 'GH', name: 'Ghana' },
+  { code: 'GR', name: 'Greece' }, { code: 'GD', name: 'Grenada' },
+  { code: 'GT', name: 'Guatemala' }, { code: 'GN', name: 'Guinea' },
+  { code: 'GW', name: 'Guinea-Bissau' }, { code: 'GY', name: 'Guyana' },
+  { code: 'HT', name: 'Haiti' }, { code: 'HN', name: 'Honduras' },
+  { code: 'HU', name: 'Hungary' }, { code: 'IS', name: 'Iceland' },
+  { code: 'IN', name: 'India' }, { code: 'ID', name: 'Indonesia' },
+  { code: 'IR', name: 'Iran' }, { code: 'IQ', name: 'Iraq' },
+  { code: 'IE', name: 'Ireland' }, { code: 'IL', name: 'Israel' },
+  { code: 'IT', name: 'Italy' }, { code: 'JM', name: 'Jamaica' },
+  { code: 'JP', name: 'Japan' }, { code: 'JO', name: 'Jordan' },
+  { code: 'KZ', name: 'Kazakhstan' }, { code: 'KE', name: 'Kenya' },
+  { code: 'KI', name: 'Kiribati' }, { code: 'KW', name: 'Kuwait' },
+  { code: 'KG', name: 'Kyrgyzstan' }, { code: 'LA', name: 'Laos' },
+  { code: 'LV', name: 'Latvia' }, { code: 'LB', name: 'Lebanon' },
+  { code: 'LS', name: 'Lesotho' }, { code: 'LR', name: 'Liberia' },
+  { code: 'LY', name: 'Libya' }, { code: 'LI', name: 'Liechtenstein' },
+  { code: 'LT', name: 'Lithuania' }, { code: 'LU', name: 'Luxembourg' },
+  { code: 'MG', name: 'Madagascar' }, { code: 'MW', name: 'Malawi' },
+  { code: 'MY', name: 'Malaysia' }, { code: 'MV', name: 'Maldives' },
+  { code: 'ML', name: 'Mali' }, { code: 'MT', name: 'Malta' },
+  { code: 'MH', name: 'Marshall Islands' }, { code: 'MR', name: 'Mauritania' },
+  { code: 'MU', name: 'Mauritius' }, { code: 'MX', name: 'Mexico' },
+  { code: 'FM', name: 'Micronesia' }, { code: 'MD', name: 'Moldova' },
+  { code: 'MC', name: 'Monaco' }, { code: 'MN', name: 'Mongolia' },
+  { code: 'ME', name: 'Montenegro' }, { code: 'MA', name: 'Morocco' },
+  { code: 'MZ', name: 'Mozambique' }, { code: 'MM', name: 'Myanmar' },
+  { code: 'NA', name: 'Namibia' }, { code: 'NR', name: 'Nauru' },
+  { code: 'NP', name: 'Nepal' }, { code: 'NL', name: 'Netherlands' },
+  { code: 'NZ', name: 'New Zealand' }, { code: 'NI', name: 'Nicaragua' },
+  { code: 'NE', name: 'Niger' }, { code: 'NG', name: 'Nigeria' },
+  { code: 'NO', name: 'Norway' }, { code: 'OM', name: 'Oman' },
+  { code: 'PK', name: 'Pakistan' }, { code: 'PW', name: 'Palau' },
+  { code: 'PA', name: 'Panama' }, { code: 'PG', name: 'Papua New Guinea' },
+  { code: 'PY', name: 'Paraguay' }, { code: 'PE', name: 'Peru' },
+  { code: 'PH', name: 'Philippines' }, { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' }, { code: 'QA', name: 'Qatar' },
+  { code: 'RO', name: 'Romania' }, { code: 'RU', name: 'Russia' },
+  { code: 'RW', name: 'Rwanda' }, { code: 'KN', name: 'Saint Kitts and Nevis' },
+  { code: 'LC', name: 'Saint Lucia' }, { code: 'VC', name: 'Saint Vincent and the Grenadines' },
+  { code: 'WS', name: 'Samoa' }, { code: 'SM', name: 'San Marino' },
+  { code: 'ST', name: 'São Tomé and Príncipe' }, { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'SN', name: 'Senegal' }, { code: 'RS', name: 'Serbia' },
+  { code: 'SC', name: 'Seychelles' }, { code: 'SL', name: 'Sierra Leone' },
+  { code: 'SG', name: 'Singapore' }, { code: 'SK', name: 'Slovakia' },
+  { code: 'SI', name: 'Slovenia' }, { code: 'SB', name: 'Solomon Islands' },
+  { code: 'SO', name: 'Somalia' }, { code: 'ZA', name: 'South Africa' },
+  { code: 'SS', name: 'South Sudan' }, { code: 'ES', name: 'Spain' },
+  { code: 'LK', name: 'Sri Lanka' }, { code: 'SD', name: 'Sudan' },
+  { code: 'SR', name: 'Suriname' }, { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' }, { code: 'SY', name: 'Syria' },
+  { code: 'TW', name: 'Taiwan' }, { code: 'TJ', name: 'Tajikistan' },
+  { code: 'TZ', name: 'Tanzania' }, { code: 'TH', name: 'Thailand' },
+  { code: 'TL', name: 'Timor-Leste' }, { code: 'TG', name: 'Togo' },
+  { code: 'TO', name: 'Tonga' }, { code: 'TT', name: 'Trinidad and Tobago' },
+  { code: 'TN', name: 'Tunisia' }, { code: 'TR', name: 'Turkey' },
+  { code: 'TM', name: 'Turkmenistan' }, { code: 'TV', name: 'Tuvalu' },
+  { code: 'UG', name: 'Uganda' }, { code: 'UA', name: 'Ukraine' },
+  { code: 'AE', name: 'United Arab Emirates' }, { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' }, { code: 'UY', name: 'Uruguay' },
+  { code: 'UZ', name: 'Uzbekistan' }, { code: 'VU', name: 'Vanuatu' },
+  { code: 'VE', name: 'Venezuela' }, { code: 'VN', name: 'Vietnam' },
+  { code: 'YE', name: 'Yemen' }, { code: 'ZM', name: 'Zambia' },
+  { code: 'ZW', name: 'Zimbabwe' },
+] as const
+
 type ApiKeyData = {
   id: string
   provider: string
@@ -82,8 +182,16 @@ export default function SettingsPage() {
   const [organizationWebsite, setOrganizationWebsite]   = useState('')
   const [organizationEmail, setOrganizationEmail]       = useState('')
   const [organizationPhone, setOrganizationPhone]       = useState('')
-  const [organizationAddress, setOrganizationAddress]   = useState('')
-  const [organizationCountryCode, setOrganizationCountryCode] = useState('')
+  // Structured address sub-fields
+  const [addressLine1, setAddressLine1]                 = useState('')
+  const [addressLine2, setAddressLine2]                 = useState('')
+  const [addressLocality, setAddressLocality]           = useState('') // city
+  const [addressRegion, setAddressRegion]               = useState('') // state / province
+  const [postalCode, setPostalCode]                     = useState('')
+  const [addressCountryName, setAddressCountryName]     = useState('') // full name
+  const [organizationCountryCode, setOrganizationCountryCode] = useState('') // ISO, auto-set from dropdown
+  // Legacy combined string — only used to show a migration hint when structured fields are empty
+  const [legacyAddress, setLegacyAddress]               = useState('')
   const [googleBusinessProfileUrl, setGoogleBusinessProfileUrl] = useState('')
   const [socialMediaLinks, setSocialMediaLinks]         = useState<Array<{ platform: string; url: string }>>([])
 
@@ -137,8 +245,16 @@ export default function SettingsPage() {
           if (brand.organizationWebsite) setOrganizationWebsite(brand.organizationWebsite)
           if (brand.organizationEmail)   setOrganizationEmail(brand.organizationEmail)
           if (brand.organizationPhone)   setOrganizationPhone(brand.organizationPhone)
-          if (brand.organizationAddress) setOrganizationAddress(brand.organizationAddress)
+          // Structured address sub-fields
+          if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
+          if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
+          if (brand.addressLocality)    setAddressLocality(brand.addressLocality)
+          if (brand.addressRegion)      setAddressRegion(brand.addressRegion)
+          if (brand.postalCode)         setPostalCode(brand.postalCode)
+          if (brand.addressCountryName) setAddressCountryName(brand.addressCountryName)
           if (brand.organizationCountryCode) setOrganizationCountryCode(brand.organizationCountryCode)
+          // Store legacy combined string so we can show a migration hint
+          if (brand.organizationAddress && !brand.addressLine1) setLegacyAddress(brand.organizationAddress)
           if (brand.googleBusinessProfileUrl) setGoogleBusinessProfileUrl(brand.googleBusinessProfileUrl)
           if (Array.isArray(brand.socialMediaLinks)) setSocialMediaLinks(brand.socialMediaLinks)
           setDiagramPrimaryColor(brand.diagramPrimaryColor ?? '')
@@ -518,8 +634,13 @@ export default function SettingsPage() {
           organizationWebsite: organizationWebsite || null,
           organizationEmail: organizationEmail || null,
           organizationPhone: organizationPhone || null,
-          organizationAddress: organizationAddress || null,
-          organizationCountryCode: organizationCountryCode.trim().toUpperCase().slice(0, 2) || null,
+          addressLine1: addressLine1.trim() || null,
+          addressLine2: addressLine2.trim() || null,
+          addressLocality: addressLocality.trim() || null,
+          addressRegion: addressRegion.trim() || null,
+          postalCode: postalCode.trim() || null,
+          addressCountryName: addressCountryName.trim() || null,
+          organizationCountryCode: organizationCountryCode || null,
           googleBusinessProfileUrl: googleBusinessProfileUrl.trim() || null,
           socialMediaLinks: socialMediaLinks.filter((l) => l.platform && l.url),
           diagramPrimaryColor: diagramPrimaryColor.trim() || null,
@@ -779,7 +900,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Geographic focus
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{geolocation}}'}</code></span>
               </label>
               <input
                 type="text"
@@ -795,7 +915,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 About you / your business
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{who}}'}</code></span>
               </label>
               <textarea
                 value={who}
@@ -810,7 +929,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Your relevant experience
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{our_experience}}'}</code></span>
               </label>
               <textarea
                 value={ourExperience}
@@ -826,7 +944,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Goal of your articles
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{article_goal}}'}</code></span>
               </label>
               <textarea
                 value={articleGoal}
@@ -842,7 +959,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Standing instructions for every article
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{special_instructions}}'}</code></span>
               </label>
               <textarea
                 value={brandSpecialInstructions}
@@ -859,21 +975,19 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-card-foreground mb-1">
                   Default author name
-                  <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_name}}'}</code></span>
                 </label>
                 <input
                   type="text"
                   value={defaultAuthorName}
                   onChange={(e) => setDefaultAuthorName(e.target.value)}
-                  placeholder="e.g. Jane Smith"
+                  placeholder="e.g. Dr. Jane Smith, PhD, PT"
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <p className="text-xs text-muted-foreground mt-1">The article&apos;s bylined voice.</p>
+                <p className="text-xs text-muted-foreground mt-1">Include all professional credentials (e.g. Dr., PhD, MD, RN). Appears as the article byline and in schema markup.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-card-foreground mb-1">
                   Default author website
-                  <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_website}}'}</code></span>
                 </label>
                 <input
                   type="url"
@@ -889,7 +1003,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Author LinkedIn
-                <span className="ml-1.5 font-normal text-muted-foreground text-xs">— <code className="font-mono">{'{{author_linkedin}}'}</code></span>
               </label>
               <input
                 type="url"
@@ -898,7 +1011,7 @@ export default function SettingsPage() {
                 placeholder="https://linkedin.com/in/jane-smith"
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <p className="text-xs text-muted-foreground mt-1">Used in JSON-LD (<code className="font-mono">sameAs</code>) and in workflow copy for review.</p>
+              <p className="text-xs text-muted-foreground mt-1">Used in schema markup and included in the final article review.</p>
             </div>
 
             {/* Organization / Schema Markup sub-section */}
@@ -917,7 +1030,6 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs font-medium text-card-foreground mb-1">
                       Organization name
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_name}}'}</code></span>
                     </label>
                     <input
                       type="text"
@@ -930,7 +1042,6 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs font-medium text-card-foreground mb-1">
                       Organization website
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_website}}'}</code></span>
                     </label>
                     <input
                       type="url"
@@ -947,7 +1058,6 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs font-medium text-card-foreground mb-1">
                       Contact email
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_email}}'}</code></span>
                     </label>
                     <input
                       type="email"
@@ -960,7 +1070,6 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs font-medium text-card-foreground mb-1">
                       Phone number
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_phone}}'}</code></span>
                     </label>
                     <input
                       type="tel"
@@ -972,61 +1081,93 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Address */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-1">
+                {/* Structured address */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-medium text-card-foreground">
                     Business address
-                    <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_address}}'}</code></span>
                   </label>
-                  <textarea
-                    value={organizationAddress}
-                    onChange={(e) => setOrganizationAddress(e.target.value)}
-                    placeholder="123 Main St, Suite 400, New York, NY 10001"
-                    rows={2}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+                  {/* Migration hint: show old combined string if sub-fields are empty */}
+                  {legacyAddress && !addressLine1 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md px-3 py-2">
+                      Previously saved: &quot;{legacyAddress}&quot; — please re-enter using the fields below to save in the new structured format.
+                    </p>
+                  )}
+                  <input
+                    type="text"
+                    value={addressLine1}
+                    onChange={(e) => setAddressLine1(e.target.value)}
+                    placeholder="Street address"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-card-foreground mb-1">
-                      Country code (ISO 3166-1 alpha-2)
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{organization_country_code}}'}</code></span>
-                    </label>
+                  <input
+                    type="text"
+                    value={addressLine2}
+                    onChange={(e) => setAddressLine2(e.target.value)}
+                    placeholder="Suite, unit, building (optional)"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
-                      inputMode="text"
-                      maxLength={2}
-                      value={organizationCountryCode}
-                      onChange={(e) =>
-                        setOrganizationCountryCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 2))
-                      }
-                      placeholder="US"
-                      className="w-full max-w-[5rem] rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground uppercase placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Used for <code className="font-mono text-xs">addressCountry</code> in schema PostalAddress.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-card-foreground mb-1">
-                      Google Business Profile URL
-                      <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{google_business_profile_url}}'}</code></span>
-                    </label>
-                    <input
-                      type="url"
-                      value={googleBusinessProfileUrl}
-                      onChange={(e) => setGoogleBusinessProfileUrl(e.target.value)}
-                      placeholder="https://g.page/your-business"
+                      value={addressLocality}
+                      onChange={(e) => setAddressLocality(e.target.value)}
+                      placeholder="City"
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Used as <code className="font-mono text-xs">sameAs</code> and <code className="font-mono text-xs">hasMap</code> on the publisher Organization.</p>
+                    <input
+                      type="text"
+                      value={addressRegion}
+                      onChange={(e) => setAddressRegion(e.target.value)}
+                      placeholder="State / Province"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="ZIP / Postal code"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <div>
+                      <select
+                        value={organizationCountryCode}
+                        onChange={(e) => {
+                          setOrganizationCountryCode(e.target.value)
+                          const opt = e.target.options[e.target.selectedIndex]
+                          setAddressCountryName(opt.text === 'Select country…' ? '' : opt.text)
+                        }}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="">Select country…</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Google Business Profile */}
+                <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-1">
+                    Google Business Profile URL
+                  </label>
+                  <input
+                    type="url"
+                    value={googleBusinessProfileUrl}
+                    onChange={(e) => setGoogleBusinessProfileUrl(e.target.value)}
+                    placeholder="https://g.page/your-business"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Used as publisher location in schema markup.</p>
                 </div>
 
                 {/* Social media links */}
                 <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Social media profiles
-                    <span className="ml-1.5 font-normal text-muted-foreground">— <code className="font-mono text-xs">{'{{social_media_links}}'}</code></span>
                   </label>
                   <div className="space-y-2">
                     {socialMediaLinks.map((link, idx) => (

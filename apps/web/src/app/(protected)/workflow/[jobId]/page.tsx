@@ -874,22 +874,22 @@ export default function WorkflowJobPage() {
                       Rewrite Article
                     </Button>
                     <Button
-                      size="lg"
+                      size="sm"
                       onClick={handleApprove}
-                      className="shrink-0 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-base font-semibold shadow-xl shadow-purple-500/45 ring-[3px] ring-purple-400/55 hover:ring-purple-300/70 gap-2 min-h-11 px-7"
+                      className="shrink-0 gap-1.5 bg-yellow-400 hover:bg-yellow-300 dark:bg-yellow-500 dark:hover:bg-yellow-400 text-yellow-950 font-semibold shadow-md shadow-yellow-500/40 ring-2 ring-yellow-500/55 border border-yellow-700/15 dark:border-yellow-950/25"
                     >
-                      <ThumbsUp className="size-5 shrink-0" />
+                      <ThumbsUp className="h-3.5 w-3.5 shrink-0" />
                       Approve Article
                     </Button>
                   </>
                 )}
                 {isApproving && (
                   <Button
-                    size="lg"
+                    size="sm"
                     disabled
-                    className="shrink-0 min-h-11 px-7 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-base font-semibold opacity-90 shadow-xl shadow-purple-500/45 ring-[3px] ring-purple-400/55 gap-2"
+                    className="shrink-0 gap-1.5 bg-yellow-500 text-yellow-950 font-semibold opacity-95 shadow-md shadow-yellow-500/40 ring-2 ring-yellow-500/55 dark:bg-yellow-500"
                   >
-                    <Loader2 className="size-5 animate-spin shrink-0" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                     Approving…
                   </Button>
                 )}

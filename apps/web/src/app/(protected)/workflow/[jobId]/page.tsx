@@ -876,7 +876,7 @@ export default function WorkflowJobPage() {
                     <Button
                       size="sm"
                       onClick={handleApprove}
-                      className="shrink-0 gap-1.5 bg-yellow-400 hover:bg-yellow-300 dark:bg-yellow-500 dark:hover:bg-yellow-400 text-yellow-950 font-semibold shadow-md shadow-yellow-500/40 ring-2 ring-yellow-500/55 border border-yellow-700/15 dark:border-yellow-950/25"
+                      className="shrink-0 gap-1.5 bg-amber-500 hover:bg-amber-400 text-white font-semibold shadow-md shadow-amber-500/40 ring-2 ring-amber-400/60"
                     >
                       <ThumbsUp className="h-3.5 w-3.5 shrink-0" />
                       Approve Article
@@ -887,7 +887,7 @@ export default function WorkflowJobPage() {
                   <Button
                     size="sm"
                     disabled
-                    className="shrink-0 gap-1.5 bg-yellow-500 text-yellow-950 font-semibold opacity-95 shadow-md shadow-yellow-500/40 ring-2 ring-yellow-500/55 dark:bg-yellow-500"
+                    className="shrink-0 gap-1.5 bg-amber-500 text-white font-semibold opacity-90 shadow-md shadow-amber-500/40 ring-2 ring-amber-400/60"
                   >
                     <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                     Approving…

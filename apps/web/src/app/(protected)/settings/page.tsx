@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus } from 'lucide-react'
+import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus, Upload, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
@@ -182,6 +182,9 @@ export default function SettingsPage() {
   const [organizationWebsite, setOrganizationWebsite]   = useState('')
   const [organizationEmail, setOrganizationEmail]       = useState('')
   const [organizationPhone, setOrganizationPhone]       = useState('')
+  const [organizationLogoUrl, setOrganizationLogoUrl]   = useState('')
+  const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
+  const logoFileInputRef                                = useRef<HTMLInputElement>(null)
   // Structured address sub-fields
   const [addressLine1, setAddressLine1]                 = useState('')
   const [addressLine2, setAddressLine2]                 = useState('')
@@ -241,10 +244,11 @@ export default function SettingsPage() {
           if (brand.defaultAuthorWebsite) setDefaultAuthorWebsite(brand.defaultAuthorWebsite)
           if (brand.defaultAuthorLinkedIn) setDefaultAuthorLinkedIn(brand.defaultAuthorLinkedIn)
           // Organization fields
-          if (brand.organizationName)    setOrganizationName(brand.organizationName)
-          if (brand.organizationWebsite) setOrganizationWebsite(brand.organizationWebsite)
-          if (brand.organizationEmail)   setOrganizationEmail(brand.organizationEmail)
-          if (brand.organizationPhone)   setOrganizationPhone(brand.organizationPhone)
+          if (brand.organizationName)     setOrganizationName(brand.organizationName)
+          if (brand.organizationWebsite)  setOrganizationWebsite(brand.organizationWebsite)
+          if (brand.organizationEmail)    setOrganizationEmail(brand.organizationEmail)
+          if (brand.organizationPhone)    setOrganizationPhone(brand.organizationPhone)
+          if (brand.organizationLogoUrl)  setOrganizationLogoUrl(brand.organizationLogoUrl)
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -615,6 +619,49 @@ export default function SettingsPage() {
     fetchConnections()
   }, [fetchConnections]) // fetchConnections is stable (memoized with useCallback), so it won't change
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset so the same file can be re-selected if needed
+    e.target.value = ''
+
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml']
+    if (!allowed.includes(file.type)) {
+      toast.error('Please upload a PNG, JPG, WebP or SVG image')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo must be smaller than 2 MB')
+      return
+    }
+
+    setIsUploadingLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/brand-settings/logo', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      setOrganizationLogoUrl(data.url)
+      toast.success('Logo uploaded and saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload logo')
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    try {
+      const res = await fetch('/api/brand-settings/logo', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove logo')
+      setOrganizationLogoUrl('')
+      toast.success('Logo removed')
+    } catch {
+      toast.error('Failed to remove logo')
+    }
+  }
+
   const handleSaveBrandProfile = async () => {
     setIsSavingBrand(true)
     try {
@@ -634,6 +681,7 @@ export default function SettingsPage() {
           organizationWebsite: organizationWebsite || null,
           organizationEmail: organizationEmail || null,
           organizationPhone: organizationPhone || null,
+          organizationLogoUrl: organizationLogoUrl.trim() || null,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -1023,6 +1071,79 @@ export default function SettingsPage() {
                     Used to generate JSON-LD structured data injected into every published article.
                     These details appear in search engines as publisher information.
                   </p>
+                </div>
+
+                {/* Logo */}
+                <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-1">
+                    Organization logo
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Used as the publisher logo in schema markup. Recommended: square PNG or SVG, at least 112 × 112 px.
+                  </p>
+                  <div className="flex items-start gap-4">
+                    {/* Preview */}
+                    <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {organizationLogoUrl ? (
+                        <img
+                          src={organizationLogoUrl}
+                          alt="Organization logo preview"
+                          className="w-full h-full object-contain p-1"
+                          onError={() => setOrganizationLogoUrl('')}
+                        />
+                      ) : (
+                        <Building2 className="w-8 h-8 text-muted-foreground/40" />
+                      )}
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {/* Hidden file input */}
+                        <input
+                          ref={logoFileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          className="hidden"
+                          onChange={handleLogoUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => logoFileInputRef.current?.click()}
+                          disabled={isUploadingLogo}
+                        >
+                          {isUploadingLogo ? (
+                            <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading…</>
+                          ) : (
+                            <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload file</>
+                          )}
+                        </Button>
+                        {organizationLogoUrl && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveLogo}
+                            disabled={isUploadingLogo}
+                          >
+                            <X className="w-3.5 h-3.5 mr-1.5" />Remove
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Manual URL input */}
+                      <input
+                        type="url"
+                        value={organizationLogoUrl}
+                        onChange={(e) => setOrganizationLogoUrl(e.target.value)}
+                        placeholder="or paste logo URL from your website…"
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG · Max 2 MB</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Name + Website */}

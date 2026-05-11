@@ -326,6 +326,11 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       return bs?.organizationCountryCode ?? ''
     }
 
+    case 'organization_logo_url': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.organizationLogoUrl ?? ''
+    }
+
     case 'google_business_profile_url': {
       const bs = await getBrandSettings(ctx)
       return bs?.googleBusinessProfileUrl ?? ''

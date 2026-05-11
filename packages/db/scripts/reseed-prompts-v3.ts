@@ -1349,6 +1349,7 @@ Author LinkedIn: {{author_linkedin}}
 Published Date: {{published_date}}
 Last Modified Date: {{modified_date}}
 Featured Image URL: {{featured_image_url}}
+Organization Logo URL: {{organization_logo_url}}
 URL: {{article_url}}
 Article Content: {{article}}
 Article Citations: {{citation_urls}}
@@ -1365,9 +1366,10 @@ Social Media Links:
 Requirements:
 - Use @type: "Article" as the main type
 - Include headline, description, url, author (Person with name and url), datePublished, dateModified (full ISO 8601 with timezone, e.g. "2026-05-08T14:30:00.000Z")
-- Include an "image" property on the Article when "Featured Image URL" is non-empty
+- Featured image: when "Featured Image URL" is non-empty, add it as the Article "image" property ONLY, structured as { "@type": "ImageObject", "url": "<url>", "width": 1200, "height": 630 }. Do NOT place the featured image URL anywhere else (e.g. do NOT use it as the publisher logo).
 - Author: when "Author LinkedIn" is non-empty, add the author's LinkedIn URL to the Person sameAs array (or as sameAs string if a single value)
 - Publisher: use @type "Organization" only (NOT LocalBusiness). Include name, url, email, telephone, address as PostalAddress
+- Publisher logo: when "Organization Logo URL" is non-empty, add it as the publisher "logo" property structured as { "@type": "ImageObject", "url": "<logo_url>" }. If "Organization Logo URL" is empty, OMIT the logo property entirely — do not invent or reuse any other URL.
 - PostalAddress: set addressCountry to "Organization Country Code" when non-empty; otherwise infer from the address text — must always be ISO 3166-1 alpha-2 (e.g. "US", never "United States")
 - When "Google Business Profile URL" is non-empty: append it to publisher sameAs AND set publisher hasMap to the same URL (g.page links resolve to Google Maps — valid for both)
 - Merge social profile URLs into publisher sameAs; deduplicate URLs

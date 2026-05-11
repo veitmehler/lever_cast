@@ -45,6 +45,7 @@ export async function GET() {
         addressCountryName: null,
         organizationAddress: null,
         organizationCountryCode: null,
+        organizationLogoUrl: null,
         googleBusinessProfileUrl: null,
         socialMediaLinks: null,
         diagramPrimaryColor: null,
@@ -96,6 +97,7 @@ export async function PATCH(request: NextRequest) {
       // Combined legacy + fallback string (computed below if sub-fields provided)
       'organizationAddress',
       'organizationCountryCode',
+      'organizationLogoUrl',
       'googleBusinessProfileUrl',
       'diagramPrimaryColor',
       'diagramSecondaryColor',

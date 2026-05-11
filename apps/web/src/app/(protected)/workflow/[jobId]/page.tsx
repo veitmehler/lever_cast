@@ -482,29 +482,27 @@ export default function WorkflowJobPage() {
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
   const [diagramSvgs, setDiagramSvgs] = useState<Record<string, string>>({})
 
-  // Live SSE state (overlays DB state while pipeline is running)
-  const [liveStatus, setLiveStatus] = useState<string | null>(null)
-  const [liveStep,   setLiveStep]   = useState<number | null>(null)
-
   useEffect(() => {
     setReviewPanelExpandedOverride(undefined)
     prevDisplayStatusForReviewRef.current = null
   }, [jobId])
 
+  // Collapse the review panel when job transitions from completed → approved/enriched/published
   useEffect(() => {
-    const displayStatusNow = liveStatus ?? job?.status ?? 'pending'
+    const status = job?.status ?? 'pending'
     const prev = prevDisplayStatusForReviewRef.current
-    prevDisplayStatusForReviewRef.current = displayStatusNow
-    if (
-      prev === 'completed' &&
-      ['approved', 'enriched', 'published'].includes(displayStatusNow)
-    ) {
+    prevDisplayStatusForReviewRef.current = status
+    if (prev === 'completed' && ['approved', 'enriched', 'published'].includes(status)) {
       setReviewPanelExpandedOverride(undefined)
     }
-  }, [job?.status, liveStatus])
+  }, [job?.status])
 
   const sseRef             = useRef<EventSource | null>(null)
   const reconnectTimerRef  = useRef<number | null>(null)
+  // Stable ref mirrors job state so onerror callbacks can read status without
+  // causing stale-closure or side-effect-in-state-updater issues.
+  const jobRef             = useRef<ArticleJob | null>(null)
+  useEffect(() => { jobRef.current = job ?? null }, [job])
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -576,12 +574,36 @@ export default function WorkflowJobPage() {
       try {
         const update: SSEUpdate = JSON.parse(e.data)
         if (update.type === 'update') {
-          if (update.status)                    setLiveStatus(update.status)
-          if (update.currentStep !== undefined) setLiveStep(update.currentStep)
-          // Keep pipelineSteps list in sync without waiting for a full fetchJob()
-          if (update.steps && update.steps.length > 0) {
-            setJob((prev) => prev ? { ...prev, pipelineSteps: update.steps! } : prev)
-          }
+          setJob((prev) => {
+            if (!prev) return prev
+
+            // Merge incoming steps: SSE omits `output` to keep payloads small,
+            // so we preserve the existing output field from fetchJob() data.
+            // This prevents the "No citations" bug caused by replacing the whole
+            // pipelineSteps array with output-less objects.
+            let mergedSteps = prev.pipelineSteps
+            if (update.steps && update.steps.length > 0) {
+              const freshMap = new Map(update.steps.map((s) => [s.stepNumber, s]))
+              mergedSteps = prev.pipelineSteps.map((existing) => {
+                const fresh = freshMap.get(existing.stepNumber)
+                // Spread fresh fields (status, completedAt, etc.) but restore output
+                return fresh ? { ...existing, ...fresh, output: existing.output } : existing
+              })
+              // Append any steps that don't yet exist in local state
+              for (const s of update.steps) {
+                if (!mergedSteps.find((e) => e.stepNumber === s.stepNumber)) {
+                  mergedSteps = [...mergedSteps, s]
+                }
+              }
+            }
+
+            return {
+              ...prev,
+              ...(update.status     !== undefined ? { status:      update.status }      : {}),
+              ...(update.currentStep !== undefined ? { currentStep: update.currentStep } : {}),
+              pipelineSteps: mergedSteps,
+            }
+          })
         } else if (update.type === 'done') {
           es.close()
           setIsApproving(false)
@@ -590,19 +612,17 @@ export default function WorkflowJobPage() {
       } catch { /* ignore */ }
     }
 
-    // On connection error, close this instance and schedule a reconnect so
-    // the UI never freezes mid-pipeline. The native EventSource auto-reconnect
-    // is disabled once we call close(), so we schedule it manually.
+    // On connection error, close this instance and schedule a reconnect.
+    // We use jobRef (a plain ref) rather than a state-updater to read the
+    // current job status — avoids the React anti-pattern of side effects
+    // inside state updater functions.
     es.onerror = () => {
       es.close()
       reconnectTimerRef.current = window.setTimeout(() => {
-        // Only reconnect if the job is still actively running
-        setJob((prev) => {
-          if (prev && (ACTIVE_STATUSES.has(prev.status) || ENRICHMENT_ACTIVE.has(prev.status))) {
-            startSSE()
-          }
-          return prev
-        })
+        const j = jobRef.current
+        if (j && (ACTIVE_STATUSES.has(j.status) || ENRICHMENT_ACTIVE.has(j.status))) {
+          startSSE()
+        }
       }, 3000)
     }
   }, [jobId, fetchJob])
@@ -622,14 +642,12 @@ export default function WorkflowJobPage() {
     }
   }, [job?.id, job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Lightweight fallback poll: re-fetch the full job every 8 s while Phase A is
-  // running. SSE handles step-level updates in real time; this poll ensures the
-  // final completed state (and any fields SSE doesn't carry) is reflected without
-  // the user needing to manually reload.
+  // Fallback poll every 3 s while Phase A is running. SSE is the primary real-time
+  // channel; this poll ensures the UI recovers quickly if SSE is temporarily down.
   useEffect(() => {
     const status = job?.status
     if (!status || !ACTIVE_STATUSES.has(status)) return
-    const id = setInterval(fetchJob, 8000)
+    const id = setInterval(fetchJob, 3000)
     return () => clearInterval(id)
   }, [job?.status, fetchJob])
 
@@ -641,7 +659,6 @@ export default function WorkflowJobPage() {
       const res = await fetch(`/api/articles/${jobId}/resume`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to resume')
       toast.success('Pipeline resumed')
-      setLiveStatus(null); setLiveStep(null)
       await fetchJob()
     } catch {
       toast.error('Failed to resume pipeline')
@@ -697,7 +714,6 @@ export default function WorkflowJobPage() {
         throw new Error(data.error ?? 'Failed to re-enrich')
       }
       toast.success('Re-enrichment started — generating diagrams…')
-      setLiveStatus(null); setLiveStep(null)
       await fetchJob()
       startSSE()
     } catch (err) {
@@ -716,7 +732,6 @@ export default function WorkflowJobPage() {
         throw new Error(data.error ?? 'Failed to start rewrite')
       }
       toast.success('Rewrite started — re-running fact research and writing…')
-      setLiveStatus(null); setLiveStep(null)
       await fetchJob()
       startSSE()
     } catch (err) {
@@ -745,7 +760,6 @@ export default function WorkflowJobPage() {
 
   const handleApprove = async () => {
     setIsApproving(true)
-    setLiveStatus(null); setLiveStep(null)
     try {
       const res = await fetch(`/api/articles/${jobId}/approve`, { method: 'POST' })
       if (!res.ok) {
@@ -798,8 +812,8 @@ export default function WorkflowJobPage() {
 
   // ── Derived values ─────────────────────────────────────────────────────────
 
-  const displayStatus = liveStatus ?? job?.status ?? 'pending'
-  const displayStep   = liveStep   ?? job?.currentStep ?? 0
+  const displayStatus = job?.status ?? 'pending'
+  const displayStep   = job?.currentStep ?? 0
 
   const isGenerating = ACTIVE_STATUSES.has(displayStatus)
   const isEnriching  = displayStatus === 'approved' && !isApproving

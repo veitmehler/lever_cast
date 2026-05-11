@@ -116,11 +116,26 @@ export async function articleRoutes(app: FastifyInstance) {
 
     // Attach CDN URLs to diagrams so the frontend doesn't need to know the CDN base
     const cdnBase = (process.env.CDN_BASE ?? '').replace(/\/$/, '')
+
+    // Belt-and-suspenders: if sitePage.citations hasn't been written yet by the
+    // approval flow, derive it from the step 12 output so the "Review Content"
+    // copy/paste area always has citations available pre-approval.
+    let sitePageCitations = job.sitePage?.citations ?? null
+    if (!sitePageCitations) {
+      const step12 = job.pipelineSteps.find(
+        (s) => s.stepNumber === 12 && s.status === 'completed' && s.output,
+      )
+      if (step12?.output) {
+        try { sitePageCitations = JSON.parse(step12.output) } catch { /* ignore */ }
+      }
+    }
+
     const enrichedJob = {
       ...job,
       sitePage: job.sitePage
         ? {
             ...job.sitePage,
+            citations: sitePageCitations,
             diagrams: (job.sitePage.diagrams ?? []).map((d) => ({
               ...d,
               cdnUrl: d.pngS3Key ? `${cdnBase}/${d.pngS3Key}` : null,

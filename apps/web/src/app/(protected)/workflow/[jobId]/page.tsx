@@ -129,6 +129,12 @@ type BrandSettings = {
   ourExperience?: string | null
 }
 
+type WpConnectionLite = {
+  id: string
+  label: string
+  siteUrl: string
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -484,6 +490,14 @@ export default function WorkflowJobPage() {
   const [showFinalArticleReview, setShowFinalArticleReview] = useState(true)
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
   const [diagramSvgs, setDiagramSvgs] = useState<Record<string, string>>({})
+  const [wpConnections, setWpConnections] = useState<WpConnectionLite[]>([])
+
+  useEffect(() => {
+    void fetch('/api/wp/connections')
+      .then((r) => r.json())
+      .then((d) => setWpConnections((d.connections ?? []) as WpConnectionLite[]))
+      .catch(() => setWpConnections([]))
+  }, [])
 
   useEffect(() => {
     setReviewPanelExpandedOverride(undefined)
@@ -762,7 +776,10 @@ export default function WorkflowJobPage() {
     }
   }
 
-  const handlePublish = async () => {
+  const handlePublish = async (
+    autoExportTarget?: string,
+    exportConfig?: Record<string, unknown>,
+  ) => {
     setIsPublishing(true)
     try {
       const res = await fetch(`/api/articles/${jobId}/publish`, { method: 'POST' })
@@ -770,12 +787,31 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to publish')
       }
-      toast.success('Article published — export options are now available.')
+      toast.success('Article published!')
       await fetchJob()
+      if (autoExportTarget) {
+        await handleExport(autoExportTarget, exportConfig ?? {})
+      }
+      await fetchAttempts()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to publish')
     } finally {
       setIsPublishing(false)
+    }
+  }
+
+  const handleCopySubstack = async () => {
+    if (!job?.sitePage) return
+    const sp = job.sitePage
+    const bodySource = sp.bodyHtml ?? ''
+    const md = htmlToMarkdown(bodySource)
+    const title = sp.seoTitle ?? sp.title ?? ''
+    const text = `# ${title}\n\n${md}`
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Article copied as Markdown — paste into Substack editor')
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
     }
   }
 
@@ -875,6 +911,8 @@ export default function WorkflowJobPage() {
     displayStatus === 'completed' && (isApproving || displayStep >= 13)
   const statusForBadge      = phaseBApprovalRunning ? 'approved' : displayStatus
   const hasCitations = resolveCitations(sitePage, job.pipelineSteps).length > 0
+  const hasWpConnection = wpConnections.length > 0
+  const primaryWpConnectionId = wpConnections[0]?.id
 
   return (
     <div className="min-h-screen bg-background">
@@ -1323,12 +1361,17 @@ export default function WorkflowJobPage() {
                   {displayStatus === 'enriched' && (
                     <Button
                       size="default"
-                      onClick={() => void handlePublish()}
+                      variant="ghost"
+                      onClick={() =>
+                        void (hasWpConnection && primaryWpConnectionId
+                          ? handlePublish('wordpress', { connectionId: primaryWpConnectionId })
+                          : handlePublish())
+                      }
                       disabled={isPublishing}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-md"
+                      className="!bg-emerald-600 hover:!bg-emerald-700 !text-white gap-1.5 shadow-md disabled:!opacity-50"
                     >
                       {isPublishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Publish
+                      {hasWpConnection ? 'Publish to WordPress' : 'Publish'}
                     </Button>
                   )}
                 </div>
@@ -1348,34 +1391,40 @@ export default function WorkflowJobPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                size="sm" variant="outline"
-                onClick={() => handleExport('html')}
-                disabled={exportingTarget === 'html'}
-              >
-                {exportingTarget === 'html'
-                  ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  : <Globe className="h-4 w-4 mr-1.5" />}
-                Download HTML
-              </Button>
+              {!hasWpConnection && (
+                <>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={() => void handleExport('html')}
+                    disabled={exportingTarget === 'html'}
+                  >
+                    {exportingTarget === 'html'
+                      ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      : <Globe className="h-4 w-4 mr-1.5" />}
+                    Download HTML
+                  </Button>
 
-              <Button
-                size="sm" variant="outline"
-                onClick={() => handleExport('bundle')}
-                disabled={exportingTarget === 'bundle'}
-              >
-                {exportingTarget === 'bundle'
-                  ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  : <Package className="h-4 w-4 mr-1.5" />}
-                Download Bundle (.zip)
-              </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={() => void handleExport('bundle')}
+                    disabled={exportingTarget === 'bundle'}
+                  >
+                    {exportingTarget === 'bundle'
+                      ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      : <Package className="h-4 w-4 mr-1.5" />}
+                    Download Bundle (.zip)
+                  </Button>
 
-              <Link href="/settings/wordpress">
-                <Button size="sm" variant="outline">
-                  <FileText className="h-4 w-4 mr-1.5" />
-                  Publish to WordPress
-                </Button>
-              </Link>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleCopySubstack()}
+                  >
+                    <ClipboardCopy className="h-4 w-4 mr-1.5" />
+                    Copy for Substack
+                  </Button>
+                </>
+              )}
 
               {sitePage?.excerpt && (
                 <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>

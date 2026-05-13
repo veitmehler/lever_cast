@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus, Upload, Building2 } from 'lucide-react'
+import Link from 'next/link'
+import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus, Upload, Building2, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
@@ -1534,6 +1535,19 @@ export default function SettingsPage() {
               )}
             </Button>
           </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">WordPress</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Connect a WordPress site to publish articles directly from the workflow.
+          </p>
+          <Button variant="outline" asChild>
+            <Link href="/settings/wordpress" className="inline-flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Manage WordPress connections
+            </Link>
+          </Button>
         </div>
 
         {/* Connected Accounts */}

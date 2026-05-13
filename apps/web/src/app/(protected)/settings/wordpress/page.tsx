@@ -17,7 +17,16 @@ type WpConnection = {
   defaultAuthorId?: number | null
   lastVerifiedAt?: string | null
   lastError?: string | null
+  seoPlugin?: string | null
   createdAt: string
+}
+
+const SEO_PLUGIN_LABELS: Record<string, string> = {
+  yoast:            'Yoast SEO',
+  rankmath:         'Rank Math',
+  aioseo:           'All in One SEO',
+  seopress:         'SEOPress',
+  theseoframework:  'The SEO Framework',
 }
 
 type WpOption = { id: number; name: string }
@@ -155,6 +164,13 @@ function ConnectionCard({
           <p className="mt-1 text-xs text-muted-foreground">
             User: <span className="font-mono text-foreground">{conn.username}</span> &bull; Default status:{' '}
             <span className="capitalize">{conn.defaultStatus}</span>
+            {conn.lastVerifiedAt && (
+              <> &bull; SEO plugin:{' '}
+                <span className="text-foreground">
+                  {conn.seoPlugin ? (SEO_PLUGIN_LABELS[conn.seoPlugin] ?? conn.seoPlugin) : 'None detected'}
+                </span>
+              </>
+            )}
           </p>
           {conn.lastError && (
             <p className="mt-1 truncate text-xs text-red-600 dark:text-red-400">{conn.lastError}</p>

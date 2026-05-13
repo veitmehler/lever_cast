@@ -3,6 +3,42 @@ import { decrypt } from '../../lib/encryption'
 import { logger } from '../../lib/logger'
 import type { OutputPayload, OutputTarget, OutputAttemptResult } from './types'
 
+// ── SEO plugin meta key mappings ──────────────────────────────────────────
+
+type SeoMetaKeys = {
+  title: string
+  description: string
+  focusKeyword?: string
+}
+
+const SEO_META_KEYS: Record<string, SeoMetaKeys> = {
+  yoast: {
+    title:        '_yoast_wpseo_title',
+    description:  '_yoast_wpseo_metadesc',
+    focusKeyword: '_yoast_wpseo_focuskw',
+  },
+  rankmath: {
+    title:        'rank_math_title',
+    description:  'rank_math_description',
+    focusKeyword: 'rank_math_focus_keyword',
+  },
+  aioseo: {
+    title:        '_aioseo_title',
+    description:  '_aioseo_description',
+    focusKeyword: '_aioseo_keywords',
+  },
+  seopress: {
+    title:        '_seopress_titles_title',
+    description:  '_seopress_titles_desc',
+    focusKeyword: '_seopress_analysis_target_kw',
+  },
+  theseoframework: {
+    title:       '_genesis_title',
+    description: '_genesis_description',
+    // The SEO Framework has no focus keyword field
+  },
+}
+
 // ── WordPress API helpers ──────────────────────────────────────────────────
 
 function basicAuthHeader(username: string, password: string): string {
@@ -106,6 +142,11 @@ export class WordPressTarget implements OutputTarget {
 
     const conn = await prisma.wordPressConnection.findFirstOrThrow({
       where: { id: connectionId, userId: payload.userId },
+      select: {
+        id: true, username: true, appPassword: true, siteUrl: true,
+        defaultStatus: true, defaultCategoryId: true, defaultAuthorId: true,
+        seoPlugin: true,
+      },
     })
 
     const topicCategory = await prisma.articleJob
@@ -171,6 +212,15 @@ export class WordPressTarget implements OutputTarget {
           : []
     const author = authorId ?? conn.defaultAuthorId ?? undefined
 
+    const seoKeys = conn.seoPlugin ? SEO_META_KEYS[conn.seoPlugin] : undefined
+    const seoMeta = seoKeys
+      ? {
+          [seoKeys.title]: payload.seoTitle,
+          [seoKeys.description]: payload.seoDescription,
+          ...(seoKeys.focusKeyword ? { [seoKeys.focusKeyword]: payload.primaryKeyword } : {}),
+        }
+      : undefined
+
     const postBody: Record<string, unknown> = {
       title: payload.title,
       slug: payload.slug,
@@ -180,11 +230,7 @@ export class WordPressTarget implements OutputTarget {
       ...(categories.length > 0 ? { categories } : {}),
       ...(author ? { author } : {}),
       ...(featuredMediaId ? { featured_media: featuredMediaId } : {}),
-      meta: {
-        _yoast_wpseo_title: payload.seoTitle,
-        _yoast_wpseo_metadesc: payload.seoDescription,
-        _yoast_wpseo_focuskw: payload.primaryKeyword,
-      },
+      ...(seoMeta ? { meta: seoMeta } : {}),
     }
 
     const { status: wpStatus, data: post } = await wpFetch(

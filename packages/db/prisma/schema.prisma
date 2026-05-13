@@ -264,6 +264,7 @@ model WordPressConnection {
   defaultCategoryId Int?
   lastVerifiedAt  DateTime?
   lastError       String?
+  seoPlugin       String?   // yoast | rankmath | aioseo | seopress | theseoframework
   topics          Topic[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

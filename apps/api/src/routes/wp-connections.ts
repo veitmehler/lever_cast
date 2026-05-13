@@ -9,12 +9,53 @@ function basicAuthHeader(username: string, password: string): string {
   return 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
 }
 
+// Ordered by priority — first match wins when multiple plugins are active.
+const SEO_PLUGIN_NAMESPACES: Array<{ slug: string; namespace: string }> = [
+  { slug: 'yoast',            namespace: 'yoast/v1' },
+  { slug: 'rankmath',         namespace: 'rankmath/v1' },
+  { slug: 'aioseo',           namespace: 'aioseo/v1' },
+  { slug: 'seopress',         namespace: 'seopress/v1' },
+  { slug: 'theseoframework',  namespace: 'the-seo-framework/v1' },
+]
+
+/**
+ * Probe each known SEO plugin's REST namespace with a HEAD request.
+ * 2xx or 401 both mean the namespace is registered (plugin active).
+ * 404 means the plugin is not installed.
+ * Returns the first matched slug in priority order, or null.
+ */
+async function detectSeoPlugin(siteUrl: string, auth: string): Promise<string | null> {
+  const base = siteUrl.replace(/\/$/, '')
+  const results = await Promise.allSettled(
+    SEO_PLUGIN_NAMESPACES.map(({ namespace }) =>
+      fetch(`${base}/wp-json/${namespace}`, {
+        method: 'HEAD',
+        headers: { Authorization: auth },
+      }).then((r) => r.status),
+    ),
+  )
+
+  for (let i = 0; i < SEO_PLUGIN_NAMESPACES.length; i++) {
+    const result = results[i]
+    if (result.status === 'fulfilled') {
+      const status = result.value
+      // 2xx or 401 (namespace exists but auth required) means plugin is active
+      if (status < 500 && status !== 404) {
+        return SEO_PLUGIN_NAMESPACES[i].slug
+      }
+    }
+  }
+
+  return null
+}
+
 async function verifyConnection(
   siteUrl: string,
   auth: string,
 ): Promise<{
   ok: boolean
   error?: string
+  seoPlugin?: string | null
   categories?: Array<{ id: number; name: string; slug: string }>
   authors?: Array<{ id: number; name: string }>
 }> {
@@ -29,28 +70,30 @@ async function verifyConnection(
       return { ok: false, error: body.message ?? `HTTP ${meRes.status}` }
     }
 
-    // Load categories
-    const catRes = await fetch(`${base}/wp-json/wp/v2/categories?per_page=100`, {
-      headers: { Authorization: auth },
-    })
+    // Run categories, authors, and SEO plugin detection in parallel
+    const [catRes, usersRes, seoPlugin] = await Promise.all([
+      fetch(`${base}/wp-json/wp/v2/categories?per_page=100`, {
+        headers: { Authorization: auth },
+      }),
+      fetch(`${base}/wp-json/wp/v2/users?roles=author,editor,administrator&per_page=100`, {
+        headers: { Authorization: auth },
+      }),
+      detectSeoPlugin(siteUrl, auth),
+    ])
+
     const categories = catRes.ok
       ? ((await catRes.json()) as Array<{ id: number; name: string; slug: string }>).map(
           (c) => ({ id: c.id, name: c.name, slug: c.slug }),
         )
       : []
 
-    // Load authors (users with relevant roles)
-    const usersRes = await fetch(
-      `${base}/wp-json/wp/v2/users?roles=author,editor,administrator&per_page=100`,
-      { headers: { Authorization: auth } },
-    )
     const authors = usersRes.ok
       ? ((await usersRes.json()) as Array<{ id: number; name: string }>).map(
           (u) => ({ id: u.id, name: u.name }),
         )
       : []
 
-    return { ok: true, categories, authors }
+    return { ok: true, seoPlugin, categories, authors }
   } catch (err) {
     return { ok: false, error: `Network error: ${err instanceof Error ? err.message : String(err)}` }
   }
@@ -93,7 +136,8 @@ export async function wpConnectionRoutes(app: FastifyInstance) {
       select: {
         id: true, label: true, siteUrl: true, username: true,
         defaultStatus: true, defaultCategoryId: true, defaultAuthorId: true,
-        lastVerifiedAt: true, lastError: true, createdAt: true, updatedAt: true,
+        lastVerifiedAt: true, lastError: true, seoPlugin: true,
+        createdAt: true, updatedAt: true,
       },
     })
     return reply.send({ connections })
@@ -135,11 +179,13 @@ export async function wpConnectionRoutes(app: FastifyInstance) {
         defaultAuthorId: defaultAuthorId ?? null,
         lastVerifiedAt: new Date(),
         lastError: null,
+        seoPlugin: verification.seoPlugin ?? null,
       },
       select: {
         id: true, label: true, siteUrl: true, username: true,
         defaultStatus: true, defaultCategoryId: true, defaultAuthorId: true,
-        lastVerifiedAt: true, lastError: true, createdAt: true, updatedAt: true,
+        lastVerifiedAt: true, lastError: true, seoPlugin: true,
+        createdAt: true, updatedAt: true,
       },
     })
 
@@ -171,6 +217,7 @@ export async function wpConnectionRoutes(app: FastifyInstance) {
       data: {
         lastVerifiedAt: result.ok ? new Date() : undefined,
         lastError: result.ok ? null : (result.error ?? 'Verification failed'),
+        ...(result.ok ? { seoPlugin: result.seoPlugin ?? null } : {}),
       },
     })
 
@@ -209,7 +256,8 @@ export async function wpConnectionRoutes(app: FastifyInstance) {
       select: {
         id: true, label: true, siteUrl: true, username: true,
         defaultStatus: true, defaultCategoryId: true, defaultAuthorId: true,
-        lastVerifiedAt: true, lastError: true, createdAt: true, updatedAt: true,
+        lastVerifiedAt: true, lastError: true, seoPlugin: true,
+        createdAt: true, updatedAt: true,
       },
     })
 

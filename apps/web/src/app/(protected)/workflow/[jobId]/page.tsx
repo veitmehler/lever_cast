@@ -7,7 +7,7 @@ import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Search, Tag, BookOpen, RefreshCw,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2,
+  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -145,6 +145,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 const ACTIVE_STATUSES = new Set(['pending', 'in_progress'])
 // Enrichment is running when approved (diagrams being generated in background)
 const ENRICHMENT_ACTIVE = new Set(['approved'])
+// Phase B approval steps (in execution order)
+const APPROVAL_STEPS = [13, 15, 16, 17, 18] as const
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -651,6 +653,15 @@ export default function WorkflowJobPage() {
     return () => clearInterval(id)
   }, [job?.status, fetchJob])
 
+  // Fallback poll during Phase B (approval chain). The job status stays 'completed'
+  // throughout Phase B so the Phase A poll above won't run, but we still need
+  // currentStep updates to drive the approval stepper.
+  useEffect(() => {
+    if (!isApproving) return
+    const id = setInterval(fetchJob, 3000)
+    return () => clearInterval(id)
+  }, [isApproving, fetchJob])
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleResume = async () => {
@@ -867,13 +878,11 @@ export default function WorkflowJobPage() {
             </div>
           </div>
 
-          {/* Progress bar (generation or approval in progress) */}
-          {(isGenerating || isApproving) && (
+          {/* Progress bar — Phase A (steps 1-12) */}
+          {isGenerating && (
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-muted-foreground">
-                  {isApproving ? 'Running approval chain…' : `Step ${displayStep} of 12`}
-                </span>
+                <span className="text-sm text-muted-foreground">{`Step ${displayStep} of 12`}</span>
                 <span className="text-sm text-muted-foreground">{progressPct}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-muted">
@@ -881,6 +890,34 @@ export default function WorkflowJobPage() {
                   className="h-2 rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${progressPct}%` }}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Approval stepper — Phase B (steps 13-18) */}
+          {(isApproving || (displayStep >= 13 && displayStep <= 18)) && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground">Approval:</span>
+                {APPROVAL_STEPS.map((step) => {
+                  const done   = displayStep > step
+                  const active = displayStep === step
+                  return (
+                    <span
+                      key={step}
+                      className={[
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        done   ? 'bg-green-500/20 text-green-400' :
+                        active ? 'bg-blue-500/20 text-blue-400' :
+                                 'bg-muted text-muted-foreground opacity-50',
+                      ].join(' ')}
+                    >
+                      {active && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {done   && <Check   className="h-3 w-3" />}
+                      Step {step}
+                    </span>
+                  )
+                })}
               </div>
             </div>
           )}

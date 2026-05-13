@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma'
 import { decrypt } from '../../lib/encryption'
 import { logger } from '../../lib/logger'
+import { selectWordPressCategory } from '../enrichment/wp-category-selector'
+import { selectWordPressTags } from '../enrichment/wp-tag-selector'
 import type { OutputPayload, OutputTarget, OutputAttemptResult } from './types'
 
 // ── SEO plugin meta key mappings ──────────────────────────────────────────
@@ -149,19 +151,62 @@ export class WordPressTarget implements OutputTarget {
       },
     })
 
-    const topicPublishing = await prisma.articleJob
-      .findFirst({
-        where: { id: payload.jobId },
-        select: { topic: { select: { wpCategoryId: true, wpTagIds: true } } },
-      })
-      .then((r) => r?.topic)
-
-    const topicCategory = topicPublishing?.wpCategoryId ?? null
-    const topicTags = topicPublishing?.wpTagIds ?? []
-
     const plainPassword = decrypt(conn.appPassword)
     const auth = basicAuthHeader(conn.username, plainPassword)
     const siteUrl = conn.siteUrl
+
+    // Resolve topic row for category/tag IDs — select at publish time if not already set
+    const jobRow = await prisma.articleJob.findFirst({
+      where: { id: payload.jobId },
+      select: { topicId: true, topic: { select: { id: true, topic: true, wpCategoryId: true, wpTagIds: true } } },
+    })
+    const topicRow = jobRow?.topic ?? null
+    let topicCategory = topicRow?.wpCategoryId ?? null
+    let topicTags = topicRow?.wpTagIds ?? []
+
+    const sitePage = await prisma.sitePage.findUnique({
+      where: { jobId: payload.jobId },
+      select: { title: true },
+    })
+    const articleTitle = sitePage?.title ?? topicRow?.topic ?? payload.title
+
+    if (topicRow && topicCategory == null && !categoryId) {
+      try {
+        const cat = await selectWordPressCategory({
+          topic: topicRow.topic,
+          title: articleTitle,
+          siteUrl,
+          authHeader: auth,
+          jobId: payload.jobId,
+        })
+        if (cat.categoryId != null) {
+          await prisma.topic.update({ where: { id: topicRow.id }, data: { wpCategoryId: cat.categoryId } })
+          topicCategory = cat.categoryId
+          logger.info({ jobId: payload.jobId, categoryId: cat.categoryId }, '[wordpress] publish-time category selected')
+        }
+      } catch (err) {
+        logger.warn({ jobId: payload.jobId, err }, '[wordpress] publish-time category selection failed — skipping')
+      }
+    }
+
+    if (topicRow && topicTags.length === 0) {
+      try {
+        const sel = await selectWordPressTags({
+          topic: topicRow.topic,
+          title: articleTitle,
+          siteUrl,
+          authHeader: auth,
+          jobId: payload.jobId,
+        })
+        if (sel.tagIds.length > 0) {
+          await prisma.topic.update({ where: { id: topicRow.id }, data: { wpTagIds: sel.tagIds } })
+          topicTags = sel.tagIds
+          logger.info({ jobId: payload.jobId, tagIds: sel.tagIds }, '[wordpress] publish-time tags selected')
+        }
+      } catch (err) {
+        logger.warn({ jobId: payload.jobId, err }, '[wordpress] publish-time tag selection failed — skipping')
+      }
+    }
 
     // 1. Upload featured image to WP media library
     let featuredMediaId: number | undefined

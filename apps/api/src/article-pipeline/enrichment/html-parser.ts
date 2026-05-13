@@ -67,8 +67,19 @@ export function extractH2Sections(bodyHtml: string): H2Section[] {
 }
 
 /**
- * Rebuild bodyHtml with diagram figures inserted after each <h2> opening block
- * (immediately after </h2>).
+ * GEO sections place `<div class="geo-summary">` immediately after the question `</h2>`.
+ * Diagrams must appear after that summary, not between `</h2>` and the summary.
+ */
+function advancePastGeoSummary(html: string, offset: number): number {
+  const tail = html.slice(offset)
+  const m =
+    /^(\s*<div[^>]*class="[^"]*geo-summary[^"]*"[^>]*>[\s\S]*?<\/div>)/i.exec(tail)
+  return m ? offset + m[1].length : offset
+}
+
+/**
+ * Rebuild bodyHtml with diagram figures inserted after each section's GEO summary
+ * (when present), else immediately after each `</h2>`.
  */
 export function buildEnrichedHtml(
   bodyHtml: string,
@@ -77,12 +88,9 @@ export function buildEnrichedHtml(
   const sorted = [...diagrams].sort((a, b) => b.afterH2Offset - a.afterH2Offset)
   let result = bodyHtml
   for (const { afterH2Offset, figureHtml } of sorted) {
+    const insertAt = advancePastGeoSummary(result, afterH2Offset)
     result =
-      result.slice(0, afterH2Offset) +
-      '\n' +
-      figureHtml +
-      '\n' +
-      result.slice(afterH2Offset)
+      result.slice(0, insertAt) + '\n' + figureHtml + '\n' + result.slice(insertAt)
   }
   return result
 }

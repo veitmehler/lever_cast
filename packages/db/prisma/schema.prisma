@@ -294,6 +294,7 @@ model Topic {
   realCaseStudies            String?  @db.Text // per-article real anecdotes or case studies (optional)
   outlineFrameworkSource     String?           // diagnostic: 'user' | 'csv' | 'llm_assigned'
   wpCategoryId               Int?              // AI-selected WP category when site linked
+  wpTagIds                   Int[]             @default([]) // AI-selected WP tag IDs when site linked
   articleJobs                ArticleJob[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt

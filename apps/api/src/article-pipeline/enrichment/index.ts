@@ -5,6 +5,7 @@
  * 2) Key takeaways + collapsible TOC (after intro, before first content H2)
  * 3) Mermaid diagrams per content H2 (runs on body after intro split — skips takeaways)
  * 4) Optional WP category when topic has wordPressConnectionId
+ * 5) Optional WP tags (up to 4) when topic has wordPressConnectionId
  */
 
 import { prisma } from '../../lib/prisma'
@@ -37,6 +38,7 @@ import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restruct
 import { generateKeyTakeaways } from './key-takeaways-generator'
 import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
+import { selectWordPressTags } from './wp-tag-selector'
 import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
 
 const CDN_BASE = process.env.CDN_BASE ?? ''
@@ -341,6 +343,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
       bodyWithIds
     await finishEnrichment(jobId, sitePage.id, mergedPlain, keyTakeawaysHtml, tocHtml, totalCost, totalInputTokens, totalOutputTokens)
     await maybeWpCategory(jobId)
+    await maybeWpTags(jobId)
     return
   }
 
@@ -612,6 +615,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   )
 
   await maybeWpCategory(jobId)
+  await maybeWpTags(jobId)
 }
 
 async function maybeWpCategory(jobId: string): Promise<void> {
@@ -664,6 +668,58 @@ async function maybeWpCategory(jobId: string): Promise<void> {
     }
   } catch (err) {
     logger.warn({ jobId, err }, '[enrichment] WP category selection failed')
+  }
+}
+
+async function maybeWpTags(jobId: string): Promise<void> {
+  try {
+    const job = await prisma.articleJob.findUnique({
+      where: { id: jobId },
+      select: { userId: true, topicId: true },
+    })
+    if (!job) return
+
+    const topicRow = await prisma.topic.findUnique({
+      where: { id: job.topicId },
+      select: { id: true, topic: true, wordPressConnectionId: true },
+    })
+    if (!topicRow?.wordPressConnectionId) return
+
+    const conn = await prisma.wordPressConnection.findFirst({
+      where: { id: topicRow.wordPressConnectionId, userId: job.userId },
+    })
+    if (!conn) return
+
+    const sp = await prisma.sitePage.findUnique({
+      where: { jobId },
+      select: { title: true },
+    })
+
+    const plain = decrypt(conn.appPassword)
+    const auth = 'Basic ' + Buffer.from(`${conn.username}:${plain}`).toString('base64')
+
+    const sel = await selectWordPressTags({
+      topic: topicRow.topic,
+      title: sp?.title ?? topicRow.topic,
+      siteUrl: conn.siteUrl,
+      authHeader: auth,
+      jobId,
+    })
+
+    await prisma.topic.update({
+      where: { id: topicRow.id },
+      data: { wpTagIds: sel.tagIds },
+    })
+
+    await prisma.articleJob.update({
+      where: { id: jobId },
+      data: {
+        totalCost: { increment: sel.cost },
+        totalTokens: { increment: sel.inputTokens + sel.outputTokens },
+      },
+    })
+  } catch (err) {
+    logger.warn({ jobId, err }, '[enrichment] WP tag selection failed')
   }
 }
 

@@ -406,7 +406,7 @@ If the section is purely narrative or doesn't benefit from a visual, output exac
   },
 ]
 
-// ── GEO / Phase C expansion (Steps 101–104, 107–108) ─────────────────────────
+// ── GEO / Phase C expansion (Steps 101–104, 107–109) ─────────────────────────
 const GEO_ENRICHMENT_TEMPLATES = [
   {
     stepNumber: 101,
@@ -536,6 +536,27 @@ Rules:
 - Select exactly ONE category from the list.
 - Respond with ONLY the category ID as a number — nothing else.
 - If no category is a good fit, respond with the ID of the most general/default category.`,
+  },
+  {
+    stepNumber: 109,
+    stepName: 'enrichment_wp_tags',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    systemPrompt:
+      'You are a content tagging expert. Given an article topic and a list of WordPress tags, select the most applicable tags.',
+    userPrompt: `Select the most applicable WordPress tags for this article.
+
+Article topic: {{topic}}
+Article title: {{title}}
+
+Available tags (JSON):
+{{tags}}
+
+Rules:
+- Select UP TO 4 tags from the list.
+- Respond with ONLY a JSON array of tag IDs, e.g. [12, 47, 83].
+- If fewer than 4 tags are relevant, return only the relevant ones.
+- If no tags apply, return an empty array: []`,
   },
 ]
 

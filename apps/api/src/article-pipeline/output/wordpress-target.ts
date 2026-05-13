@@ -149,12 +149,15 @@ export class WordPressTarget implements OutputTarget {
       },
     })
 
-    const topicCategory = await prisma.articleJob
+    const topicPublishing = await prisma.articleJob
       .findFirst({
         where: { id: payload.jobId },
-        select: { topic: { select: { wpCategoryId: true } } },
+        select: { topic: { select: { wpCategoryId: true, wpTagIds: true } } },
       })
-      .then((r) => r?.topic?.wpCategoryId)
+      .then((r) => r?.topic)
+
+    const topicCategory = topicPublishing?.wpCategoryId ?? null
+    const topicTags = topicPublishing?.wpTagIds ?? []
 
     const plainPassword = decrypt(conn.appPassword)
     const auth = basicAuthHeader(conn.username, plainPassword)
@@ -228,6 +231,7 @@ export class WordPressTarget implements OutputTarget {
       excerpt: payload.excerpt,
       status: postStatus,
       ...(categories.length > 0 ? { categories } : {}),
+      ...(topicTags.length > 0 ? { tags: topicTags } : {}),
       ...(author ? { author } : {}),
       ...(featuredMediaId ? { featured_media: featuredMediaId } : {}),
       ...(seoMeta ? { meta: seoMeta } : {}),

@@ -135,7 +135,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   pending:     { label: 'Pending',          color: 'text-muted-foreground',                                                bg: 'bg-muted' },
   in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',     bg: 'bg-blue-50 dark:bg-blue-900/40' },
   completed:   { label: 'Needs Approval',   color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-900/40' },
-  approved:    { label: 'Processing…',      color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
+  approved:    { label: 'Processing', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
   enriched:    { label: 'Ready to Publish',  color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-50 dark:bg-green-900/40' },
   published:   { label: 'Published',        color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/40' },
   failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',       bg: 'bg-red-50 dark:bg-red-900/40' },
@@ -443,11 +443,11 @@ function formatSchemaJsonDisplay(raw: string | null | undefined): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, busy }: { status: string; busy?: boolean }) {
   const { label, color, bg } = STATUS_LABELS[status] ?? {
     label: status, color: 'text-muted-foreground', bg: 'bg-muted',
   }
-  const isActive = ACTIVE_STATUSES.has(status)
+  const isActive = busy === true ? true : ACTIVE_STATUSES.has(status)
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${color} ${bg}`}>
       {isActive && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -870,6 +870,10 @@ export default function WorkflowJobPage() {
     || isApproving
     || enrichmentPhaseRunning
     || (displayStep >= 13 && displayStep < TOTAL_PIPELINE_STEPS)
+  /** Phase B persists DB status `completed` — badge should match Processing like post-approve. */
+  const phaseBApprovalRunning =
+    displayStatus === 'completed' && (isApproving || displayStep >= 13)
+  const statusForBadge      = phaseBApprovalRunning ? 'approved' : displayStatus
   const hasCitations = resolveCitations(sitePage, job.pipelineSteps).length > 0
 
   return (
@@ -896,7 +900,7 @@ export default function WorkflowJobPage() {
                 </span>
               </div>
               <h1 className="text-xl font-bold text-card-foreground mb-2">{job.topic.topic}</h1>
-              <StatusBadge status={displayStatus} />
+              <StatusBadge status={statusForBadge} busy={phaseBApprovalRunning} />
             </div>
           </div>
 
@@ -922,7 +926,7 @@ export default function WorkflowJobPage() {
             {isEnriching && (
               <Button disabled className="bg-indigo-600 text-white opacity-75">
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Processing…
+                Processing
               </Button>
             )}
 

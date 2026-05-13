@@ -53,6 +53,15 @@ function getCdnUrl(s3Key: string): string {
   return `${CDN_BASE.replace(/\/$/, '')}/${s3Key}`
 }
 
+/** Phase C milestones → ArticleJob.currentStep (SSE + workflow UI). Not PromptTemplate IDs.
+ * 19 GEO · 20 key takeaways+TOC · 21 diagrams · 22 merge figures · 23 save (.finish sets 25).
+ */
+async function setEnrichmentPhaseStep(jobId: string, phaseStep: number): Promise<void> {
+  await prisma.articleJob.update({
+    where: { id: jobId },
+    data: { currentStep: phaseStep },
+  })
+}
 
 export async function runArticleEnrichment(jobId: string): Promise<void> {
   logger.info({ jobId }, '[enrichment] starting')
@@ -98,6 +107,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   await deleteS3Prefix(`articles/${job.userId}/${jobId}/diagrams/`).catch((err) =>
     logger.warn({ jobId, err }, '[enrichment] S3 diagram prefix delete failed — continuing'),
   )
+
+  await setEnrichmentPhaseStep(jobId, 19)
 
   const stepRows = await prisma.pipelineStep.findMany({
     where: { jobId, status: 'completed', stepNumber: { in: [2, 6] } },
@@ -289,6 +300,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     }
   }
 
+  await setEnrichmentPhaseStep(jobId, 20)
+
   const cut = findFirstH2Index(geoHtml)
   const intro = cut >= 0 ? geoHtml.slice(0, cut) : ''
   const bodyOnly = cut >= 0 ? geoHtml.slice(cut) : geoHtml
@@ -312,10 +325,15 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     logger.warn({ jobId, err }, '[enrichment] key takeaways / toc failed')
   }
 
+  await setEnrichmentPhaseStep(jobId, 21)
+
   const bodyWithIds = injectHeadingIds(bodyOnly)
   const sections = extractH2Sections(bodyWithIds)
 
   if (sections.length === 0) {
+    await setEnrichmentPhaseStep(jobId, 22)
+
+    await setEnrichmentPhaseStep(jobId, 23)
     const mergedPlain =
       intro +
       (keyTakeawaysHtml ?? '') +
@@ -571,12 +589,16 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     return
   }
 
+  await setEnrichmentPhaseStep(jobId, 22)
+
   const diagrammedBody = buildEnrichedHtml(bodyWithIds, figuresToInsert)
   const merged =
     intro +
     (keyTakeawaysHtml ?? '') +
     (tocHtml ?? '') +
     diagrammedBody
+
+  await setEnrichmentPhaseStep(jobId, 23)
 
   await finishEnrichment(
     jobId,
@@ -780,6 +802,7 @@ async function finishEnrichment(
       enrichedAt: new Date(),
       totalCost: { increment: cost },
       totalTokens: { increment: inputTokens + outputTokens },
+      currentStep: 25,
     },
   })
 

@@ -7,7 +7,7 @@ import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Search, Tag, BookOpen, RefreshCw,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2, Check,
+  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -135,7 +135,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   pending:     { label: 'Pending',          color: 'text-muted-foreground',                                                bg: 'bg-muted' },
   in_progress: { label: 'Generating…',      color: 'text-blue-700 dark:text-blue-300',     bg: 'bg-blue-50 dark:bg-blue-900/40' },
   completed:   { label: 'Needs Approval',   color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-900/40' },
-  approved:    { label: 'Adding Diagrams…', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
+  approved:    { label: 'Processing…',      color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-900/40' },
   enriched:    { label: 'Ready to Publish',  color: 'text-green-700 dark:text-green-300',  bg: 'bg-green-50 dark:bg-green-900/40' },
   published:   { label: 'Published',        color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-900/40' },
   failed:      { label: 'Failed',           color: 'text-red-700 dark:text-red-300',       bg: 'bg-red-50 dark:bg-red-900/40' },
@@ -143,10 +143,11 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 
 // Statuses where the pipeline is actively running (SSE should be open)
 const ACTIVE_STATUSES = new Set(['pending', 'in_progress'])
-// Enrichment is running when approved (diagrams being generated in background)
+// Job is in post-approval processing (SSE open while worker runs)
 const ENRICHMENT_ACTIVE = new Set(['approved'])
-// Phase B approval steps (in execution order)
-const APPROVAL_STEPS = [13, 15, 16, 17, 18] as const
+
+/** Max pipeline step for unified user-facing progress (internal step numbers). */
+const TOTAL_PIPELINE_STEPS = 25
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -662,6 +663,15 @@ export default function WorkflowJobPage() {
     return () => clearInterval(id)
   }, [isApproving, fetchJob])
 
+  // Fallback poll during Phase C (enrichment queued or running). Job status
+  // stays 'approved' while the worker updates currentStep 19–23.
+  useEffect(() => {
+    const enr = job?.sitePage?.enrichmentStatus
+    if (job?.status !== 'approved' || !enr || (enr !== 'pending' && enr !== 'in_progress')) return
+    const id = setInterval(fetchJob, 3000)
+    return () => clearInterval(id)
+  }, [job?.status, job?.sitePage?.enrichmentStatus, fetchJob])
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleResume = async () => {
@@ -724,7 +734,7 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to re-enrich')
       }
-      toast.success('Re-enrichment started — generating diagrams…')
+      toast.success('Processing started…')
       await fetchJob()
       startSSE()
     } catch (err) {
@@ -742,7 +752,7 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to start rewrite')
       }
-      toast.success('Rewrite started — re-running fact research and writing…')
+      toast.success('Rewrite started…')
       await fetchJob()
       startSSE()
     } catch (err) {
@@ -777,7 +787,7 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to start approval')
       }
-      toast.success('Approval started — generating SEO metadata, image and excerpt…')
+      toast.success('Processing started…')
       startSSE()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start approval')
@@ -828,7 +838,10 @@ export default function WorkflowJobPage() {
 
   const isGenerating = ACTIVE_STATUSES.has(displayStatus)
   const isEnriching  = displayStatus === 'approved' && !isApproving
-  const progressPct  = Math.min(100, Math.round((displayStep / 12) * 100))
+  const progressPct = Math.min(
+    100,
+    Math.round((Math.min(displayStep, TOTAL_PIPELINE_STEPS) / TOTAL_PIPELINE_STEPS) * 100),
+  )
 
   // Review is available once the article body exists (completed or beyond)
   const reviewAvailable = ['completed', 'approved', 'enriched', 'published'].includes(displayStatus)
@@ -848,6 +861,15 @@ export default function WorkflowJobPage() {
   if (!job) return null
 
   const sitePage = job.sitePage
+  const enrichmentPhaseRunning =
+    displayStatus === 'approved'
+    && !!sitePage
+    && ['pending', 'in_progress'].includes(sitePage.enrichmentStatus ?? '')
+  const showProgressBar =
+    isGenerating
+    || isApproving
+    || enrichmentPhaseRunning
+    || (displayStep >= 13 && displayStep < TOTAL_PIPELINE_STEPS)
   const hasCitations = resolveCitations(sitePage, job.pipelineSteps).length > 0
 
   return (
@@ -878,11 +900,11 @@ export default function WorkflowJobPage() {
             </div>
           </div>
 
-          {/* Progress bar — Phase A (steps 1-12) */}
-          {isGenerating && (
+          {/* Progress bar — unified (internal steps mapped to generic 1–25) */}
+          {showProgressBar && (
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-muted-foreground">{`Step ${displayStep} of 12`}</span>
+                <span className="text-sm text-muted-foreground">{`Step ${Math.min(displayStep, TOTAL_PIPELINE_STEPS)} of ${TOTAL_PIPELINE_STEPS}`}</span>
                 <span className="text-sm text-muted-foreground">{progressPct}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-muted">
@@ -894,41 +916,13 @@ export default function WorkflowJobPage() {
             </div>
           )}
 
-          {/* Approval stepper — Phase B (steps 13-18) */}
-          {(isApproving || (displayStep >= 13 && displayStep <= 18)) && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-muted-foreground">Approval:</span>
-                {APPROVAL_STEPS.map((step) => {
-                  const done   = displayStep > step
-                  const active = displayStep === step
-                  return (
-                    <span
-                      key={step}
-                      className={[
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        done   ? 'bg-green-500/20 text-green-400' :
-                        active ? 'bg-blue-500/20 text-blue-400' :
-                                 'bg-muted text-muted-foreground opacity-50',
-                      ].join(' ')}
-                    >
-                      {active && <Loader2 className="h-3 w-3 animate-spin" />}
-                      {done   && <Check   className="h-3 w-3" />}
-                      Step {step}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Actions — status-specific pipeline controls (approve moved to Review Content panel) */}
           <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-3">
             {/* Enrichment running indicator */}
             {isEnriching && (
               <Button disabled className="bg-indigo-600 text-white opacity-75">
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Adding Diagrams…
+                Processing…
               </Button>
             )}
 
@@ -1028,7 +1022,7 @@ export default function WorkflowJobPage() {
                   <div className="flex items-start gap-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 px-3 py-2.5 mt-4 mb-3">
                     <ThumbsUp className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-purple-700 dark:text-purple-300">
-                      Review the article below, then click <strong>Approve Article</strong> when you&apos;re satisfied — this starts enrichment (SEO metadata, featured image, diagrams).
+                      Review the article below, then click <strong>Approve Article</strong> when you&apos;re satisfied — this starts final processing.
                     </p>
                   </div>
                 )}
@@ -1060,7 +1054,7 @@ export default function WorkflowJobPage() {
                   <div className="flex items-start gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2.5 mb-3">
                     <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                      No citations found for this article. Citations are searched in Step 12 — check that the step completed successfully.
+                      No citations found for this article yet. Citations may not be available until processing finishes. If this persists, try re-running the article.
                     </p>
                   </div>
                 )}
@@ -1140,20 +1134,7 @@ export default function WorkflowJobPage() {
           </div>
         )}
 
-        {/* ── Enrichment status banner ─────────────────────────────────── */}
-        {isEnriching && (
-          <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 mb-6 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 animate-spin flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Generating diagrams…</p>
-              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-                Claude is creating Mermaid diagrams for each section. This takes 30 s – 2 min.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Schema & publish (after approval — schema from Step 16) ───────── */}
+        {/* ── Schema & publish (after approval) ───────── */}
         {sitePage && ['approved', 'enriched', 'published'].includes(displayStatus) && (
           <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
             <div className="flex items-center px-6 py-4 gap-3 flex-wrap">
@@ -1199,7 +1180,7 @@ export default function WorkflowJobPage() {
                     ) : (
                       <RefreshCw className="h-4 w-4" />
                     )}
-                    Rerun Enrichment
+                    Rerun processing
                   </Button>
                 )}
               </div>
@@ -1242,8 +1223,8 @@ export default function WorkflowJobPage() {
                     <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
                       <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-800 dark:text-amber-200">
-                        Schema markup was not saved for this article (Step 16 may have failed). You can still publish
-                        and export — fix schema in your CMS if needed.
+                        Schema markup was not saved for this article. You can still publish
+                        and export — add or fix schema in your CMS if needed.
                       </p>
                     </div>
                   </div>
@@ -1318,7 +1299,7 @@ export default function WorkflowJobPage() {
                   <div className="flex items-start gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 px-3 py-2.5 mb-3">
                     <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                      No citations found for this article. Citations are searched in Step 12 — check that the step completed successfully.
+                      No citations found for this article yet. Citations may not be available until processing finishes. If this persists, try re-running the article.
                     </p>
                   </div>
                 )}

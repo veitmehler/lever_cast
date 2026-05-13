@@ -211,11 +211,6 @@ export default function WorkflowPage() {
                           month: 'short', day: 'numeric', year: 'numeric',
                           hour: '2-digit', minute: '2-digit',
                         })}
-                        {job.totalCost > 0 && (
-                          <span className="ml-3 text-muted-foreground/70">
-                            ${job.totalCost.toFixed(4)}
-                          </span>
-                        )}
                       </p>
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0">

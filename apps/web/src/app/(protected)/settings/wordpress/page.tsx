@@ -71,8 +71,8 @@ export default function WordPressSettingsPage() {
     <div className="max-w-2xl mx-auto py-10 px-4">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">WordPress Connections</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-card-foreground">WordPress Connections</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Connect WordPress sites to publish enriched articles directly.
           </p>
         </div>
@@ -91,12 +91,12 @@ export default function WordPressSettingsPage() {
 
       {/* Existing connections */}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-gray-400">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-sm">Loading…</span>
         </div>
       ) : connections.length === 0 && !showForm ? (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-muted-foreground">
           <Globe className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No WordPress sites connected yet.</p>
         </div>
@@ -128,40 +128,48 @@ function ConnectionCard({
   onVerify: (id: string) => void
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            <span className="font-semibold text-gray-900 truncate">{conn.label}</span>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="font-semibold text-card-foreground truncate">{conn.label}</span>
             {conn.lastVerifiedAt && !conn.lastError ? (
-              <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 rounded-full px-2 py-0.5">
-                <CheckCircle2 className="h-3 w-3" /> Verified
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-500/15 dark:bg-green-500/20">
+                <CheckCircle2 className="h-3 w-3 shrink-0" /> Verified
               </span>
             ) : conn.lastError ? (
-              <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 rounded-full px-2 py-0.5">
-                <XCircle className="h-3 w-3" /> Error
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 bg-red-500/15 dark:bg-red-500/20">
+                <XCircle className="h-3 w-3 shrink-0" /> Error
               </span>
             ) : null}
           </div>
-          <a href={conn.siteUrl} target="_blank" rel="noopener noreferrer"
-            className="text-xs text-indigo-600 hover:underline truncate block">
+          <a
+            href={conn.siteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="truncate block text-xs text-primary hover:underline"
+          >
             {conn.siteUrl}
           </a>
-          <p className="text-xs text-gray-400 mt-1">
-            User: <span className="font-mono">{conn.username}</span> &bull; Default status:{' '}
+          <p className="mt-1 text-xs text-muted-foreground">
+            User: <span className="font-mono text-foreground">{conn.username}</span> &bull; Default status:{' '}
             <span className="capitalize">{conn.defaultStatus}</span>
           </p>
           {conn.lastError && (
-            <p className="text-xs text-red-500 mt-1 truncate">{conn.lastError}</p>
+            <p className="mt-1 truncate text-xs text-red-600 dark:text-red-400">{conn.lastError}</p>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => onVerify(conn.id)}>
             Verify
           </Button>
-          <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600"
-            onClick={() => onDelete(conn.id)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => onDelete(conn.id)}
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -179,6 +187,9 @@ function AddConnectionForm({
   onAdded: (conn: WpConnection) => void
   onCancel: () => void
 }) {
+  const fieldClass =
+    'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+
   const [label, setLabel] = useState('')
   const [siteUrl, setSiteUrl] = useState('https://')
   const [username, setUsername] = useState('')
@@ -222,88 +233,88 @@ function AddConnectionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-50 border border-gray-200 rounded-xl p-6 space-y-5">
-      <h2 className="text-base font-semibold text-gray-800">Connect a WordPress site</h2>
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-border bg-card p-6">
+      <h2 className="text-base font-semibold text-card-foreground">Connect a WordPress site</h2>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Label */}
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Label</label>
           <input
             type="text" value={label} onChange={(e) => setLabel(e.target.value)}
             placeholder="My Blog" required
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           />
         </div>
         {/* Site URL */}
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Site URL</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Site URL</label>
           <input
             type="url" value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)}
             placeholder="https://example.com" required
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           />
         </div>
         {/* Username */}
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">WordPress Username</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">WordPress Username</label>
           <input
             type="text" value={username} onChange={(e) => setUsername(e.target.value)}
             placeholder="your-username" required
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           />
         </div>
         {/* App Password */}
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
             Application Password
             <button
               type="button"
               onClick={() => setShowHowTo((v) => !v)}
-              className="ml-1 text-indigo-500 hover:text-indigo-700 align-middle"
+              className="ml-1 align-middle text-primary hover:text-primary/80"
               title="How to generate"
             >
-              <Info className="h-3.5 w-3.5 inline" />
+              <Info className="inline h-3.5 w-3.5" />
             </button>
           </label>
           <input
             type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)}
             placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" required
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           />
         </div>
       </div>
 
       {/* How-to instructions (collapsible) */}
       {showHowTo && (
-        <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 space-y-1">
+        <div className="space-y-1 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-card-foreground">
           <p className="font-semibold">How to generate an Application Password:</p>
-          <ol className="list-decimal pl-5 space-y-1 text-xs">
+          <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
             <li>Sign in to your WordPress admin dashboard.</li>
-            <li>Go to <strong>Users → Profile</strong> (or edit the user you want to use).</li>
-            <li>Scroll down to the <strong>Application Passwords</strong> section.</li>
-            <li>Type <code>Levercast</code> in the &ldquo;New Application Password Name&rdquo; field.</li>
-            <li>Click <strong>Add New Application Password</strong> and copy the generated value.</li>
+            <li>Go to <strong className="text-foreground">Users → Profile</strong> (or edit the user you want to use).</li>
+            <li>Scroll down to the <strong className="text-foreground">Application Passwords</strong> section.</li>
+            <li>Type <code className="rounded bg-muted px-1 py-0.5 text-foreground">Levercast</code> in the &ldquo;New Application Password Name&rdquo; field.</li>
+            <li>Click <strong className="text-foreground">Add New Application Password</strong> and copy the generated value.</li>
           </ol>
-          <p className="text-xs text-blue-600 mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Note: Application Passwords require WordPress 5.6+ and HTTPS on your site.
           </p>
         </div>
       )}
 
       {/* Default settings */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-gray-200 pt-4">
+      <div className="grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Default Status</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Default Status</label>
           <select
             value={defaultStatus} onChange={(e) => setDefaultStatus(e.target.value)}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           >
             <option value="draft">Draft</option>
             <option value="publish">Publish</option>
@@ -311,11 +322,11 @@ function AddConnectionForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Default Category</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Default Category</label>
           <select
             value={defaultCategoryId}
             onChange={(e) => setDefaultCategoryId(e.target.value !== '' ? Number(e.target.value) : '')}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           >
             <option value="">— none —</option>
             {categories.map((c) => (
@@ -324,11 +335,11 @@ function AddConnectionForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Default Author</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Default Author</label>
           <select
             value={defaultAuthorId}
             onChange={(e) => setDefaultAuthorId(e.target.value !== '' ? Number(e.target.value) : '')}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className={fieldClass}
           >
             <option value="">— none —</option>
             {authors.map((a) => (
@@ -344,9 +355,9 @@ function AddConnectionForm({
         </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
-            <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Verifying &amp; saving…</>
+            <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Verifying…</>
           ) : (
-            'Verify &amp; Save'
+            <>Verify & Save</>
           )}
         </Button>
       </div>

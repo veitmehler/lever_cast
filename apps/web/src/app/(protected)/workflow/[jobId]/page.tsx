@@ -551,6 +551,17 @@ export default function WorkflowJobPage() {
     }
   }, [job?.status])
 
+  // Safety net: clear isApproving when job reaches a definitively post-approval
+  // state without the SSE 'done' event firing. This handles the race where
+  // fetchJob returns 'enriched'/'published' and triggers the useEffect cleanup
+  // that closes the SSE connection before it can send its 'done' event.
+  useEffect(() => {
+    if (!isApproving) return
+    if (job?.status && new Set(['enriched', 'published', 'exported', 'failed']).has(job.status)) {
+      setIsApproving(false)
+    }
+  }, [job?.status, isApproving])
+
   const sseRef             = useRef<EventSource | null>(null)
   const reconnectTimerRef  = useRef<number | null>(null)
   // Stable ref mirrors job state so onerror callbacks can read status without

@@ -317,18 +317,36 @@ function resolveCitations(
 
 /**
  * Resolve the best available article title from the current pipeline run.
- * Priority:
- *  1. SitePage.seoTitle — only if step 13 has completed in this run (fresh SEO title)
- *  2. Step 0 output — clean H1 title generated before the article was written
- *  3. SitePage.title — whatever was stored from the last approval
+ *
+ * During the approval chain (isApproving=true) we intentionally ignore
+ * sp.seoTitle even if step 13 appears completed in pipelineSteps, because
+ * the fetchJob polls that fire every 3 s during approval can return a
+ * SitePage row that was written by the approval chain mid-run with a stale
+ * fallback title (topic.topic). Locking to step 0 output during approval
+ * prevents that flash.
+ *
+ * Priority matrix:
+ *  - Pre/post-approval (isApproving=false):
+ *      1. sp.seoTitle — only if step 13 is marked completed in pipelineSteps
+ *      2. Step 0 output
+ *      3. sp.seoTitle / sp.title fallback
+ *  - During approval (isApproving=true):
+ *      1. Step 0 output
+ *      2. sp.seoTitle / sp.title fallback
  */
-function resolveBestTitle(sp: SitePage, pipelineSteps: PipelineStep[]): string {
-  const step13Done = pipelineSteps.some((s) => s.stepNumber === 13 && s.status === 'completed')
-  if (step13Done && (sp.seoTitle ?? sp.title)) return sp.seoTitle ?? sp.title ?? ''
-
+function resolveBestTitle(
+  sp: SitePage,
+  pipelineSteps: PipelineStep[],
+  isApproving: boolean,
+): string {
   const step0Output = pipelineSteps.find((s) => s.stepNumber === 0 && s.status === 'completed')?.output?.trim()
-  if (step0Output) return step0Output
 
+  if (!isApproving) {
+    const step13Done = pipelineSteps.some((s) => s.stepNumber === 13 && s.status === 'completed')
+    if (step13Done && (sp.seoTitle ?? sp.title)) return sp.seoTitle ?? sp.title ?? ''
+  }
+
+  if (step0Output) return step0Output
   return sp.seoTitle ?? sp.title ?? ''
 }
 
@@ -336,6 +354,7 @@ function buildReviewText(
   sp: SitePage,
   pipelineSteps: PipelineStep[],
   brand: BrandSettings,
+  isApproving: boolean,
 ): string {
   // Resolve article body: sitePage.bodyHtml → step 11 → step 9
   const bodySource =
@@ -345,7 +364,7 @@ function buildReviewText(
     ''
   const bodyMarkdown = bodySource ? htmlToMarkdown(bodySource) : '[Article body not yet available]'
 
-  const title = resolveBestTitle(sp, pipelineSteps)
+  const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
 
   const citationLines = citations.length > 0
@@ -393,6 +412,7 @@ function buildFinalReviewText(
   pipelineSteps: PipelineStep[],
   brand: BrandSettings,
   diagramSvgs: Record<string, string>,
+  isApproving: boolean,
 ): string {
   const diagrams = sp.diagrams ?? []
 
@@ -414,7 +434,7 @@ function buildFinalReviewText(
     ? htmlToMarkdownWithDiagrams(bodySource, svgBySrc)
     : '[Article body not yet available]'
 
-  const title = resolveBestTitle(sp, pipelineSteps)
+  const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
   const citationLines = citations.length > 0
     ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
@@ -862,7 +882,7 @@ export default function WorkflowJobPage() {
 
   const handleCopy = async () => {
     if (!job?.sitePage) return
-    const text = buildReviewText(job.sitePage, job.pipelineSteps, brandSettings)
+    const text = buildReviewText(job.sitePage, job.pipelineSteps, brandSettings, isApproving)
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -874,7 +894,7 @@ export default function WorkflowJobPage() {
 
   const handleCopyFinal = async () => {
     if (!job?.sitePage) return
-    const text = buildFinalReviewText(job.sitePage, job.pipelineSteps, brandSettings, diagramSvgs)
+    const text = buildFinalReviewText(job.sitePage, job.pipelineSteps, brandSettings, diagramSvgs, isApproving)
     try {
       await navigator.clipboard.writeText(text)
       setCopiedFinal(true)
@@ -1119,7 +1139,7 @@ export default function WorkflowJobPage() {
                 )}
                 <textarea
                   readOnly
-                  value={buildReviewText(sitePage, job.pipelineSteps, brandSettings)}
+                  value={buildReviewText(sitePage, job.pipelineSteps, brandSettings, isApproving)}
                   rows={20}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -1150,7 +1170,7 @@ export default function WorkflowJobPage() {
               <div>
                 <dt className="text-xs text-muted-foreground uppercase tracking-wide">SEO Title</dt>
                 <dd className="text-sm text-card-foreground mt-0.5 font-medium">
-                  {resolveBestTitle(sitePage, job.pipelineSteps)}
+                  {resolveBestTitle(sitePage, job.pipelineSteps, isApproving)}
                 </dd>
               </div>
               <div>
@@ -1364,7 +1384,7 @@ export default function WorkflowJobPage() {
                 )}
                 <textarea
                   readOnly
-                  value={buildFinalReviewText(sitePage, job.pipelineSteps, brandSettings, diagramSvgs)}
+                  value={buildFinalReviewText(sitePage, job.pipelineSteps, brandSettings, diagramSvgs, isApproving)}
                   rows={20}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                 />

@@ -182,7 +182,7 @@ export class WordPressTarget implements OutputTarget {
         if (cat.categoryId != null) {
           await prisma.topic.update({ where: { id: topicRow.id }, data: { wpCategoryId: cat.categoryId } })
           topicCategory = cat.categoryId
-          logger.info({ jobId: payload.jobId, categoryId: cat.categoryId }, '[wordpress] publish-time category selected')
+          logger.info({ jobId: payload.jobId, wpCategoryId: cat.categoryId }, '[wordpress] publish-time category selected')
         }
       } catch (err) {
         logger.warn({ jobId: payload.jobId, err }, '[wordpress] publish-time category selection failed — skipping')
@@ -202,6 +202,8 @@ export class WordPressTarget implements OutputTarget {
           await prisma.topic.update({ where: { id: topicRow.id }, data: { wpTagIds: sel.tagIds } })
           topicTags = sel.tagIds
           logger.info({ jobId: payload.jobId, tagIds: sel.tagIds }, '[wordpress] publish-time tags selected')
+        } else {
+          logger.warn({ jobId: payload.jobId }, '[wordpress] publish-time tag selection returned no tags — WP site may have no tags configured')
         }
       } catch (err) {
         logger.warn({ jobId: payload.jobId, err }, '[wordpress] publish-time tag selection failed — skipping')

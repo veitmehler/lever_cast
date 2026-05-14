@@ -130,7 +130,10 @@ export async function selectWordPressTags(opts: {
     tagIds = fallbackTagIds(tags)
   } else {
     tagIds = validateAndCapTagIds(parsed, validIds, 4)
-    if (tagIds.length === 0 && parsed.length > 0) tagIds = fallbackTagIds(tags)
+    // When LLM returns [] or all IDs are invalid, fall back to the first few tags
+    // rather than attaching nothing — the site owner's own taxonomy is always
+    // at least loosely relevant.
+    if (tagIds.length === 0) tagIds = fallbackTagIds(tags)
   }
 
   return {

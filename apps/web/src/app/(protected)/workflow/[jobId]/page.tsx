@@ -315,6 +315,23 @@ function resolveCitations(
   return []
 }
 
+/**
+ * Resolve the best available article title from the current pipeline run.
+ * Priority:
+ *  1. SitePage.seoTitle — only if step 13 has completed in this run (fresh SEO title)
+ *  2. Step 0 output — clean H1 title generated before the article was written
+ *  3. SitePage.title — whatever was stored from the last approval
+ */
+function resolveBestTitle(sp: SitePage, pipelineSteps: PipelineStep[]): string {
+  const step13Done = pipelineSteps.some((s) => s.stepNumber === 13 && s.status === 'completed')
+  if (step13Done && (sp.seoTitle ?? sp.title)) return sp.seoTitle ?? sp.title ?? ''
+
+  const step0Output = pipelineSteps.find((s) => s.stepNumber === 0 && s.status === 'completed')?.output?.trim()
+  if (step0Output) return step0Output
+
+  return sp.seoTitle ?? sp.title ?? ''
+}
+
 function buildReviewText(
   sp: SitePage,
   pipelineSteps: PipelineStep[],
@@ -328,7 +345,7 @@ function buildReviewText(
     ''
   const bodyMarkdown = bodySource ? htmlToMarkdown(bodySource) : '[Article body not yet available]'
 
-  const title = sp.seoTitle ?? sp.title ?? ''
+  const title = resolveBestTitle(sp, pipelineSteps)
   const citations = resolveCitations(sp, pipelineSteps)
 
   const citationLines = citations.length > 0
@@ -397,7 +414,7 @@ function buildFinalReviewText(
     ? htmlToMarkdownWithDiagrams(bodySource, svgBySrc)
     : '[Article body not yet available]'
 
-  const title = sp.seoTitle ?? sp.title ?? ''
+  const title = resolveBestTitle(sp, pipelineSteps)
   const citations = resolveCitations(sp, pipelineSteps)
   const citationLines = citations.length > 0
     ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
@@ -1133,7 +1150,7 @@ export default function WorkflowJobPage() {
               <div>
                 <dt className="text-xs text-muted-foreground uppercase tracking-wide">SEO Title</dt>
                 <dd className="text-sm text-card-foreground mt-0.5 font-medium">
-                  {sitePage.seoTitle ?? sitePage.title}
+                  {resolveBestTitle(sitePage, job.pipelineSteps)}
                 </dd>
               </div>
               <div>

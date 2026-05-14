@@ -217,7 +217,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   const citations = parseCitations(ctx.completedSteps.get(12) ?? '')
   const baseSlug = slugify(seo.urlSlug || seo.metaTitle || topic.topic)
   const finalSlug = await resolveUniqueSlug(userId, jobId, baseSlug)
-  const seoTitle = seo.metaTitle || topic.topic
+  const seoTitle = seo.metaTitle || ctx.completedSteps.get(0)?.trim() || topic.topic
   const readingTime = calculateReadingTime(step11)
 
   // Delete any conflicting sitePage keyed by jobId — shouldn't exist, but defensive

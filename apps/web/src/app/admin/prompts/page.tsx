@@ -40,6 +40,7 @@ function ProviderBadge({ provider }: { provider: string }) {
 
 const STEP_LABELS: Record<string, string> = {
   // Phase A
+  generate_title:                '0. Generate Title',
   generate_outline:               '1. Generate Outline',
   keyword_research:               '2. Keyword Research',
   find_supporting_keywords:       '3. Supporting Keywords',
@@ -72,6 +73,7 @@ const STEP_LABELS: Record<string, string> = {
 /** Maps DB stepNumber → visual display number shown in the badge. */
 const VISUAL_STEP_NUMBER: Record<number, string> = {
   // Phase A
+  0: '0',
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
   7: '7', 8: '8', 9: '9', 10: '10', 11: '11', 12: '12',
   // Phase B
@@ -83,7 +85,7 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   {
     label: 'Phase A — Pre-approval Pipeline',
-    steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   },
   {
     // Actual execution order: 13 → 15 → Fal.ai (150) → 16 → 17 → 18

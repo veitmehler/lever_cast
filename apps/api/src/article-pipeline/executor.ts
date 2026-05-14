@@ -6,10 +6,10 @@ import { assignOutlineFramework } from './outline-assignment'
 import { sanitizeKeywordJson, sanitizeKeywordText } from './keyword-sanitizer'
 import type { PipelineContext } from './variable-resolver'
 
-const PHASE_A_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MAX_KEYWORD_RETRIES = 3
 
-/** Executes Phase A (Steps 1–12) for a given ArticleJob. */
+/** Executes Phase A (Steps 0–12) for a given ArticleJob. */
 export async function runPipelinePhaseA(jobId: string): Promise<void> {
   // Load job + topic
   const job = await prisma.articleJob.findUniqueOrThrow({

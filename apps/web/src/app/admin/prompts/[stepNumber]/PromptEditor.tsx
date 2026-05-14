@@ -20,7 +20,7 @@ interface PromptTemplate {
 
 // All known pipeline variables with descriptions
 const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] = [
-  { name: 'topic',              description: 'The article topic / idea',                        steps: [1, 2, 3, 5, 6, 7, 8] },
+  { name: 'topic',              description: 'The article topic / idea',                        steps: [0, 1, 2, 3, 5, 6, 7, 8] },
   { name: 'excludedKeywords',   description: 'Comma-joined primary keywords already in DB (prevents cannibalization)' },
   { name: 'outline',            description: 'Step 1 output — article outline',                 steps: [4, 8, 9] },
   { name: 'keywords',           description: 'Step 2 output — keyword JSON',                    steps: [4, 9] },
@@ -44,6 +44,9 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'published_date',     description: 'Topic.publishingDate or current date (ISO 8601)', steps: [] },
   { name: 'modified_date',    description: 'Same as published_date for schema dateModified',      steps: [] },
   { name: 'featured_image_url', description: 'SitePage featured image CDN URL (after approval)',    steps: [] },
+  { name: 'industry', description: 'BrandSettings.industry (vertical / profession)',                 steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 17, 18] },
+  { name: 'business_description', description: 'BrandSettings.businessDescription (what the business does)', steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 17, 18] },
+  { name: 'title', description: 'Step 0 output — generated H1 title (falls back to topic if absent)', steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 17, 18] },
   { name: 'author_linkedin',    description: 'BrandSettings.defaultAuthorLinkedIn',                 steps: [] },
   { name: 'organization_country_code', description: 'BrandSettings ISO 3166-1 alpha-2 (e.g. US)',    steps: [] },
   { name: 'google_business_profile_url', description: 'BrandSettings GBP / g.page URL',          steps: [] },
@@ -55,6 +58,7 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
 
 const STEP_LABELS: Record<number, string> = {
   // Phase A — Pre-approval Pipeline
+  0:   'Phase A · Step 0 — Generate Title',
   1:   'Phase A · Step 1 — Generate Outline',
   2:   'Phase A · Step 2 — Keyword Research',
   3:   'Phase A · Step 3 — Supporting Keywords',

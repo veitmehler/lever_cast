@@ -4,6 +4,7 @@ import { getGlobalExcludedKeywords } from './keyword-validator'
 
 // Maps generic {{<step_name>_output}} variable suffixes to step numbers
 const STEP_NAME_MAP: Record<string, number> = {
+  generate_title: 0,
   generate_outline: 1,
   keyword_research: 2,
   find_supporting_keywords: 3,
@@ -231,6 +232,16 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     case 'geolocation': {
       const bs = await getBrandSettings(ctx)
       return bs?.geolocation ?? ''
+    }
+
+    case 'industry': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.industry ?? ''
+    }
+
+    case 'business_description': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.businessDescription ?? ''
     }
 
     case 'who': {

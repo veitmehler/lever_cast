@@ -4,6 +4,26 @@ const prisma = new PrismaClient()
 
 const PROMPT_TEMPLATES = [
   {
+    stepNumber: 0,
+    stepName: 'generate_title',
+    defaultProvider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    systemPrompt:
+      'You are an expert content strategist and SEO copywriter. Your task is to convert a raw article idea into a compelling, SEO-optimized H1 title.',
+    userPrompt: `Convert this article idea into a single, compelling H1 article title:
+
+Idea: {{topic}}
+Industry: {{industry}}
+Business context: {{business_description}}
+
+Rules:
+- The title must be specific, clear, and engaging
+- Optimise for search intent and click-through
+- Keep it under 70 characters when possible
+- Do NOT use clickbait or vague phrasing
+- Respond with ONLY the title text — no quotes, no explanation, nothing else`,
+  },
+  {
     stepNumber: 1,
     stepName: 'generate_outline',
     defaultProvider: 'gemini',

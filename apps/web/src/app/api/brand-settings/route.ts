@@ -26,6 +26,8 @@ export async function GET() {
     return NextResponse.json(
       settings ?? {
         geolocation: null,
+        industry: null,
+        businessDescription: null,
         who: null,
         ourExperience: null,
         articleGoal: null,
@@ -76,6 +78,8 @@ export async function PATCH(request: NextRequest) {
 
     const stringFields = [
       'geolocation',
+      'industry',
+      'businessDescription',
       'who',
       'ourExperience',
       'articleGoal',

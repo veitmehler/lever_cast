@@ -169,6 +169,8 @@ export default function SettingsPage() {
   const [isSavingTelegramChatId, setIsSavingTelegramChatId] = useState(false)
 
   // Article Brand Profile — content fields
+  const [industry, setIndustry]                         = useState('')
+  const [businessDescription, setBusinessDescription]   = useState('')
   const [geolocation, setGeolocation]                   = useState('')
   const [who, setWho]                                   = useState('')
   const [ourExperience, setOurExperience]               = useState('')
@@ -236,6 +238,8 @@ export default function SettingsPage() {
 
         if (brandRes.ok) {
           const brand = await brandRes.json()
+          if (brand.industry)             setIndustry(brand.industry)
+          if (brand.businessDescription) setBusinessDescription(brand.businessDescription)
           if (brand.geolocation)          setGeolocation(brand.geolocation)
           if (brand.who)                  setWho(brand.who)
           if (brand.ourExperience)        setOurExperience(brand.ourExperience)
@@ -671,6 +675,8 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           geolocation: geolocation || null,
+          industry: industry || null,
+          businessDescription: businessDescription || null,
           who: who || null,
           ourExperience: ourExperience || null,
           articleGoal: articleGoal || null,
@@ -945,6 +951,41 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-5">
+            {/* Industry / profession & business description — primes AI article prompts */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Industry / profession
+              </label>
+              <input
+                type="text"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder='e.g. "Chiropractic", "Accounting", "Real Estate"'
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Appears as the <code className="rounded bg-muted px-1">{'{{industry}}'}</code> variable in article prompts.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Business description
+              </label>
+              <textarea
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value)}
+                placeholder='e.g. "We are a CPA firm specializing in small business tax compliance and bookkeeping in the Denver metro area."'
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional: what you do and who you serve. Injected as the{' '}
+                <code className="rounded bg-muted px-1">{'{{business_description}}'}</code>{' '}
+                variable in article prompts.
+              </p>
+            </div>
+
             {/* Geographic focus */}
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">

@@ -562,6 +562,8 @@ model BrandSettings {
 
   // Article brand context (used by prompt variable resolver)
   geolocation          String? @db.Text
+  industry             String? @db.Text // e.g. Chiropractic, Accounting — primes LLM prompts
+  businessDescription  String? @db.Text // free-text: what the business does, who it serves
   who                  String? @db.Text // target audience description
   ourExperience        String? @db.Text // firm / author experience blurb
   articleGoal          String? @db.Text // strategic goal of each article

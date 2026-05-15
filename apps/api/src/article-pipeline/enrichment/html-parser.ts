@@ -32,7 +32,7 @@ export function slugify(text: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 60) || 'section'
+    .slice(0, 120) || 'section'
 }
 
 /** Parse bodyHtml and return one H2Section per `<h2>` tag found. */

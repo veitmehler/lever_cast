@@ -5,6 +5,9 @@ import { DuplicateKeywordError, validatePrimaryKeywordUniqueness } from './keywo
 import { assignOutlineFramework } from './outline-assignment'
 import { sanitizeKeywordJson, sanitizeKeywordText } from './keyword-sanitizer'
 import type { PipelineContext } from './variable-resolver'
+import { extractCitationsForValidation, validateCitationUrls } from './citation-validator'
+import { insertInlineCitations } from './citation-inserter'
+import { cleanStepOutput, normalizeH2Questions } from './approval-service'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MAX_KEYWORD_RETRIES = 3
@@ -112,6 +115,8 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     // Update metrics after each step
     await updateJobMetrics(jobId)
   }
+
+  await ensurePhaseAInlineCitations(jobId, ctx)
 
   // All steps complete
   await prisma.articleJob.update({
@@ -258,4 +263,68 @@ async function updateJobMetrics(jobId: string): Promise<void> {
     where: { id: jobId },
     data: { totalCost, totalTokens },
   })
+}
+
+/** True when every URL appears as the href of an anchor (string match including query strings). */
+function htmlHasCitationAnchorsForUrls(html: string, urls: string[]): boolean {
+  return urls.every((url) => {
+    if (!url) return false
+    const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`<a\\b[^>]*href\\s*=\\s*(["'])${escaped}\\1`, 'i')
+    return re.test(html)
+  })
+}
+
+/**
+ * After Phase A steps 0–12: validate citations and insert inline links into Step 11 HTML.
+ * Runs at end so resume skips still get this pass. Idempotent when links already exist.
+ */
+async function ensurePhaseAInlineCitations(jobId: string, ctx: PipelineContext): Promise<void> {
+  const step12Raw = ctx.completedSteps.get(12)
+  const step11Raw = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
+  if (!step12Raw?.trim() || !step11Raw.trim()) return
+
+  const normalized = normalizeH2Questions(cleanStepOutput(step11Raw))
+  const pairs = extractCitationsForValidation(step12Raw)
+  if (pairs.length === 0) return
+
+  let validated: Awaited<ReturnType<typeof validateCitationUrls>>
+  try {
+    validated = await validateCitationUrls(pairs, jobId)
+  } catch (err) {
+    logger.warn({ jobId, err }, '[executor] step 12.5 — citation validation failed, skipping')
+    return
+  }
+
+  const live = validated.filter((c) => c.status !== 'dead')
+  const deadCount = validated.length - live.length
+  if (deadCount > 0) {
+    logger.warn({ jobId, deadCount }, '[executor] step 12.5 — omitted dead citation URLs')
+  }
+  if (live.length === 0) return
+
+  const urls = live.map((c) => c.url)
+  if (htmlHasCitationAnchorsForUrls(normalized, urls)) {
+    logger.info({ jobId }, '[executor] step 12.5 — inline citations already present, skipping')
+    return
+  }
+
+  try {
+    const { linkedHtml, insertedCount } = await insertInlineCitations(normalized, live, jobId, ctx)
+    if (linkedHtml === normalized) {
+      logger.warn({ jobId, insertedCount }, '[executor] step 12.5 — no HTML change from citation inserter')
+      return
+    }
+    ctx.completedSteps.set(11, linkedHtml)
+    await prisma.pipelineStep.updateMany({
+      where: { jobId, stepNumber: 11, status: 'completed' },
+      data: { output: linkedHtml },
+    })
+    logger.info({ jobId, insertedCount, total: live.length }, '[executor] step 12.5 — inline citations inserted')
+  } catch (err) {
+    logger.warn({ jobId, err }, '[executor] step 12.5 — citation insertion failed, continuing')
+    return
+  }
+
+  await updateJobMetrics(jobId)
 }

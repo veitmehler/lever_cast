@@ -86,14 +86,19 @@ export class GeminiAdapter implements LLMAdapter {
     maxTokens: number,
   ): Promise<LLMResponse> {
     const genAI = new GoogleGenerativeAI(apiKey)
+    const generationConfig: Record<string, unknown> = {
+      temperature,
+      maxOutputTokens: maxTokens,
+      ...(options.jsonMode ? { responseMimeType: 'application/json' } : {}),
+      ...(options.thinkingBudget !== undefined
+        ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
+        : {}),
+    }
+
     const genModel = genAI.getGenerativeModel({
       model,
       ...(options.systemPrompt ? { systemInstruction: options.systemPrompt } : {}),
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
-        ...(options.jsonMode ? { responseMimeType: 'application/json' } : {}),
-      },
+      generationConfig: generationConfig as Parameters<GoogleGenerativeAI['getGenerativeModel']>[0]['generationConfig'],
     })
 
     const result = await genModel.generateContent(options.userPrompt, { timeout: GEMINI_FETCH_TIMEOUT_MS })
@@ -134,7 +139,13 @@ export class GeminiAdapter implements LLMAdapter {
     const body = {
       contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
       tools: [{ google_search: {} }],
-      generationConfig: { temperature, maxOutputTokens: maxTokens },
+      generationConfig: {
+        temperature,
+        maxOutputTokens: maxTokens,
+        ...(options.thinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
+          : {}),
+      },
     }
 
     const res = await fetch(url, {

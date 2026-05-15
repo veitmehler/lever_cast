@@ -318,35 +318,20 @@ function resolveCitations(
 /**
  * Resolve the best available article title from the current pipeline run.
  *
- * During the approval chain (isApproving=true) we intentionally ignore
- * sp.seoTitle even if step 13 appears completed in pipelineSteps, because
- * the fetchJob polls that fire every 3 s during approval can return a
- * SitePage row that was written by the approval chain mid-run with a stale
- * fallback title (topic.topic). Locking to step 0 output during approval
- * prevents that flash.
+ * Canonical title is Step 0 (`generate_title`); SEO title may shorten it for SERPs.
+ * Review panels use this string so pasted copies match the article headline intent.
  *
- * Priority matrix:
- *  - Pre/post-approval (isApproving=false):
- *      1. sp.seoTitle — only if step 13 is marked completed in pipelineSteps
- *      2. Step 0 output
- *      3. sp.seoTitle / sp.title fallback
- *  - During approval (isApproving=true):
- *      1. Step 0 output
- *      2. sp.seoTitle / sp.title fallback
+ * Fallback: SitePage seoTitle/title then topic-derived values.
  */
 function resolveBestTitle(
   sp: SitePage,
   pipelineSteps: PipelineStep[],
-  isApproving: boolean,
+  _isApproving: boolean,
 ): string {
   const step0Output = pipelineSteps.find((s) => s.stepNumber === 0 && s.status === 'completed')?.output?.trim()
 
-  if (!isApproving) {
-    const step13Done = pipelineSteps.some((s) => s.stepNumber === 13 && s.status === 'completed')
-    if (step13Done && (sp.seoTitle ?? sp.title)) return sp.seoTitle ?? sp.title ?? ''
-  }
-
   if (step0Output) return step0Output
+
   return sp.seoTitle ?? sp.title ?? ''
 }
 

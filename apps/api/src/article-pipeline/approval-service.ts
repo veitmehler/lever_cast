@@ -5,11 +5,11 @@
  * Precondition: ArticleJob.status === 'completed'.
  *
  * Flow:
- *   1. Build PipelineContext from DB-persisted step outputs (1-12)
+ *   1. Build PipelineContext from DB-persisted Phase A step outputs (0–12)
  *   2. Step 13  — generate_seo_metadata  (JSON: metaTitle, metaDescription, urlSlug)
  *   3. Step 15  — generate_image_prompt  (text prompt sent to Fal.ai)
  *      ↳ generateFeaturedImage → uploadFeaturedImageToS3 → Media row
- *   4. Upsert SitePage (body, SEO fields, citations, featured image)
+ *   4. Upsert SitePage (body already has inline citations from Phase A step 12.5; SEO fields, citations, featured image)
  *   5. Step 16  — generate_schema_markup → SitePage.schemaJson (non-fatal if fails)
  *   6. Step 17  — generate_excerpt       → SitePage.excerpt
  *   7. Step 18  — generate_legal_disclaimer → SitePage.disclaimer
@@ -26,8 +26,6 @@ import { generateFeaturedImage } from './image-generation'
 import { uploadFeaturedImageToS3WithRetry } from './image-uploader'
 import { getBoss, QUEUES } from '../queues/index'
 import type { PipelineContext } from './variable-resolver'
-import { validateCitationUrls } from './citation-validator'
-import { insertInlineCitations } from './citation-inserter'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -91,42 +89,6 @@ function parseCitations(raw: string): Record<string, unknown> | null {
     if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
   } catch { /* ignore */ }
   return null
-}
-
-type CitationEntry = {
-  sourceTitle?: string
-  link_title?: string
-  title?: string
-  sourceUrl?: string
-  link_url?: string
-  url?: string
-}
-
-/**
- * Extract flat {title, url} pairs from step 12 output for URL validation.
- * Handles multiple JSON shapes the LLM might produce.
- */
-function extractCitationsForValidation(raw: string): Array<{ title: string; url: string }> {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    const entries: CitationEntry[] = Array.isArray(parsed)
-      ? (parsed as CitationEntry[])
-      : Array.isArray((parsed as Record<string, unknown>).resource_links)
-        ? ((parsed as Record<string, unknown>).resource_links as CitationEntry[])
-        : Array.isArray((parsed as Record<string, unknown>).links)
-          ? ((parsed as Record<string, unknown>).links as CitationEntry[])
-          : []
-
-    return entries
-      .map((e) => ({
-        title: String(e.sourceTitle ?? e.link_title ?? e.title ?? ''),
-        url: String(e.sourceUrl ?? e.link_url ?? e.url ?? ''),
-      }))
-      .filter((c) => c.url.startsWith('http'))
-  } catch {
-    return []
-  }
 }
 
 /** Truncate excerpt to ≤150 chars. */
@@ -246,40 +208,8 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     Sentry.captureException(err, { tags: { phase: 'approval', step: 15 } })
   }
 
-  // ── Citation URL validation + inline linking ──────────────────────────────
-  // Validate each citation URL (via OxyLabs residential proxy if configured,
-  // direct HEAD otherwise) and then ask the LLM to insert inline <a> tags
-  // for the live citations. Each URL is used at most once.
-  let articleBodyHtml = step11
-  const rawCitationsForValidation = extractCitationsForValidation(ctx.completedSteps.get(12) ?? '')
-  if (rawCitationsForValidation.length > 0) {
-    try {
-      logger.info({ jobId, count: rawCitationsForValidation.length }, '[approval] validating citation URLs')
-      const validated = await validateCitationUrls(rawCitationsForValidation, jobId)
-      const liveCitations = validated.filter((c) => c.status !== 'dead')
-      const deadCount = validated.length - liveCitations.length
-      if (deadCount > 0) {
-        logger.warn({ jobId, deadCount }, '[approval] removed dead citation URLs before insertion')
-      }
-      if (liveCitations.length > 0) {
-        const { linkedHtml, insertedCount } = await insertInlineCitations(
-          step11,
-          liveCitations,
-          jobId,
-          ctx,
-        )
-        articleBodyHtml = linkedHtml
-        logger.info(
-          { jobId, insertedCount, total: liveCitations.length },
-          '[approval] inline citations inserted',
-        )
-      }
-    } catch (err) {
-      // Non-fatal — log and continue with the unlinked body
-      logger.error({ jobId, err }, '[approval] citation validation/insertion failed — continuing without inline links')
-      Sentry.captureException(err, { tags: { phase: 'approval', step: 'inline_citations' } })
-    }
-  }
+  // Inline citations are inserted in Phase A (executor) immediately after Step 12.
+  const articleBodyHtml = step11
 
   // ── Upsert SitePage (makes {{article_title}} resolvable for steps 17/18) ──
   logger.info({ jobId }, '[approval] upserting SitePage')
@@ -302,7 +232,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       slug: finalSlug,
       title: seoTitle,
       bodyHtml: articleBodyHtml,
-      originalBodyHtml: step11,
+      originalBodyHtml: articleBodyHtml,
       seoTitle,
       seoDescription: seo.metaDescription || null,
       primaryKeyword: primaryKeyword || null,
@@ -315,7 +245,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       slug: finalSlug,
       title: seoTitle,
       bodyHtml: articleBodyHtml,
-      originalBodyHtml: step11,
+      originalBodyHtml: articleBodyHtml,
       seoTitle,
       seoDescription: seo.metaDescription || null,
       primaryKeyword: primaryKeyword || null,

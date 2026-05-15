@@ -37,9 +37,6 @@ import { generateAiSummary } from './geo-summary-generator'
 import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restructurer'
 import { sanitizeGeoQuestion } from './geo-question-sanitizer'
 import { normalizeH2Questions } from '../approval-service'
-import { insertInlineCitations } from '../citation-inserter'
-import type { PipelineContext } from '../variable-resolver'
-import type { ValidatedCitation } from '../citation-validator'
 import { generateKeyTakeaways } from './key-takeaways-generator'
 import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
@@ -858,29 +855,6 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   logger.info({ jobId, position: section.position, svgUrl }, '[enrichment] diagram saved')
 }
 
-/** Extract citation pairs from the SitePage.citations JSON blob as ValidatedCitations.
- *  All citations from step 12 are treated as "uncertain" (keep) — dead links are an
- *  acceptable tradeoff vs. running another validation round at enrichment time.
- */
-function extractCitationsFromJson(raw: unknown): ValidatedCitation[] {
-  if (!raw || typeof raw !== 'object') return []
-  const obj = raw as Record<string, unknown>
-  const arr: unknown[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray(obj.resource_links)
-      ? (obj.resource_links as unknown[])
-      : Array.isArray(obj.links)
-        ? (obj.links as unknown[])
-        : []
-  return (arr as Array<Record<string, unknown>>)
-    .map((e) => ({
-      title: String(e.sourceTitle ?? e.link_title ?? e.title ?? ''),
-      url: String(e.sourceUrl ?? e.link_url ?? e.url ?? ''),
-      status: 'uncertain' as const,
-    }))
-    .filter((c) => c.url.startsWith('http'))
-}
-
 async function finishEnrichment(
   jobId: string,
   sitePageId: string,
@@ -891,67 +865,12 @@ async function finishEnrichment(
   inputTokens: number,
   outputTokens: number,
 ): Promise<void> {
-  // Ensure any GEO question headings that slipped through without a '?' get one
   const normalizedHtml = normalizeH2Questions(enrichedHtml)
-
-  // Re-insert inline citation links that were stripped when enrichment read from
-  // originalBodyHtml. The validated citations are already stored in SitePage.citations.
-  let finalBodyHtml = normalizedHtml
-  try {
-    const sitePage = await prisma.sitePage.findUnique({
-      where: { id: sitePageId },
-      select: { citations: true, jobId: true, userId: true },
-    })
-    const rawCitations = extractCitationsFromJson(sitePage?.citations)
-    if (rawCitations.length > 0 && sitePage) {
-      // Build a minimal PipelineContext so StepRunner can resolve {{article}} and
-      // {{validated_citations}} for the step 110 prompt template.
-      const job = await prisma.articleJob.findUnique({
-        where: { id: jobId },
-        select: { userId: true, topicId: true, topic: { select: { topic: true, slug: true } } },
-      })
-      if (job) {
-        const pipelineSteps = await prisma.pipelineStep.findMany({
-          where: { jobId, status: 'completed' },
-          select: { stepNumber: true, output: true },
-        })
-        const ctx: PipelineContext = {
-          jobId,
-          userId: job.userId,
-          topicId: job.topicId,
-          topicText: job.topic.topic,
-          topicSlug: job.topic.slug,
-          completedSteps: new Map(pipelineSteps.map((s) => [s.stepNumber, s.output ?? ''])),
-          parsedSteps: new Map(),
-        }
-        // Override step 11 with the enriched HTML so {{article}} resolves to the
-        // post-enrichment body (GEO + diagrams + ToC already merged in).
-        ctx.completedSteps.set(11, normalizedHtml)
-        const { linkedHtml, insertedCount } = await insertInlineCitations(
-          normalizedHtml,
-          rawCitations,
-          jobId,
-          ctx,
-        )
-        finalBodyHtml = linkedHtml
-        logger.info(
-          { jobId, insertedCount, total: rawCitations.length },
-          '[enrichment] inline citations re-inserted after Phase C enrichment',
-        )
-      }
-    }
-  } catch (err) {
-    logger.error(
-      { jobId, err },
-      '[enrichment] citation re-insertion failed — saving enriched HTML without inline links',
-    )
-    Sentry.captureException(err, { tags: { phase: 'enrichment', step: 'reinsert_citations' } })
-  }
 
   await prisma.sitePage.update({
     where: { id: sitePageId },
     data: {
-      bodyHtml: finalBodyHtml,
+      bodyHtml: normalizedHtml,
       enrichmentStatus: 'completed',
       enrichedAt: new Date(),
       enrichmentError: null,

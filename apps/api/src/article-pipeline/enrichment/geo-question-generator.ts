@@ -53,7 +53,8 @@ export async function generateQuestionFromKeyword(opts: {
       userPrompt: usr,
       model,
       temperature: 0.3,
-      maxTokens: 256,
+      maxTokens: 512,
+      thinkingBudget: 0,
     }),
   )
   const rawQ = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
@@ -85,7 +86,8 @@ export async function rephraseForUniqueness(opts: {
       userPrompt: usr,
       model,
       temperature: 0.4,
-      maxTokens: 256,
+      maxTokens: 512,
+      thinkingBudget: 0,
     }),
   )
   const rawQ = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')

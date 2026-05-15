@@ -15,6 +15,8 @@ export interface LLMCallOptions {
   useGenerativeSearch?: boolean
   /** Force JSON output mode (Gemini: responseMimeType = 'application/json'). */
   jsonMode?: boolean
+  /** Gemini 2.5: set `0` to disable thinking so output budget is not consumed by reasoning tokens. */
+  thinkingBudget?: number
 }
 
 export interface LLMAdapter {

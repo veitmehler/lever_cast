@@ -25,6 +25,42 @@ export interface ValidatedCitation {
 const REQUEST_TIMEOUT_MS = 8_000
 const CONCURRENCY = 5
 
+type CitationEntry = {
+  sourceTitle?: string
+  link_title?: string
+  title?: string
+  sourceUrl?: string
+  link_url?: string
+  url?: string
+}
+
+/**
+ * Extract flat {title, url} pairs from step 12 JSON output for URL validation.
+ * Handles multiple JSON shapes the LLM might produce.
+ */
+export function extractCitationsForValidation(raw: string): Array<{ title: string; url: string }> {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    const entries: CitationEntry[] = Array.isArray(parsed)
+      ? (parsed as CitationEntry[])
+      : Array.isArray((parsed as Record<string, unknown>).resource_links)
+        ? ((parsed as Record<string, unknown>).resource_links as CitationEntry[])
+        : Array.isArray((parsed as Record<string, unknown>).links)
+          ? ((parsed as Record<string, unknown>).links as CitationEntry[])
+          : []
+
+    return entries
+      .map((e) => ({
+        title: String(e.sourceTitle ?? e.link_title ?? e.title ?? ''),
+        url: String(e.sourceUrl ?? e.link_url ?? e.url ?? ''),
+      }))
+      .filter((c) => c.url.startsWith('http'))
+  } catch {
+    return []
+  }
+}
+
 function classifyStatus(httpStatus: number): ValidatedCitation['status'] {
   if ([200, 201, 301, 302, 303, 307, 308].includes(httpStatus)) return 'valid'
   if (httpStatus === 403 || httpStatus === 401 || httpStatus === 429) return 'uncertain'

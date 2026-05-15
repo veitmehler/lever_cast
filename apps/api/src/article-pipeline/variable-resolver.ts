@@ -110,6 +110,9 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     case 'topic':
       return ctx.topicText
 
+    case 'title':
+      return ctx.completedSteps.get(0) ?? ''
+
     case 'slug':
       return ctx.topicSlug ?? ''
 

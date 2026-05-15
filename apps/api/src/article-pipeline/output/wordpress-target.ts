@@ -228,9 +228,33 @@ export class WordPressTarget implements OutputTarget {
       }
     }
 
-    // 2. Upload diagrams — best-effort (fall back to CDN URL on failure)
+    // 2. Upload diagrams to WP — SVG first, PNG as fallback.
+    // bodyHtml contains SVG CDN URLs, so the map key must be svgCdnUrl.
     const diagramUrlMap = new Map<string, string>()
     for (const d of payload.diagrams) {
+      const svgSrc = d.svgCdnUrl // what bodyHtml contains in <img src>
+
+      // Attempt SVG upload (preferred — same fidelity, smaller DOM footprint)
+      if (d.svgS3Key) {
+        try {
+          const { source_url } = await uploadWpMedia(
+            siteUrl,
+            auth,
+            d.svgCdnUrl,
+            `${payload.slug}-diagram-${d.position}.svg`,
+            d.caption ?? d.sectionTitle,
+          )
+          diagramUrlMap.set(svgSrc, source_url)
+          continue
+        } catch (err) {
+          logger.warn(
+            { err, jobId: payload.jobId, position: d.position },
+            '[wordpress] SVG upload failed — trying PNG fallback',
+          )
+        }
+      }
+
+      // PNG fallback (e.g. WP site blocks SVG uploads without a plugin)
       try {
         const { source_url } = await uploadWpMedia(
           siteUrl,
@@ -239,13 +263,12 @@ export class WordPressTarget implements OutputTarget {
           `${payload.slug}-diagram-${d.position}.png`,
           d.caption ?? d.sectionTitle,
         )
-        diagramUrlMap.set(d.cdnUrl, source_url)
+        diagramUrlMap.set(svgSrc, source_url)
       } catch (err) {
         logger.warn(
           { err, jobId: payload.jobId, position: d.position },
           '[wordpress] diagram upload failed — using CDN fallback',
         )
-        // Keep original CDN URL (no replacement)
       }
     }
 

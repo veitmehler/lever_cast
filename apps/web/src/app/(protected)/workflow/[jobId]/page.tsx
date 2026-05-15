@@ -198,42 +198,34 @@ function htmlToMarkdown(html: string): string {
 }
 
 /**
- * Like htmlToMarkdown but substitutes <figure class="article-diagram"> blocks
- * with inline SVG content at the correct position. Each figure's <img src> is
- * used to look up the pre-fetched SVG string in svgBySrc.
- * Falls back to a caption-only placeholder when the SVG hasn't loaded yet.
+ * Like htmlToMarkdown but converts <figure class="article-diagram"> blocks
+ * into clean markdown image references: ![caption](src).
+ * This keeps the review text free of raw SVG XML while still referencing
+ * each diagram so evaluators (and Google tools) can follow the link.
  */
-function htmlToMarkdownWithDiagrams(
-  html: string,
-  svgBySrc: Record<string, string>,
-): string {
-  // Replace each article-diagram figure with a placeholder token before
-  // running the standard markdown conversion (which strips all tags).
+function htmlToMarkdownWithDiagrams(html: string): string {
   const tokens: string[] = []
   const withPlaceholders = html.replace(
     /<figure\s[^>]*class="[^"]*article-diagram[^"]*"[^>]*>([\s\S]*?)<\/figure>/gi,
-    (fullMatch, inner) => {
-      // Extract src from the <img> inside the figure
+    (_fullMatch, inner: string) => {
       const srcMatch = inner.match(/\bsrc="([^"]+)"/)
       const captionMatch = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i)
       const src = srcMatch?.[1] ?? ''
       const captionText = captionMatch
         ? captionMatch[1].replace(/<[^>]+>/g, '').trim()
         : ''
-      const svg = svgBySrc[src]
-      const replacement = svg
-        ? `\n\n${captionText ? `**${captionText}**\n\n` : ''}${svg}\n\n`
-        : `\n\n${captionText ? `*[Diagram: ${captionText}]*` : '*[Diagram]*'}\n\n`
+      const altText = captionText || 'Diagram'
+      const replacement = src
+        ? `\n\n![${altText}](${src})\n\n`
+        : `\n\n*[Diagram: ${altText}]*\n\n`
       const token = `@@DIAGRAM_${tokens.length}@@`
       tokens.push(replacement)
       return token
     },
   )
 
-  // Run the normal markdown pipeline (placeholder tokens pass through intact)
   let markdown = htmlToMarkdown(withPlaceholders)
 
-  // Substitute tokens back with their SVG / caption content
   for (let i = 0; i < tokens.length; i++) {
     markdown = markdown.replace(`@@DIAGRAM_${i}@@`, tokens[i])
   }
@@ -387,28 +379,16 @@ ${citationLines}`
 }
 
 /**
- * Like buildReviewText but inlines SVG content at the exact position each
- * diagram <figure> occupies in the article body. diagramSvgs is keyed by
- * diagram id; svgBySrc maps CDN src URLs to the same SVG text so the inline
- * substitutor can match <img src> attributes inside each <figure>.
+ * Like buildReviewText but converts diagram <figure> blocks into clean
+ * markdown image references: ![caption](cdn-url). Keeps the review text free
+ * of raw SVG XML for Google evaluation tools.
  */
 function buildFinalReviewText(
   sp: SitePage,
   pipelineSteps: PipelineStep[],
   brand: BrandSettings,
-  diagramSvgs: Record<string, string>,
   isApproving: boolean,
 ): string {
-  const diagrams = sp.diagrams ?? []
-
-  // Build a src→svg lookup so htmlToMarkdownWithDiagrams can match <img src>
-  const svgBySrc: Record<string, string> = {}
-  for (const d of diagrams) {
-    if (d.svgCdnUrl && diagramSvgs[d.id]) {
-      svgBySrc[d.svgCdnUrl] = diagramSvgs[d.id]
-    }
-  }
-
   const bodySource =
     sp.bodyHtml?.trim() ||
     pipelineSteps.find((s) => s.stepNumber === 11 && s.status === 'completed')?.output?.trim() ||
@@ -416,7 +396,7 @@ function buildFinalReviewText(
     ''
 
   const bodyMarkdown = bodySource
-    ? htmlToMarkdownWithDiagrams(bodySource, svgBySrc)
+    ? htmlToMarkdownWithDiagrams(bodySource)
     : '[Article body not yet available]'
 
   const title = resolveBestTitle(sp, pipelineSteps, isApproving)
@@ -511,7 +491,6 @@ export default function WorkflowJobPage() {
   const [copiedFinal, setCopiedFinal] = useState(false)
   const [showFinalArticleReview, setShowFinalArticleReview] = useState(true)
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
-  const [diagramSvgs, setDiagramSvgs] = useState<Record<string, string>>({})
   const [wpConnections, setWpConnections] = useState<WpConnectionLite[]>([])
 
   useEffect(() => {
@@ -605,28 +584,6 @@ export default function WorkflowJobPage() {
       }))
       .catch(() => {/* silent */})
   }, [])
-
-  // Fetch SVG content via API proxy (avoids CDN CORS restrictions).
-  // Keyed by diagram id so buildFinalReviewText can look them up.
-  useEffect(() => {
-    const diagrams = job?.sitePage?.diagrams
-    if (!diagrams?.length) return
-    const eligible = diagrams.filter((d) => d.svgCdnUrl)
-    if (eligible.length === 0) return
-    void Promise.all(
-      eligible.map(async (d) => {
-        try {
-          const res = await fetch(`/api/articles/${jobId}/diagram-svg/${d.id}`)
-          if (res.ok) return [d.id, await res.text()] as const
-        } catch { /* skip */ }
-        return null
-      }),
-    ).then((results) => {
-      const map: Record<string, string> = {}
-      for (const r of results) { if (r) map[r[0]] = r[1] }
-      setDiagramSvgs(map)
-    })
-  }, [job?.sitePage?.diagrams, jobId])
 
   // ── SSE ────────────────────────────────────────────────────────────────────
 
@@ -905,7 +862,7 @@ export default function WorkflowJobPage() {
 
   const handleCopyFinal = async () => {
     if (!job?.sitePage) return
-    const text = buildFinalReviewText(job.sitePage, job.pipelineSteps, brandSettings, diagramSvgs, isApproving)
+    const text = buildFinalReviewText(job.sitePage, job.pipelineSteps, brandSettings, isApproving)
     try {
       await navigator.clipboard.writeText(text)
       setCopiedFinal(true)
@@ -1395,7 +1352,7 @@ export default function WorkflowJobPage() {
                 )}
                 <textarea
                   readOnly
-                  value={buildFinalReviewText(sitePage, job.pipelineSteps, brandSettings, diagramSvgs, isApproving)}
+                  value={buildFinalReviewText(sitePage, job.pipelineSteps, brandSettings, isApproving)}
                   rows={20}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-xs font-mono text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                 />

@@ -92,8 +92,10 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
       sectionTitle: d.sectionTitle,
       caption: d.caption,
       cdnUrl: cdnUrl(d.pngS3Key!),
+      svgCdnUrl: d.svgS3Key ? cdnUrl(d.svgS3Key) : cdnUrl(d.pngS3Key!),
       svgContent: d.svgContent,
       pngS3Key: d.pngS3Key!,
+      svgS3Key: d.svgS3Key ?? '',
       width: d.pngWidth,
       height: d.pngHeight,
     }))

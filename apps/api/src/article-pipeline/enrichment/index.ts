@@ -759,6 +759,23 @@ interface SaveDiagramOpts {
 /** Match screenshot + crop background (mmdc `-b white`). */
 const DIAGRAM_LIGHT_RASTER_BG = '#FFFFFF'
 
+/**
+ * Extract intrinsic dimensions from an SVG string for CLS-prevention width/height attributes.
+ * Reads viewBox first (most reliable), falls back to explicit width/height attributes.
+ */
+function extractSvgViewBoxDimensions(svg: string): { width: number; height: number } | null {
+  const vb = /\bviewBox\s*=\s*["']\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)\s*["']/i.exec(svg)
+  if (vb) {
+    return { width: Math.round(Number.parseFloat(vb[1])), height: Math.round(Number.parseFloat(vb[2])) }
+  }
+  const w = /\bwidth\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(svg)
+  const h = /\bheight\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(svg)
+  if (w && h) {
+    return { width: Math.round(Number.parseFloat(w[1])), height: Math.round(Number.parseFloat(h[1])) }
+  }
+  return null
+}
+
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, caption } =
     opts
@@ -843,12 +860,15 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
 
   // Article HTML references the SVG — browsers render it natively and it's
   // AI-crawlable text. PNG is kept for bundle/email fallback only.
+  const svgDims = extractSvgViewBoxDimensions(cleanSvg)
   figuresToInsert.push({
     afterH2Offset: section.afterH2Offset,
     figureHtml: buildFigureHtml({
       imgUrl: svgUrl,
       alt: section.heading,
       caption,
+      width: svgDims?.width,
+      height: svgDims?.height,
     }),
   })
 

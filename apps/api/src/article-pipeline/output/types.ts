@@ -26,9 +26,11 @@ export interface OutputPayload {
     sectionAnchor: string
     sectionTitle: string
     caption?: string | null
-    cdnUrl: string
+    cdnUrl: string       // PNG CDN URL — used for bundle/email fallback
+    svgCdnUrl: string    // SVG CDN URL — matches what is in bodyHtml <img src>
     svgContent: string
     pngS3Key: string
+    svgS3Key: string     // needed for WP SVG upload
     width?: number | null
     height?: number | null
   }>

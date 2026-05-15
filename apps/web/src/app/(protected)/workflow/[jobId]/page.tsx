@@ -562,6 +562,21 @@ export default function WorkflowJobPage() {
     }
   }, [job?.status, isApproving])
 
+  // When Phase A finishes (status → 'completed'), the SSE appends the final
+  // steps (including step 12) without their `output` field, then both SSE and
+  // the 3-second fetchJob poll stop immediately. This leaves step 12 output-
+  // less in React state, so citations never render until the user reloads.
+  // Fix: do a fresh fetchJob() the moment status becomes 'completed' so the
+  // Review Content panel always has full step data, including citations.
+  const prevStatusForCitationsRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevStatusForCitationsRef.current
+    prevStatusForCitationsRef.current = job?.status
+    if (prev === 'in_progress' && job?.status === 'completed') {
+      fetchJob()
+    }
+  }, [job?.status, fetchJob])
+
   const sseRef             = useRef<EventSource | null>(null)
   const reconnectTimerRef  = useRef<number | null>(null)
   // Stable ref mirrors job state so onerror callbacks can read status without

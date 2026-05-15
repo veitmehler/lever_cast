@@ -55,6 +55,7 @@ const STEP_LABELS: Record<string, string> = {
   find_citations:                 '12. Find Citations',
   // Phase B
   generate_seo_metadata:          '13. SEO Metadata',
+  insert_inline_citations:        '14. Insert Inline Citations',
   generate_image_prompt:          '15. Image Prompt (LLM)',
   image_generation_model:         '15b. Featured Image — Fal.ai Model',
   generate_schema_markup:         '16. Schema Markup',
@@ -77,7 +78,7 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6',
   7: '7', 8: '8', 9: '9', 10: '10', 11: '11', 12: '12',
   // Phase B
-  13: '13', 15: '15', 150: '15b', 16: '16', 17: '17', 18: '18',
+  13: '13', 110: '14', 15: '15', 150: '15b', 16: '16', 17: '17', 18: '18',
   // Phase C (continues from 18)
   101: '19', 102: '20', 103: '21', 104: '22', 107: '23', 20: '24', 108: '25',
 }
@@ -88,10 +89,10 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
     steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   },
   {
-    // Actual execution order: 13 → 15 → Fal.ai (150) → 16 → 17 → 18
+    // Actual execution order: 13 → 110 (inline citations) → 15 → Fal.ai (150) → 16 → 17 → 18
     // Step 14 (select_category) is not part of the pipeline — not seeded
     label: 'Phase B — Approval Chain',
-    steps: [13, 15, 150, 16, 17, 18],
+    steps: [13, 110, 15, 150, 16, 17, 18],
   },
   {
     // Actual execution order: 101 → 102 → 103 → 104 → 107 → diagram loop (20) → 108

@@ -26,6 +26,8 @@ import { generateFeaturedImage } from './image-generation'
 import { uploadFeaturedImageToS3WithRetry } from './image-uploader'
 import { getBoss, QUEUES } from '../queues/index'
 import type { PipelineContext } from './variable-resolver'
+import { validateCitationUrls } from './citation-validator'
+import { insertInlineCitations } from './citation-inserter'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +82,7 @@ function extractPrimaryKeyword(parsed: Record<string, unknown> | undefined): str
   )
 }
 
-/** Parse citations from the Step 12 output. */
+/** Parse citations from the Step 12 output (for storage in SitePage.citations). */
 function parseCitations(raw: string): Record<string, unknown> | null {
   if (!raw) return null
   try {
@@ -89,6 +91,42 @@ function parseCitations(raw: string): Record<string, unknown> | null {
     if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
   } catch { /* ignore */ }
   return null
+}
+
+type CitationEntry = {
+  sourceTitle?: string
+  link_title?: string
+  title?: string
+  sourceUrl?: string
+  link_url?: string
+  url?: string
+}
+
+/**
+ * Extract flat {title, url} pairs from step 12 output for URL validation.
+ * Handles multiple JSON shapes the LLM might produce.
+ */
+function extractCitationsForValidation(raw: string): Array<{ title: string; url: string }> {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    const entries: CitationEntry[] = Array.isArray(parsed)
+      ? (parsed as CitationEntry[])
+      : Array.isArray((parsed as Record<string, unknown>).resource_links)
+        ? ((parsed as Record<string, unknown>).resource_links as CitationEntry[])
+        : Array.isArray((parsed as Record<string, unknown>).links)
+          ? ((parsed as Record<string, unknown>).links as CitationEntry[])
+          : []
+
+    return entries
+      .map((e) => ({
+        title: String(e.sourceTitle ?? e.link_title ?? e.title ?? ''),
+        url: String(e.sourceUrl ?? e.link_url ?? e.url ?? ''),
+      }))
+      .filter((c) => c.url.startsWith('http'))
+  } catch {
+    return []
+  }
 }
 
 /** Truncate excerpt to ≤150 chars. */
@@ -208,6 +246,41 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     Sentry.captureException(err, { tags: { phase: 'approval', step: 15 } })
   }
 
+  // ── Citation URL validation + inline linking ──────────────────────────────
+  // Validate each citation URL (via OxyLabs residential proxy if configured,
+  // direct HEAD otherwise) and then ask the LLM to insert inline <a> tags
+  // for the live citations. Each URL is used at most once.
+  let articleBodyHtml = step11
+  const rawCitationsForValidation = extractCitationsForValidation(ctx.completedSteps.get(12) ?? '')
+  if (rawCitationsForValidation.length > 0) {
+    try {
+      logger.info({ jobId, count: rawCitationsForValidation.length }, '[approval] validating citation URLs')
+      const validated = await validateCitationUrls(rawCitationsForValidation, jobId)
+      const liveCitations = validated.filter((c) => c.status !== 'dead')
+      const deadCount = validated.length - liveCitations.length
+      if (deadCount > 0) {
+        logger.warn({ jobId, deadCount }, '[approval] removed dead citation URLs before insertion')
+      }
+      if (liveCitations.length > 0) {
+        const { linkedHtml, insertedCount } = await insertInlineCitations(
+          step11,
+          liveCitations,
+          jobId,
+          ctx,
+        )
+        articleBodyHtml = linkedHtml
+        logger.info(
+          { jobId, insertedCount, total: liveCitations.length },
+          '[approval] inline citations inserted',
+        )
+      }
+    } catch (err) {
+      // Non-fatal — log and continue with the unlinked body
+      logger.error({ jobId, err }, '[approval] citation validation/insertion failed — continuing without inline links')
+      Sentry.captureException(err, { tags: { phase: 'approval', step: 'inline_citations' } })
+    }
+  }
+
   // ── Upsert SitePage (makes {{article_title}} resolvable for steps 17/18) ──
   logger.info({ jobId }, '[approval] upserting SitePage')
 
@@ -218,7 +291,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   const baseSlug = slugify(seo.urlSlug || seo.metaTitle || topic.topic)
   const finalSlug = await resolveUniqueSlug(userId, jobId, baseSlug)
   const seoTitle = seo.metaTitle || ctx.completedSteps.get(0)?.trim() || topic.topic
-  const readingTime = calculateReadingTime(step11)
+  const readingTime = calculateReadingTime(articleBodyHtml)
 
   // Delete any conflicting sitePage keyed by jobId — shouldn't exist, but defensive
   await prisma.sitePage.upsert({
@@ -228,7 +301,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       userId,
       slug: finalSlug,
       title: seoTitle,
-      bodyHtml: step11,
+      bodyHtml: articleBodyHtml,
       originalBodyHtml: step11,
       seoTitle,
       seoDescription: seo.metaDescription || null,
@@ -241,7 +314,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     update: {
       slug: finalSlug,
       title: seoTitle,
-      bodyHtml: step11,
+      bodyHtml: articleBodyHtml,
       originalBodyHtml: step11,
       seoTitle,
       seoDescription: seo.metaDescription || null,

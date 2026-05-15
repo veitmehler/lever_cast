@@ -20,6 +20,7 @@ const STEP_NAME_MAP: Record<string, number> = {
   generate_seo_metadata: 13,
   select_category: 14,
   generate_image_prompt: 15,
+  insert_inline_citations: 110,
 }
 
 export interface PipelineContext {
@@ -383,6 +384,12 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       const slug = topic?.slug ?? ctx.topicSlug ?? ''
       return slug ? `${base}/${slug}` : base
     }
+
+    case 'validated_citations':
+      // Populated by the approval service (step 110 setup) before calling StepRunner.
+      // The approval service calls ctx.completedSteps.set(110, JSON.stringify(liveCitations))
+      // so the resolved value is the JSON array of validated citations.
+      return ctx.completedSteps.get(110) ?? ''
 
     // ── Generic step output accessor: {{<step_name>_output}} ─────────────────
     default: {

@@ -578,6 +578,31 @@ Rules:
 - If fewer than 4 tags are relevant, return only the relevant ones.
 - If no tags apply, return an empty array: []`,
   },
+  {
+    stepNumber: 110,
+    stepName: 'insert_inline_citations',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    systemPrompt:
+      'You are a professional editor specializing in adding inline citation hyperlinks to HTML articles. You add links precisely at the most relevant claim or data point, preserving the article\'s existing structure exactly.',
+    userPrompt: `Add inline citation hyperlinks to this article. Each citation must be inserted as an <a> tag wrapping the most relevant phrase, sentence, or data point in the article body.
+
+Article HTML:
+{{article}}
+
+Validated Citations (JSON):
+{{validated_citations}}
+
+Rules:
+- Each citation URL must appear AT MOST ONCE in the entire article.
+- Wrap the most relevant existing text in an <a href="URL" target="_blank" rel="noopener noreferrer"> tag. Do NOT add new text — only wrap existing text.
+- Place each citation near the specific claim or data point it supports.
+- Do NOT modify any other HTML structure, headings, paragraphs, lists, or content.
+- Do NOT remove or rearrange any existing content.
+- If a citation has no clearly relevant passage in the article, skip it entirely — do not force it.
+- Return the COMPLETE article HTML with the citation links added.
+- Output ONLY the HTML — no explanation, no markdown fences, no preamble.`,
+  },
 ]
 
 // ── Outline Frameworks (12 genericized structures) ───────────────────────────

@@ -50,6 +50,8 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'author_linkedin',    description: 'BrandSettings.defaultAuthorLinkedIn',                 steps: [] },
   { name: 'organization_country_code', description: 'BrandSettings ISO 3166-1 alpha-2 (e.g. US)',    steps: [] },
   { name: 'google_business_profile_url', description: 'BrandSettings GBP / g.page URL',          steps: [] },
+  // Phase B citation insertion
+  { name: 'validated_citations', description: 'JSON array of validated {title, url, status} citation objects (step 110 only)', steps: [110] },
   // Enrichment-specific
   { name: 'article_topic',      description: '[Enrichment] Article topic string',             steps: [20] },
   { name: 'section_title',      description: '[Enrichment] H2 section heading',               steps: [20] },
@@ -71,8 +73,9 @@ const STEP_LABELS: Record<number, string> = {
   10:  'Phase A · Step 10 — Fact Check',
   11:  'Phase A · Step 11 — Adjust Incorrect Facts',
   12:  'Phase A · Step 12 — Find Citations',
-  // Phase B — Approval Chain (runs in order: 13 → 15 → 150/Fal → 16 → 17 → 18)
+  // Phase B — Approval Chain (runs in order: 13 → 110 → 15 → 150/Fal → 16 → 17 → 18)
   13:  'Phase B · Step 13 — SEO Metadata',
+  110: 'Phase B · Step 14 — Insert Inline Citations',
   15:  'Phase B · Step 15 — Image Prompt (LLM)',
   150: 'Phase B · Step 15b — Featured Image Model (Fal.ai)',
   16:  'Phase B · Step 16 — Schema Markup',

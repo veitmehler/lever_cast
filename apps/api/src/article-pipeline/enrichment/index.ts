@@ -35,6 +35,8 @@ import { matchQuestionsToSections } from './geo-question-matcher'
 import { generateQuestionFromKeyword, rephraseForUniqueness } from './geo-question-generator'
 import { generateAiSummary } from './geo-summary-generator'
 import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restructurer'
+import { sanitizeGeoQuestion } from './geo-question-sanitizer'
+import { normalizeH2Questions } from '../approval-service'
 import { generateKeyTakeaways } from './key-takeaways-generator'
 import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
@@ -172,7 +174,8 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     }
 
     for (const e of eligible) {
-      let question = matchByPos.get(e.position) ?? null
+      // Sanitize the FAQ-matched question first; null means fall through to keyword generation
+      let question = sanitizeGeoQuestion(matchByPos.get(e.position) ?? null)
       let source: 'faq_match' | 'keyword_gen' | 'rephrased' | null = question ? 'faq_match' : null
       let qCost = 0
       let qIn = 0
@@ -180,7 +183,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
       let qProv = ''
       let qModel = ''
 
-      if (!question?.trim()) {
+      if (!question) {
         try {
           const kw = pickKeywordForSection(e.heading, secondaryKws)
           const g = await generateQuestionFromKeyword({
@@ -189,22 +192,25 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             jobId,
             position: e.position,
           })
-          question = g.question
-          source = 'keyword_gen'
-          qCost += g.cost
-          qIn += g.inputTokens
-          qOut += g.outputTokens
-          qProv = g.provider
-          qModel = g.model
-          totalCost += g.cost
-          totalInputTokens += g.inputTokens
-          totalOutputTokens += g.outputTokens
+          // Sanitize keyword-generated question; null means skip this section
+          question = sanitizeGeoQuestion(g.question)
+          if (question) {
+            source = 'keyword_gen'
+            qCost += g.cost
+            qIn += g.inputTokens
+            qOut += g.outputTokens
+            qProv = g.provider
+            qModel = g.model
+            totalCost += g.cost
+            totalInputTokens += g.inputTokens
+            totalOutputTokens += g.outputTokens
+          }
         } catch (err) {
           logger.warn({ jobId, err, position: e.position }, '[enrichment] geo 102 failed')
         }
       }
 
-      if (!question?.trim()) continue
+      if (!question) continue
 
       try {
         const collision = await prisma.sectionEnrichment.count({
@@ -216,16 +222,20 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
         })
         if (collision > 0) {
           const r = await rephraseForUniqueness({ question, jobId, position: e.position })
-          question = r.question
-          source = 'rephrased'
-          totalCost += r.cost
-          totalInputTokens += r.inputTokens
-          totalOutputTokens += r.outputTokens
-          qCost += r.cost
-          qIn += r.inputTokens
-          qOut += r.outputTokens
-          qProv = r.provider
-          qModel = r.model
+          // Sanitize rephrased question; if null, keep the pre-rephrase question
+          const rephrased = sanitizeGeoQuestion(r.question)
+          if (rephrased) {
+            question = rephrased
+            source = 'rephrased'
+            totalCost += r.cost
+            totalInputTokens += r.inputTokens
+            totalOutputTokens += r.outputTokens
+            qCost += r.cost
+            qIn += r.inputTokens
+            qOut += r.outputTokens
+            qProv = r.provider
+            qModel = r.model
+          }
         }
       } catch (err) {
         logger.warn({ jobId, err }, '[enrichment] geo 103 skipped')
@@ -839,10 +849,13 @@ async function finishEnrichment(
   inputTokens: number,
   outputTokens: number,
 ): Promise<void> {
+  // Ensure any GEO question headings that slipped through without a '?' get one
+  const normalizedHtml = normalizeH2Questions(enrichedHtml)
+
   await prisma.sitePage.update({
     where: { id: sitePageId },
     data: {
-      bodyHtml: enrichedHtml,
+      bodyHtml: normalizedHtml,
       enrichmentStatus: 'completed',
       enrichedAt: new Date(),
       enrichmentError: null,

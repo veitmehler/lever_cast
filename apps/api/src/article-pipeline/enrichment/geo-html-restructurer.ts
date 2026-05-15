@@ -21,9 +21,28 @@ function demoteH3ToH4(fragment: string): string {
 }
 
 /**
+ * Produce a unique ID for a heading, avoiding collisions with previously used IDs.
+ * First attempt: plain slug. On collision: append -2, -3, etc.
+ */
+function uniqueId(base: string, usedIds: Set<string>): string {
+  if (!usedIds.has(base)) {
+    usedIds.add(base)
+    return base
+  }
+  let n = 2
+  while (usedIds.has(`${base}-${n}`)) n++
+  const id = `${base}-${n}`
+  usedIds.add(id)
+  return id
+}
+
+/**
  * Replace each H2 section that has GEO data: insert question H2 + optional summary,
  * demote original H2 to H3, demote inner h3→h4.
  * Processes from last section to first so string replacement stays aligned.
+ *
+ * Heading IDs use clean slugs only — no geo-/sec- prefixes, no position suffixes —
+ * so ToC anchor links look natural to crawlers and users.
  */
 export function restructureHtmlWithGeo(
   bodyHtml: string,
@@ -32,6 +51,9 @@ export function restructureHtmlWithGeo(
 ): string {
   let result = bodyHtml
   const n = extractH2Sections(result).length
+  // Track IDs used across the whole document to guarantee uniqueness
+  const usedIds = new Set<string>()
+
   for (let idx = n - 1; idx >= 0; idx--) {
     const pos = idx + 1
     const geo = geoByPosition.get(pos)
@@ -48,16 +70,19 @@ export function restructureHtmlWithGeo(
     const titleInner = h2Match[1]
     const afterFirstH2 = cur.sectionHtml.slice(h2Match[0].length)
     const demotedRest = demoteH3ToH4(afterFirstH2)
-    const anchor = `${cur.anchor}-${pos}`
     const qEsc = escapeHtml(q)
     const summaryBlock =
       geo.summary?.trim()
         ? `\n<div class="geo-summary" data-question="${qEsc}"><p>${escapeHtml(geo.summary.trim())}</p></div>\n`
         : '\n'
 
+    // Clean IDs: plain slugs, no prefixes or position suffixes
+    const h2Id = uniqueId(slugify(q), usedIds)
+    const h3Id = uniqueId(cur.anchor, usedIds)
+
     const newSection =
-      `<h2 id="geo-${slugify(q)}-${pos}">${q}</h2>${summaryBlock}` +
-      `<h3 id="sec-${anchor}">${titleInner}</h3>` +
+      `<h2 id="${h2Id}">${q}</h2>${summaryBlock}` +
+      `<h3 id="${h3Id}">${titleInner}</h3>` +
       demotedRest
 
     const start = result.indexOf(cur.sectionHtml)

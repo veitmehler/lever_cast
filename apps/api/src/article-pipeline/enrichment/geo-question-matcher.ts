@@ -24,6 +24,40 @@ Rules:
 
 Example response: ["Why is X important?", null, "How does Y work?"]`
 
+/**
+ * Word-overlap score between two strings (Jaccard-style, case-insensitive).
+ * Returns a value in [0, 1].
+ */
+function wordOverlap(a: string, b: string): number {
+  const words = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean))
+  const wa = words(a)
+  const wb = words(b)
+  if (wa.size === 0 || wb.size === 0) return 0
+  let intersection = 0
+  for (const w of wa) { if (wb.has(w)) intersection++ }
+  return intersection / Math.max(wa.size, wb.size)
+}
+
+/**
+ * Snap an LLM-returned string back to the best-matching original FAQ candidate.
+ * Returns the original candidate text (verbatim and complete) when overlap ≥ 0.80,
+ * or null to signal "no good match — fall through to keyword generation".
+ */
+function snapToCandidate(llmString: string, candidates: string[]): string | null {
+  if (candidates.length === 0) return null
+  let best: string | null = null
+  let bestScore = 0
+  for (const c of candidates) {
+    const score = wordOverlap(llmString, c)
+    if (score > bestScore) {
+      bestScore = score
+      best = c
+    }
+  }
+  return bestScore >= 0.8 ? best : null
+}
+
 export interface QuestionMatchResult {
   matches: (string | null)[]
   inputTokens: number
@@ -78,7 +112,11 @@ export async function matchQuestionsToSections(opts: {
       if (x === null || x === undefined) return null
       const s = typeof x === 'string' ? x.trim() : String(x).trim()
       if (!s.length || s.toLowerCase() === 'null') return null
-      return s
+      // Strict-match: snap the LLM's string back to the original candidate it
+      // best resembles (by word overlap). If overlap is <80%, treat as null so
+      // the caller falls through to keyword generation rather than using a
+      // truncated or paraphrased heading.
+      return snapToCandidate(s, opts.faqQuestions)
     })
   } catch (err) {
     logger.warn({ jobId: opts.jobId, err, raw: raw.slice(0, 400) }, '[geo-101] JSON parse failed')

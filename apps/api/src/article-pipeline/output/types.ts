@@ -11,6 +11,7 @@ export interface OutputPayload {
   seoDescription: string
   primaryKeyword: string
   disclaimer: string
+  schemaJson: string
   citations: Array<{ link_title: string; link_url: string }>
 
   featuredImage: {

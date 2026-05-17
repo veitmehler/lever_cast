@@ -379,12 +379,14 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     }
 
     case 'article_url': {
-      const [topic, bs] = await Promise.all([
-        prisma.topic.findUnique({ where: { id: ctx.topicId }, select: { slug: true } }),
+      // SitePage.slug is always written before any approval step that needs this variable.
+      // Topic.slug is user-supplied and often null for auto-generated topics.
+      const [sp, bs] = await Promise.all([
+        prisma.sitePage.findFirst({ where: { jobId: ctx.jobId }, select: { slug: true } }),
         getBrandSettings(ctx),
       ])
       const base = bs?.organizationWebsite?.replace(/\/$/, '') ?? ''
-      const slug = topic?.slug ?? ctx.topicSlug ?? ''
+      const slug = sp?.slug ?? ''
       return slug ? `${base}/${slug}` : base
     }
 

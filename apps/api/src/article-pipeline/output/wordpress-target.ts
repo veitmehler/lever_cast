@@ -272,7 +272,12 @@ export class WordPressTarget implements OutputTarget {
       }
     }
 
-    const wpReadyHtml = rewriteImageSrcs(payload.bodyHtml, diagramUrlMap)
+    let wpReadyHtml = rewriteImageSrcs(payload.bodyHtml, diagramUrlMap)
+
+    // Append JSON-LD schema markup so it is published with the post regardless of plugin.
+    if (payload.schemaJson?.trim()) {
+      wpReadyHtml += `\n<script type="application/ld+json">\n${payload.schemaJson.trim()}\n</script>`
+    }
 
     // 3. Create the WP post
     const postStatus = status ?? conn.defaultStatus ?? 'draft'

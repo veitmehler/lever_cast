@@ -224,7 +224,12 @@ function htmlToMarkdownWithDiagrams(html: string): string {
     },
   )
 
-  let markdown = htmlToMarkdown(withPlaceholders)
+  // Strip any raw <svg>…</svg> blocks that weren't wrapped in article-diagram figures.
+  // These can appear from LLM-generated HTML or entity-decoded markup and would otherwise
+  // produce massive XML noise in the review textarea.
+  const svgStripped = withPlaceholders.replace(/<svg[\s\S]*?<\/svg>/gi, '')
+
+  let markdown = htmlToMarkdown(svgStripped)
 
   for (let i = 0; i < tokens.length; i++) {
     markdown = markdown.replace(`@@DIAGRAM_${i}@@`, tokens[i])

@@ -122,6 +122,7 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
     seoDescription: sp.seoDescription ?? '',
     primaryKeyword: sp.primaryKeyword ?? '',
     disclaimer: sp.disclaimer ?? '',
+    schemaJson: sp.schemaJson ?? '',
     citations,
     featuredImage,
     diagrams,

@@ -12,6 +12,7 @@ interface PromptTemplate {
   stepName: string
   defaultProvider: string
   defaultModel: string
+  maxTokens: number | null
   systemPrompt: string | null
   userPrompt: string
   version: number

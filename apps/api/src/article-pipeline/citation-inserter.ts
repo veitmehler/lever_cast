@@ -8,6 +8,7 @@
  * Safety guarantees (enforced in post-processing regardless of LLM output):
  *  - Each citation URL appears AT MOST ONCE in the returned HTML
  *  - If the LLM drops H2 headings, we discard its output and return the original
+ *  - Every external <a> link has target="_blank" and rel="noopener noreferrer"
  */
 
 import { logger } from '../lib/logger'
@@ -29,6 +30,44 @@ function countOccurrences(haystack: string, needle: string): number {
 /** Count <h2 elements in an HTML string (rough but reliable). */
 function countH2s(html: string): number {
   return (html.match(/<h2[\s>]/gi) ?? []).length
+}
+
+/**
+ * Ensure every external <a> tag (href not starting with "#") has
+ * target="_blank" and rel="noopener noreferrer", regardless of what the LLM
+ * produced. Existing correct attributes are left untouched; missing or
+ * incomplete ones are injected/normalised.
+ */
+function normalizeExternalLinkAttrs(html: string): string {
+  return html.replace(/<a\b([^>]*)>/gi, (_match, attrs: string) => {
+    // Extract href value
+    const hrefMatch = /href\s*=\s*["']?([^"'\s>]*)["']?/i.exec(attrs)
+    const href = hrefMatch?.[1] ?? ''
+
+    // Leave internal anchor links (#...) and empty hrefs unchanged
+    if (!href || href.startsWith('#')) return `<a${attrs}>`
+
+    let result = attrs
+
+    // Inject target="_blank" if absent
+    if (!/\btarget\s*=/i.test(result)) {
+      result += ' target="_blank"'
+    }
+
+    // Inject or normalise rel to include both noopener and noreferrer
+    const relMatch = /\brel\s*=\s*["']([^"']*)["']/i.exec(result)
+    if (!relMatch) {
+      result += ' rel="noopener noreferrer"'
+    } else {
+      const relVal = relMatch[1]
+      const parts = relVal.split(/\s+/).filter(Boolean)
+      if (!parts.includes('noopener')) parts.push('noopener')
+      if (!parts.includes('noreferrer')) parts.push('noreferrer')
+      result = result.replace(/\brel\s*=\s*["'][^"']*["']/i, `rel="${parts.join(' ')}"`)
+    }
+
+    return `<a ${result.trim()}>`
+  })
 }
 
 /**
@@ -110,6 +149,10 @@ export async function insertInlineCitations(
       linkedHtml = deduplicateCitationLinks(linkedHtml, citation.url)
     }
   }
+
+  // Post-processing: guarantee target="_blank" and rel="noopener noreferrer"
+  // on every external link, regardless of what the LLM produced.
+  linkedHtml = normalizeExternalLinkAttrs(linkedHtml)
 
   // Count how many citation URLs actually appear in the final HTML
   const insertedCount = liveCitations.filter((c) =>

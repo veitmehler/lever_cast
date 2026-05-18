@@ -414,6 +414,10 @@ function buildFinalReviewText(
     ? `\n---\n\n## Article Disclaimer\n\n${sp.disclaimer.trim()}`
     : ''
 
+  const schemaSection = sp.schemaJson?.trim()
+    ? `\n---\n\n## Schema Markup\n\n\`\`\`json\n${sp.schemaJson.trim()}\n\`\`\``
+    : ''
+
   return `# Evaluation Request
 
 Does this article comply with and satisfy:
@@ -441,7 +445,7 @@ ${bodyMarkdown}
 
 ## Citations
 
-${citationLines}${disclaimerSection}`
+${citationLines}${disclaimerSection}${schemaSection}`
 }
 
 /** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */

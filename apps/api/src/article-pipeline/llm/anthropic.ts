@@ -60,12 +60,19 @@ export class AnthropicAdapter implements LLMAdapter {
       const inputTokens = response.usage.input_tokens
       const outputTokens = response.usage.output_tokens
 
+      const rawFinish = response.stop_reason
+      const finishReason =
+        rawFinish === 'end_turn'      ? 'stop'   :
+        rawFinish === 'max_tokens'    ? 'length' :
+        rawFinish === 'stop_sequence' ? 'stop'   : 'other'
+
       return {
         content: text,
         tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
         cost: calculateCost(model, inputTokens, outputTokens),
         model,
         provider: 'anthropic',
+        finishReason,
       }
     } catch (err) {
       if (err instanceof LLMError) throw err

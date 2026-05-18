@@ -51,11 +51,18 @@ export class OpenAIAdapter implements LLMAdapter {
         ...(maxTokens ? { max_tokens: maxTokens } : {}),
       })
 
-      const text = response.choices[0]?.message?.content ?? ''
+      const choice = response.choices[0]
+      const text = choice?.message?.content ?? ''
       if (!text.trim()) throw new LLMError('OpenAI returned empty response')
 
       const inputTokens = response.usage?.prompt_tokens ?? 0
       const outputTokens = response.usage?.completion_tokens ?? 0
+
+      const rawFinish = choice?.finish_reason
+      const finishReason =
+        rawFinish === 'stop'           ? 'stop'   :
+        rawFinish === 'length'         ? 'length' :
+        rawFinish === 'content_filter' ? 'filter' : 'other'
 
       return {
         content: text,
@@ -63,6 +70,7 @@ export class OpenAIAdapter implements LLMAdapter {
         cost: calculateCost(model, inputTokens, outputTokens),
         model,
         provider: 'openai',
+        finishReason,
       }
     } catch (err) {
       if (err instanceof LLMError) throw err

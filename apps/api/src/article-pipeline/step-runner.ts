@@ -247,6 +247,37 @@ export class StepRunner {
         const totalTokens       = llmResponse.tokens.total  + phase1Tokens.total
         const totalCost         = llmResponse.cost           + phase1Cost
 
+        // Always-on completion log: maxTokens ceiling + actual usage + stop signal.
+        // finishReason 'length' means the model was cut off — a warning follows.
+        const configuredMaxTokens = template.maxTokens ?? (isJsonStep ? JSON_STEP_MAX_TOKENS : undefined)
+        logger.info(
+          {
+            jobId: this.jobId,
+            step: this.stepNumber,
+            stepName: template.stepName,
+            provider,
+            model,
+            maxTokens: configuredMaxTokens ?? null,
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            finishReason: llmResponse.finishReason,
+            durationMs,
+          },
+          '[step-runner] step completed',
+        )
+        if (llmResponse.finishReason === 'length') {
+          logger.warn(
+            {
+              jobId: this.jobId,
+              step: this.stepNumber,
+              stepName: template.stepName,
+              outputTokens: totalOutputTokens,
+              maxTokens: configuredMaxTokens ?? null,
+            },
+            '[step-runner] output may be truncated — model stopped at token limit (finishReason: length)',
+          )
+        }
+
         // Persist step result
         await prisma.pipelineStep.update({
           where: { jobId_stepNumber: { jobId: this.jobId, stepNumber: this.stepNumber } },

@@ -4,6 +4,13 @@ export interface LLMResponse {
   cost: number
   model: string
   provider: string
+  /** Normalised stop signal from the provider.
+   *  'stop'     — model finished naturally (end of sequence / stop token)
+   *  'length'   — output was cut off at the maxTokens ceiling (potential truncation)
+   *  'filter'   — content safety filter halted generation
+   *  'other'    — any other provider-specific reason
+   */
+  finishReason: 'stop' | 'length' | 'filter' | 'other'
 }
 
 export interface LLMCallOptions {

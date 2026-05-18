@@ -114,12 +114,19 @@ export class GeminiAdapter implements LLMAdapter {
     const inputTokens = response.usageMetadata?.promptTokenCount ?? 0
     const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0
 
+    const rawFinish = response.candidates?.[0]?.finishReason
+    const finishReason =
+      rawFinish === 'STOP'       ? 'stop'   :
+      rawFinish === 'MAX_TOKENS' ? 'length' :
+      rawFinish === 'SAFETY'     ? 'filter' : 'other'
+
     return {
       content: text,
       tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
       cost: calculateCost(model, inputTokens, outputTokens),
       model,
       provider: 'gemini',
+      finishReason,
     }
   }
 
@@ -168,12 +175,19 @@ export class GeminiAdapter implements LLMAdapter {
     const inputTokens = data?.usageMetadata?.promptTokenCount ?? 0
     const outputTokens = data?.usageMetadata?.candidatesTokenCount ?? 0
 
+    const rawFinish = data?.candidates?.[0]?.finishReason
+    const finishReason =
+      rawFinish === 'STOP'       ? 'stop'   :
+      rawFinish === 'MAX_TOKENS' ? 'length' :
+      rawFinish === 'SAFETY'     ? 'filter' : 'other'
+
     return {
       content: text,
       tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
       cost: calculateCost(model, inputTokens, outputTokens),
       model,
       provider: 'gemini',
+      finishReason,
     }
   }
 }

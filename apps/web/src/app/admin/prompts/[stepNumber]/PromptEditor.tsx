@@ -12,10 +12,46 @@ interface PromptTemplate {
   stepName: string
   defaultProvider: string
   defaultModel: string
+  maxTokens: number | null
   systemPrompt: string | null
   userPrompt: string
   version: number
   isActive: boolean
+}
+
+// Known maximum output token limits per model slug.
+// Used to display a hint and warn when the entered value exceeds the model ceiling.
+const MODEL_MAX_OUTPUT_TOKENS: Record<string, number> = {
+  // Gemini
+  'gemini-2.5-flash':              65536,
+  'gemini-2.5-flash-lite':         32768,
+  'gemini-2.5-pro':                65536,
+  'gemini-3-flash-preview':        65536,
+  'gemini-3.1-flash-lite':         65536,
+  'gemini-3.1-flash-lite-preview': 65536,
+  'gemini-3.1-pro-preview':        65536,
+  'gemini-2.0-flash':              8192,
+  'gemini-2.0-flash-lite':         8192,
+  // Anthropic
+  'claude-sonnet-4-5-20250929':    16384,
+  'claude-sonnet-4-5':             16384,
+  'claude-sonnet-4-6':             16384,
+  'claude-opus-4-5':               16384,
+  'claude-opus-4-6':               16384,
+  'claude-opus-4-7':               16384,
+  'claude-haiku-3-5-20241022':     8192,
+  'claude-haiku-4-5':              16384,
+  // OpenAI
+  'gpt-4o':                        16384,
+  'gpt-4o-mini':                   16384,
+  'gpt-5.4':                       32768,
+  'gpt-5.4-mini':                  16384,
+  'gpt-5.4-nano':                  16384,
+  'gpt-5.5':                       32768,
+  'gpt-5-mini':                    16384,
+  'gpt-5-nano':                    16384,
+  'o3':                            100000,
+  'o4-mini':                       100000,
 }
 
 // All known pipeline variables with descriptions
@@ -189,6 +225,7 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
   const [userPrompt,   setUserPrompt]   = useState(template.userPrompt)
   const [provider,     setProvider]     = useState(template.defaultProvider)
   const [model,        setModel]        = useState(template.defaultModel)
+  const [maxTokens,    setMaxTokens]    = useState<number | null>(template.maxTokens)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
 
@@ -210,7 +247,8 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
     systemPrompt !== (template.systemPrompt ?? '') ||
     userPrompt   !== template.userPrompt ||
     provider     !== template.defaultProvider ||
-    model        !== template.defaultModel
+    model        !== template.defaultModel ||
+    maxTokens    !== template.maxTokens
 
   // Variables referenced in the current text
   const usedVars = new Set([
@@ -241,6 +279,7 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
           userPrompt,
           defaultProvider: provider,
           defaultModel: model,
+          maxTokens,
         }),
       })
       if (!res.ok) {
@@ -372,6 +411,61 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
                 )}
               </div>
             </div>
+
+            {/* Max output tokens row */}
+            {(() => {
+              const modelLimit = MODEL_MAX_OUTPUT_TOKENS[model]
+              const exceedsLimit = maxTokens !== null && modelLimit !== undefined && maxTokens > modelLimit
+              return (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1 max-w-xs">
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                        Max Output Tokens
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={512}
+                        value={maxTokens ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setMaxTokens(v === '' ? null : parseInt(v, 10))
+                        }}
+                        placeholder="Adapter default"
+                        className={`w-full rounded-lg border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 ${
+                          exceedsLimit
+                            ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/20'
+                            : 'border-border bg-background focus:border-indigo-400 focus:ring-indigo-400/20'
+                        }`}
+                      />
+                    </div>
+                    <div className="pb-2 text-xs text-muted-foreground">
+                      {modelLimit !== undefined ? (
+                        <span>
+                          Model limit:{' '}
+                          <span className={`font-semibold ${exceedsLimit ? 'text-red-500' : 'text-foreground'}`}>
+                            {modelLimit.toLocaleString()}
+                          </span>
+                        </span>
+                      ) : (
+                        <span>Model limit: unknown</span>
+                      )}
+                    </div>
+                  </div>
+                  {exceedsLimit && (
+                    <p className="mt-1.5 text-xs text-red-500">
+                      Value exceeds the known limit for this model — the API may reject or silently cap the request.
+                    </p>
+                  )}
+                  {maxTokens === null && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      When empty, each provider adapter uses its own safe default (8 192 for Anthropic/Gemini; model default for OpenAI).
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Prompts — hidden for model-only steps */}

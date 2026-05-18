@@ -7,6 +7,7 @@ interface UpdatePromptBody {
   userPrompt?: string
   defaultProvider?: string
   defaultModel?: string
+  maxTokens?: number | null
 }
 
 export async function promptsAdminRoutes(app: FastifyInstance) {
@@ -49,7 +50,7 @@ export async function promptsAdminRoutes(app: FastifyInstance) {
       const existing = await prisma.promptTemplate.findUnique({ where: { stepNumber } })
       if (!existing) return reply.status(404).send({ error: 'Template not found' })
 
-      const { systemPrompt, userPrompt, defaultProvider, defaultModel } = request.body ?? {}
+      const { systemPrompt, userPrompt, defaultProvider, defaultModel, maxTokens } = request.body ?? {}
 
       const updated = await prisma.promptTemplate.update({
         where: { stepNumber },
@@ -58,6 +59,7 @@ export async function promptsAdminRoutes(app: FastifyInstance) {
           ...(userPrompt !== undefined ? { userPrompt } : {}),
           ...(defaultProvider !== undefined ? { defaultProvider } : {}),
           ...(defaultModel !== undefined ? { defaultModel } : {}),
+          ...(maxTokens !== undefined ? { maxTokens } : {}),
         },
       })
 

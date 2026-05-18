@@ -368,6 +368,7 @@ model PromptTemplate {
   variables       Json?
   defaultProvider String   @default("gemini")
   defaultModel    String   @default("gemini-2.5-flash")
+  maxTokens       Int?
   version         Int      @default(1)
   isActive        Boolean  @default(true)
   pipelineSteps   PipelineStep[]

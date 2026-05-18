@@ -18,13 +18,9 @@ const SEARCH_STEPS = new Set([6, 7, 8, 10, 12])
 //   Phase 2 — standard call with jsonMode:true → converts prose to JSON
 const SEARCH_JSON_STEPS = new Set([12])
 
-// Higher token budget for JSON steps to avoid truncation before the JSON is emitted.
+// Fallback token budget for JSON steps when no per-step maxTokens is set in the DB.
+// Avoids truncation before the full JSON structure is emitted.
 const JSON_STEP_MAX_TOKENS = 16384
-
-// Explicit budget for plain-text steps so OpenAI doesn't apply its own unpredictable
-// default cap. 4096 is generous for any single-step text output (disclaimers, excerpts,
-// summaries) while staying well inside context limits.
-const TEXT_STEP_MAX_TOKENS = 4096
 
 // Set VERBOSE_LLM_LOGS=true in the environment to log full prompts + responses.
 // Set VERBOSE_LLM_LOGS_TRUNCATE=0 to disable truncation (logs full text).
@@ -196,7 +192,11 @@ export class StepRunner {
           model,
           // Fix B: larger token budget for JSON steps — model must finish emitting
           // the full JSON structure without truncation mid-array.
-          maxTokens: isJsonStep ? JSON_STEP_MAX_TOKENS : TEXT_STEP_MAX_TOKENS,
+          // Per-step value from DB takes precedence; fall back to JSON_STEP_MAX_TOKENS
+          // for JSON steps (prevents mid-array truncation). Text steps with no DB value
+          // pass undefined so each adapter uses its own safe default (8192 for
+          // Anthropic/Gemini, model default for OpenAI).
+          maxTokens: template.maxTokens ?? (isJsonStep ? JSON_STEP_MAX_TOKENS : undefined),
           // Two-phase steps use jsonMode (no search) in phase 2.
           // Other search steps continue using search grounding.
           useGenerativeSearch: isTwoPhase ? false : useSearch,
@@ -365,7 +365,7 @@ export class StepRunner {
             systemPrompt: fbPhase2SystemPrompt,
             userPrompt: fbPhase2UserPrompt,
             model: GEMINI_SEARCH_FALLBACK_MODEL,
-            maxTokens: isJsonStep ? JSON_STEP_MAX_TOKENS : TEXT_STEP_MAX_TOKENS,
+            maxTokens: template.maxTokens ?? (isJsonStep ? JSON_STEP_MAX_TOKENS : undefined),
             useGenerativeSearch: isTwoPhase ? false : useSearch,
             jsonMode: isTwoPhase ? true : false,
           })

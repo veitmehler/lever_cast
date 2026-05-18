@@ -10,6 +10,7 @@ interface PromptTemplate {
   stepName: string
   defaultProvider: string
   defaultModel: string
+  maxTokens: number | null
   systemPrompt: string | null
   userPrompt: string
   version: number
@@ -201,6 +202,11 @@ export default function AdminPromptsPage() {
                             <span className="text-sm font-medium text-foreground">{label}</span>
                             <ProviderBadge provider={t.defaultProvider} />
                             <span className="text-xs text-gray-400">{t.defaultModel}</span>
+                            {t.maxTokens !== null && t.maxTokens !== undefined && (
+                              <span className="text-xs text-gray-400 font-mono">
+                                {t.maxTokens.toLocaleString()} tok
+                              </span>
+                            )}
                           </div>
                           {vars.length > 0 && (
                             <div className="flex flex-wrap gap-1">

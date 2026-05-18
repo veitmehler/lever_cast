@@ -22,6 +22,7 @@ import {
   buildTocHtml,
   findFirstH2Index,
   stripTags,
+  normalizeHeadingCase,
 } from './html-parser'
 import { generateMermaidDiagram, extractMermaidConcepts } from './mermaid-generator'
 import { renderMermaidToSvg } from './svg-renderer'
@@ -889,7 +890,9 @@ async function finishEnrichment(
   inputTokens: number,
   outputTokens: number,
 ): Promise<void> {
-  const normalizedHtml = normalizeH2Questions(enrichedHtml)
+  // 1. Append `?` to question-phrased headings.
+  // 2. Title-case all h1–h4 text so body headings match the TOC labels.
+  const normalizedHtml = normalizeHeadingCase(normalizeH2Questions(enrichedHtml))
 
   await prisma.sitePage.update({
     where: { id: sitePageId },

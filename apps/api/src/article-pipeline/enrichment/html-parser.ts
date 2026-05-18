@@ -170,7 +170,7 @@ export function extractHeadingsForToc(html: string): TocEntry[] {
 
 const LOWERCASE_WORDS = new Set(['a','an','the','and','but','or','nor','for','so','yet','at','by','in','of','on','to','up','as','is'])
 
-function toTitleCase(text: string): string {
+export function toTitleCase(text: string): string {
   return text
     .split(/\s+/)
     .map((word, i) => {
@@ -179,6 +179,22 @@ function toTitleCase(text: string): string {
       return word.charAt(0).toUpperCase() + word.slice(1)
     })
     .join(' ')
+}
+
+/**
+ * Apply title case to the visible text of every h1–h4 in the HTML.
+ * Preserves all tag attributes (including id= anchors) exactly — only the
+ * inner text content is changed, so TOC anchor links stay valid.
+ * Inner HTML tags inside a heading are stripped; the plain text is
+ * title-cased and re-injected. Trailing punctuation (e.g. `?`) is preserved.
+ */
+export function normalizeHeadingCase(html: string): string {
+  return html.replace(/<(h[1-4])([^>]*)>([\s\S]*?)<\/\1>/gi, (_match, tag: string, attrs: string, inner: string) => {
+    const plain = inner.replace(/<[^>]+>/g, '').trim()
+    if (!plain) return _match
+    const titled = toTitleCase(plain)
+    return `<${tag}${attrs}>${escapeHtml(titled)}</${tag}>`
+  })
 }
 
 /**

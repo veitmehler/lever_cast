@@ -35,6 +35,7 @@ export interface GenTokens {
 export async function generateQuestionFromKeyword(opts: {
   keyword: string
   sectionHeading: string
+  contentSnippet: string
   jobId: string
   position: number
 }): Promise<{ question: string } & GenTokens> {
@@ -45,6 +46,7 @@ export async function generateQuestionFromKeyword(opts: {
   const usr = (t?.userPrompt ?? DEF_102_USER)
     .replace(/\{\{keyword\}\}/g, opts.keyword)
     .replace(/\{\{sectionHeading\}\}/g, opts.sectionHeading)
+    .replace(/\{\{content\}\}/g, opts.contentSnippet)
 
   const adapter = getLLMAdapter(provider)
   const run = await withGeoRetry(`geo_step_102_${opts.position}`, () =>
@@ -71,13 +73,16 @@ export async function generateQuestionFromKeyword(opts: {
 
 export async function rephraseForUniqueness(opts: {
   question: string
+  contentSnippet: string
   jobId: string
   position: number
 }): Promise<{ question: string } & GenTokens> {
   const t = await loadPromptTemplate(103)
   const provider = (t?.defaultProvider ?? 'openai').toLowerCase()
   const model = t?.defaultModel ?? 'gpt-4o-mini'
-  const usr = (t?.userPrompt ?? DEF_103_USER).replace(/\{\{question\}\}/g, opts.question)
+  const usr = (t?.userPrompt ?? DEF_103_USER)
+    .replace(/\{\{question\}\}/g, opts.question)
+    .replace(/\{\{content\}\}/g, opts.contentSnippet)
 
   const adapter = getLLMAdapter(provider)
   const run = await withGeoRetry(`geo_step_103_${opts.position}`, () =>

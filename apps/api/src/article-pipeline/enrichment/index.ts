@@ -189,6 +189,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           const g = await generateQuestionFromKeyword({
             keyword: kw,
             sectionHeading: e.heading,
+            contentSnippet: e.contentSnippet,
             jobId,
             position: e.position,
           })
@@ -221,7 +222,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           },
         })
         if (collision > 0) {
-          const r = await rephraseForUniqueness({ question, jobId, position: e.position })
+          const r = await rephraseForUniqueness({ question, contentSnippet: e.contentSnippet, jobId, position: e.position })
           // Sanitize rephrased question; if null, keep the pre-rephrase question
           const rephrased = sanitizeGeoQuestion(r.question)
           if (rephrased) {
@@ -310,6 +311,9 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     if (geoByPosition.size > 0) {
       geoHtml = restructureHtmlWithGeo(bodyHtml, baseSections, geoByPosition)
     }
+    // Normalise question-style H2s (append `?`) before the TOC is built so
+    // TOC display text matches the headings that appear in the article body.
+    geoHtml = normalizeH2Questions(geoHtml)
   }
 
   await setEnrichmentPhaseStep(jobId, 20)

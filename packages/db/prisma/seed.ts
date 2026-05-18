@@ -1331,11 +1331,9 @@ async function main() {
     await prisma.outlineFramework.upsert({
       where: { number: framework.number },
       create: framework,
-      update: {
-        label: framework.label,
-        description: framework.description,
-        body: framework.body,
-      },
+      // Never overwrite admin edits on re-seed.
+      // To bulk-update frameworks, run a dedicated reseed script.
+      update: {},
     })
     console.log(`  ✓ Framework ${framework.number}: ${framework.label}`)
   }

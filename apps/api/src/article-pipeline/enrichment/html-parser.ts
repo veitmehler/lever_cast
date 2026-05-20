@@ -98,23 +98,31 @@ export function buildEnrichedHtml(
 /** Build the HTML for a diagram figure block. */
 export function buildFigureHtml(opts: {
   imgUrl: string
+  diagramId: string       // unique id used for aria-describedby linkage
   alt: string             // section heading — fallback when altText is absent
-  altText?: string | null // accessibility-specific alt: concise visual description
-  caption?: string | null // visible figcaption: explains the diagram's meaning
+  altText?: string | null // short visual description for img alt= (≤125 chars, screen readers)
+  caption?: string | null // visible figcaption explaining meaning, linked via aria-describedby
   width?: number          // SVG intrinsic width — prevents CLS
   height?: number         // SVG intrinsic height — prevents CLS
 }): string {
-  // altText describes what the image looks like (for screen readers).
-  // caption describes what it means (shown as visible figcaption).
-  // They are now separate strings — never conflated.
-  const imgAlt = opts.altText?.trim() || opts.alt
+  // Enforce 125-char hard cap on alt text — some screen readers truncate beyond this point.
+  const rawAlt = opts.altText?.trim() || opts.alt
+  const imgAlt = rawAlt.length > 125
+    ? rawAlt.slice(0, 124).replace(/\s+\S*$/, '') // trim to last full word
+    : rawAlt
+
+  const captionId = `diagram-desc-${opts.diagramId}`
+  const ariaDescribedBy = opts.caption ? ` aria-describedby="${captionId}"` : ''
+
   const cap = opts.caption
-    ? `<figcaption>${escapeHtml(opts.caption)}</figcaption>`
+    ? `<figcaption id="${captionId}">${escapeHtml(opts.caption)}</figcaption>`
     : ''
+
   const dimAttrs = opts.width && opts.height
     ? ` width="${opts.width}" height="${opts.height}"`
     : ''
-  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(imgAlt)}" loading="lazy"${dimAttrs} style="max-width:100%;height:auto" />\n  ${cap}\n</figure>`
+
+  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(imgAlt)}"${ariaDescribedBy} loading="lazy"${dimAttrs} style="max-width:100%;height:auto" />\n  ${cap}\n</figure>`
 }
 
 function escapeHtml(str: string): string {

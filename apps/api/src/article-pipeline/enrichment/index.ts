@@ -873,6 +873,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     afterH2Offset: section.afterH2Offset,
     figureHtml: buildFigureHtml({
       imgUrl: svgUrl,
+      diagramId: `${jobId.slice(0, 8)}-${section.position}`,
       alt: section.heading,
       altText,
       caption,

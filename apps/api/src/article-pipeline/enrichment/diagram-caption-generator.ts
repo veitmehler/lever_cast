@@ -20,17 +20,17 @@ Mermaid syntax (excerpt):
 
 Produce a JSON object with exactly two fields:
 
-1. "altText": 8–15 words describing what the diagram LOOKS LIKE visually. Start with the diagram type (e.g. "Flowchart showing…", "Mindmap of…", "Class diagram comparing…"). Describe the key elements shown — NOT the meaning or section content. This is read by screen readers.
+1. "altText": 6–8 words maximum, under 80 characters. Describe only what the diagram LOOKS LIKE visually. Start with the diagram type (e.g. "Flowchart showing…", "Mindmap of…", "Timeline of…"). Do NOT explain meaning — this is read by screen readers and must be brief.
 
 2. "caption": One sentence (15–25 words) explaining what the diagram ILLUSTRATES or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
 
 Rules:
-- altText must describe the visual structure only, not summarise the article section.
-- caption should explain the relationships, steps, or comparisons depicted.
+- altText: visual structure only, 6–8 words, never more than 80 characters.
+- caption: meaning and insight, shown as visible text below the diagram.
 - Respond with ONLY valid JSON — no markdown, no code fences.
 
 Example:
-{"altText": "Flowchart showing five stages from pregnancy changes through chiropractor assessment to restored pelvic balance", "caption": "Pregnancy-induced weight shifts and ligament softening create pelvic instability that targeted chiropractic adjustments can progressively restore."}`
+{"altText": "Flowchart showing five chiropractic care stages", "caption": "Pregnancy-induced weight shifts and ligament softening create pelvic instability that targeted chiropractic adjustments can progressively restore."}`
 
 export interface DiagramCaptionResult {
   altText: string

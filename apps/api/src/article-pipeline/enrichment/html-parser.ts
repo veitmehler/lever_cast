@@ -98,21 +98,23 @@ export function buildEnrichedHtml(
 /** Build the HTML for a diagram figure block. */
 export function buildFigureHtml(opts: {
   imgUrl: string
-  alt: string           // section heading — used as fallback only
-  caption?: string | null // LLM-generated description — preferred as alt text
-  width?: number        // SVG intrinsic width — prevents CLS
-  height?: number       // SVG intrinsic height — prevents CLS
+  alt: string             // section heading — fallback when altText is absent
+  altText?: string | null // accessibility-specific alt: concise visual description
+  caption?: string | null // visible figcaption: explains the diagram's meaning
+  width?: number          // SVG intrinsic width — prevents CLS
+  height?: number         // SVG intrinsic height — prevents CLS
 }): string {
-  // Prefer the LLM-generated caption as alt text because it describes what is
-  // actually depicted in the diagram. Fall back to the section heading.
-  const altText = opts.caption?.trim() || opts.alt
+  // altText describes what the image looks like (for screen readers).
+  // caption describes what it means (shown as visible figcaption).
+  // They are now separate strings — never conflated.
+  const imgAlt = opts.altText?.trim() || opts.alt
   const cap = opts.caption
     ? `<figcaption>${escapeHtml(opts.caption)}</figcaption>`
     : ''
   const dimAttrs = opts.width && opts.height
     ? ` width="${opts.width}" height="${opts.height}"`
     : ''
-  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(altText)}" loading="lazy"${dimAttrs} style="max-width:100%;height:auto" />\n  ${cap}\n</figure>`
+  return `<figure class="article-diagram">\n  <img src="${opts.imgUrl}" alt="${escapeHtml(imgAlt)}" loading="lazy"${dimAttrs} style="max-width:100%;height:auto" />\n  ${cap}\n</figure>`
 }
 
 function escapeHtml(str: string): string {

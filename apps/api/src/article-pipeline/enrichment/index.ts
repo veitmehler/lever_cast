@@ -538,6 +538,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             gen: gen2,
             figuresToInsert,
             darkDiagramInitDirective,
+            altText: captionResult2.altText,
             caption: captionResult2.caption,
           })
           usedDiagramTypes.push(diagramType)
@@ -567,6 +568,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           gen: gen1,
           figuresToInsert,
           darkDiagramInitDirective,
+          altText: captionResult1.altText,
           caption: captionResult1.caption,
         })
         usedDiagramTypes.push(diagramType)
@@ -758,7 +760,8 @@ interface SaveDiagramOpts {
   gen: { inputTokens: number; outputTokens: number; cost: number; provider: string; model: string }
   figuresToInsert: Array<{ afterH2Offset: number; figureHtml: string }>
   darkDiagramInitDirective: string
-  caption: string
+  altText: string  // concise visual description for img alt= and SVG <title>
+  caption: string  // meaning-focused sentence shown as visible <figcaption>
 }
 
 /** Match screenshot + crop background (mmdc `-b white`). */
@@ -782,12 +785,12 @@ function extractSvgViewBoxDimensions(svg: string): { width: number; height: numb
 }
 
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
-  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, caption } =
+  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, altText, caption } =
     opts
 
   const cleanSvg = addSvgAccessibility(
     sanitizeSvg(svgContent),
-    caption || section.heading,
+    altText || section.heading,  // SVG <title> uses the visual alt text, not the caption
     section.heading,
     `diagram-title-${jobId.slice(0, 8)}-${section.position}`,
   )
@@ -871,6 +874,7 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     figureHtml: buildFigureHtml({
       imgUrl: svgUrl,
       alt: section.heading,
+      altText,
       caption,
       width: svgDims?.width,
       height: svgDims?.height,

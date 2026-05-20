@@ -7,8 +7,9 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_SYNTAX = 600
 
 const SYSTEM =
-  'You write brief, specific one-sentence captions for data visualisation diagrams embedded in articles. ' +
-  'Captions must describe what the diagram actually illustrates, not just restate the section title.'
+  'You produce two descriptions for data visualisation diagrams embedded in articles: ' +
+  'a concise accessibility alt text describing the visual, and a caption explaining what the diagram illustrates. ' +
+  'You respond with valid JSON only — no markdown, no code fences.'
 
 const USER_TEMPLATE =
   `Article topic: {{articleTopic}}
@@ -17,14 +18,22 @@ Diagram type: {{diagramType}}
 Mermaid syntax (excerpt):
 {{syntaxExcerpt}}
 
-Write ONE sentence (15–30 words) that describes what this diagram illustrates.
+Produce a JSON object with exactly two fields:
+
+1. "altText": 8–15 words describing what the diagram LOOKS LIKE visually. Start with the diagram type (e.g. "Flowchart showing…", "Mindmap of…", "Class diagram comparing…"). Describe the key elements shown — NOT the meaning or section content. This is read by screen readers.
+
+2. "caption": One sentence (15–25 words) explaining what the diagram ILLUSTRATES or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
+
 Rules:
-- Be specific about the relationships, steps, or comparisons shown.
-- Do NOT start with "This diagram", "This chart", or "The diagram".
-- Do NOT include quotes or punctuation beyond a period.
-- Respond with ONLY the caption sentence.`
+- altText must describe the visual structure only, not summarise the article section.
+- caption should explain the relationships, steps, or comparisons depicted.
+- Respond with ONLY valid JSON — no markdown, no code fences.
+
+Example:
+{"altText": "Flowchart showing five stages from pregnancy changes through chiropractor assessment to restored pelvic balance", "caption": "Pregnancy-induced weight shifts and ligament softening create pelvic instability that targeted chiropractic adjustments can progressively restore."}`
 
 export interface DiagramCaptionResult {
+  altText: string
   caption: string
   inputTokens: number
   outputTokens: number
@@ -46,27 +55,44 @@ export async function generateDiagramCaption(opts: {
     .replace('{{diagramType}}', opts.diagramType)
     .replace('{{syntaxExcerpt}}', opts.mermaidSyntax.slice(0, MAX_SYNTAX))
 
+  const fallbackAltText = `${opts.diagramType.charAt(0).toUpperCase() + opts.diagramType.slice(1)} diagram: ${opts.sectionTitle}`
+  const fallbackCaption = `Diagram: ${opts.sectionTitle}`
+
   try {
     const run = await adapter.call({
       systemPrompt: SYSTEM,
       userPrompt,
       model: MODEL,
       temperature: 0.3,
-      maxTokens: 128,
+      maxTokens: 200,
     })
-    const raw = cleanTextOutput(run.content).trim().replace(/^["']|["']$/g, '')
-    const caption = raw && raw.toLowerCase() !== 'null' ? raw : `Diagram: ${opts.sectionTitle}`
-    return {
-      caption,
-      inputTokens: run.tokens.input,
-      outputTokens: run.tokens.output,
-      cost: run.cost,
+
+    let altText = fallbackAltText
+    let caption = fallbackCaption
+
+    try {
+      // Strip accidental code fences before parsing
+      const cleaned = cleanTextOutput(run.content).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      const parsed = JSON.parse(cleaned) as Record<string, unknown>
+      if (typeof parsed.altText === 'string' && parsed.altText.trim()) {
+        altText = parsed.altText.trim()
+      }
+      if (typeof parsed.caption === 'string' && parsed.caption.trim()) {
+        caption = parsed.caption.trim()
+      }
+    } catch {
+      logger.warn(
+        { jobId: opts.jobId, position: opts.position, raw: run.content },
+        '[enrichment] caption-gen JSON parse failed — using fallbacks',
+      )
     }
+
+    return { altText, caption, inputTokens: run.tokens.input, outputTokens: run.tokens.output, cost: run.cost }
   } catch (err) {
     logger.warn(
       { jobId: opts.jobId, position: opts.position, err },
       '[enrichment] caption-gen failed — using fallback',
     )
-    return { caption: `Diagram: ${opts.sectionTitle}`, inputTokens: 0, outputTokens: 0, cost: 0 }
+    return { altText: fallbackAltText, caption: fallbackCaption, inputTokens: 0, outputTokens: 0, cost: 0 }
   }
 }

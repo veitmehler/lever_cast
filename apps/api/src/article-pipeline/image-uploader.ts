@@ -3,6 +3,7 @@
  * and creates a Media row.  Returns the new Media.id.
  */
 
+import sharp from 'sharp'
 import { uploadBufferWithKey } from '../lib/storage'
 import { prisma } from '../lib/prisma'
 import { logger } from '../lib/logger'
@@ -53,6 +54,17 @@ export async function uploadFeaturedImageToS3WithRetry(
 
       const { url: cdnUrl } = await uploadBufferWithKey(s3Key, buffer, contentType)
 
+      // Extract pixel dimensions before upload so schema markup can reference them
+      let width: number | null = null
+      let height: number | null = null
+      try {
+        const meta = await sharp(buffer).metadata()
+        width  = meta.width  ?? null
+        height = meta.height ?? null
+      } catch {
+        // Non-fatal — schema will just omit width/height
+      }
+
       const media = await prisma.media.create({
         data: {
           userId,
@@ -60,6 +72,8 @@ export async function uploadFeaturedImageToS3WithRetry(
           url: cdnUrl,
           altText: altText ?? 'Featured Image',
           mimeType: contentType,
+          width,
+          height,
         },
       })
 

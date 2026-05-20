@@ -282,14 +282,18 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     const siteBase = brand.organizationWebsite?.replace(/\/$/, '') ?? ''
     const articleUrl = sitePage.slug ? `${siteBase}/${sitePage.slug}` : siteBase
 
-    // Extract citation URLs from the stored citations JSON
+    // Extract citation URLs from the stored citations JSON.
+    // Step 12 stores: { resource_links: [{ link_title: "...", link_url: "..." }] }
+    // Some older records may use plain arrays or a `url` key — handle all variants.
     const citationUrls: string[] = []
     if (sitePage.citations && typeof sitePage.citations === 'object') {
       const c = sitePage.citations as Record<string, unknown>
-      const links = (c.resource_links ?? c.citations ?? []) as Array<{ url?: string } | string>
+      const links = (c.resource_links ?? c.citations ?? []) as Array<Record<string, unknown> | string>
       for (const entry of links) {
-        const url = typeof entry === 'string' ? entry : entry?.url
-        if (url) citationUrls.push(url)
+        const url = typeof entry === 'string'
+          ? entry
+          : (entry?.link_url ?? entry?.url ?? null)
+        if (url && typeof url === 'string') citationUrls.push(url)
       }
     }
 

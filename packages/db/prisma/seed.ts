@@ -1351,33 +1351,54 @@ async function main() {
   })
   console.log('  ✓ PlatformSettings singleton seeded (google guidelines preserved if already set)')
 
-  // Seed default schema type rules only if the field has never been set.
-  // This ensures admin edits via /admin/schema-rules are never clobbered on redeploy.
+  // Seed default schema type rules.
+  // Strategy: ADDITIVE — only add keywords that don't already exist in the array.
+  // This means admin edits (including removals) are always preserved, but new
+  // default keywords added here will be picked up on the next deploy.
+  interface SchemaTypeRuleSeed { keyword: string; articleType: string; publisherType: string }
+  const DEFAULT_SCHEMA_RULES: SchemaTypeRuleSeed[] = [
+    // Practitioner-form variants come first so "chiropractor" matches before the
+    // root "chiropractic" would in a regex approach — both are kept in the list so
+    // industry strings like "Chiropractic Clinic" also match.
+    { keyword: 'chiropractor',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'chiropractic',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'physiotherapist', articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'physiotherapy',   articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'dentist',         articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'dental',          articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'psychologist',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'psychology',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'optometrist',     articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'optometry',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'podiatrist',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'podiatry',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'osteopath',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'naturopath',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'medical',         articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'health',          articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'nursing',         articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'pharmacy',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'pharmacist',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'veterinary',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+    { keyword: 'veterinarian',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+  ]
+
   const ps = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
-  if (!ps?.schemaTypeRules) {
+  const existingRules = (ps?.schemaTypeRules ?? []) as SchemaTypeRuleSeed[]
+  const existingKeywords = new Set(existingRules.map((r) => r.keyword))
+  const toAdd = DEFAULT_SCHEMA_RULES.filter((r) => !existingKeywords.has(r.keyword))
+
+  if (toAdd.length > 0) {
     await prisma.platformSettings.update({
       where: { id: 'singleton' },
       data: {
-        schemaTypeRules: [
-          { keyword: 'chiropractic',  articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'physiotherapy', articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'medical',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'health',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'dental',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'nursing',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'pharmacy',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'veterinary',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'psychology',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'optometry',     articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'podiatry',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'osteopath',     articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-          { keyword: 'naturopath',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
-        ],
+        // Append new defaults after existing (admin-edited) rules so ordering is preserved.
+        schemaTypeRules: [...existingRules, ...toAdd],
       },
     })
-    console.log('  ✓ Default schema type rules seeded')
+    console.log(`  ✓ Schema type rules updated — added ${toAdd.length} new keyword(s): ${toAdd.map((r) => r.keyword).join(', ')}`)
   } else {
-    console.log('  ─ Schema type rules already set — skipping')
+    console.log('  ✓ Schema type rules up to date — no new keywords to add')
   }
 }
 

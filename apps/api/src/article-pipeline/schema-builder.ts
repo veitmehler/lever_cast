@@ -105,8 +105,8 @@ export function buildArticleSchema(opts: BuildSchemaOpts): string {
   let image: Record<string, unknown> | undefined
   if (opts.featuredImageUrl) {
     image = { '@type': 'ImageObject', url: opts.featuredImageUrl }
-    if (opts.featuredImageWidth)  image.width  = String(opts.featuredImageWidth)
-    if (opts.featuredImageHeight) image.height = String(opts.featuredImageHeight)
+    if (opts.featuredImageWidth)  image.width  = opts.featuredImageWidth
+    if (opts.featuredImageHeight) image.height = opts.featuredImageHeight
   }
 
   // ── Root object ───────────────────────────────────────────────────────────

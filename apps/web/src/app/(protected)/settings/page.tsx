@@ -636,9 +636,9 @@ export default function SettingsPage() {
     // Reset so the same file can be re-selected if needed
     e.target.value = ''
 
-    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml']
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
     if (!allowed.includes(file.type)) {
-      toast.error('Please upload a PNG, JPG, WebP or SVG image')
+      toast.error('Please upload a PNG, JPG or WebP image. SVG is not supported by Google structured data.')
       return
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -1176,7 +1176,7 @@ export default function SettingsPage() {
                     Organization logo
                   </label>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Used as the publisher logo in schema markup. Recommended: square PNG or SVG, at least 112 × 112 px.
+                    Used as the publisher logo in schema markup. Recommended: square PNG, at least 112 × 112 px. SVG is not supported by Google structured data.
                   </p>
                   <div className="flex items-start gap-4">
                     {/* Preview */}
@@ -1200,7 +1200,7 @@ export default function SettingsPage() {
                         <input
                           ref={logoFileInputRef}
                           type="file"
-                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          accept="image/png,image/jpeg,image/webp"
                           className="hidden"
                           onChange={handleLogoUpload}
                         />
@@ -1238,7 +1238,7 @@ export default function SettingsPage() {
                         placeholder="or paste logo URL from your website…"
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
-                      <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG · Max 2 MB</p>
+                      <p className="text-xs text-muted-foreground">PNG, JPG or WebP · Max 2 MB · SVG not supported by Google</p>
                     </div>
                   </div>
                 </div>

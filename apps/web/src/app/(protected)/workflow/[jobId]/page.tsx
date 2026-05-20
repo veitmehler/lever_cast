@@ -209,15 +209,19 @@ function htmlToMarkdownWithDiagrams(html: string): string {
     /<figure\s[^>]*class="[^"]*article-diagram[^"]*"[^>]*>([\s\S]*?)<\/figure>/gi,
     (_fullMatch, inner: string) => {
       const srcMatch = inner.match(/\bsrc="([^"]+)"/)
+      const altMatch = inner.match(/\balt="([^"]*)"/)
       const captionMatch = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i)
       const src = srcMatch?.[1] ?? ''
-      const captionText = captionMatch
-        ? captionMatch[1].replace(/<[^>]+>/g, '').trim()
-        : ''
-      const altText = captionText || 'Diagram'
+      // Use the img alt attribute (short visual description) for the Markdown alt text.
+      // Fall back to the figcaption text only when no alt attribute is present.
+      const altText = altMatch?.[1]?.trim() || captionMatch?.[1]?.replace(/<[^>]+>/g, '').trim() || 'Diagram'
+      const captionText = captionMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
+      // Append the figcaption as an italic line below the image so Google sees both
+      // the concise visual alt and the explanatory caption in the review text.
+      const captionLine = captionText ? `\n*${captionText}*` : ''
       const replacement = src
-        ? `\n\n![${altText}](${src})\n\n`
-        : `\n\n*[Diagram: ${altText}]*\n\n`
+        ? `\n\n![${altText}](${src})${captionLine}\n\n`
+        : `\n\n*[Diagram: ${altText}]*${captionLine}\n\n`
       const token = `@@DIAGRAM_${tokens.length}@@`
       tokens.push(replacement)
       return token

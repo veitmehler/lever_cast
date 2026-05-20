@@ -7,8 +7,8 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_SYNTAX = 600
 
 const SYSTEM =
-  'You produce two descriptions for data visualisation diagrams embedded in articles: ' +
-  'a concise accessibility alt text describing the visual, and a caption explaining what the diagram illustrates. ' +
+  'You produce two descriptions for data visualisation diagrams: ' +
+  'a short accessibility alt text and a visible caption. ' +
   'You respond with valid JSON only — no markdown, no code fences.'
 
 const USER_TEMPLATE =
@@ -18,19 +18,27 @@ Diagram type: {{diagramType}}
 Mermaid syntax (excerpt):
 {{syntaxExcerpt}}
 
-Produce a JSON object with exactly two fields:
+Return a JSON object with exactly two fields:
 
-1. "altText": 6–8 words maximum, under 80 characters. Describe only what the diagram LOOKS LIKE visually. Start with the diagram type (e.g. "Flowchart showing…", "Mindmap of…", "Timeline of…"). Do NOT explain meaning — this is read by screen readers and must be brief.
+"altText": Under 100 characters. Describe the diagram so someone could sketch it from your words alone. State the diagram type and its subject — nothing more. Do NOT list individual steps, nodes, or data points. The detailed explanation belongs in the caption, not here.
 
-2. "caption": One sentence (15–25 words) explaining what the diagram ILLUSTRATES or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
+"caption": One sentence (15–25 words) explaining what the diagram means or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
+
+GOOD altText examples:
+- "Flowchart showing five stages of chiropractic spinal assessment"
+- "Mindmap of six ergonomic risk factors at a desk workstation"
+- "Diagram of a person demonstrating proper lifting with bent knees"
+
+BAD altText (too long — lists individual steps instead of describing the shape):
+- "Proper lifting technique requires standing close, bending knees, engaging core, maintaining neutral spine, holding close to chest, and lifting with legs."
 
 Rules:
-- altText: visual structure only, 6–8 words, never more than 80 characters.
+- altText: visual description only, under 100 characters, never list individual steps or nodes.
 - caption: meaning and insight, shown as visible text below the diagram.
 - Respond with ONLY valid JSON — no markdown, no code fences.
 
-Example:
-{"altText": "Flowchart showing five chiropractic care stages", "caption": "Pregnancy-induced weight shifts and ligament softening create pelvic instability that targeted chiropractic adjustments can progressively restore."}`
+Example output:
+{"altText": "Flowchart showing five stages of chiropractic spinal assessment", "caption": "Progressive spinal evaluation identifies misalignment severity and guides the appropriate adjustment technique for each patient."}`
 
 export interface DiagramCaptionResult {
   altText: string

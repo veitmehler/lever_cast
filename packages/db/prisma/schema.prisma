@@ -551,6 +551,7 @@ model OutlineFramework {
 model PlatformSettings {
   id               String   @id @default("singleton") // only one row
   googleGuidelines String?  @db.Text                  // Google Helpful Content guidelines text
+  schemaTypeRules  Json?                               // [{ keyword, articleType, publisherType }]
   updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")
@@ -572,6 +573,9 @@ model BrandSettings {
   defaultAuthorName      String?
   defaultAuthorWebsite   String?
   defaultAuthorLinkedIn  String? // personal LinkedIn URL for schema + author profile
+  defaultAuthorJobTitle  String? // e.g. "Chiropractor" — author.jobTitle in JSON-LD
+  defaultAuthorAlumniOf  String? // institution name — author.alumniOf in JSON-LD
+  schemaArticleType      String? // override auto-derived @type, e.g. "MedicalArticle"
 
   // Organization / schema markup fields (used in Wave 4)
   organizationName        String?

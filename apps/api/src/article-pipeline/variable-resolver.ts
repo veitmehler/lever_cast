@@ -283,6 +283,21 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       return bs?.defaultAuthorLinkedIn ?? ''
     }
 
+    case 'author_job_title': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.defaultAuthorJobTitle ?? ''
+    }
+
+    case 'author_alumni_of': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.defaultAuthorAlumniOf ?? ''
+    }
+
+    case 'schema_article_type': {
+      const bs = await getBrandSettings(ctx)
+      return bs?.schemaArticleType ?? ''
+    }
+
     case 'outline_special_instructions': {
       const topic = await prisma.topic.findUnique({
         where: { id: ctx.topicId },

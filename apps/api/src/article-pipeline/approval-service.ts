@@ -10,7 +10,7 @@
  *   3. Step 15  — generate_image_prompt  (text prompt sent to Fal.ai)
  *      ↳ generateFeaturedImage → uploadFeaturedImageToS3 → Media row
  *   4. Upsert SitePage (body already has inline citations from Phase A step 12.5; SEO fields, citations, featured image)
- *   5. Step 16  — generate_schema_markup → SitePage.schemaJson (non-fatal if fails)
+ *   5. Step 16  — build_schema_markup (deterministic, no LLM) → SitePage.schemaJson (non-fatal if fails)
  *   6. Step 17  — generate_excerpt       → SitePage.excerpt
  *   7. Step 18  — generate_legal_disclaimer → SitePage.disclaimer
  *   8. Mark ArticleJob.status = 'approved'
@@ -26,6 +26,7 @@ import { generateFeaturedImage } from './image-generation'
 import { uploadFeaturedImageToS3WithRetry } from './image-uploader'
 import { getBoss, QUEUES } from '../queues/index'
 import type { PipelineContext } from './variable-resolver'
+import { buildArticleSchema, type SchemaTypeRule } from './schema-builder'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -256,26 +257,70 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     },
   })
 
-  // ── Step 16: generate_schema_markup ───────────────────────────────────────
-  // Runs after SitePage upsert so {{article_url}} resolves (slug is now persisted).
-  logger.info({ jobId }, '[approval] step 16 — generate_schema_markup')
+  // ── Step 16: build_schema_markup (deterministic, no LLM) ─────────────────
+  // Runs after SitePage upsert so the persisted slug can be used to build the canonical URL.
+  logger.info({ jobId }, '[approval] step 16 — build_schema_markup (deterministic)')
   await prisma.articleJob.update({ where: { id: jobId }, data: { currentStep: 16 } })
 
   try {
-    const runner16 = new StepRunner(jobId, 16, ctx)
-    const result16 = await runner16.execute()
-    ctx.completedSteps.set(16, result16.output)
-
-    const rawSchema = result16.output.trim()
-    if (rawSchema) {
-      // Validate it's parseable JSON before persisting
-      JSON.parse(rawSchema)
-      await prisma.sitePage.update({
+    const [brand, platformSettings, sitePage] = await Promise.all([
+      prisma.brandSettings.findUnique({ where: { userId } }),
+      prisma.platformSettings.findUnique({ where: { id: 'singleton' } }),
+      prisma.sitePage.findUnique({
         where: { jobId },
-        data: { schemaJson: rawSchema },
-      })
-      logger.info({ jobId }, '[approval] step 16 — schema markup persisted')
+        select: {
+          slug: true,
+          seoTitle: true,
+          title: true,
+          seoDescription: true,
+          citations: true,
+          createdAt: true,
+          updatedAt: true,
+          featuredImage: { select: { url: true, width: true, height: true } },
+        },
+      }),
+    ])
+
+    if (!brand || !sitePage) {
+      throw new Error('[approval] step 16 — missing brand or sitePage, cannot build schema')
     }
+
+    const schemaTypeRules = (platformSettings?.schemaTypeRules ?? []) as SchemaTypeRule[]
+    const siteBase = brand.organizationWebsite?.replace(/\/$/, '') ?? ''
+    const articleUrl = sitePage.slug ? `${siteBase}/${sitePage.slug}` : siteBase
+
+    // Extract citation URLs from the stored citations JSON
+    const citationUrls: string[] = []
+    if (sitePage.citations && typeof sitePage.citations === 'object') {
+      const c = sitePage.citations as Record<string, unknown>
+      const links = (c.resource_links ?? c.citations ?? []) as Array<{ url?: string } | string>
+      for (const entry of links) {
+        const url = typeof entry === 'string' ? entry : entry?.url
+        if (url) citationUrls.push(url)
+      }
+    }
+
+    const schemaJson = buildArticleSchema({
+      brand,
+      schemaTypeRules,
+      title: sitePage.seoTitle ?? sitePage.title ?? topic.topic,
+      description: sitePage.seoDescription ?? '',
+      articleUrl,
+      featuredImageUrl: sitePage.featuredImage?.url ?? null,
+      featuredImageWidth: sitePage.featuredImage?.width ?? null,
+      featuredImageHeight: sitePage.featuredImage?.height ?? null,
+      citationUrls,
+      publishedDate: sitePage.createdAt.toISOString(),
+      modifiedDate: sitePage.updatedAt.toISOString(),
+    })
+
+    ctx.completedSteps.set(16, schemaJson)
+
+    await prisma.sitePage.update({
+      where: { jobId },
+      data: { schemaJson },
+    })
+    logger.info({ jobId }, '[approval] step 16 — schema markup persisted')
   } catch (err) {
     // Schema markup failure is non-fatal — log + Sentry, article is still approved
     logger.error({ jobId, err }, '[approval] step 16 — schema markup failed, continuing')
@@ -312,7 +357,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
 
   // ── Aggregate costs & mark approved ───────────────────────────────────────
   const approvalSteps = await prisma.pipelineStep.findMany({
-    where: { jobId, stepNumber: { in: [13, 15, 16, 17, 18] }, status: 'completed' },
+    where: { jobId, stepNumber: { in: [13, 15, 17, 18] }, status: 'completed' },
     select: { cost: true, inputTokens: true, outputTokens: true },
   })
 

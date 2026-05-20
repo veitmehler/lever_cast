@@ -1350,6 +1350,35 @@ async function main() {
     update: {}, // never overwrite admin edits on redeploy
   })
   console.log('  ✓ PlatformSettings singleton seeded (google guidelines preserved if already set)')
+
+  // Seed default schema type rules only if the field has never been set.
+  // This ensures admin edits via /admin/schema-rules are never clobbered on redeploy.
+  const ps = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
+  if (!ps?.schemaTypeRules) {
+    await prisma.platformSettings.update({
+      where: { id: 'singleton' },
+      data: {
+        schemaTypeRules: [
+          { keyword: 'chiropractic',  articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'physiotherapy', articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'medical',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'health',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'dental',        articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'nursing',       articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'pharmacy',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'veterinary',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'psychology',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'optometry',     articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'podiatry',      articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'osteopath',     articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+          { keyword: 'naturopath',    articleType: 'MedicalArticle', publisherType: 'MedicalOrganization' },
+        ],
+      },
+    })
+    console.log('  ✓ Default schema type rules seeded')
+  } else {
+    console.log('  ─ Schema type rules already set — skipping')
+  }
 }
 
 main()

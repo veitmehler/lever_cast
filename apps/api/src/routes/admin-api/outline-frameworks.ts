@@ -13,6 +13,16 @@ interface UpdatePlatformSettingsBody {
   googleGuidelines?: string | null
 }
 
+interface SchemaTypeRule {
+  keyword: string
+  articleType: string
+  publisherType: string
+}
+
+interface UpdateSchemaTypeRulesBody {
+  rules: SchemaTypeRule[]
+}
+
 export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
   // GET /api/admin/outline-frameworks
   app.get('/outline-frameworks', async (request, reply) => {
@@ -81,6 +91,52 @@ export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
       })
 
       return reply.send({ settings: updated })
+    },
+  )
+
+  // GET /api/admin/schema-type-rules
+  app.get('/schema-type-rules', async (request, reply) => {
+    const clerkId = await requireAdmin(request, reply)
+    if (!clerkId) return
+
+    const ps = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
+    const rules = (ps?.schemaTypeRules ?? []) as SchemaTypeRule[]
+
+    return reply.send({ rules })
+  })
+
+  // PUT /api/admin/schema-type-rules
+  app.put<{ Body: UpdateSchemaTypeRulesBody }>(
+    '/schema-type-rules',
+    async (request, reply) => {
+      const clerkId = await requireAdmin(request, reply)
+      if (!clerkId) return
+
+      const { rules } = request.body ?? {}
+      if (!Array.isArray(rules)) {
+        return reply.status(400).send({ error: '`rules` must be an array' })
+      }
+
+      // Validate each rule
+      for (const r of rules) {
+        if (!r.keyword?.trim() || !r.articleType?.trim() || !r.publisherType?.trim()) {
+          return reply.status(400).send({ error: 'Each rule must have keyword, articleType, and publisherType' })
+        }
+      }
+
+      const sanitized: SchemaTypeRule[] = rules.map((r) => ({
+        keyword:       r.keyword.trim(),
+        articleType:   r.articleType.trim(),
+        publisherType: r.publisherType.trim(),
+      }))
+
+      await prisma.platformSettings.upsert({
+        where: { id: 'singleton' },
+        create: { id: 'singleton', schemaTypeRules: sanitized },
+        update: { schemaTypeRules: sanitized },
+      })
+
+      return reply.send({ rules: sanitized })
     },
   )
 }

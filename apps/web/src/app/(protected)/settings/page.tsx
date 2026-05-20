@@ -176,9 +176,12 @@ export default function SettingsPage() {
   const [ourExperience, setOurExperience]               = useState('')
   const [articleGoal, setArticleGoal]                   = useState('')
   const [brandSpecialInstructions, setBrandSpecialInst] = useState('')
-  const [defaultAuthorName, setDefaultAuthorName]       = useState('')
-  const [defaultAuthorWebsite, setDefaultAuthorWebsite] = useState('')
-  const [defaultAuthorLinkedIn, setDefaultAuthorLinkedIn] = useState('')
+  const [defaultAuthorName, setDefaultAuthorName]           = useState('')
+  const [defaultAuthorWebsite, setDefaultAuthorWebsite]     = useState('')
+  const [defaultAuthorLinkedIn, setDefaultAuthorLinkedIn]   = useState('')
+  const [defaultAuthorJobTitle, setDefaultAuthorJobTitle]   = useState('')
+  const [defaultAuthorAlumniOf, setDefaultAuthorAlumniOf]   = useState('')
+  const [schemaArticleType, setSchemaArticleType]           = useState('')
 
   // Article Brand Profile — organization / schema markup fields
   const [organizationName, setOrganizationName]         = useState('')
@@ -248,6 +251,9 @@ export default function SettingsPage() {
           if (brand.defaultAuthorName)    setDefaultAuthorName(brand.defaultAuthorName)
           if (brand.defaultAuthorWebsite) setDefaultAuthorWebsite(brand.defaultAuthorWebsite)
           if (brand.defaultAuthorLinkedIn) setDefaultAuthorLinkedIn(brand.defaultAuthorLinkedIn)
+          if (brand.defaultAuthorJobTitle) setDefaultAuthorJobTitle(brand.defaultAuthorJobTitle)
+          if (brand.defaultAuthorAlumniOf) setDefaultAuthorAlumniOf(brand.defaultAuthorAlumniOf)
+          if (brand.schemaArticleType)    setSchemaArticleType(brand.schemaArticleType)
           // Organization fields
           if (brand.organizationName)     setOrganizationName(brand.organizationName)
           if (brand.organizationWebsite)  setOrganizationWebsite(brand.organizationWebsite)
@@ -684,6 +690,9 @@ export default function SettingsPage() {
           defaultAuthorName: defaultAuthorName || null,
           defaultAuthorWebsite: defaultAuthorWebsite || null,
           defaultAuthorLinkedIn: defaultAuthorLinkedIn.trim() || null,
+          defaultAuthorJobTitle: defaultAuthorJobTitle.trim() || null,
+          defaultAuthorAlumniOf: defaultAuthorAlumniOf.trim() || null,
+          schemaArticleType: schemaArticleType.trim() || null,
           organizationName: organizationName || null,
           organizationWebsite: organizationWebsite || null,
           organizationEmail: organizationEmail || null,
@@ -1102,6 +1111,52 @@ export default function SettingsPage() {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <p className="text-xs text-muted-foreground mt-1">Used in schema markup and included in the final article review.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">
+                  Author job title
+                </label>
+                <input
+                  type="text"
+                  value={defaultAuthorJobTitle}
+                  onChange={(e) => setDefaultAuthorJobTitle(e.target.value)}
+                  placeholder="e.g. Chiropractor, Physiotherapist"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Added to the author&apos;s schema as <code>jobTitle</code>.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-1">
+                  Author alma mater / institution
+                </label>
+                <input
+                  type="text"
+                  value={defaultAuthorAlumniOf}
+                  onChange={(e) => setDefaultAuthorAlumniOf(e.target.value)}
+                  placeholder="e.g. University of Melbourne"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Added to the author&apos;s schema as <code>alumniOf</code>.</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Schema article type override
+              </label>
+              <input
+                type="text"
+                value={schemaArticleType}
+                onChange={(e) => setSchemaArticleType(e.target.value)}
+                placeholder="Leave blank for auto-detection (e.g. MedicalArticle, NewsArticle)"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Overrides the auto-detected <code>@type</code> for all articles. Leave blank to let industry keyword rules determine the type automatically.
+                Common values: <code>Article</code>, <code>MedicalArticle</code>, <code>NewsArticle</code>, <code>TechArticle</code>, <code>BlogPosting</code>.
+              </p>
             </div>
 
             {/* Organization / Schema Markup sub-section */}

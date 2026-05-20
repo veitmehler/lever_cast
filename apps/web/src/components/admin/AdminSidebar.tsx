@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   MessageSquareText,
   LayoutList,
+  Braces,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ const navItems = [
   { label: 'LLM Keys', href: '/admin/llm', icon: Key },
   { label: 'Prompts', href: '/admin/prompts', icon: MessageSquareText },
   { label: 'Outline Frameworks', href: '/admin/outline-frameworks', icon: LayoutList },
+  { label: 'Schema Rules',       href: '/admin/schema-rules',       icon: Braces },
   { label: 'Costs', href: '/admin/costs', icon: DollarSign },
   { label: 'Articles', href: '/admin/articles', icon: FileText },
   { label: 'Users', href: '/admin/users', icon: Users },

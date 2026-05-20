@@ -268,14 +268,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       prisma.platformSettings.findUnique({ where: { id: 'singleton' } }),
       prisma.sitePage.findUnique({
         where: { jobId },
-        select: {
-          slug: true,
-          seoTitle: true,
-          title: true,
-          seoDescription: true,
-          citations: true,
-          createdAt: true,
-          updatedAt: true,
+        include: {
           featuredImage: { select: { url: true, width: true, height: true } },
         },
       }),
@@ -285,7 +278,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       throw new Error('[approval] step 16 — missing brand or sitePage, cannot build schema')
     }
 
-    const schemaTypeRules = (platformSettings?.schemaTypeRules ?? []) as SchemaTypeRule[]
+    const schemaTypeRules = (platformSettings?.schemaTypeRules ?? []) as unknown as SchemaTypeRule[]
     const siteBase = brand.organizationWebsite?.replace(/\/$/, '') ?? ''
     const articleUrl = sitePage.slug ? `${siteBase}/${sitePage.slug}` : siteBase
 
@@ -310,8 +303,8 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       featuredImageWidth: sitePage.featuredImage?.width ?? null,
       featuredImageHeight: sitePage.featuredImage?.height ?? null,
       citationUrls,
-      publishedDate: sitePage.createdAt.toISOString(),
-      modifiedDate: sitePage.updatedAt.toISOString(),
+      publishedDate: (sitePage.publishedAt ?? new Date()).toISOString(),
+      modifiedDate: new Date().toISOString(),
     })
 
     ctx.completedSteps.set(16, schemaJson)

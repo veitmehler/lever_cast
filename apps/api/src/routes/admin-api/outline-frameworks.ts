@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { requireAdmin } from '../../middleware/admin'
 
@@ -100,7 +101,7 @@ export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
     if (!clerkId) return
 
     const ps = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
-    const rules = (ps?.schemaTypeRules ?? []) as SchemaTypeRule[]
+    const rules = (ps?.schemaTypeRules ?? []) as unknown as SchemaTypeRule[]
 
     return reply.send({ rules })
   })
@@ -132,8 +133,8 @@ export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
 
       await prisma.platformSettings.upsert({
         where: { id: 'singleton' },
-        create: { id: 'singleton', schemaTypeRules: sanitized },
-        update: { schemaTypeRules: sanitized },
+        create: { id: 'singleton', schemaTypeRules: sanitized as unknown as Prisma.InputJsonValue },
+        update: { schemaTypeRules: sanitized as unknown as Prisma.InputJsonValue },
       })
 
       return reply.send({ rules: sanitized })

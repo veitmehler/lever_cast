@@ -181,6 +181,18 @@ export class GeminiAdapter implements LLMAdapter {
       rawFinish === 'MAX_TOKENS' ? 'length' :
       rawFinish === 'SAFETY'     ? 'filter' : 'other'
 
+    // Extract grounding source URLs from Gemini's search metadata
+    const chunks = (data?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []) as Array<{
+      web?: { uri?: string; title?: string; domain?: string }
+    }>
+    const groundingSources = chunks
+      .filter((c) => c.web?.uri)
+      .map((c) => ({
+        title: c.web!.title ?? '',
+        uri: c.web!.uri!,
+        domain: c.web!.domain ?? undefined,
+      }))
+
     return {
       content: text,
       tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
@@ -188,6 +200,7 @@ export class GeminiAdapter implements LLMAdapter {
       model,
       provider: 'gemini',
       finishReason,
+      ...(groundingSources.length > 0 ? { groundingSources } : {}),
     }
   }
 }

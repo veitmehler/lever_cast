@@ -12,7 +12,7 @@ export interface OutputPayload {
   primaryKeyword: string
   disclaimer: string
   schemaJson: string
-  citations: Array<{ link_title: string; link_url: string }>
+  citations: Array<{ link_title: string; link_url: string; link_date?: string; source_type?: 'inline' | 'reference' }>
 
   featuredImage: {
     s3Key: string

@@ -60,13 +60,16 @@ export function buildHtmlBody(
   payload: OutputPayload,
   opts: { relativeImages?: boolean } = {},
 ): string {
+  // Bottom-of-page references from Tier 2 only — Tier 1 inline citations are already <a> tags in the body
+  const referenceCitations = payload.citations.filter(
+    (c) => c.link_url && c.source_type !== 'inline',
+  )
   const citationsHtml =
-    payload.citations.length > 0
+    referenceCitations.length > 0
       ? `<section class="citations">
   <h2>References</h2>
   <ol>
-    ${payload.citations
-      .filter((c) => c.link_url)
+    ${referenceCitations
       .map((c) => `<li><a href="${escapeHtml(c.link_url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(c.link_title || c.link_url)}</a></li>`)
       .join('\n    ')}
   </ol>

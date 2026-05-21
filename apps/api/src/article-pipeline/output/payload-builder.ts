@@ -51,22 +51,51 @@ export async function buildOutputPayload(jobId: string): Promise<OutputPayload> 
   const bodyHtml = sp.bodyHtml ?? ''
   const bodyMarkdown = td.turndown(bodyHtml)
 
-  // Normalise citations (stored as Json — could be array or { resource_links: [] })
-  const rawCitations = sp.citations as
-    | Array<{ link_title?: string; link_url?: string; title?: string; url?: string }>
-    | { resource_links: Array<{ link_title?: string; link_url?: string }> }
-    | null
+  // Normalise citations — handles both two-tier format and legacy formats.
+  // Two-tier: { inline_sources: [...], resource_links: [...] }
+  // Legacy:   { resource_links: [...] } or plain array
+  const rawCitations = sp.citations as Record<string, unknown> | Array<Record<string, string>> | null
 
-  let citations: Array<{ link_title: string; link_url: string }> = []
-  if (Array.isArray(rawCitations)) {
+  let citations: Array<{ link_title: string; link_url: string; link_date?: string; source_type?: 'inline' | 'reference' }> = []
+  if (rawCitations && !Array.isArray(rawCitations)) {
+    const obj = rawCitations as Record<string, unknown>
+    // Tier 1 — inline sources (from research grounding)
+    if (Array.isArray(obj.inline_sources)) {
+      for (const s of obj.inline_sources as Array<Record<string, string>>) {
+        citations.push({
+          link_title: s.link_title ?? s.title ?? '',
+          link_url: s.link_url ?? s.url ?? '',
+          source_type: 'inline',
+        })
+      }
+    }
+    // Tier 2 — resource links (from Step 12)
+    if (Array.isArray(obj.resource_links)) {
+      for (const s of obj.resource_links as Array<Record<string, string>>) {
+        citations.push({
+          link_title: s.link_title ?? '',
+          link_url: s.link_url ?? '',
+          link_date: s.link_date || undefined,
+          source_type: 'reference',
+        })
+      }
+    }
+    // Legacy: { citations: [...] }
+    if (citations.length === 0 && Array.isArray(obj.citations)) {
+      for (const s of obj.citations as Array<Record<string, string>>) {
+        citations.push({
+          link_title: s.link_title ?? s.title ?? '',
+          link_url: s.link_url ?? s.url ?? '',
+          source_type: 'reference',
+        })
+      }
+    }
+  } else if (Array.isArray(rawCitations)) {
     citations = rawCitations.map((c) => ({
       link_title: c.link_title ?? c.title ?? '',
       link_url: c.link_url ?? c.url ?? '',
+      source_type: 'reference' as const,
     }))
-  } else if (rawCitations && Array.isArray((rawCitations as { resource_links: unknown[] }).resource_links)) {
-    citations = (rawCitations as { resource_links: Array<{ link_title?: string; link_url?: string }> }).resource_links.map(
-      (c) => ({ link_title: c.link_title ?? '', link_url: c.link_url ?? '' }),
-    )
   }
 
   const featuredImage = sp.featuredImage

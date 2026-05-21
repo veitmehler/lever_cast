@@ -8,9 +8,13 @@ import type { PipelineContext } from './variable-resolver'
 import { extractCitationsForValidation, validateCitationUrls } from './citation-validator'
 import { insertInlineCitations } from './citation-inserter'
 import { cleanStepOutput, normalizeH2Questions } from './approval-service'
+import { resolveGroundingUrls } from './grounding-resolver'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MAX_KEYWORD_RETRIES = 3
+
+/** Steps whose Gemini grounding sources should be captured as research sources (Tier 1 citations). */
+const GROUNDING_CAPTURE_STEPS = new Set([6, 7, 8, 10])
 
 /** Executes Phase A (Steps 0–12) for a given ArticleJob. */
 export async function runPipelinePhaseA(jobId: string): Promise<void> {
@@ -101,6 +105,23 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
         if (result.parsedOutput !== undefined) {
           ctx.parsedSteps.set(stepNumber, result.parsedOutput)
         }
+
+        // Capture grounding sources from Gemini search steps for Tier 1 citations
+        if (GROUNDING_CAPTURE_STEPS.has(stepNumber) && result.groundingSources?.length) {
+          try {
+            const resolved = await resolveGroundingUrls(result.groundingSources, stepNumber, jobId)
+            if (!ctx.researchSources) ctx.researchSources = []
+            const existing = new Set(ctx.researchSources.map((s) => s.url))
+            for (const src of resolved) {
+              if (!existing.has(src.url)) {
+                ctx.researchSources.push(src)
+                existing.add(src.url)
+              }
+            }
+          } catch (err) {
+            logger.warn({ jobId, stepNumber, err }, '[executor] grounding URL resolution failed — continuing')
+          }
+        }
       }
     } catch (err) {
       logger.error({ jobId, stepNumber, err }, '[executor] step failed — aborting pipeline')
@@ -117,6 +138,25 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
   }
 
   await ensurePhaseAInlineCitations(jobId, ctx)
+
+  // Persist accumulated research sources so the approval service can reconstruct them.
+  // Stored as step 120 (synthetic, not a real LLM step) to avoid schema changes.
+  if (ctx.researchSources?.length) {
+    const sourcesJson = JSON.stringify(ctx.researchSources)
+    await prisma.pipelineStep.upsert({
+      where: { jobId_stepNumber: { jobId, stepNumber: 120 } },
+      create: {
+        jobId,
+        stepNumber: 120,
+        stepName: 'research_sources',
+        status: 'completed',
+        output: sourcesJson,
+        completedAt: new Date(),
+      },
+      update: { output: sourcesJson, completedAt: new Date() },
+    })
+    logger.info({ jobId, count: ctx.researchSources.length }, '[executor] persisted research sources as step 120')
+  }
 
   // All steps complete
   await prisma.articleJob.update({
@@ -277,20 +317,31 @@ function htmlHasCitationAnchorsForUrls(html: string, urls: string[]): boolean {
 
 /**
  * After Phase A steps 0–12: validate citations and insert inline links into Step 11 HTML.
- * Runs at end so resume skips still get this pass. Idempotent when links already exist.
+ *
+ * Two-tier approach:
+ *   Tier 1 (inline) — research sources gathered from Gemini search grounding (Steps 6, 7, 8, 10)
+ *   Tier 2 (bottom-of-page) — Step 12 citations, kept separate
+ *
+ * If research sources are available, they are used as the primary inline citation pool.
+ * Step 12 citations are used as fallback when no research sources exist.
  */
 async function ensurePhaseAInlineCitations(jobId: string, ctx: PipelineContext): Promise<void> {
-  const step12Raw = ctx.completedSteps.get(12)
   const step11Raw = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
-  if (!step12Raw?.trim() || !step11Raw.trim()) return
+  if (!step11Raw.trim()) return
 
   const normalized = normalizeH2Questions(cleanStepOutput(step11Raw))
-  const pairs = extractCitationsForValidation(step12Raw)
-  if (pairs.length === 0) return
+
+  // Build the inline citation pool — prefer Tier 1 research sources, fall back to Step 12
+  const researchPairs = (ctx.researchSources ?? []).map((s) => ({ title: s.title, url: s.url }))
+  const step12Raw = ctx.completedSteps.get(12)
+  const step12Pairs = step12Raw?.trim() ? extractCitationsForValidation(step12Raw) : []
+
+  const candidatePairs = researchPairs.length > 0 ? researchPairs : step12Pairs
+  if (candidatePairs.length === 0) return
 
   let validated: Awaited<ReturnType<typeof validateCitationUrls>>
   try {
-    validated = await validateCitationUrls(pairs, jobId)
+    validated = await validateCitationUrls(candidatePairs, jobId)
   } catch (err) {
     logger.warn({ jobId, err }, '[executor] step 12.5 — citation validation failed, skipping')
     return
@@ -308,6 +359,9 @@ async function ensurePhaseAInlineCitations(jobId: string, ctx: PipelineContext):
     logger.info({ jobId }, '[executor] step 12.5 — inline citations already present, skipping')
     return
   }
+
+  const sourceLabel = researchPairs.length > 0 ? 'research sources (Tier 1)' : 'step 12 (fallback)'
+  logger.info({ jobId, pool: sourceLabel, count: live.length }, '[executor] step 12.5 — using citation pool')
 
   try {
     const { linkedHtml, insertedCount } = await insertInlineCitations(normalized, live, jobId, ctx)

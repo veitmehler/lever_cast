@@ -81,15 +81,62 @@ function extractPrimaryKeyword(parsed: Record<string, unknown> | undefined): str
   )
 }
 
-/** Parse citations from the Step 12 output (for storage in SitePage.citations). */
-function parseCitations(raw: string): Record<string, unknown> | null {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) return { resource_links: parsed }
-    if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
-  } catch { /* ignore */ }
-  return null
+/**
+ * Build the two-tier citations structure for SitePage.citations.
+ *
+ * Returns:
+ * ```
+ * {
+ *   inline_sources:  [{ link_title, link_url, step }],   // Tier 1 — from research grounding
+ *   resource_links:  [{ link_title, link_url, link_date? }] // Tier 2 — from Step 12
+ * }
+ * ```
+ *
+ * Backward-compatible: consumers can check for `inline_sources` to detect the new format.
+ */
+function buildTwoTierCitations(
+  step12Raw: string,
+  researchSourcesRaw: string,
+): Record<string, unknown> | null {
+  // Parse Step 12 (Tier 2 — bottom-of-page references)
+  let resourceLinks: Array<Record<string, unknown>> = []
+  if (step12Raw) {
+    try {
+      const parsed = JSON.parse(step12Raw)
+      if (Array.isArray(parsed)) {
+        resourceLinks = parsed
+      } else if (parsed && typeof parsed === 'object') {
+        resourceLinks = (parsed as Record<string, unknown>).resource_links as Array<Record<string, unknown>> ?? []
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Parse research sources (Tier 1 — inline)
+  let inlineSources: Array<{ link_title: string; link_url: string; step: number }> = []
+  if (researchSourcesRaw) {
+    try {
+      const parsed = JSON.parse(researchSourcesRaw) as Array<{ title: string; url: string; step: number }>
+      inlineSources = parsed.map((s) => ({
+        link_title: s.title,
+        link_url: s.url,
+        step: s.step,
+      }))
+    } catch { /* ignore */ }
+  }
+
+  if (resourceLinks.length === 0 && inlineSources.length === 0) return null
+
+  // Deduplicate: remove Tier 2 entries that already appear in Tier 1 (research sources take priority)
+  const tier1Urls = new Set(inlineSources.map((s) => s.link_url))
+  const dedupedResourceLinks = resourceLinks.filter((r) => {
+    const url = (r.link_url ?? r.url ?? '') as string
+    return !tier1Urls.has(url)
+  })
+
+  return {
+    inline_sources: inlineSources,
+    resource_links: dedupedResourceLinks,
+  }
 }
 
 /** Truncate excerpt to ≤150 chars. */
@@ -218,7 +265,10 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   const primaryKeyword = extractPrimaryKeyword(
     ctx.parsedSteps.get(2) as Record<string, unknown> | undefined,
   )
-  const citations = parseCitations(ctx.completedSteps.get(12) ?? '')
+  const citations = buildTwoTierCitations(
+    ctx.completedSteps.get(12) ?? '',
+    ctx.completedSteps.get(120) ?? '',
+  )
   const baseSlug = slugify(seo.urlSlug || seo.metaTitle || topic.topic)
   const finalSlug = await resolveUniqueSlug(userId, jobId, baseSlug)
   const seoTitle = seo.metaTitle || ctx.completedSteps.get(0)?.trim() || topic.topic
@@ -282,18 +332,34 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     const siteBase = brand.organizationWebsite?.replace(/\/$/, '') ?? ''
     const articleUrl = sitePage.slug ? `${siteBase}/${sitePage.slug}` : siteBase
 
-    // Extract citation URLs from the stored citations JSON.
-    // Step 12 stores: { resource_links: [{ link_title: "...", link_url: "..." }] }
-    // Some older records may use plain arrays or a `url` key — handle all variants.
+    // Extract citation URLs from the stored citations JSON (union of both tiers).
+    // New format: { inline_sources: [...], resource_links: [...] }
+    // Old format: { resource_links: [...] } or plain array — handle all variants.
     const citationUrls: string[] = []
     if (sitePage.citations && typeof sitePage.citations === 'object') {
       const c = sitePage.citations as Record<string, unknown>
-      const links = (c.resource_links ?? c.citations ?? []) as Array<Record<string, unknown> | string>
-      for (const entry of links) {
-        const url = typeof entry === 'string'
-          ? entry
-          : (entry?.link_url ?? entry?.url ?? null)
-        if (url && typeof url === 'string') citationUrls.push(url)
+      const allArrays = [
+        c.inline_sources,
+        c.resource_links,
+        c.citations,
+      ].filter(Array.isArray) as Array<Array<Record<string, unknown> | string>>
+
+      // If the stored value is itself a plain array (legacy)
+      if (Array.isArray(sitePage.citations)) {
+        allArrays.push(sitePage.citations as Array<Record<string, unknown> | string>)
+      }
+
+      const seen = new Set<string>()
+      for (const arr of allArrays) {
+        for (const entry of arr) {
+          const url = typeof entry === 'string'
+            ? entry
+            : ((entry?.link_url ?? entry?.url ?? null) as string | null)
+          if (url && typeof url === 'string' && !seen.has(url)) {
+            seen.add(url)
+            citationUrls.push(url)
+          }
+        }
       }
     }
 

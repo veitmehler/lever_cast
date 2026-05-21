@@ -33,6 +33,8 @@ export interface PipelineContext {
   parsedSteps: Map<number, unknown>    // stepNumber -> parsed JSON (for steps 2, 12, 13)
   // Filled in progressively as the pipeline runs
   excludedKeywordsCache?: string
+  // Research sources accumulated from Gemini search grounding metadata (Steps 6, 7, 8, 10)
+  researchSources?: Array<{ title: string; url: string; step: number }>
   // Lazy-loaded caches for new V2 models
   brandSettingsCache?: BrandSettings | null
   platformSettingsCache?: PlatformSettings | null
@@ -410,6 +412,9 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
       // The approval service calls ctx.completedSteps.set(110, JSON.stringify(liveCitations))
       // so the resolved value is the JSON array of validated citations.
       return ctx.completedSteps.get(110) ?? ''
+
+    case 'research_sources':
+      return JSON.stringify(ctx.researchSources ?? [])
 
     // ── Generic step output accessor: {{<step_name>_output}} ─────────────────
     default: {

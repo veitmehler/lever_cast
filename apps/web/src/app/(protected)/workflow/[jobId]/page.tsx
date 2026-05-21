@@ -248,21 +248,42 @@ function stripJsonMarkdownFences(text: string): string {
   return fenced ? fenced[1].trim() : t
 }
 
-function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
+interface ParsedCitation {
+  title: string
+  url: string
+  source_type: 'inline' | 'reference'
+}
+
+function parseCitationsFlat(raw: unknown): ParsedCitation[] {
   if (!raw) return []
   try {
-    // Handle double-encoded strings (e.g. JSON stored as a JSON string)
     let data: unknown =
       typeof raw === 'string' ? JSON.parse(stripJsonMarkdownFences(raw)) : raw
     if (typeof data === 'string') {
       data = JSON.parse(stripJsonMarkdownFences(data))
     }
 
-    // Extract the links array — support all known shapes:
-    //   { resource_links: [...] }  ← step 12 structuring prompt format
-    //   [...]                      ← bare array
-    //   { links: [...] }           ← occasional LLM variation
     const obj = data as Record<string, unknown>
+
+    // Two-tier format: { inline_sources: [...], resource_links: [...] }
+    if (obj && !Array.isArray(data) && (Array.isArray(obj.inline_sources) || Array.isArray(obj.resource_links))) {
+      const result: ParsedCitation[] = []
+      if (Array.isArray(obj.inline_sources)) {
+        for (const s of obj.inline_sources as CitationEntry[]) {
+          const url = s.link_url ?? s.url ?? ''
+          if (url) result.push({ title: s.link_title ?? s.title ?? '', url, source_type: 'inline' })
+        }
+      }
+      if (Array.isArray(obj.resource_links)) {
+        for (const s of obj.resource_links as CitationEntry[]) {
+          const url = s.link_url ?? s.linkUrl ?? s.url ?? ''
+          if (url) result.push({ title: s.link_title ?? s.linkTitle ?? s.title ?? '', url, source_type: 'reference' })
+        }
+      }
+      return result
+    }
+
+    // Legacy flat format
     const links: CitationEntry[] = Array.isArray(data)
       ? (data as CitationEntry[])
       : Array.isArray(obj.resource_links)
@@ -279,6 +300,7 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
       .map((c) => ({
         title: c.link_title ?? c.linkTitle ?? c.title ?? c.sourceTitle ?? '',
         url: pickUrl(c),
+        source_type: 'reference' as const,
       }))
   } catch {
     return []
@@ -294,22 +316,22 @@ function parseCitations(raw: unknown): Array<{ title: string; url: string }> {
 function resolveCitations(
   sp: SitePage | null | undefined,
   pipelineSteps: PipelineStep[],
-): Array<{ title: string; url: string }> {
+): ParsedCitation[] {
   if (sp) {
-    const fromSitePage = parseCitations(sp.citations)
+    const fromSitePage = parseCitationsFlat(sp.citations)
     if (fromSitePage.length > 0) return fromSitePage
   }
 
   const step12 = pipelineSteps.find(
     (s) => Number(s.stepNumber) === 12 && s.status === 'completed',
   )
-  const fromStep12 = parseCitations(step12?.output)
+  const fromStep12 = parseCitationsFlat(step12?.output)
   if (fromStep12.length > 0) return fromStep12
 
   // Fallback: scan all completed step outputs for resource_links
   for (const step of pipelineSteps) {
     if (step.status !== 'completed' || !step.output) continue
-    const found = parseCitations(step.output)
+    const found = parseCitationsFlat(step.output)
     if (found.length > 0) return found
   }
 
@@ -353,9 +375,20 @@ function buildReviewText(
   const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
 
-  const citationLines = citations.length > 0
-    ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
-    : '[No citations available for this article]'
+  const inlineSources = citations.filter((c) => c.source_type === 'inline')
+  const references = citations.filter((c) => c.source_type === 'reference')
+
+  const inlineSection = inlineSources.length > 0
+    ? `## Inline Sources\n\n${inlineSources.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
+    : ''
+  const referenceSection = references.length > 0
+    ? `## Citations\n\n${references.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
+    : ''
+
+  // Fallback for legacy data where all citations are 'reference' type
+  const citationsBlock = inlineSection || referenceSection
+    ? [inlineSection, referenceSection].filter(Boolean).join('\n\n---\n\n')
+    : `## Citations\n\n${citations.length > 0 ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n') : '[No citations available for this article]'}`
 
   return `# Evaluation Request
 
@@ -382,9 +415,7 @@ ${bodyMarkdown}
 
 ---
 
-## Citations
-
-${citationLines}`
+${citationsBlock}`
 }
 
 /**
@@ -410,9 +441,20 @@ function buildFinalReviewText(
 
   const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
-  const citationLines = citations.length > 0
-    ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n')
-    : '[No citations available for this article]'
+
+  const inlineSources = citations.filter((c) => c.source_type === 'inline')
+  const references = citations.filter((c) => c.source_type === 'reference')
+
+  const inlineSection = inlineSources.length > 0
+    ? `## Inline Sources\n\n${inlineSources.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
+    : ''
+  const referenceSection = references.length > 0
+    ? `## Citations\n\n${references.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
+    : ''
+
+  const citationsBlock = inlineSection || referenceSection
+    ? [inlineSection, referenceSection].filter(Boolean).join('\n\n---\n\n')
+    : `## Citations\n\n${citations.length > 0 ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n') : '[No citations available for this article]'}`
 
   const disclaimerSection = sp.disclaimer?.trim()
     ? `\n---\n\n## Article Disclaimer\n\n${sp.disclaimer.trim()}`
@@ -447,9 +489,7 @@ ${bodyMarkdown}
 
 ---
 
-## Citations
-
-${citationLines}${disclaimerSection}${schemaSection}`
+${citationsBlock}${disclaimerSection}${schemaSection}`
 }
 
 /** Pretty-print JSON-LD for the schema review panel; falls back to raw string if not valid JSON. */

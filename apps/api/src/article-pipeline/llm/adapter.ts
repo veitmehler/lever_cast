@@ -11,6 +11,8 @@ export interface LLMResponse {
    *  'other'    — any other provider-specific reason
    */
   finishReason: 'stop' | 'length' | 'filter' | 'other'
+  /** Raw grounding source URIs returned by Gemini search. Redirect URIs need resolution. */
+  groundingSources?: Array<{ title: string; uri: string; domain?: string }>
 }
 
 export interface LLMCallOptions {

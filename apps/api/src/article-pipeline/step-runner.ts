@@ -49,6 +49,7 @@ export interface StepRunResult {
   durationMs: number
   provider: string
   model: string
+  groundingSources?: Array<{ title: string; uri: string; domain?: string }>
 }
 
 export class StepRunner {
@@ -150,6 +151,8 @@ export class StepRunner {
           searchResearch = searchResponse.content
           phase1Tokens = searchResponse.tokens
           phase1Cost = searchResponse.cost
+          // For two-phase steps, grounding sources come from the search phase
+          var searchGroundingSources = searchResponse.groundingSources
           if (VERBOSE) {
             logger.info(
               { jobId: this.jobId, step: this.stepNumber, phase: 1, response: truncate(searchResearch, TRUNCATE) },
@@ -308,6 +311,12 @@ export class StepRunner {
           },
         })
 
+        // Collect grounding sources — from the search phase for two-phase steps,
+        // otherwise from the main LLM call for regular search steps.
+        const sources = isTwoPhase
+          ? searchGroundingSources
+          : llmResponse.groundingSources
+
         return {
           output: finalOutput,
           parsedOutput,
@@ -317,6 +326,7 @@ export class StepRunner {
           durationMs,
           provider,
           model,
+          ...(sources?.length ? { groundingSources: sources } : {}),
         }
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err))
@@ -369,6 +379,7 @@ export class StepRunner {
           let searchResearch: string | undefined
           let phase1Tokens = { input: 0, output: 0, total: 0 }
           let phase1Cost = 0
+          let fbSearchGroundingSources: Array<{ title: string; uri: string; domain?: string }> | undefined
           if (isTwoPhase) {
             const searchResponse = await adapter.call({
               systemPrompt,
@@ -380,6 +391,7 @@ export class StepRunner {
             searchResearch = searchResponse.content
             phase1Tokens = searchResponse.tokens
             phase1Cost = searchResponse.cost
+            fbSearchGroundingSources = searchResponse.groundingSources
             logger.info(
               { jobId: this.jobId, step: this.stepNumber, researchLength: searchResearch.length },
               '[step-runner] fallback phase-1 search complete; proceeding to phase-2',
@@ -458,6 +470,10 @@ export class StepRunner {
             '[step-runner] fallback model succeeded',
           )
 
+          const fbSources = isTwoPhase
+            ? fbSearchGroundingSources
+            : llmResponse.groundingSources
+
           return {
             output: finalOutput,
             parsedOutput,
@@ -467,6 +483,7 @@ export class StepRunner {
             durationMs,
             provider,
             model: GEMINI_SEARCH_FALLBACK_MODEL,
+            ...(fbSources?.length ? { groundingSources: fbSources } : {}),
           }
         } catch (err) {
           lastError = err instanceof Error ? err : new Error(String(err))
@@ -547,13 +564,14 @@ ${research}
 Return ONLY valid JSON in this exact format — no markdown, no code fences, no commentary:
 {
   "resource_links": [
-    { "link_title": "<source title>", "link_url": "<source URL>" },
-    { "link_title": "<source title>", "link_url": "<source URL>" }
+    { "link_title": "<source title>", "link_url": "<source URL>", "link_date": "<publication date if known, else empty string>" },
+    { "link_title": "<source title>", "link_url": "<source URL>", "link_date": "<publication date if known, else empty string>" }
   ]
 }
 
 Rules:
 - Include only sources that have a real URL (skip any with placeholder or missing URLs).
+- For link_date, use the format "Month YYYY" (e.g. "May 2025") or "YYYY" if only the year is known. Leave as "" if unknown.
 - Aim for 8-12 entries.
 - Output ONLY the JSON object. Nothing else.`
   }

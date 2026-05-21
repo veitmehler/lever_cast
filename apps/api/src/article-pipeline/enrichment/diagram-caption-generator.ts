@@ -18,26 +18,29 @@ Diagram type: {{diagramType}}
 Mermaid syntax (excerpt):
 {{syntaxExcerpt}}
 
-Return a JSON object with exactly two fields:
+Return a JSON object with exactly two fields. The two fields serve DIFFERENT purposes — never repeat the same words or ideas in both:
 
-"altText": Aim for under 100 characters, but always write a grammatically complete sentence — never cut off mid-phrase. Describe the diagram so someone could sketch it from your words alone. State the diagram type and its subject — nothing more. Do NOT list individual steps, nodes, or data points. The detailed explanation belongs in the caption, not here.
+"altText": For screen readers. State the diagram type and its visual subject in 60–80 characters. A noun phrase — no insight, no explanation. Always write a grammatically complete phrase, never cut off mid-word.
 
-"caption": One sentence (15–25 words) explaining what the diagram means or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
+"caption": For sighted readers. One sentence (15–25 words) explaining the insight or meaning the diagram conveys. Do NOT start with "This diagram", "This chart", or "The diagram". Do NOT restate what the altText already says.
 
-GOOD altText examples (note: varied connectors, no filler words):
-- "Flowchart tracing five stages of chiropractic spinal assessment"
+GOOD pair (no overlap — altText is visual, caption is insight):
+- altText: "Flowchart tracing five stages of chiropractic spinal assessment"
+- caption: "Progressive spinal evaluation identifies misalignment severity and guides the appropriate adjustment technique for each patient."
+
+BAD pair (redundant — both say "five stages" and "assessment/adjustment"):
+- altText: "Flowchart tracing five stages of spinal assessment from intake to adjustment"
+- caption: "Progressive spinal evaluation traces five stages from intake to the appropriate adjustment technique."
+
+More GOOD altText examples (60–80 chars, diagram type + subject noun phrase):
 - "Mindmap of six ergonomic risk factors at a desk workstation"
 - "State diagram comparing a pain cycle loop to a recovery path"
-- "Diagram of a person demonstrating proper lifting with bent knees"
-
-BAD altText — do NOT do these:
-- Uses "showing" (filler word): "Flowchart showing five stages of chiropractic spinal assessment"
-- Lists individual steps: "Proper lifting technique requires standing close, bending knees, engaging core, maintaining neutral spine, holding close to chest, and lifting with legs."
+- "Class diagram linking cervicogenic headache origins to treatment pathways"
 
 Rules:
-- altText: visual description only, aim for under 100 characters but always finish the sentence — a complete 110-character alt text beats a truncated 95-character one.
-- Do NOT use the word "showing" — use a specific connector instead: of, tracing, comparing, mapping, illustrating, linking, branching into.
-- caption: meaning and insight, shown as visible text below the diagram.
+- altText: diagram type + visual subject only, 60–80 characters, no insight words.
+- Do NOT use the word "showing" — use: of, tracing, comparing, mapping, linking, branching into.
+- caption: meaning and insight only, 15–25 words, no repetition of altText content.
 - Respond with ONLY valid JSON — no markdown, no code fences.
 
 Example output:

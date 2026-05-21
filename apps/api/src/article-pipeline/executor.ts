@@ -7,7 +7,7 @@ import { sanitizeKeywordJson, sanitizeKeywordText } from './keyword-sanitizer'
 import type { PipelineContext } from './variable-resolver'
 import { extractCitationsForValidation, validateCitationUrls } from './citation-validator'
 import { insertInlineCitations } from './citation-inserter'
-import { cleanStepOutput, normalizeH2Questions } from './approval-service'
+import { cleanStepOutput } from './approval-service'
 import { resolveGroundingUrls } from './grounding-resolver'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -329,7 +329,7 @@ async function ensurePhaseAInlineCitations(jobId: string, ctx: PipelineContext):
   const step11Raw = ctx.completedSteps.get(11) ?? ctx.completedSteps.get(9) ?? ''
   if (!step11Raw.trim()) return
 
-  const normalized = normalizeH2Questions(cleanStepOutput(step11Raw))
+  const normalized = cleanStepOutput(step11Raw)
 
   // Build the inline citation pool — prefer Tier 1 research sources, fall back to Step 12
   const researchPairs = (ctx.researchSources ?? []).map((s) => ({ title: s.title, url: s.url }))

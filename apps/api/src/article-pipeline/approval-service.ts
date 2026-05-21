@@ -212,7 +212,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   if (!step11Raw) {
     throw new Error('Missing step 11 (article body) — cannot approve')
   }
-  const step11 = normalizeH2Questions(cleanStepOutput(step11Raw))
+  const step11 = cleanStepOutput(step11Raw)
 
   // ── Step 13: generate_seo_metadata ────────────────────────────────────────
   logger.info({ jobId }, '[approval] step 13 — generate_seo_metadata')

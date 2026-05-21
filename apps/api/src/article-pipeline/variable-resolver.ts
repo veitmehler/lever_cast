@@ -213,7 +213,7 @@ async function resolveVariable(name: string, ctx: PipelineContext): Promise<stri
     }
 
     case 'current_date':
-      return new Date().toISOString()
+      return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
     case 'min_citation_year':
       return String(new Date().getFullYear() - 10)

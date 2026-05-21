@@ -24,21 +24,24 @@ Return a JSON object with exactly two fields:
 
 "caption": One sentence (15–25 words) explaining what the diagram means or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
 
-GOOD altText examples:
-- "Flowchart showing five stages of chiropractic spinal assessment"
+GOOD altText examples (note: varied connectors, no filler words):
+- "Flowchart tracing five stages of chiropractic spinal assessment"
 - "Mindmap of six ergonomic risk factors at a desk workstation"
+- "State diagram comparing a pain cycle loop to a recovery path"
 - "Diagram of a person demonstrating proper lifting with bent knees"
 
-BAD altText (too long — lists individual steps instead of describing the shape):
-- "Proper lifting technique requires standing close, bending knees, engaging core, maintaining neutral spine, holding close to chest, and lifting with legs."
+BAD altText — do NOT do these:
+- Uses "showing" (filler word): "Flowchart showing five stages of chiropractic spinal assessment"
+- Lists individual steps: "Proper lifting technique requires standing close, bending knees, engaging core, maintaining neutral spine, holding close to chest, and lifting with legs."
 
 Rules:
 - altText: visual description only, under 100 characters, never list individual steps or nodes.
+- Do NOT use the word "showing" — use a specific connector instead: of, tracing, comparing, mapping, illustrating, linking, branching into.
 - caption: meaning and insight, shown as visible text below the diagram.
 - Respond with ONLY valid JSON — no markdown, no code fences.
 
 Example output:
-{"altText": "Flowchart showing five stages of chiropractic spinal assessment", "caption": "Progressive spinal evaluation identifies misalignment severity and guides the appropriate adjustment technique for each patient."}`
+{"altText": "Flowchart tracing five stages of chiropractic spinal assessment", "caption": "Progressive spinal evaluation identifies misalignment severity and guides the appropriate adjustment technique for each patient."}`
 
 export interface DiagramCaptionResult {
   altText: string

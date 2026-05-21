@@ -375,20 +375,14 @@ function buildReviewText(
   const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
 
-  const inlineSources = citations.filter((c) => c.source_type === 'inline')
-  const references = citations.filter((c) => c.source_type === 'reference')
-
-  const inlineSection = inlineSources.length > 0
-    ? `## Inline Sources\n\n${inlineSources.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
-    : ''
-  const referenceSection = references.length > 0
-    ? `## Citations\n\n${references.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
-    : ''
-
-  // Fallback for legacy data where all citations are 'reference' type
-  const citationsBlock = inlineSection || referenceSection
-    ? [inlineSection, referenceSection].filter(Boolean).join('\n\n---\n\n')
-    : `## Citations\n\n${citations.length > 0 ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n') : '[No citations available for this article]'}`
+  // Only show Tier 2 (Step 12 curated references) in the review text.
+  // Tier 1 inline sources are already visible as <a> links in the body — listing them
+  // separately as a bibliography block risks a spam penalty for unfiltered link stuffing.
+  const tier2 = citations.filter((c) => c.source_type === 'reference')
+  const displayCitations = tier2.length > 0 ? tier2 : citations
+  const citationLines = displayCitations.length > 0
+    ? displayCitations.map((c) => `- [${c.title}](${c.url})`).join('\n')
+    : '[No citations available for this article]'
 
   return `# Evaluation Request
 
@@ -415,7 +409,9 @@ ${bodyMarkdown}
 
 ---
 
-${citationsBlock}`
+## Citations
+
+${citationLines}`
 }
 
 /**
@@ -442,19 +438,15 @@ function buildFinalReviewText(
   const title = resolveBestTitle(sp, pipelineSteps, isApproving)
   const citations = resolveCitations(sp, pipelineSteps)
 
-  const inlineSources = citations.filter((c) => c.source_type === 'inline')
-  const references = citations.filter((c) => c.source_type === 'reference')
+  // Only show Tier 2 (Step 12 curated references) in the review text.
+  // Tier 1 inline sources are already visible as <a> links in the body.
+  const tier2 = citations.filter((c) => c.source_type === 'reference')
+  const displayCitations = tier2.length > 0 ? tier2 : citations
+  const citationLines = displayCitations.length > 0
+    ? displayCitations.map((c) => `- [${c.title}](${c.url})`).join('\n')
+    : '[No citations available for this article]'
 
-  const inlineSection = inlineSources.length > 0
-    ? `## Inline Sources\n\n${inlineSources.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
-    : ''
-  const referenceSection = references.length > 0
-    ? `## Citations\n\n${references.map((c) => `- [${c.title}](${c.url})`).join('\n')}`
-    : ''
-
-  const citationsBlock = inlineSection || referenceSection
-    ? [inlineSection, referenceSection].filter(Boolean).join('\n\n---\n\n')
-    : `## Citations\n\n${citations.length > 0 ? citations.map((c) => `- [${c.title}](${c.url})`).join('\n') : '[No citations available for this article]'}`
+  const citationsBlock = `## Citations\n\n${citationLines}`
 
   const disclaimerSection = sp.disclaimer?.trim()
     ? `\n---\n\n## Article Disclaimer\n\n${sp.disclaimer.trim()}`

@@ -20,7 +20,7 @@ Mermaid syntax (excerpt):
 
 Return a JSON object with exactly two fields:
 
-"altText": Under 100 characters. Describe the diagram so someone could sketch it from your words alone. State the diagram type and its subject — nothing more. Do NOT list individual steps, nodes, or data points. The detailed explanation belongs in the caption, not here.
+"altText": Aim for under 100 characters, but always write a grammatically complete sentence — never cut off mid-phrase. Describe the diagram so someone could sketch it from your words alone. State the diagram type and its subject — nothing more. Do NOT list individual steps, nodes, or data points. The detailed explanation belongs in the caption, not here.
 
 "caption": One sentence (15–25 words) explaining what the diagram means or what insight it conveys. Do NOT start with "This diagram", "This chart", or "The diagram".
 
@@ -35,7 +35,7 @@ BAD altText — do NOT do these:
 - Lists individual steps: "Proper lifting technique requires standing close, bending knees, engaging core, maintaining neutral spine, holding close to chest, and lifting with legs."
 
 Rules:
-- altText: visual description only, under 100 characters, never list individual steps or nodes.
+- altText: visual description only, aim for under 100 characters but always finish the sentence — a complete 110-character alt text beats a truncated 95-character one.
 - Do NOT use the word "showing" — use a specific connector instead: of, tracing, comparing, mapping, illustrating, linking, branching into.
 - caption: meaning and insight, shown as visible text below the diagram.
 - Respond with ONLY valid JSON — no markdown, no code fences.

@@ -100,16 +100,16 @@ export function buildFigureHtml(opts: {
   imgUrl: string
   diagramId: string       // unique id used for aria-describedby linkage
   alt: string             // section heading — fallback when altText is absent
-  altText?: string | null // short visual description for img alt= (≤125 chars, screen readers)
+  altText?: string | null // short visual description for img alt= (screen readers)
   caption?: string | null // visible figcaption explaining meaning, linked via aria-describedby
   width?: number          // SVG intrinsic width — prevents CLS
   height?: number         // SVG intrinsic height — prevents CLS
 }): string {
-  // Enforce 125-char hard cap on alt text — some screen readers truncate beyond this point.
-  const rawAlt = opts.altText?.trim() || opts.alt
-  const imgAlt = rawAlt.length > 125
-    ? rawAlt.slice(0, 124).replace(/\s+\S*$/, '') // trim to last full word
-    : rawAlt
+  // Use the LLM-generated alt text as-is — do NOT hard-truncate.
+  // Truncation causes grammatically incomplete sentences (e.g. "...and"), which is
+  // worse than a slightly longer alt text. Modern screen readers have no hard character
+  // limit, and the detailed explanation is already in the <figcaption> via aria-describedby.
+  const imgAlt = opts.altText?.trim() || opts.alt
 
   const captionId = `diagram-desc-${opts.diagramId}`
   const ariaDescribedBy = opts.caption ? ` aria-describedby="${captionId}"` : ''

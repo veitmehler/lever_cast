@@ -332,16 +332,17 @@ export async function approveArticleJob(jobId: string): Promise<void> {
     const siteBase = brand.organizationWebsite?.replace(/\/$/, '') ?? ''
     const articleUrl = sitePage.slug ? `${siteBase}/${sitePage.slug}` : siteBase
 
-    // Extract citation URLs from the stored citations JSON (union of both tiers).
+    // Extract citation URLs for schema markup — Tier 2 (Step 12 curated references) only.
+    // Tier 1 inline sources are excluded: they are already <a> links in the body HTML and
+    // listing 30+ grounding URLs in JSON-LD schema looks like a manipulated signal to Google.
     // New format: { inline_sources: [...], resource_links: [...] }
     // Old format: { resource_links: [...] } or plain array — handle all variants.
     const citationUrls: string[] = []
     if (sitePage.citations && typeof sitePage.citations === 'object') {
       const c = sitePage.citations as Record<string, unknown>
       const allArrays = [
-        c.inline_sources,
-        c.resource_links,
-        c.citations,
+        c.resource_links,   // Tier 2: Step 12 curated references
+        c.citations,        // legacy key
       ].filter(Array.isArray) as Array<Array<Record<string, unknown> | string>>
 
       // If the stored value is itself a plain array (legacy)

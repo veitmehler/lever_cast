@@ -840,7 +840,22 @@ export default function WorkflowJobPage() {
       toast.success('Article published!')
       await fetchJob()
       if (autoExportTarget) {
-        await handleExport(autoExportTarget, exportConfig ?? {})
+        // Re-fetch WP connections at publish time so we always use the current
+        // connectionId, not the one cached at page load (which may be stale if
+        // the user changed their WordPress connection while the page was open).
+        let freshConfig = exportConfig ?? {}
+        if (autoExportTarget === 'wordpress') {
+          const connsRes = await fetch('/api/wp/connections').catch(() => null)
+          const connsData = connsRes?.ok ? await connsRes.json().catch(() => ({})) : {}
+          const freshConnections: WpConnectionLite[] = connsData.connections ?? []
+          setWpConnections(freshConnections)
+          const freshConnectionId = freshConnections[0]?.id
+          if (!freshConnectionId) {
+            throw new Error('No WordPress connection found. Please add one in Settings.')
+          }
+          freshConfig = { ...freshConfig, connectionId: freshConnectionId }
+        }
+        await handleExport(autoExportTarget, freshConfig)
       }
       await fetchAttempts()
     } catch (err) {

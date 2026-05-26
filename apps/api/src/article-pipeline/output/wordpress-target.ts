@@ -142,7 +142,7 @@ export class WordPressTarget implements OutputTarget {
 
     if (!connectionId) throw new Error('WordPress connectionId is required')
 
-    const conn = await prisma.wordPressConnection.findFirstOrThrow({
+    const conn = await prisma.wordPressConnection.findFirst({
       where: { id: connectionId, userId: payload.userId },
       select: {
         id: true, username: true, appPassword: true, siteUrl: true,
@@ -150,6 +150,12 @@ export class WordPressTarget implements OutputTarget {
         seoPlugin: true,
       },
     })
+
+    if (!conn) {
+      throw new Error(
+        `WordPress connection not found (id: ${connectionId}). It may have been deleted or belongs to a different account. Please refresh the page and try again.`,
+      )
+    }
 
     const plainPassword = decrypt(conn.appPassword)
     const auth = basicAuthHeader(conn.username, plainPassword)

@@ -120,6 +120,33 @@ function rewriteImageSrcs(
   return result
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildWordPressCitationsHtml(payload: OutputPayload): string {
+  const referenceCitations = payload.citations.filter(
+    (c) => c.link_url && c.source_type !== 'inline',
+  )
+  if (referenceCitations.length === 0) return ''
+
+  const listItems = referenceCitations
+    .map(
+      (c) =>
+        `<li><a href="${escapeHtml(c.link_url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(c.link_title || c.link_url)}</a></li>`,
+    )
+    .join('\n    ')
+
+  return `<details style="margin-top:2rem;border-top:1px solid #e5e7eb;padding-top:1rem;">
+  <summary style="cursor:pointer;list-style:revert;">
+    <h5 style="display:inline;margin:0;">Article Citations:</h5>
+  </summary>
+  <ol style="margin-top:0.75rem;padding-left:1.25rem;">
+    ${listItems}
+  </ol>
+</details>`
+}
+
 // ── WordPressTarget ────────────────────────────────────────────────────────
 
 interface WpConfig {
@@ -279,6 +306,11 @@ export class WordPressTarget implements OutputTarget {
     }
 
     let wpReadyHtml = rewriteImageSrcs(payload.bodyHtml, diagramUrlMap)
+
+    const citationsHtml = buildWordPressCitationsHtml(payload)
+    if (citationsHtml) {
+      wpReadyHtml += `\n${citationsHtml}`
+    }
 
     // Append JSON-LD schema markup so it is published with the post regardless of plugin.
     if (payload.schemaJson?.trim()) {

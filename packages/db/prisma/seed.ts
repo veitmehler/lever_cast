@@ -397,6 +397,122 @@ const IMAGE_GEN_TEMPLATE = [
   },
 ]
 
+// ── Platform syndication templates (Steps 30–31) ─────────────────────────────
+const SYNDICATION_TEMPLATES = [
+  {
+    stepNumber: 30,
+    stepName: 'generate_linkedin_article',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 4096,
+    systemPrompt:
+      'You are an expert LinkedIn content strategist who writes high-performing LinkedIn Articles (long-form, newsletter-style). ' +
+      'You adapt well-researched articles into compelling LinkedIn Articles that drive professional engagement and thought leadership. ' +
+      'LinkedIn Articles support rich formatting: use ## headings, **bold** for emphasis, and bullet lists. ' +
+      'Do NOT use H1 (#) — LinkedIn renders the article title separately. ' +
+      'Write for a professional audience. Be direct, credible, and insightful. ' +
+      'Output ONLY the article content — no preamble, no commentary, no "Here is your article" intro.',
+    userPrompt: `You are adapting the following article into a LinkedIn Article.
+
+ORIGINAL ARTICLE TITLE: {{title}}
+
+PRIMARY KEYWORD: {{primary_keyword}}
+
+ARTICLE EXCERPT: {{excerpt}}
+
+FULL ARTICLE BODY:
+{{article_body}}
+
+REFERENCE CITATIONS:
+{{citations}}
+
+---
+
+Write a LinkedIn Article based on the same facts, research, and citations above. Follow these requirements strictly:
+
+**Format & Length**
+- 900–1300 words
+- Use ## for section headings (LinkedIn renders these as H2)
+- Use **bold** for key terms and emphasis
+- Use bullet lists for scannable takeaways
+- No H1 (#) heading — the title is handled separately
+
+**Structure**
+1. Hook (2–3 sentences): a compelling professional insight or surprising finding from the article that stops the scroll
+2. Context (1 short paragraph): why this matters right now for professionals
+3. 3–4 substantive sections with ## headings covering the main insights
+4. Key Takeaways (bullet list, 4–6 points)
+5. Closing CTA (1–2 sentences): invite readers to share their experience or connect
+
+**Tone & Style**
+- Authoritative but conversational — write as a senior practitioner, not an academic
+- First-person perspective where natural ("In my experience…", "What I've found…")
+- Direct, no filler, no hedging
+- Cite specific facts and data points from the original article
+
+**At the end**, add a "## References" section with a numbered list of the citations provided above.
+
+Output the article content only. Start directly with the hook paragraph.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 31,
+    stepName: 'generate_medium_article',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 6000,
+    systemPrompt:
+      'You are an expert writer for Medium who crafts high-quality, deeply researched long-form articles. ' +
+      'Medium readers expect substance, nuance, and a distinct point of view. ' +
+      'Medium supports full Markdown: use # for title (H1), ## for sections, ### for sub-sections, **bold**, *italic*, ' +
+      '> blockquotes for pull quotes, and numbered/bullet lists. ' +
+      'Write with intellectual depth and a clear narrative arc. ' +
+      'Output ONLY the article content in Markdown — no preamble, no commentary.',
+    userPrompt: `You are adapting the following article into a Medium article.
+
+ORIGINAL ARTICLE TITLE: {{title}}
+
+PRIMARY KEYWORD: {{primary_keyword}}
+
+ARTICLE EXCERPT: {{excerpt}}
+
+FULL ARTICLE BODY:
+{{article_body}}
+
+REFERENCE CITATIONS:
+{{citations}}
+
+---
+
+Write a Medium article based on the same facts, research, and citations above. Follow these requirements strictly:
+
+**Format & Length**
+- 1500–2500 words
+- Full Markdown — use # for the article title, ## for main sections, ### for sub-sections
+- Use > blockquotes to highlight the single most important insight in each major section (1 per section max)
+- Use **bold** for key terms, *italic* for nuanced qualifications
+- Use numbered lists for sequential steps; bullet lists for parallel points
+
+**Structure**
+1. # [Title] — rewrite the title to be compelling for Medium's audience (keep the core topic but optimise for curiosity and click-through)
+2. Introduction (3–4 paragraphs): set the scene, establish the problem, and state your thesis
+3. 4–6 substantive sections with ## headings — each should develop a distinct insight from the original article
+4. Use ### sub-sections where a topic needs further breakdown
+5. Conclusion (2–3 paragraphs): synthesise the argument, leave the reader with a memorable closing thought
+6. ## References — numbered list of the citations provided
+
+**Tone & Style**
+- Authoritative and intellectually engaging — write for curious, informed readers
+- Develop ideas with depth: explain the "why" and "so what" behind every fact
+- Use pull quotes (>) for the single most important insight per section
+- Cite specific data points and facts from the original article throughout
+- Third-person or first-person — whichever serves the argument better
+
+Output the full article in Markdown. Start directly with the # title.`,
+    isActive: true,
+  },
+]
+
 // ── Enrichment template (not a numbered pipeline step — uses stepNumber 20) ─────
 const ENRICHMENT_TEMPLATES = [
   {
@@ -1311,7 +1427,7 @@ Before publishing any article, ask: "If a visitor reads only this article, will 
 async function main() {
   console.log('Seeding prompt templates...')
 
-  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES]) {
+  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,

@@ -70,6 +70,9 @@ const STEP_LABELS: Record<string, string> = {
   enrichment_key_takeaways:       '23. Key Takeaways & TOC',
   enrichment_generate_diagram:    '24. Mermaid Diagram (prompt slot)',
   enrichment_wp_category:         '25. WP Category (conditional, runs last)',
+  // Platform syndication
+  generate_linkedin_article:      '1. LinkedIn Article',
+  generate_medium_article:        '2. Medium Article',
 }
 
 /** Maps DB stepNumber → visual display number shown in the badge. */
@@ -82,6 +85,8 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
   13: '13', 110: '14', 15: '15', 150: '15b', 16: '16', 17: '17', 18: '18',
   // Phase C (continues from 18)
   101: '19', 102: '20', 103: '21', 104: '22', 107: '23', 20: '24', 108: '25',
+  // Platform syndication
+  30: '1', 31: '2',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
@@ -99,6 +104,10 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
     // Actual execution order: 101 → 102 → 103 → 104 → 107 → diagram loop (20) → 108
     label: 'Phase C — Enrichment',
     steps: [101, 102, 103, 104, 107, 20, 108],
+  },
+  {
+    label: 'Platform Syndication — LinkedIn & Medium',
+    steps: [30, 31],
   },
 ]
 

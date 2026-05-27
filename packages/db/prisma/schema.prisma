@@ -322,15 +322,39 @@ model ArticleJob {
   completedAt     DateTime?
   approvedAt      DateTime?
   enrichedAt      DateTime?
-  pipelineSteps   PipelineStep[]
-  sitePage        SitePage?
-  errorLogs       ErrorLog[]
-  outputAttempts  OutputAttempt[]
-  llmUsage        LLMUsage[]
+  pipelineSteps        PipelineStep[]
+  sitePage             SitePage?
+  errorLogs            ErrorLog[]
+  outputAttempts       OutputAttempt[]
+  llmUsage             LLMUsage[]
+  syndicationArticles  SyndicationArticle[]
 
   @@index([userId])
   @@index([status])
   @@map("article_jobs")
+}
+
+model SyndicationArticle {
+  id           String     @id @default(cuid())
+  jobId        String
+  job          ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId       String
+  platform     String     // 'linkedin' | 'medium'
+  title        String
+  content      String     @db.Text
+  status       String     @default("pending") // pending | completed | failed
+  errorMessage String?    @db.Text
+  inputTokens  Int        @default(0)
+  outputTokens Int        @default(0)
+  cost         Float      @default(0)
+  provider     String?
+  model        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([jobId, platform])
+  @@index([userId])
+  @@map("syndication_articles")
 }
 
 model PipelineStep {

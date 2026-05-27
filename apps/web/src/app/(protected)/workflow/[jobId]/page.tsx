@@ -7,7 +7,7 @@ import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Search, Tag, BookOpen, RefreshCw,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2,
+  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2, Linkedin, BookMarked,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -538,12 +538,35 @@ export default function WorkflowJobPage() {
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
   const [wpConnections, setWpConnections] = useState<WpConnectionLite[]>([])
 
+  type SyndicationArticle = { platform: string; title: string; content: string; status: string }
+  const [syndicationArticles, setSyndicationArticles] = useState<SyndicationArticle[]>([])
+  const [syndicationLoading, setSyndicationLoading] = useState(false)
+  const [syndicationGenerated, setSyndicationGenerated] = useState(false)
+  const [activeSyndicationTab, setActiveSyndicationTab] = useState<'linkedin' | 'medium'>('linkedin')
+  const [copiedSyndication, setCopiedSyndication] = useState<string | null>(null)
+
   useEffect(() => {
     void fetch('/api/wp/connections')
       .then((r) => r.json())
       .then((d) => setWpConnections((d.connections ?? []) as WpConnectionLite[]))
       .catch(() => setWpConnections([]))
   }, [])
+
+  // Pre-load any previously generated syndication articles
+  useEffect(() => {
+    if (!jobId) return
+    void fetch(`/api/articles/${jobId}/syndication`)
+      .then((r) => r.ok ? r.json() : { articles: [] })
+      .then((d) => {
+        const arts: SyndicationArticle[] = d.articles ?? []
+        if (arts.some((a) => a.status === 'completed')) {
+          setSyndicationArticles(arts)
+          setSyndicationGenerated(true)
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId])
 
   useEffect(() => {
     setReviewPanelExpandedOverride(undefined)
@@ -901,6 +924,33 @@ export default function WorkflowJobPage() {
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Article copied as Markdown — paste into Substack editor')
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
+    }
+  }
+
+  const handleGenerateSyndication = async () => {
+    setSyndicationLoading(true)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/syndication`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Generation failed')
+      const arts: SyndicationArticle[] = data.articles ?? []
+      setSyndicationArticles(arts)
+      setSyndicationGenerated(true)
+      toast.success('Platform articles generated!')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate platform articles')
+    } finally {
+      setSyndicationLoading(false)
+    }
+  }
+
+  const handleCopySyndication = async (content: string, platform: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedSyndication(platform)
+      setTimeout(() => setCopiedSyndication(null), 2500)
     } catch {
       toast.error('Copy failed — please select and copy manually')
     }
@@ -1525,6 +1575,20 @@ export default function WorkflowJobPage() {
                   </Button>
                 </Link>
               )}
+              {!syndicationGenerated && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                  onClick={() => void handleGenerateSyndication()}
+                  disabled={syndicationLoading}
+                >
+                  {syndicationLoading
+                    ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    : <BookMarked className="h-4 w-4 mr-1.5" />}
+                  {syndicationLoading ? 'Generating articles…' : 'Generate LinkedIn & Medium Articles'}
+                </Button>
+              )}
             </div>
 
             {/* Attempt history */}
@@ -1572,6 +1636,105 @@ export default function WorkflowJobPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── LinkedIn & Medium articles panel ─────────────────────────── */}
+        {displayStatus === 'published' && syndicationGenerated && syndicationArticles.length > 0 && (
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BookMarked className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider flex-1">
+                Platform Articles
+              </h2>
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex gap-1 mb-4 bg-muted rounded-lg p-1 w-fit">
+              {(['linkedin', 'medium'] as const).map((platform) => {
+                const art = syndicationArticles.find((a) => a.platform === platform)
+                if (!art || art.status !== 'completed') return null
+                return (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => setActiveSyndicationTab(platform)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      activeSyndicationTab === platform
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {platform === 'linkedin'
+                      ? <Linkedin className="h-3.5 w-3.5" />
+                      : <BookMarked className="h-3.5 w-3.5" />}
+                    {platform === 'linkedin' ? 'LinkedIn Article' : 'Medium Article'}
+                  </button>
+                )
+              })}
+            </div>
+
+            {syndicationArticles
+              .filter((a) => a.platform === activeSyndicationTab && a.status === 'completed')
+              .map((art) => (
+                <div key={art.platform}>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <h3 className="text-base font-semibold text-card-foreground leading-snug">{art.title}</h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => void handleCopySyndication(
+                        `# ${art.title}\n\n${art.content}`,
+                        art.platform,
+                      )}
+                    >
+                      {copiedSyndication === art.platform
+                        ? <><ClipboardCheck className="h-3.5 w-3.5 mr-1.5 text-green-500" />Copied!</>
+                        : <><ClipboardCopy className="h-3.5 w-3.5 mr-1.5" />Copy</>}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/40 p-4 max-h-96 overflow-y-auto">
+                    <pre className="text-sm text-card-foreground whitespace-pre-wrap font-sans leading-relaxed">
+                      {art.content}
+                    </pre>
+                  </div>
+                  {/* Diagram downloads */}
+                  {sitePage?.diagrams && sitePage.diagrams.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-muted-foreground font-medium mb-2 uppercase tracking-wider">
+                        Download diagrams to upload as article images:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {sitePage.diagrams.map((d) => (
+                          <a
+                            key={d.id}
+                            href={`/api/articles/${jobId}/diagram-svg/${d.id}`}
+                            download={`diagram-${d.position}.svg`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          >
+                            <Download className="h-3 w-3" />
+                            Diagram {d.position}
+                            {d.sectionTitle ? ` — ${d.sectionTitle.slice(0, 24)}` : ''}
+                          </a>
+                        ))}
+                        {sitePage.featuredImage && (
+                          <a
+                            href={sitePage.featuredImage.url}
+                            download="featured-image.jpg"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          >
+                            <Download className="h-3 w-3" />
+                            Featured Image
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         )}
 

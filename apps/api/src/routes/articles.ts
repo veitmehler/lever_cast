@@ -14,6 +14,7 @@ import {
   findFirstH2Index,
 } from '../article-pipeline/enrichment/html-parser'
 import { readS3Object } from '../lib/storage'
+import { generateSyndicationArticles } from '../article-pipeline/syndication/generate'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -642,6 +643,89 @@ export async function articleRoutes(app: FastifyInstance) {
   )
 
   // ── GET /api/articles/:jobId/diagram-svg/:diagramId — proxy SVG from S3 ─
+  // ── POST /api/articles/:jobId/syndication/generate ────────────────────────
+  // Generates LinkedIn Article + Medium article from the published main article.
+  // One-shot — no regeneration to prevent abuse. Re-calling overwrites existing rows.
+  app.post<{ Params: { jobId: string } }>(
+    '/articles/:jobId/syndication/generate',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+      if (job.status !== 'published') {
+        return reply.status(400).send({
+          error: `Job must be published before generating platform articles (current: ${job.status})`,
+        })
+      }
+
+      // Check if already generated (idempotent — only allow once)
+      const existing = await prisma.syndicationArticle.findMany({
+        where: { jobId },
+        select: { platform: true, status: true },
+      })
+      if (existing.some((a) => a.status === 'completed')) {
+        return reply.status(409).send({
+          error: 'Platform articles have already been generated for this job.',
+        })
+      }
+
+      try {
+        const results = await generateSyndicationArticles(jobId, user.id)
+        return reply.status(201).send({ articles: results })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        request.log.error({ jobId, err }, '[syndication] generation failed')
+        return reply.status(500).send({ error: `Generation failed: ${msg}` })
+      }
+    },
+  )
+
+  // ── GET /api/articles/:jobId/syndication ──────────────────────────────────
+  app.get<{ Params: { jobId: string } }>(
+    '/articles/:jobId/syndication',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+      const articles = await prisma.syndicationArticle.findMany({
+        where: { jobId, userId: user.id },
+        select: {
+          platform:     true,
+          title:        true,
+          content:      true,
+          status:       true,
+          errorMessage: true,
+          createdAt:    true,
+          inputTokens:  true,
+          outputTokens: true,
+          cost:         true,
+          provider:     true,
+          model:        true,
+        },
+        orderBy: { platform: 'asc' },
+      })
+
+      return reply.send({ articles })
+    },
+  )
+
   // Avoids browser CORS restrictions when fetching SVG text content for
   // embedding in the Gemini review copy/paste area.
   app.get<{ Params: { jobId: string; diagramId: string } }>(

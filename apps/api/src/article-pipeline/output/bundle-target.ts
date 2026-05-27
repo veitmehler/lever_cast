@@ -86,6 +86,41 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer())
 }
 
+function buildMarkdownArticle(payload: OutputPayload): string {
+  // YAML frontmatter
+  const fmLines = [
+    '---',
+    `title: "${payload.title.replace(/"/g, '\\"')}"`,
+    `slug: "${payload.slug}"`,
+    payload.excerpt ? `excerpt: "${payload.excerpt.replace(/"/g, '\\"')}"` : null,
+    `seo_title: "${payload.seoTitle.replace(/"/g, '\\"')}"`,
+    `seo_description: "${payload.seoDescription.replace(/"/g, '\\"')}"`,
+    payload.primaryKeyword ? `primary_keyword: "${payload.primaryKeyword.replace(/"/g, '\\"')}"` : null,
+    payload.meta.readingTime != null ? `reading_time: ${payload.meta.readingTime}` : null,
+    payload.meta.publishedAt ? `published_at: "${payload.meta.publishedAt.toISOString()}"` : null,
+    payload.featuredImage ? `featured_image: images/featured.jpg` : null,
+    '---',
+  ].filter(Boolean).join('\n')
+
+  // Featured image as markdown at the top of content
+  const featuredImageMd = payload.featuredImage
+    ? `![${payload.featuredImage.alt}](images/featured.jpg)\n\n`
+    : ''
+
+  // Tier 2 citations appended as a References section
+  const referenceCitations = payload.citations.filter(
+    (c) => c.link_url && c.source_type !== 'inline',
+  )
+  const citationsMd =
+    referenceCitations.length > 0
+      ? `\n\n## References\n\n${referenceCitations
+          .map((c, i) => `${i + 1}. [${c.link_title || c.link_url}](${c.link_url})`)
+          .join('\n')}`
+      : ''
+
+  return `${fmLines}\n\n# ${payload.title}\n\n${featuredImageMd}${payload.bodyMarkdown}${citationsMd}`
+}
+
 export class BundleTarget implements OutputTarget {
   name = 'bundle'
 
@@ -101,8 +136,8 @@ export class BundleTarget implements OutputTarget {
 
     // article.html with relative image paths
     archive.append(buildHtmlBody(payload, { relativeImages: true }), { name: 'article.html' })
-    // article.md
-    archive.append(payload.bodyMarkdown, { name: 'article.md' })
+    // article.md — with YAML frontmatter, featured image, and citations
+    archive.append(buildMarkdownArticle(payload), { name: 'article.md' })
     // metadata.json
     archive.append(JSON.stringify(buildManifest(payload), null, 2), { name: 'metadata.json' })
     // README.md

@@ -15,7 +15,11 @@ h3{font-size:1.2rem;font-weight:700;margin:2rem 0 .5rem;color:#222}
 p{margin:0 0 1.25rem}
 a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 img{max-width:100%;height:auto;border-radius:.5rem}
-img.hero{width:100%;max-height:480px;object-fit:cover;border-radius:.75rem;margin-bottom:2rem}
+.hero-wrapper{position:relative;width:100%;border-radius:.75rem;overflow:hidden;margin-bottom:2.5rem}
+.hero-img{width:100%;max-height:480px;object-fit:cover;display:block}
+.hero-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:2rem 1.5rem 1.5rem;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,.72) 100%)}
+.hero-overlay h1{color:#fff;margin:0 0 .4rem;text-shadow:0 1px 4px rgba(0,0,0,.4);font-size:2.2rem;line-height:1.2;font-weight:700}
+.hero-reading-time{color:rgba(255,255,255,.85);font-size:.875rem}
 .excerpt{font-size:1.1rem;font-style:italic;color:#555;border-left:4px solid #e2e8f0;padding-left:1rem;margin-bottom:2rem}
 figure.article-diagram{margin:1.5rem 0;text-align:center}
 figure.article-diagram img{max-width:100%;border-radius:.5rem;border:1px solid #e5e7eb}
@@ -80,12 +84,28 @@ export function buildHtmlBody(
     ? `<footer class="disclaimer">${escapeHtml(payload.disclaimer)}</footer>`
     : ''
 
-  const heroHtml = payload.featuredImage
-    ? `<img class="hero" src="${escapeHtml(opts.relativeImages ? 'images/featured.jpg' : payload.featuredImage.cdnUrl)}" alt="${escapeHtml(payload.featuredImage.alt)}" />`
-    : ''
+  // Hero: full-width image with h1 + reading time overlaid via gradient
+  // When no featured image, h1 falls back to a plain heading above the meta bar
+  let heroHtml = ''
+  let standaloneH1 = `<h1>${escapeHtml(payload.title)}</h1>`
+  if (payload.featuredImage) {
+    const imgSrc = opts.relativeImages ? 'images/featured.jpg' : payload.featuredImage.cdnUrl
+    const readingTimeMeta = payload.meta.readingTime
+      ? `<div class="hero-reading-time">⏱ ${payload.meta.readingTime} min read</div>`
+      : ''
+    heroHtml = `<div class="hero-wrapper">
+  <img class="hero-img" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(payload.featuredImage.alt)}" />
+  <div class="hero-overlay">
+    <h1>${escapeHtml(payload.title)}</h1>
+    ${readingTimeMeta}
+  </div>
+</div>`
+    standaloneH1 = '' // h1 is inside the overlay — don't duplicate it
+  }
 
+  // Meta bar below the hero: reading time only shown here when there is no hero overlay
   const metaBar = [
-    payload.meta.readingTime ? `<span>${payload.meta.readingTime} min read</span>` : '',
+    !payload.featuredImage && payload.meta.readingTime ? `<span>${payload.meta.readingTime} min read</span>` : '',
     payload.primaryKeyword ? `<span>${escapeHtml(payload.primaryKeyword)}</span>` : '',
     payload.meta.publishedAt
       ? `<span>${new Date(payload.meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>`
@@ -103,6 +123,17 @@ export function buildHtmlBody(
   <div class="seo-title">${escapeHtml(payload.seoTitle)}</div>
   <div class="seo-desc">${escapeHtml(payload.seoDescription)}</div>
 </div>`
+
+  // Rewrite diagram CDN URLs to relative paths when building the bundle ZIP
+  let processedBodyHtml = payload.bodyHtml
+  if (opts.relativeImages && payload.diagrams.length > 0) {
+    for (const d of payload.diagrams) {
+      processedBodyHtml = processedBodyHtml.replaceAll(
+        d.svgCdnUrl,
+        `images/diagrams/${d.position}.svg`,
+      )
+    }
+  }
 
   const typo = buildArticleTypographyCss(payload.articleTypography)
 
@@ -123,11 +154,11 @@ export function buildHtmlBody(
 <body>
 <div class="page">
   ${heroHtml}
-  <h1>${escapeHtml(payload.title)}</h1>
+  ${standaloneH1}
   ${metaBar ? `<div class="meta-bar">${metaBar}</div>` : ''}
   ${excerptHtml}
   ${snippetPreview}
-  ${payload.bodyHtml}
+  ${processedBodyHtml}
   ${citationsHtml}
   ${disclaimerHtml}
 </div>

@@ -869,9 +869,35 @@ export default function WorkflowJobPage() {
     if (!job?.sitePage) return
     const sp = job.sitePage
     const bodySource = sp.bodyHtml ?? ''
-    const md = htmlToMarkdown(bodySource)
+    const md = htmlToMarkdownWithDiagrams(bodySource)
     const title = sp.seoTitle ?? sp.title ?? ''
-    const text = `# ${title}\n\n${md}`
+
+    // Featured image as a markdown image at the top
+    const featuredImageMd = sp.featuredImage?.url
+      ? `![${sp.featuredImage.altText ?? title}](${sp.featuredImage.url})\n\n`
+      : ''
+
+    // Tier 2 citations appended as a References section
+    const rawCitations = sp.citations as Record<string, unknown> | Array<Record<string, string>> | null
+    const referenceCitations: Array<{ title: string; url: string }> = []
+    if (rawCitations && !Array.isArray(rawCitations)) {
+      const obj = rawCitations as Record<string, unknown>
+      if (Array.isArray(obj.resource_links)) {
+        for (const s of obj.resource_links as Array<Record<string, string>>) {
+          if (s.link_url) referenceCitations.push({ title: s.link_title || s.link_url, url: s.link_url })
+        }
+      }
+    } else if (Array.isArray(rawCitations)) {
+      for (const s of rawCitations) {
+        if (s.link_url) referenceCitations.push({ title: s.link_title || s.link_url, url: s.link_url })
+      }
+    }
+    const citationsMd =
+      referenceCitations.length > 0
+        ? `\n\n## References\n\n${referenceCitations.map((c, i) => `${i + 1}. [${c.title}](${c.url})`).join('\n')}`
+        : ''
+
+    const text = `# ${title}\n\n${featuredImageMd}${md}${citationsMd}`
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Article copied as Markdown — paste into Substack editor')

@@ -935,9 +935,13 @@ export default function WorkflowJobPage() {
       const res = await fetch(`/api/articles/${jobId}/syndication`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Generation failed')
-      const arts: SyndicationArticle[] = data.articles ?? []
+
+      // POST returns in-memory results without status — re-fetch from DB for full rows.
+      const getRes = await fetch(`/api/articles/${jobId}/syndication`)
+      const getData = getRes.ok ? await getRes.json().catch(() => ({})) : {}
+      const arts: SyndicationArticle[] = getData.articles ?? data.articles ?? []
       setSyndicationArticles(arts)
-      setSyndicationGenerated(true)
+      setSyndicationGenerated(arts.some((a) => a.status === 'completed'))
       toast.success('Platform articles generated!')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate platform articles')

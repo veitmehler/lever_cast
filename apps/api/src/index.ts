@@ -15,6 +15,7 @@ import { imageRoutes } from './routes/images'
 import { mediaRoutes } from './routes/media'
 import { ghlRoutes } from './routes/ghl'
 import { socialRoutes } from './routes/social'
+import { voiceRoutes } from './routes/voice'
 import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 import { topicRoutes } from './routes/topics'
@@ -31,7 +32,7 @@ async function main() {
   })
 
   // ── CORS ───────────────────────────────────────────────────────────────────
-  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 /* 10 MB */ } })
+  await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 /* 25 MB for voice samples */ } })
   await app.register(cors, {
     origin: [
       'https://app.socioply.com',
@@ -69,6 +70,7 @@ async function main() {
   await app.register(mediaRoutes, { prefix: '/api' })
   await app.register(ghlRoutes, { prefix: '/api' })
   await app.register(socialRoutes, { prefix: '/api' })
+  await app.register(voiceRoutes, { prefix: '/api' })
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })
   await app.register(wpConnectionRoutes, { prefix: '/api' })

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { encrypt, decrypt, maskApiKey } from '@/lib/encryption'
 
 // Valid provider names
-const VALID_PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter', 'fal', 'openai-dalle', 'replicate', 'telegram']
+const VALID_PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter', 'fal', 'openai-dalle', 'replicate', 'telegram', 'elevenlabs']
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {

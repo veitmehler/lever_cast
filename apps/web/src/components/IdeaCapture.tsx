@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Mic, Image as ImageIcon, Sparkles, X, Images, Quote, LayoutGrid, Loader2 } from 'lucide-react'
+import { Mic, Image as ImageIcon, Sparkles, X, Images, Quote, LayoutGrid, Loader2, Film, Clapperboard, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageGenerationModal } from '@/components/ImageGenerationModal'
 import { ImageLibraryPicker } from '@/components/ImageLibraryPicker'
@@ -93,6 +93,7 @@ interface IdeaCaptureProps {
     postType: SocialPostType
     imageUrl?: string
     mediaUrls?: string[]
+    videoUrl?: string
     quoteText?: string
   }) => void
   postType?: SocialPostType
@@ -537,6 +538,86 @@ export function IdeaCapture({
     } catch (error) {
       console.error('Carousel generation failed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to generate carousel')
+    } finally {
+      setIsGeneratingAssets(false)
+    }
+  }
+
+  const handleGenerateVideoReel = async () => {
+    if (!content.trim()) {
+      toast.error('Enter your content first')
+      return
+    }
+    setIsGeneratingAssets(true)
+    try {
+      const response = await fetch('/api/social/generate/video-reel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim() }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.error || 'Failed to generate video reel')
+      }
+      const result = await response.json()
+      onMediaAssetsReady?.({ postType: 'video_reel', videoUrl: result.videoUrl })
+      toast.success('Video reel generated!')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate video reel')
+    } finally {
+      setIsGeneratingAssets(false)
+    }
+  }
+
+  const handleGenerateHookVideo = async () => {
+    if (!content.trim()) {
+      toast.error('Enter your content first')
+      return
+    }
+    setIsGeneratingAssets(true)
+    try {
+      const response = await fetch('/api/social/generate/hook-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim() }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.error || 'Failed to generate hook video')
+      }
+      const result = await response.json()
+      onMediaAssetsReady?.({ postType: 'hook_video', videoUrl: result.videoUrl })
+      toast.success('Hook video generated!')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate hook video')
+    } finally {
+      setIsGeneratingAssets(false)
+    }
+  }
+
+  const handleGenerateQuoteVideo = async () => {
+    if (!content.trim()) {
+      toast.error('Enter your content first')
+      return
+    }
+    setIsGeneratingAssets(true)
+    try {
+      const response = await fetch('/api/social/generate/quote-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim() }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.error || 'Failed to generate quote video')
+      }
+      const result = await response.json()
+      onMediaAssetsReady?.({ postType: 'quote_video', videoUrl: result.videoUrl })
+      toast.success(
+        result.voiceoverUsed ? 'Quote video generated with voiceover!' : 'Quote video generated!',
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate quote video')
     } finally {
       setIsGeneratingAssets(false)
     }
@@ -1098,6 +1179,37 @@ export function IdeaCapture({
               <LayoutGrid className="w-4 h-4 mr-2" />
             )}
             Generate Carousel
+          </Button>
+        </div>
+      )}
+
+      {(postType === 'video_reel' || postType === 'hook_video' || postType === 'quote_video') && (
+        <div className="mt-4">
+          <p className="text-xs text-muted-foreground mb-2">
+            Video generation uses FFmpeg + fal Seedance (720p). Quote videos use your ElevenLabs voice when enabled in Settings.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={
+              postType === 'video_reel'
+                ? handleGenerateVideoReel
+                : postType === 'hook_video'
+                  ? handleGenerateHookVideo
+                  : handleGenerateQuoteVideo
+            }
+            disabled={!content.trim() || isGeneratingAssets}
+          >
+            {isGeneratingAssets ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : postType === 'video_reel' ? (
+              <Film className="w-4 h-4 mr-2" />
+            ) : postType === 'hook_video' ? (
+              <Clapperboard className="w-4 h-4 mr-2" />
+            ) : (
+              <Video className="w-4 h-4 mr-2" />
+            )}
+            Generate {postType === 'video_reel' ? 'Video Reel' : postType === 'hook_video' ? 'Hook Video' : 'Quote Video'}
           </Button>
         </div>
       )}

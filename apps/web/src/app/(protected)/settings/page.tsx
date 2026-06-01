@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus, Upload, Building2, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GhlSettingsPanel } from '@/components/GhlSettingsPanel'
+import { VoiceSettingsPanel } from '@/components/VoiceSettingsPanel'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
 
@@ -1648,6 +1649,8 @@ export default function SettingsPage() {
         </div>
 
         <GhlSettingsPanel />
+
+        <VoiceSettingsPanel />
 
         {/* Connected Accounts */}
         <div className="rounded-lg border border-border bg-card p-6">

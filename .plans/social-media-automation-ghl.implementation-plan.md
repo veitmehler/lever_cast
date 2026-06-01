@@ -212,22 +212,22 @@ Produce all still-image assets and expose them as manual post types. Covers F1/F
 Stand up video assembly and the per-user voice feature. Covers F2 (reel), F6 (hook video), S2 (looped reel), S3 (quote video + VO).
 
 ### Infra
-- [ ] **Add FFmpeg + ffprobe to the `apps/api` worker Docker image.** (New system dependency — critical.)
-- [ ] Wire fal **Seedance v1, 720p** video gen (`$0.34/clip`) with request/poll helper; default to **image-to-video** animating the first carousel slide, ≤5s.
+- [x] **Add FFmpeg + ffprobe to the `apps/api` worker Docker image.** (New system dependency — critical.)
+- [x] Wire fal **Seedance v1, 720p** video gen (`$0.34/clip`) with request/poll helper; default to **image-to-video** animating the first carousel slide, ≤5s.
 
 ### Video compositors
-- [ ] `slideshow-video.ts`: build MP4 from ordered images (Ken Burns optional), brand bar, text overlays; 1:1 feed + 9:16 story.
-- [ ] Hook concat: prepend fal hook clip, overlay **title text** on the hook section, then slideshow body (F6).
-- [ ] Video Reel (F2): seedance background + bullet overlays from key takeaways.
-- [ ] Loop helper (S2): FFmpeg loop the F2 reel 3× to extend read time.
-- [ ] Quote Video (S3): quote cards → timed slideshow video, optional VO track.
-- [ ] Enforce story video limits (≤60s, ≥540×960, 9:16).
+- [x] `slideshow-video.ts`: build MP4 from ordered images (Ken Burns optional), brand bar, text overlays; 1:1 feed + 9:16 story.
+- [x] Hook concat: prepend fal hook clip, overlay **title text** on the hook section, then slideshow body (F6).
+- [x] Video Reel (F2): seedance background + bullet overlays from key takeaways.
+- [x] Loop helper (S2): FFmpeg loop the F2 reel 3× to extend read time.
+- [x] Quote Video (S3): quote cards → timed slideshow video, optional VO track.
+- [x] Enforce story video limits (≤60s, ≥540×960, 9:16).
 
 ### Per-user ElevenLabs voice
-- [ ] Store key in `ApiKey` (`provider:'elevenlabs'`, encrypted); verify via `GET /v1/user`.
-- [ ] Settings → Voice UI: (a) **select** existing voice (`GET /v1/voices`) or (b) **clone** — upload 1–2 min sample → `POST /v1/voices/add` (multipart) → store returned `voice_id` (+ honor `requires_verification`).
-- [ ] TTS at render: `POST /v1/text-to-speech/{voice_id}` → MP3 → FFmpeg merge into S3 quote video.
-- [ ] UX caveats surfaced: **IVC requires a paid ElevenLabs plan**; consent/verification; store sample in S3 and delete raw after cloning.
+- [x] Store key in `ApiKey` (`provider:'elevenlabs'`, encrypted); verify via `GET /v1/user`.
+- [x] Settings → Voice UI: (a) **select** existing voice (`GET /v1/voices`) or (b) **clone** — upload 1–2 min sample → `POST /v1/voices/add` (multipart) → store returned `voice_id` (+ honor `requires_verification`).
+- [x] TTS at render: `POST /v1/text-to-speech/{voice_id}` → MP3 → FFmpeg merge into S3 quote video.
+- [x] UX caveats surfaced: **IVC requires a paid ElevenLabs plan**; consent/verification; store sample in S3 and delete raw after cloning.
 
 ---
 
@@ -294,9 +294,9 @@ GHL `media[].url` and all video/image assets must be **publicly fetchable** → 
 ### Completed Tasks
 - Wave 0: GHL posting backbone (settings, client, dispatcher, UI, publish routing)
 - Wave 1: Quote-card + carousel compositors, LLM prompts, manual post types, platform image limits
+- Wave 2: FFmpeg video compositors, Seedance integration, ElevenLabs voice settings + quote video VO
 
 ### Pending Tasks (priority order)
-- W2: FFmpeg in Docker + video compositors + per-user ElevenLabs voice
 - W3: Automation engine (run model, 12-spec processor, scheduling, trigger, safety net)
 - W4: Analytics read-back, alerts, per-platform prompts, calendar, cleanup
 

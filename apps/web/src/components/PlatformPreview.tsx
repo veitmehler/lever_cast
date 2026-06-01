@@ -12,6 +12,7 @@ interface PlatformPreviewProps {
   content: string | string[] // Support both single post and thread
   image?: string
   images?: string[]
+  video?: string
   onRegenerate: () => void | Promise<void>
   onPublish: (content: string | string[]) => void
   onSchedule?: (content: string | string[], scheduledAt: Date) => Promise<void>
@@ -52,6 +53,7 @@ export function PlatformPreview({
   content,
   image,
   images,
+  video,
   onRegenerate,
   onPublish,
   onSchedule,
@@ -261,6 +263,14 @@ export function PlatformPreview({
               width={800}
               height={600}
               className="rounded-lg max-h-64 w-full object-cover border border-border"
+            />
+          </div>
+        ) : video ? (
+          <div className="mb-3">
+            <video
+              src={video}
+              controls
+              className="rounded-lg max-h-80 w-full border border-border bg-black"
             />
           </div>
         ) : null}

@@ -1,4 +1,10 @@
-export type SocialPostType = 'standard' | 'quote' | 'carousel'
+export type SocialPostType =
+  | 'standard'
+  | 'quote'
+  | 'carousel'
+  | 'video_reel'
+  | 'hook_video'
+  | 'quote_video'
 
 export type QuoteCardVariant = 'feed' | 'story'
 
@@ -50,8 +56,16 @@ export function buildPublishMedia(opts: {
   platform: string
   attachedImage?: string
   mediaUrls?: string[]
-}): { imageUrl?: string; mediaUrls?: string[]; postType?: string } {
-  const { postType, platform, attachedImage, mediaUrls = [] } = opts
+  videoUrl?: string
+}): { imageUrl?: string; mediaUrls?: string[]; videoUrl?: string; postType?: string } {
+  const { postType, platform, attachedImage, mediaUrls = [], videoUrl } = opts
+
+  if (
+    (postType === 'video_reel' || postType === 'hook_video' || postType === 'quote_video') &&
+    videoUrl
+  ) {
+    return { videoUrl, postType, imageUrl: attachedImage }
+  }
 
   if (postType === 'carousel' && mediaUrls.length > 0) {
     const trimmed = trimSlidesForPlatform(mediaUrls, platform)

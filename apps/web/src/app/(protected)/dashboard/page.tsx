@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  const [videoUrl, setVideoUrl] = useState<string | undefined>(undefined)
   const [postType, setPostType] = useState<SocialPostType>('standard')
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
@@ -55,7 +56,7 @@ export default function DashboardPage() {
       : 'U'
 
   const getMediaForPlatform = (platform: PlatformKey) =>
-    buildPublishMedia({ postType, platform, attachedImage, mediaUrls })
+    buildPublishMedia({ postType, platform, attachedImage, mediaUrls, videoUrl })
 
   const [actualSelectedPlatforms, setActualSelectedPlatforms] = useState<PlatformKey[] | 'all'>([])
 
@@ -80,7 +81,10 @@ export default function DashboardPage() {
     setGeneratedContent(null)
     setCurrentDraftId(null)
     setAttachedImage(image)
-    if (!image) setMediaUrls([])
+    if (!image) {
+      setMediaUrls([])
+      setVideoUrl(undefined)
+    }
 
     try {
       // Pass platform as-is (can be array, 'all', or single platform)
@@ -975,6 +979,7 @@ export default function DashboardPage() {
             setPostType(type)
             if (type === 'standard') {
               setMediaUrls([])
+              setVideoUrl(undefined)
             }
           }}
           carouselImages={mediaUrls}
@@ -982,6 +987,7 @@ export default function DashboardPage() {
             setPostType(assets.postType)
             if (assets.imageUrl) setAttachedImage(assets.imageUrl)
             if (assets.mediaUrls) setMediaUrls(assets.mediaUrls)
+            if (assets.videoUrl) setVideoUrl(assets.videoUrl)
           }}
           onGenerate={handleGenerate} 
           onImageAttached={async (imageUrl: string) => {
@@ -1087,6 +1093,7 @@ export default function DashboardPage() {
                 content={generatedContent.linkedin}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('linkedin')}
@@ -1102,6 +1109,7 @@ export default function DashboardPage() {
                 content={generatedContent.facebook}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('facebook')}
@@ -1117,6 +1125,7 @@ export default function DashboardPage() {
                 content={generatedContent.instagram}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('instagram')}
@@ -1132,6 +1141,7 @@ export default function DashboardPage() {
                 content={generatedContent.telegram}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('telegram')}
@@ -1147,6 +1157,7 @@ export default function DashboardPage() {
                 content={generatedContent.threads}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('threads')}
@@ -1162,6 +1173,7 @@ export default function DashboardPage() {
                 content={generatedContent.twitter}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('twitter')}

@@ -6,10 +6,22 @@ import {
   generatePitchStoryAssets,
   generateQuoteCardAsset,
 } from '../social/generate-assets'
+import {
+  generateHookVideoAsset,
+  generateLoopedReelAsset,
+  generateQuoteVideoAsset,
+  generateVideoReelAsset,
+} from '../social/generate-video-assets'
 import { maxSlidesForPlatforms } from '../social/platform-limits'
 
 async function resolveUser(clerkId: string) {
   return prisma.user.findUnique({ where: { clerkId } })
+}
+
+const videoRateLimit = {
+  max: 3,
+  timeWindow: '1 minute' as const,
+  keyGenerator: (req: { clerkId?: string; ip: string }) => req.clerkId ?? req.ip,
 }
 
 export async function socialRoutes(app: FastifyInstance) {
@@ -133,6 +145,125 @@ export async function socialRoutes(app: FastifyInstance) {
       request.log.error({ err }, 'Error in /social/generate/pitch')
       return reply.status(500).send({
         error: 'Failed to generate pitch story',
+        details: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
+
+  // POST /api/social/generate/video-reel
+  app.post('/social/generate/video-reel', { config: { rateLimit: videoRateLimit } }, async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const body = request.body as { content?: string; jobId?: string }
+    if (!body.content?.trim()) {
+      return reply.status(400).send({ error: 'Missing required field: content' })
+    }
+
+    try {
+      const result = await generateVideoReelAsset({
+        userId: user.id,
+        content: body.content.trim(),
+        jobId: body.jobId,
+      })
+      return reply.send({ success: true, ...result })
+    } catch (err) {
+      request.log.error({ err }, 'Error in /social/generate/video-reel')
+      return reply.status(500).send({
+        error: 'Failed to generate video reel',
+        details: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
+
+  // POST /api/social/generate/hook-video
+  app.post('/social/generate/hook-video', { config: { rateLimit: videoRateLimit } }, async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const body = request.body as { content?: string; title?: string; jobId?: string }
+    if (!body.content?.trim()) {
+      return reply.status(400).send({ error: 'Missing required field: content' })
+    }
+
+    try {
+      const result = await generateHookVideoAsset({
+        userId: user.id,
+        content: body.content.trim(),
+        title: body.title,
+        jobId: body.jobId,
+      })
+      return reply.send({ success: true, ...result })
+    } catch (err) {
+      request.log.error({ err }, 'Error in /social/generate/hook-video')
+      return reply.status(500).send({
+        error: 'Failed to generate hook video',
+        details: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
+
+  // POST /api/social/generate/quote-video
+  app.post('/social/generate/quote-video', { config: { rateLimit: videoRateLimit } }, async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const body = request.body as { content?: string; quoteCount?: number; jobId?: string }
+    if (!body.content?.trim()) {
+      return reply.status(400).send({ error: 'Missing required field: content' })
+    }
+
+    try {
+      const result = await generateQuoteVideoAsset({
+        userId: user.id,
+        content: body.content.trim(),
+        quoteCount: body.quoteCount,
+        jobId: body.jobId,
+      })
+      return reply.send({ success: true, ...result })
+    } catch (err) {
+      request.log.error({ err }, 'Error in /social/generate/quote-video')
+      return reply.status(500).send({
+        error: 'Failed to generate quote video',
+        details: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
+
+  // POST /api/social/generate/loop-video
+  app.post('/social/generate/loop-video', { config: { rateLimit: videoRateLimit } }, async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const body = request.body as { sourceVideoUrl?: string; loopCount?: number; jobId?: string }
+    if (!body.sourceVideoUrl?.trim()) {
+      return reply.status(400).send({ error: 'Missing required field: sourceVideoUrl' })
+    }
+
+    try {
+      const result = await generateLoopedReelAsset({
+        userId: user.id,
+        sourceVideoUrl: body.sourceVideoUrl.trim(),
+        loopCount: body.loopCount,
+        jobId: body.jobId,
+      })
+      return reply.send({ success: true, ...result })
+    } catch (err) {
+      request.log.error({ err }, 'Error in /social/generate/loop-video')
+      return reply.status(500).send({
+        error: 'Failed to loop video',
         details: err instanceof Error ? err.message : String(err),
       })
     }

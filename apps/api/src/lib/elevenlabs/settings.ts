@@ -1,0 +1,58 @@
+import { prisma } from '../prisma'
+import { decrypt } from '../encryption'
+
+export interface VoiceSettings {
+  voiceId: string | null
+  modelId: string
+  voiceoverEnabled: boolean
+  stability: number
+  similarity: number
+  apiKey: string | null
+  hasApiKey: boolean
+}
+
+export async function getUserElevenLabsApiKey(userId: string): Promise<string | null> {
+  const row = await prisma.apiKey.findFirst({
+    where: { userId, provider: 'elevenlabs' },
+  })
+  if (!row) return null
+  return decrypt(row.encryptedKey) || null
+}
+
+export async function getVoiceSettings(userId: string): Promise<VoiceSettings> {
+  const settings = await prisma.settings.findUnique({ where: { userId } })
+  const apiKey = await getUserElevenLabsApiKey(userId)
+
+  return {
+    voiceId: settings?.elevenLabsVoiceId ?? null,
+    modelId: settings?.elevenLabsModelId ?? 'eleven_multilingual_v2',
+    voiceoverEnabled: settings?.voiceoverEnabled ?? false,
+    stability: settings?.voiceoverStability ?? 0.5,
+    similarity: settings?.voiceoverSimilarity ?? 0.75,
+    apiKey,
+    hasApiKey: !!apiKey,
+  }
+}
+
+export async function updateVoiceSettings(
+  userId: string,
+  data: {
+    elevenLabsVoiceId?: string | null
+    elevenLabsModelId?: string | null
+    voiceoverEnabled?: boolean
+    voiceoverStability?: number
+    voiceoverSimilarity?: number
+  },
+): Promise<VoiceSettings> {
+  await prisma.settings.upsert({
+    where: { userId },
+    create: {
+      userId,
+      theme: 'light',
+      sidebarState: 'open',
+      ...data,
+    },
+    update: data,
+  })
+  return getVoiceSettings(userId)
+}

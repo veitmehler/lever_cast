@@ -30,7 +30,7 @@ export interface DispatchPublishOptions {
   scheduledAt?: Date
 }
 
-function useDirectSocialPublish(): boolean {
+function shouldUseDirectPublish(): boolean {
   return process.env.USE_DIRECT_SOCIAL_PUBLISH === 'true'
 }
 
@@ -191,12 +191,12 @@ export async function dispatchPublish(
   content: string | string[],
   options: DispatchPublishOptions = {},
 ): Promise<PublishOutcome> {
-  if (isGhlPlatform(platform) && !useDirectSocialPublish()) {
+  if (isGhlPlatform(platform) && !shouldUseDirectPublish()) {
     return publishViaGhl(userId, platform, content, options)
   }
   return publishViaDirect(userId, platform, content, options)
 }
 
 export function isGhlManagedPlatform(platform: string): boolean {
-  return isGhlPlatform(platform) && !useDirectSocialPublish()
+  return isGhlPlatform(platform) && !shouldUseDirectPublish()
 }

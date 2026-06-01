@@ -197,9 +197,9 @@ export async function POST(request: Request) {
     }
 
     const isScheduled = !!scheduledAt
-    let finalStatus = isScheduled ? 'scheduled' : status
-    let finalPublishedAt = isScheduled ? null : new Date()
-    let finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
+    const finalStatus = isScheduled ? 'scheduled' : status
+    const finalPublishedAt = isScheduled ? null : new Date()
+    const finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
     let resolvedProvider = provider as string | undefined
     let resolvedGhlPostId = ghlPostId as string | undefined
 

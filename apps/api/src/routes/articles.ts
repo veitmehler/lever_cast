@@ -15,6 +15,7 @@ import {
 } from '../article-pipeline/enrichment/html-parser'
 import { readS3Object } from '../lib/storage'
 import { generateSyndicationArticles } from '../article-pipeline/syndication/generate'
+import { enqueueSocialAutomation } from '../social/automation/enqueue'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -723,6 +724,79 @@ export async function articleRoutes(app: FastifyInstance) {
       })
 
       return reply.send({ articles })
+    },
+  )
+
+  // ── GET /api/articles/:jobId/social-automation ────────────────────────────
+  app.get<{ Params: { jobId: string } }>(
+    '/articles/:jobId/social-automation',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+        select: { id: true },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+      const runs = await prisma.socialAutomationRun.findMany({
+        where: { jobId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          _count: { select: { posts: true } },
+        },
+      })
+
+      return reply.send({ runs })
+    },
+  )
+
+  // ── POST /api/articles/:jobId/generate-social-set ─────────────────────────
+  app.post<{ Params: { jobId: string } }>(
+    '/articles/:jobId/generate-social-set',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+        include: {
+          topic: true,
+          sitePage: { select: { id: true } },
+        },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+      if (job.status !== 'enriched' && job.status !== 'published') {
+        return reply.status(400).send({
+          error: `Article must be enriched before generating social posts (current: ${job.status})`,
+        })
+      }
+      if (!job.sitePage?.id) {
+        return reply.status(400).send({ error: 'Article has no site page content yet' })
+      }
+
+      const settings = await prisma.settings.findUnique({ where: { userId: user.id } })
+      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate
+
+      const result = await enqueueSocialAutomation({
+        userId: user.id,
+        jobId: job.id,
+        sitePageId: job.sitePage.id,
+        publishingDate,
+        timeZone: settings?.socialTimezone ?? 'America/New_York',
+      })
+
+      return reply.status(result.enqueued ? 202 : 200).send(result)
     },
   )
 

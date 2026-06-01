@@ -237,18 +237,18 @@ Stand up video assembly and the per-user voice feature. Covers F2 (reel), F6 (ho
 Per-article orchestration that generates all 12 specs and schedules them (GHL for FB/IG/LinkedIn, direct for the rest).
 
 ### Tasks
-- [ ] `SocialAutomationRun` + `SocialPostSpec` models + seed default 12 slots/times.
-- [ ] New pg-boss queue **`social-generate`** (low concurrency due to FFmpeg). Register in `worker.ts` + `QUEUES`.
-- [ ] Orchestrator `apps/api/src/social/automation/run.ts`:
+- [x] `SocialAutomationRun` + `SocialPostSpec` models + seed default 12 slots/times.
+- [x] New pg-boss queue **`social-generate`** (low concurrency due to FFmpeg). Register in `worker.ts` + `QUEUES`.
+- [x] Orchestrator `apps/api/src/social/automation/run.ts`:
   1. Parse article (SitePage: intro, key takeaways, H2 sections, quotes).
   2. Resolve content per spec.
   3. Generate assets in dependency order (carousel → hook → reel → quotes → quote video → reuse for S2/S4/S6).
   4. Upload to S3 / Media.
   5. Create `Post` rows; push GHL posts (`scheduleDate`) + enqueue direct scheduled posts.
   6. Update run status + counts.
-- [ ] Trigger from article pipeline after enrichment (gate behind `Topic.skipSocialMedia`-style flag).
-- [ ] Safety-net schedule: restart `processing` runs stuck >15 min and `pending` >5 min.
-- [ ] Manual "Generate social set" button on the article/workflow page.
+- [x] Trigger from article pipeline after enrichment (gate behind `Topic.skipSocialMedia`-style flag).
+- [x] Safety-net schedule: restart `processing` runs stuck >15 min and `pending` >5 min.
+- [x] Manual "Generate social set" button on the article/workflow page.
 
 ---
 
@@ -295,9 +295,9 @@ GHL `media[].url` and all video/image assets must be **publicly fetchable** → 
 - Wave 0: GHL posting backbone (settings, client, dispatcher, UI, publish routing)
 - Wave 1: Quote-card + carousel compositors, LLM prompts, manual post types, platform image limits
 - Wave 2: FFmpeg video compositors, Seedance integration, ElevenLabs voice settings + quote video VO
+- Wave 3: Per-article automation engine (12-spec orchestrator, social-generate queue, scheduling, workflow UI)
 
 ### Pending Tasks (priority order)
-- W3: Automation engine (run model, 12-spec processor, scheduling, trigger, safety net)
 - W4: Analytics read-back, alerts, per-platform prompts, calendar, cleanup
 
 ### Backlog Tasks

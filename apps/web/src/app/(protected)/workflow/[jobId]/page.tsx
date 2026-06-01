@@ -7,7 +7,7 @@ import {
   ChevronLeft, Loader2, AlertTriangle, FileText, Play, ThumbsUp,
   Search, Tag, BookOpen, RefreshCw,
   Download, Globe, Package, Eye, ExternalLink, ChevronDown, ChevronUp,
-  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2, Linkedin, BookMarked,
+  Share2, ClipboardCopy, ClipboardCheck, PenLine, Code2, Linkedin, BookMarked, CalendarClock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -545,6 +545,21 @@ export default function WorkflowJobPage() {
   const [activeSyndicationTab, setActiveSyndicationTab] = useState<'linkedin' | 'medium'>('linkedin')
   const [copiedSyndication, setCopiedSyndication] = useState<string | null>(null)
 
+  type SocialAutomationRunRow = {
+    id: string
+    status: string
+    scheduledDate: string
+    totalSpecs: number
+    completedSpecs: number
+    failedSpecs: number
+    currentSpec: string | null
+    error: string | null
+    createdAt: string
+    _count?: { posts: number }
+  }
+  const [socialRuns, setSocialRuns] = useState<SocialAutomationRunRow[]>([])
+  const [isGeneratingSocial, setIsGeneratingSocial] = useState(false)
+
   useEffect(() => {
     void fetch('/api/wp/connections')
       .then((r) => r.json())
@@ -788,6 +803,42 @@ export default function WorkflowJobPage() {
   useEffect(() => {
     if (job?.status === 'enriched' || job?.status === 'published') fetchAttempts()
   }, [job?.status, fetchAttempts])
+
+  const fetchSocialRuns = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/articles/${jobId}/social-automation`)
+      if (res.ok) {
+        const data = await res.json()
+        setSocialRuns(data.runs ?? [])
+      }
+    } catch { /* silent */ }
+  }, [jobId])
+
+  useEffect(() => {
+    if (job?.status === 'enriched' || job?.status === 'published') fetchSocialRuns()
+  }, [job?.status, fetchSocialRuns])
+
+  useEffect(() => {
+    const active = socialRuns.some((r) => r.status === 'pending' || r.status === 'processing')
+    if (!active) return
+    const id = setInterval(fetchSocialRuns, 5000)
+    return () => clearInterval(id)
+  }, [socialRuns, fetchSocialRuns])
+
+  const handleGenerateSocialSet = async () => {
+    setIsGeneratingSocial(true)
+    try {
+      const res = await fetch(`/api/articles/${jobId}/generate-social-set`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to start social automation')
+      toast.success(data.message ?? (data.enqueued ? 'Generating 12-post social set…' : 'Social set already queued'))
+      await fetchSocialRuns()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate social set')
+    } finally {
+      setIsGeneratingSocial(false)
+    }
+  }
 
   const handleExport = async (target: string, config: Record<string, unknown> = {}) => {
     setExportingTarget(target)
@@ -1520,6 +1571,60 @@ export default function WorkflowJobPage() {
                     </Button>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Social automation (12-post daily set) ───────────────────────── */}
+        {sitePage && ['enriched', 'published'].includes(displayStatus) && (
+          <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
+            <div className="flex items-center px-6 py-4 gap-3 flex-wrap border-b border-border">
+              <CalendarClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-semibold text-card-foreground">Social media set</h2>
+                <p className="text-xs text-muted-foreground">
+                  Generate 12 branded posts (6 feed + 6 story) and schedule across your connected platforms.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => void handleGenerateSocialSet()}
+                disabled={
+                  isGeneratingSocial ||
+                  socialRuns.some((r) => r.status === 'pending' || r.status === 'processing')
+                }
+                className="gap-1.5"
+              >
+                {isGeneratingSocial ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
+                Generate social set
+              </Button>
+            </div>
+            {socialRuns.length > 0 && (
+              <div className="divide-y divide-border">
+                {socialRuns.map((run) => (
+                  <div key={run.id} className="px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div>
+                      <span className="font-medium capitalize">{run.status}</span>
+                      <span className="text-muted-foreground ml-2">
+                        {run.scheduledDate} · {run.completedSpecs}/{run.totalSpecs} specs
+                        {run.currentSpec ? ` · ${run.currentSpec}` : ''}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {run._count?.posts ?? 0} scheduled posts
+                      {run.failedSpecs > 0 ? ` · ${run.failedSpecs} failed` : ''}
+                    </div>
+                    {run.error && (
+                      <p className="w-full text-xs text-red-500">{run.error}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

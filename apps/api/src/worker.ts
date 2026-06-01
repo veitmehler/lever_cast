@@ -23,6 +23,8 @@ import { articlePipelineHandler, ArticlePipelineJobData } from './handlers/artic
 import { articleEnrichmentHandler, ArticleEnrichmentJobData } from './handlers/article-enrichment'
 import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-output'
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
+import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
+import { socialAutomationSafetyHandler } from './handlers/social-automation-safety'
 
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
 function withSentry<T>(
@@ -65,6 +67,7 @@ async function main() {
   await boss.schedule(QUEUES.OAUTH_STATE_CLEANUP, '0 * * * *', {})    // hourly
   await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * 0', {})              // Sunday 03:00 UTC
   await boss.schedule(QUEUES.PG_CONN_MONITOR, '*/15 * * * *', {})     // every 15 min
+  await boss.schedule(QUEUES.SOCIAL_AUTOMATION_SAFETY, '*/5 * * * *', {}) // every 5 min
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -140,6 +143,20 @@ async function main() {
     QUEUES.GENERATE_SOCIAL_FROM_ARTICLE,
     { batchSize: 3 },
     withSentry('generate-social-from-article', generateSocialFromArticleHandler),
+  )
+
+  await boss.work<SocialGenerateJobData>(
+    QUEUES.SOCIAL_GENERATE,
+    { batchSize: 1 },
+    withSentry('social-generate', socialGenerateHandler),
+  )
+
+  await boss.work(
+    QUEUES.SOCIAL_AUTOMATION_SAFETY,
+    { batchSize: 1 },
+    withSentry('social-automation-safety', async () => {
+      await socialAutomationSafetyHandler()
+    }),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

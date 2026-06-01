@@ -48,6 +48,8 @@ export const QUEUES = {
   ARTICLE_ENRICHMENT: 'article-enrichment',
   ARTICLE_OUTPUT: 'article-output',
   GENERATE_SOCIAL_FROM_ARTICLE: 'generate-social-from-article',
+  SOCIAL_GENERATE: 'social-generate',
+  SOCIAL_AUTOMATION_SAFETY: 'social-automation-safety',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

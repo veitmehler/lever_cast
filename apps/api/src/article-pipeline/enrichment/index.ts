@@ -963,4 +963,11 @@ async function finishEnrichment(
   })
 
   logger.info({ jobId, cost }, '[enrichment] article enriched successfully')
+
+  const { maybeEnqueueSocialAutomationAfterEnrichment } = await import(
+    '../../social/automation/enqueue'
+  )
+  await maybeEnqueueSocialAutomationAfterEnrichment(jobId).catch((err) => {
+    logger.error({ jobId, err }, '[enrichment] failed to enqueue social automation')
+  })
 }

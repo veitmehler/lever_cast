@@ -40,6 +40,8 @@ model User {
   media                 Media[]
   sectionEnrichments    SectionEnrichment[]
   ghlSettings           GhlSettings?
+  socialAutomationRuns  SocialAutomationRun[]
+  socialPostSpecs       SocialPostSpec[]
 
   @@map("users")
 }
@@ -93,6 +95,7 @@ model Post {
   provider              String? // ghl | direct
   ghlPostId             String?
   automationRunId       String?
+  automationRun         SocialAutomationRun? @relation(fields: [automationRunId], references: [id], onDelete: SetNull)
   status                String    @default("published") // published, scheduled, failed, deleted
   errorMsg              String? // If publishing failed, store error
   analyticsLastSyncedAt DateTime? // When analytics were last fetched
@@ -113,7 +116,51 @@ model Post {
   @@index([tweetId]) // For quick tweet ID lookups
   @@index([draftId, threadOrder]) // For thread ordering
   @@index([provider, status])
+  @@index([automationRunId])
   @@map("posts")
+}
+
+model SocialAutomationRun {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId          String?
+  job            ArticleJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  sitePageId     String?
+  sitePage       SitePage? @relation(fields: [sitePageId], references: [id], onDelete: SetNull)
+  scheduledDate  String // YYYY-MM-DD in user's social timezone
+  status         String    @default("pending") // pending | processing | completed | failed | cancelled
+  totalSpecs     Int       @default(12)
+  completedSpecs Int       @default(0)
+  failedSpecs    Int       @default(0)
+  currentSpec    String?
+  error          String?   @db.Text
+  groupId        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  posts          Post[]
+
+  @@index([userId, status])
+  @@index([jobId])
+  @@index([status, updatedAt])
+  @@map("social_automation_runs")
+}
+
+model SocialPostSpec {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slotKey    String // F1..F6, S1..S6
+  enabled    Boolean  @default(true)
+  timeHour   Int
+  timeMinute Int
+  postType   String // quote | video_reel | carousel | hook_video | quote_video | pitch_carousel | pitch_hook
+  isStory    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, slotKey])
+  @@map("social_post_specs")
 }
 
 model GhlSettings {
@@ -166,6 +213,8 @@ model Settings {
   voiceoverEnabled              Boolean  @default(false)
   voiceoverStability            Float    @default(0.5)
   voiceoverSimilarity           Float    @default(0.75)
+  socialTimezone                String?  @default("America/New_York")
+  socialAutomationEnabled       Boolean  @default(true)
   lastLogin                     DateTime @default(now())
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
@@ -336,6 +385,7 @@ model Topic {
   outlineFrameworkSource     String?           // diagnostic: 'user' | 'csv' | 'llm_assigned'
   wpCategoryId               Int?              // AI-selected WP category when site linked
   wpTagIds                   Int[]             @default([]) // AI-selected WP tag IDs when site linked
+  skipSocialMedia            Boolean           @default(false)
   articleJobs                ArticleJob[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
@@ -368,7 +418,8 @@ model ArticleJob {
   errorLogs            ErrorLog[]
   outputAttempts       OutputAttempt[]
   llmUsage             LLMUsage[]
-  syndicationArticles  SyndicationArticle[]
+  syndicationArticles   SyndicationArticle[]
+  socialAutomationRuns  SocialAutomationRun[]
 
   @@index([userId])
   @@index([status])
@@ -467,7 +518,8 @@ model SitePage {
   keyTakeawaysHtml  String?  @db.Text
   tocHtml           String?  @db.Text
   diagrams         ArticleDiagram[]
-  sectionEnrichments SectionEnrichment[]
+  sectionEnrichments     SectionEnrichment[]
+  socialAutomationRuns   SocialAutomationRun[]
 
   @@unique([userId, slug])
   @@index([primaryKeyword])

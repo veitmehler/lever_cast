@@ -8,6 +8,8 @@ const WWW_HOST = 'www.socioply.com'
 const APP_PATHS = [
   '/dashboard',
   '/posts',
+  '/workflow',
+  '/images',
   '/calendar',
   '/account',
   '/settings',

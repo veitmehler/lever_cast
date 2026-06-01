@@ -112,6 +112,10 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   await deleteS3Prefix(`articles/${job.userId}/${jobId}/diagrams/`).catch((err) =>
     logger.warn({ jobId, err }, '[enrichment] S3 diagram prefix delete failed — continuing'),
   )
+  await prisma.media.updateMany({
+    where: { userId: job.userId, jobId, source: 'diagram', deletedAt: null },
+    data: { deletedAt: new Date() },
+  })
 
   await setEnrichmentPhaseStep(jobId, 19)
 
@@ -865,6 +869,42 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       cost: gen.cost,
     },
   })
+
+  const pngUrl = getCdnUrl(pngKey)
+  const existingMedia = await prisma.media.findFirst({
+    where: { userId: sitePage.userId, s3Key: pngKey },
+  })
+  if (existingMedia) {
+    await prisma.media.update({
+      where: { id: existingMedia.id },
+      data: {
+        url: pngUrl,
+        title: section.heading,
+        altText: altText ?? section.heading,
+        mimeType: 'image/png',
+        width: light.width,
+        height: light.height,
+        jobId,
+        source: 'diagram',
+        deletedAt: null,
+      },
+    })
+  } else {
+    await prisma.media.create({
+      data: {
+        userId: sitePage.userId,
+        s3Key: pngKey,
+        url: pngUrl,
+        source: 'diagram',
+        title: section.heading,
+        altText: altText ?? section.heading,
+        mimeType: 'image/png',
+        width: light.width,
+        height: light.height,
+        jobId,
+      },
+    }).catch(() => {/* non-fatal */})
+  }
 
   // Article HTML references the SVG — browsers render it natively and it's
   // AI-crawlable text. PNG is kept for bundle/email fallback only.

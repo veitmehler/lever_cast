@@ -102,8 +102,18 @@ export async function POST(request: NextRequest) {
       file = imageDataUrl
     }
 
-    // Upload to Supabase Storage
+    // Upload to S3
     const { url, path } = await uploadImageToStorage(file, user.id, fileName)
+
+    await prisma.media.create({
+      data: {
+        userId: user.id,
+        s3Key: path,
+        url,
+        source: 'upload',
+        title: fileName ?? 'Uploaded image',
+      },
+    }).catch(() => {/* non-fatal */})
 
     return NextResponse.json({
       success: true,

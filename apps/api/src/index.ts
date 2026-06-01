@@ -12,6 +12,7 @@ import rateLimit from '@fastify/rate-limit'
 import { logger } from './lib/logger'
 import { aiRoutes } from './routes/ai'
 import { imageRoutes } from './routes/images'
+import { mediaRoutes } from './routes/media'
 import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 import { topicRoutes } from './routes/topics'
@@ -63,6 +64,7 @@ async function main() {
   await app.register(healthRoutes)
   await app.register(aiRoutes, { prefix: '/api/ai' })
   await app.register(imageRoutes, { prefix: '/api/images' })
+  await app.register(mediaRoutes, { prefix: '/api' })
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })
   await app.register(wpConnectionRoutes, { prefix: '/api' })

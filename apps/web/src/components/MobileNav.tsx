@@ -12,12 +12,16 @@ import {
   Sparkles,
   Calendar,
   Menu,
-  X 
+  X,
+  Workflow,
+  Images,
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Posts', href: '/posts', icon: FileText },
+  { label: 'Workflow', href: '/workflow', icon: Workflow },
+  { label: 'Image Library', href: '/images', icon: Images },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },

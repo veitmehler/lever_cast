@@ -243,11 +243,21 @@ model Media {
   mimeType  String?
   width     Int?
   height    Int?
+
+  source    String    @default("upload") // upload | ai_featured | ai_social | diagram
+  title     String?
+  prompt    String?   @db.Text
+  provider  String?
+  jobId     String?
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
 
   sitePageFeaturedImages SitePage[] @relation("SitePageFeaturedImage")
 
   @@index([userId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, source])
   @@map("media")
 }
 

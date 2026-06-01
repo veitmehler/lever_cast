@@ -74,6 +74,9 @@ export async function uploadFeaturedImageToS3WithRetry(
           mimeType: contentType,
           width,
           height,
+          source: 'ai_featured',
+          jobId,
+          title: altText ?? 'Featured Image',
         },
       })
 

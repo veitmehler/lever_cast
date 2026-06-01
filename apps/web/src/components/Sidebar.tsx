@@ -14,6 +14,7 @@ import {
   Calendar,
   ShieldCheck,
   Workflow,
+  Images,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { label: 'Posts', href: '/posts', icon: <FileText className="w-5 h-5" /> },
   { label: 'Workflow', href: '/workflow', icon: <Workflow className="w-5 h-5" /> },
+  { label: 'Image Library', href: '/images', icon: <Images className="w-5 h-5" /> },
   { label: 'Calendar', href: '/calendar', icon: <Calendar className="w-5 h-5" /> },
   { label: 'Templates', href: '/templates', icon: <Sparkles className="w-5 h-5" /> },
   { label: 'Settings', href: '/settings', icon: <Settings className="w-5 h-5" /> },

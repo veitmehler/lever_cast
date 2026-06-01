@@ -210,6 +210,19 @@ export async function imageRoutes(app: FastifyInstance) {
       // Upload to S3
       const { url, path } = await uploadBufferToS3(imageBuffer, user.id, 'image/png', 'png')
 
+      await prisma.media.create({
+        data: {
+          userId: user.id,
+          s3Key: path,
+          url,
+          source: 'ai_social',
+          prompt,
+          provider,
+          mimeType: 'image/png',
+          title: 'AI social image',
+        },
+      }).catch(() => {/* non-fatal */})
+
       // Optionally update draft
       if (draftId) {
         try {
@@ -321,6 +334,18 @@ export async function imageRoutes(app: FastifyInstance) {
       const buffer = Buffer.from(base64Data, 'base64')
 
       const { url, path } = await uploadBufferToS3(buffer, user.id, contentType, extension)
+
+      await prisma.media.create({
+        data: {
+          userId: user.id,
+          s3Key: path,
+          url,
+          source: 'upload',
+          mimeType: contentType,
+          title: fileName ?? 'Uploaded image',
+        },
+      }).catch(() => {/* non-fatal */})
+
       return reply.send({ success: true, url, path })
     } catch (err) {
       request.log.error({ err }, 'Error in /images/upload')

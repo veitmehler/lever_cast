@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Mic, Image as ImageIcon, Sparkles, X } from 'lucide-react'
+import { Mic, Image as ImageIcon, Sparkles, X, Images } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageGenerationModal } from '@/components/ImageGenerationModal'
+import { ImageLibraryPicker } from '@/components/ImageLibraryPicker'
 import Image from 'next/image'
 
 // TypeScript definitions for Web Speech API
@@ -93,6 +94,7 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isImageGenerationModalOpen, setIsImageGenerationModalOpen] = useState(false)
+  const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false)
   // Use Set to track multiple selected platforms
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'>>(new Set())
   const [twitterFormat, setTwitterFormat] = useState<'single' | 'thread'>('single')
@@ -938,6 +940,14 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
         />
 
         <button
+          onClick={() => setIsLibraryPickerOpen(true)}
+          className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center"
+          title="Choose from image library"
+        >
+          <Images className="w-5 h-5" />
+        </button>
+
+        <button
           onClick={() => setIsImageGenerationModalOpen(true)}
           className="p-3 md:p-3 min-h-[44px] min-w-[44px] rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all flex items-center justify-center"
           title="Generate image with AI"
@@ -956,6 +966,15 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
           Generate Posts
         </Button>
       </div>
+
+      <ImageLibraryPicker
+        open={isLibraryPickerOpen}
+        onClose={() => setIsLibraryPickerOpen(false)}
+        onSelect={(url) => {
+          setSelectedImage(url)
+          onImageAttached?.(url)
+        }}
+      />
 
       {/* Image Generation Modal */}
       <ImageGenerationModal

@@ -63,13 +63,12 @@ async function publishViaGhl(
   const summary = Array.isArray(content) ? content[0] : content
   const media: Array<{ url: string; type?: string }> = []
 
-  if (options.imageUrl) {
-    media.push({ url: options.imageUrl, type: 'image' })
-  }
   if (options.mediaUrls?.length) {
     for (const url of options.mediaUrls) {
       media.push({ url, type: 'image' })
     }
+  } else if (options.imageUrl) {
+    media.push({ url: options.imageUrl, type: 'image' })
   }
   if (options.videoUrl) {
     media.push({ url: options.videoUrl, type: 'video' })

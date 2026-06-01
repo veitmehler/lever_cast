@@ -11,6 +11,7 @@ interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
   content: string | string[] // Support both single post and thread
   image?: string
+  images?: string[]
   onRegenerate: () => void | Promise<void>
   onPublish: (content: string | string[]) => void
   onSchedule?: (content: string | string[], scheduledAt: Date) => Promise<void>
@@ -50,6 +51,7 @@ export function PlatformPreview({
   platform,
   content,
   image,
+  images,
   onRegenerate,
   onPublish,
   onSchedule,
@@ -237,8 +239,21 @@ export function PlatformPreview({
           </div>
         </div>
 
-        {/* Attached Image */}
-        {image && (
+        {/* Attached Image(s) */}
+        {images && images.length > 1 ? (
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {images.map((slideUrl, index) => (
+              <Image
+                key={`${slideUrl}-${index}`}
+                src={slideUrl}
+                alt={`Carousel slide ${index + 1}`}
+                width={400}
+                height={400}
+                className="rounded-lg aspect-square w-full object-cover border border-border"
+              />
+            ))}
+          </div>
+        ) : image ? (
           <div className="mb-3">
             <Image 
               src={image} 
@@ -248,7 +263,7 @@ export function PlatformPreview({
               className="rounded-lg max-h-64 w-full object-cover border border-border"
             />
           </div>
-        )}
+        ) : null}
 
         {/* Editable Content */}
         {isEditing ? (

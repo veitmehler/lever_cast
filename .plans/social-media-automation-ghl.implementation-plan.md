@@ -198,11 +198,11 @@ Connect a user's GHL location, and route **existing manual** FB/IG/LinkedIn post
 Produce all still-image assets and expose them as manual post types. Covers F1/F3/F5, S1/S5 (quotes), F4 (carousel), and the title frames for S4/S6.
 
 ### Tasks
-- [ ] `apps/api/src/social/compositors/quote-card.ts` (Sharp + SVG): 1:1 feed + 9:16 story variants. Pull brand colors/fonts/logo from `BrandSettings`.
-- [ ] `apps/api/src/social/compositors/carousel.ts`: fal flux image gen per slide + Sharp compositing (headline, body bullets, brand bar, logo). Output 1:1 slides, upload to S3 + register in `Media`.
-- [ ] LLM "carousel plan" + "quote selection" prompts (store in `PromptTemplate` or a social-prompts table).
-- [ ] Extend manual composer UI with post types: `quote`, `carousel`.
-- [ ] Per-platform image-count adaptation (Twitter ≤4).
+- [x] `apps/api/src/social/compositors/quote-card.ts` (Sharp + SVG): 1:1 feed + 9:16 story variants. Pull brand colors/fonts/logo from `BrandSettings`.
+- [x] `apps/api/src/social/compositors/carousel.ts`: fal flux image gen per slide + Sharp compositing (headline, body bullets, brand bar, logo). Output 1:1 slides, upload to S3 + register in `Media`.
+- [x] LLM "carousel plan" + "quote selection" prompts (store in `PromptTemplate` or a social-prompts table).
+- [x] Extend manual composer UI with post types: `quote`, `carousel`.
+- [x] Per-platform image-count adaptation (Twitter ≤4).
 
 ---
 
@@ -293,9 +293,9 @@ GHL `media[].url` and all video/image assets must be **publicly fetchable** → 
 
 ### Completed Tasks
 - Wave 0: GHL posting backbone (settings, client, dispatcher, UI, publish routing)
+- Wave 1: Quote-card + carousel compositors, LLM prompts, manual post types, platform image limits
 
 ### Pending Tasks (priority order)
-- W1: Quote-card + carousel compositors + manual post types
 - W2: FFmpeg in Docker + video compositors + per-user ElevenLabs voice
 - W3: Automation engine (run model, 12-spec processor, scheduling, trigger, safety net)
 - W4: Analytics read-back, alerts, per-platform prompts, calendar, cleanup

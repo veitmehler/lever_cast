@@ -1424,10 +1424,63 @@ Before publishing any article, ask: "If a visitor reads only this article, will 
 - If you can't add something original to a topic (personal experience, unique data, specialist analysis), reconsider whether to publish.
 - A shorter article that fully satisfies the reader's intent is better than a long article that partially satisfies it.`
 
+// ── Social media image generation prompts (Steps 201–202) ────────────────────
+const SOCIAL_TEMPLATES = [
+  {
+    stepNumber: 201,
+    stepName: 'social_quote_selection',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 256,
+    systemPrompt:
+      'You are a social media content strategist. Select the single most compelling, shareable quote from the provided content. The quote must stand alone without context, be under 220 characters, and avoid hashtags or emojis.',
+    userPrompt: `Select ONE quote from the content below for a branded social media quote card.
+
+Content:
+{{content}}
+
+Organization: {{organizationName}}
+
+Rules:
+- Return ONLY valid JSON: { "quote": "...", "attribution": "optional source label" }
+- Quote must be ≤ 220 characters
+- Prefer declarative insights, surprising facts, or actionable advice
+- Do not invent facts not present in the content
+- attribution is optional (e.g. article title or author); omit if unclear`,
+    isActive: true,
+  },
+  {
+    stepNumber: 202,
+    stepName: 'social_carousel_plan',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 2048,
+    systemPrompt:
+      'You are a social media designer planning image carousel slides. Each slide needs a punchy headline, 1–3 short bullet points, and a detailed image prompt for AI image generation (no text in the image).',
+    userPrompt: `Plan an image carousel with exactly {{slideCount}} slides based on the content below.
+
+Content:
+{{content}}
+
+Organization: {{organizationName}}
+Industry context: {{industry}}
+
+Rules:
+- Return ONLY valid JSON: { "slides": [ { "headline": "...", "bullets": ["..."], "imagePrompt": "..." } ] }
+- Exactly {{slideCount}} slides
+- headline: ≤ 60 characters
+- bullets: 1–3 items, each ≤ 80 characters
+- imagePrompt: descriptive scene for flux image gen, no text/words/logos/watermarks, photorealistic or editorial style
+- Slide 1 should hook the reader; final slide should summarize or CTA
+- Do not invent facts not in the content`,
+    isActive: true,
+  },
+]
+
 async function main() {
   console.log('Seeding prompt templates...')
 
-  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES]) {
+  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES, ...SOCIAL_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,

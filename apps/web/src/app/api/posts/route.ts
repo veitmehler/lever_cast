@@ -146,6 +146,7 @@ export async function POST(request: Request) {
       mediaUrls,
       videoUrl,
       postAsStory,
+      postType,
     } = body
 
     // Validate required fields
@@ -236,6 +237,7 @@ export async function POST(request: Request) {
         imageUrl: shouldStoreImage ? imageUrl : null,
         mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
         videoUrl: videoUrl || null,
+        postType: postType || null,
         postAsStory: !!postAsStory,
         provider: resolvedProvider ?? null,
         ghlPostId: resolvedGhlPostId ?? null,

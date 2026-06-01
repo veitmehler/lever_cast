@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Mic, Image as ImageIcon, Sparkles, X, Images } from 'lucide-react'
+import { Mic, Image as ImageIcon, Sparkles, X, Images, Quote, LayoutGrid, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageGenerationModal } from '@/components/ImageGenerationModal'
 import { ImageLibraryPicker } from '@/components/ImageLibraryPicker'
+import { SocialPostTypeSelector } from '@/components/SocialPostTypeSelector'
+import type { GeneratedCarouselResponse, GeneratedQuoteCardResponse, SocialPostType } from '@/lib/social/types'
+import { maxSlidesForPlatforms } from '@/lib/social/types'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 // TypeScript definitions for Web Speech API
 interface SpeechRecognition extends EventTarget {
@@ -85,10 +89,27 @@ interface IdeaCaptureProps {
     twitterFormat?: 'single' | 'thread'
   ) => void
   onImageAttached?: (imageUrl: string) => void
+  onMediaAssetsReady?: (assets: {
+    postType: SocialPostType
+    imageUrl?: string
+    mediaUrls?: string[]
+    quoteText?: string
+  }) => void
+  postType?: SocialPostType
+  onPostTypeChange?: (postType: SocialPostType) => void
+  carouselImages?: string[]
   initialIdea?: string
 }
 
-export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCaptureProps) {
+export function IdeaCapture({
+  onGenerate,
+  onImageAttached,
+  onMediaAssetsReady,
+  postType = 'standard',
+  onPostTypeChange,
+  carouselImages = [],
+  initialIdea,
+}: IdeaCaptureProps) {
   const [content, setContent] = useState(initialIdea ?? '')
   const [isRecording, setIsRecording] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -105,6 +126,8 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [recognitionError, setRecognitionError] = useState<string | null>(null)
+  const [isGeneratingAssets, setIsGeneratingAssets] = useState(false)
+  const [quoteVariant, setQuoteVariant] = useState<'feed' | 'story'>('feed')
 
   // Fetch available platforms (social connections + Telegram API key)
   const fetchAvailablePlatforms = async () => {
@@ -436,6 +459,89 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
     }
   }
 
+  const selectedPlatformList = Array.from(selectedPlatforms)
+
+  const handleGenerateQuoteCard = async () => {
+    if (!content.trim()) {
+      toast.error('Enter your content first')
+      return
+    }
+
+    setIsGeneratingAssets(true)
+    try {
+      const response = await fetch('/api/social/generate/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: content.trim(),
+          variant: quoteVariant,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.details || errorData.error || 'Failed to generate quote card')
+      }
+
+      const result = (await response.json()) as GeneratedQuoteCardResponse
+      setSelectedImage(result.imageUrl)
+      onImageAttached?.(result.imageUrl)
+      onMediaAssetsReady?.({
+        postType: 'quote',
+        imageUrl: result.imageUrl,
+        quoteText: result.quoteText,
+      })
+      toast.success('Quote card generated!')
+    } catch (error) {
+      console.error('Quote card generation failed:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to generate quote card')
+    } finally {
+      setIsGeneratingAssets(false)
+    }
+  }
+
+  const handleGenerateCarousel = async () => {
+    if (!content.trim()) {
+      toast.error('Enter your content first')
+      return
+    }
+
+    setIsGeneratingAssets(true)
+    try {
+      const response = await fetch('/api/social/generate/carousel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: content.trim(),
+          platforms: selectedPlatformList,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.details || errorData.error || 'Failed to generate carousel')
+      }
+
+      const result = (await response.json()) as GeneratedCarouselResponse
+      const firstUrl = result.imageUrls[0]
+      if (firstUrl) {
+        setSelectedImage(firstUrl)
+        onImageAttached?.(firstUrl)
+      }
+      onMediaAssetsReady?.({
+        postType: 'carousel',
+        imageUrl: firstUrl,
+        mediaUrls: result.imageUrls,
+      })
+      toast.success(`Carousel generated (${result.slideCount} slides)`)
+    } catch (error) {
+      console.error('Carousel generation failed:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to generate carousel')
+    } finally {
+      setIsGeneratingAssets(false)
+    }
+  }
+
   const charCount = content.length
   const maxChars = 2000
   const charPercentage = (charCount / maxChars) * 100
@@ -481,7 +587,7 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
       </div>
 
       {/* Image Preview */}
-      {selectedImage && (
+      {selectedImage && postType !== 'carousel' && (
         <div className="mt-4 relative inline-block">
           <Image
             src={selectedImage}
@@ -496,6 +602,27 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
           >
             <X className="w-3 h-3" />
           </button>
+        </div>
+      )}
+
+      {/* Carousel Preview */}
+      {postType === 'carousel' && carouselImages.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-card-foreground mb-2">
+            Carousel slides ({carouselImages.length})
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {carouselImages.map((url, index) => (
+              <Image
+                key={`${url}-${index}`}
+                src={url}
+                alt={`Slide ${index + 1}`}
+                width={96}
+                height={96}
+                className="h-24 w-24 shrink-0 object-cover rounded-lg border border-border"
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -902,6 +1029,76 @@ export function IdeaCapture({ onGenerate, onImageAttached, initialIdea }: IdeaCa
               💡 <span className="font-medium">How it works:</span> Type your raw idea above, then click Generate. AI will automatically format it using this template structure.
             </p>
           </div>
+        </div>
+      )}
+
+      <SocialPostTypeSelector
+        value={postType}
+        onChange={(type) => onPostTypeChange?.(type)}
+        disabled={isGeneratingAssets || isRecording}
+      />
+
+      {postType === 'quote' && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="flex gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="quoteVariant"
+                checked={quoteVariant === 'feed'}
+                onChange={() => setQuoteVariant('feed')}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">1:1 Feed</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="quoteVariant"
+                checked={quoteVariant === 'story'}
+                onChange={() => setQuoteVariant('story')}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">9:16 Story</span>
+            </label>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleGenerateQuoteCard}
+            disabled={!content.trim() || isGeneratingAssets}
+          >
+            {isGeneratingAssets ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Quote className="w-4 h-4 mr-2" />
+            )}
+            Generate Quote Card
+          </Button>
+        </div>
+      )}
+
+      {postType === 'carousel' && (
+        <div className="mt-4">
+          <p className="text-xs text-muted-foreground mb-2">
+            Slide count adapts to selected platforms (Twitter max {maxSlidesForPlatforms(['twitter'])}, LinkedIn max {maxSlidesForPlatforms(['linkedin'])}).
+            {selectedPlatformList.length > 0 && (
+              <> Current limit: {maxSlidesForPlatforms(selectedPlatformList)} slides.</>
+            )}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleGenerateCarousel}
+            disabled={!content.trim() || isGeneratingAssets || selectedPlatforms.size === 0}
+          >
+            {isGeneratingAssets ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <LayoutGrid className="w-4 h-4 mr-2" />
+            )}
+            Generate Carousel
+          </Button>
         </div>
       )}
 

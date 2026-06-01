@@ -12,6 +12,8 @@ import { Loader2, Save, Send, Calendar, Newspaper, MessageSquare, FileEdit } fro
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { NewArticleForm } from '@/components/article/NewArticleForm'
+import type { SocialPostType } from '@/lib/social/types'
+import { buildPublishMedia } from '@/lib/social/types'
 
 type PlatformKey = 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
 const PLATFORM_ORDER: PlatformKey[] = ['linkedin', 'facebook', 'instagram', 'twitter', 'threads', 'telegram']
@@ -35,6 +37,8 @@ export default function DashboardPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all'>('all')
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [attachedImage, setAttachedImage] = useState<string | undefined>(undefined)
+  const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  const [postType, setPostType] = useState<SocialPostType>('standard')
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [apiKeyErrorReason, setApiKeyErrorReason] = useState<'no_key' | 'api_error'>('no_key')
@@ -49,6 +53,9 @@ export default function DashboardPage() {
     : user?.firstName 
       ? user.firstName.slice(0, 2).toUpperCase()
       : 'U'
+
+  const getMediaForPlatform = (platform: PlatformKey) =>
+    buildPublishMedia({ postType, platform, attachedImage, mediaUrls })
 
   const [actualSelectedPlatforms, setActualSelectedPlatforms] = useState<PlatformKey[] | 'all'>([])
 
@@ -73,6 +80,7 @@ export default function DashboardPage() {
     setGeneratedContent(null)
     setCurrentDraftId(null)
     setAttachedImage(image)
+    if (!image) setMediaUrls([])
 
     try {
       // Pass platform as-is (can be array, 'all', or single platform)
@@ -380,7 +388,7 @@ export default function DashboardPage() {
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
             threadOrder: 0, // Summary post is always order 0
-            imageUrl: attachedImage || undefined,
+            ...getMediaForPlatform(platform),
           }),
         })
 
@@ -437,7 +445,7 @@ export default function DashboardPage() {
             content,
             status: 'scheduled',
             scheduledAt: scheduledAt.toISOString(),
-            imageUrl: attachedImage || undefined,
+            ...getMediaForPlatform(platform),
           }),
         })
 
@@ -583,8 +591,8 @@ export default function DashboardPage() {
         platform,
         content: Array.isArray(content) ? content : content,
         draftId: draftId || null,
-        imageUrl: attachedImage || undefined,
-        chatId: telegramChatId, // For Telegram
+        chatId: telegramChatId,
+        ...getMediaForPlatform(platform),
       }
       
       console.log('[Dashboard] Publishing with payload:', {
@@ -706,7 +714,7 @@ export default function DashboardPage() {
               tweetId: tweetIds[0] || null,
               provider: publishResult.provider || null,
               ghlPostId: publishResult.ghlPostId || null,
-              imageUrl: attachedImage || undefined,
+              ...getMediaForPlatform(platform),
             }),
           })
 
@@ -962,6 +970,19 @@ export default function DashboardPage() {
       <div className="mb-8">
         <IdeaCapture
           initialIdea={prefillIdea ?? undefined}
+          postType={postType}
+          onPostTypeChange={(type) => {
+            setPostType(type)
+            if (type === 'standard') {
+              setMediaUrls([])
+            }
+          }}
+          carouselImages={mediaUrls}
+          onMediaAssetsReady={(assets) => {
+            setPostType(assets.postType)
+            if (assets.imageUrl) setAttachedImage(assets.imageUrl)
+            if (assets.mediaUrls) setMediaUrls(assets.mediaUrls)
+          }}
           onGenerate={handleGenerate} 
           onImageAttached={async (imageUrl: string) => {
             // Update local state immediately for preview
@@ -1065,6 +1086,7 @@ export default function DashboardPage() {
                 platform="linkedin"
                 content={generatedContent.linkedin}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('linkedin')}
@@ -1079,6 +1101,7 @@ export default function DashboardPage() {
                 platform="facebook"
                 content={generatedContent.facebook}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('facebook')}
@@ -1093,6 +1116,7 @@ export default function DashboardPage() {
                 platform="instagram"
                 content={generatedContent.instagram}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('instagram')}
@@ -1107,6 +1131,7 @@ export default function DashboardPage() {
                 platform="telegram"
                 content={generatedContent.telegram}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('telegram')}
@@ -1121,6 +1146,7 @@ export default function DashboardPage() {
                 platform="threads"
                 content={generatedContent.threads}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('threads')}
@@ -1135,6 +1161,7 @@ export default function DashboardPage() {
                 platform="twitter"
                 content={generatedContent.twitter}
                 image={attachedImage}
+                images={postType === 'carousel' ? mediaUrls : undefined}
                 userName={userName}
                 userInitials={userInitials}
                 onRegenerate={() => handleRegenerate('twitter')}

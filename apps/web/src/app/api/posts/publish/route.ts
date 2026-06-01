@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { platform, content, imageUrl, chatId } = body
+    const { platform, content, imageUrl, mediaUrls, chatId } = body
 
     if (!platform || !content) {
       return NextResponse.json(
@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
 
     const publishResult = await dispatchPublish(user.id, platform, content, {
       imageUrl: imageUrl || undefined,
+      mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : undefined,
       chatId: chatId || undefined,
     })
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
+import { dispatchPublish, isGhlManagedPlatform } from '@/lib/social/dispatcher'
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {
@@ -138,8 +139,13 @@ export async function POST(request: Request) {
       status = 'published',
       scheduledAt,
       errorMsg,
-      parentPostId, // For Twitter threads: link to parent post
-      threadOrder, // For Twitter threads: 0 = summary, 1+ = replies
+      parentPostId,
+      threadOrder,
+      provider,
+      ghlPostId,
+      mediaUrls,
+      videoUrl,
+      postAsStory,
     } = body
 
     // Validate required fields
@@ -190,24 +196,33 @@ export async function POST(request: Request) {
       }
     }
 
-    // Determine status and dates
     const isScheduled = !!scheduledAt
-    const finalStatus = isScheduled ? 'scheduled' : status
-    const finalPublishedAt = isScheduled ? null : new Date()
-    const finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
+    let finalStatus = isScheduled ? 'scheduled' : status
+    let finalPublishedAt = isScheduled ? null : new Date()
+    let finalScheduledAt = isScheduled ? new Date(scheduledAt) : null
+    let resolvedProvider = provider as string | undefined
+    let resolvedGhlPostId = ghlPostId as string | undefined
 
-    // Create the post
-    // Only store imageUrl for summary posts (threadOrder 0 or null)
-    const shouldStoreImage = imageUrl && (threadOrder === null || threadOrder === 0)
-    
-    console.log(`[Posts API] Creating post:`, {
-      platform,
-      status: finalStatus,
-      scheduledAt: finalScheduledAt?.toISOString(),
-      isScheduled,
-      draftId: draftId || null,
-    })
-    
+    // Schedule Facebook / Instagram / LinkedIn through GHL at creation time
+    if (isScheduled && isGhlManagedPlatform(platform)) {
+      const ghlResult = await dispatchPublish(user.id, platform, content, {
+        imageUrl: imageUrl || undefined,
+        mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : undefined,
+        videoUrl: videoUrl || undefined,
+        postAsStory: !!postAsStory,
+        scheduledAt: finalScheduledAt ?? undefined,
+      })
+
+      if (!ghlResult.success) {
+        return NextResponse.json({ error: ghlResult.error }, { status: 400 })
+      }
+
+      resolvedProvider = ghlResult.provider ?? 'ghl'
+      resolvedGhlPostId = ghlResult.ghlPostId
+    }
+
+    const shouldStoreImage = imageUrl && (threadOrder === null || threadOrder === undefined || threadOrder === 0)
+
     const post = await prisma.post.create({
       data: {
         userId: user.id,
@@ -219,6 +234,11 @@ export async function POST(request: Request) {
         postUrl: postUrl || null,
         tweetId: tweetId || null,
         imageUrl: shouldStoreImage ? imageUrl : null,
+        mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : [],
+        videoUrl: videoUrl || null,
+        postAsStory: !!postAsStory,
+        provider: resolvedProvider ?? null,
+        ghlPostId: resolvedGhlPostId ?? null,
         status: finalStatus,
         publishedAt: finalPublishedAt,
         scheduledAt: finalScheduledAt,

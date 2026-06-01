@@ -1,11 +1,6 @@
 import PgBoss from 'pg-boss'
 import { prisma } from '../lib/prisma'
-import { postToLinkedIn } from '../lib/linkedinApi'
-import { postToTwitter, postTwitterThread } from '../lib/twitterApi'
-import { postToFacebook } from '../lib/facebookApi'
-import { postToInstagram } from '../lib/instagramApi'
-import { postToTelegram } from '../lib/telegramApi'
-import { postToThreads } from '../lib/threadsApi'
+import { dispatchPublish } from '../social/dispatcher'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,75 +18,6 @@ export interface PublishScheduledJobData {
   _batch?: true
 }
 
-// ─── Shared dispatch logic ────────────────────────────────────────────────────
-
-type PublishOutcome =
-  | { success: true; postUrl: string | string[]; tweetId?: string; tweetIds?: string[]; postId?: string }
-  | { success: false; error: string }
-
-async function dispatchToPlatform(
-  userId: string,
-  platform: string,
-  content: string | string[],
-  imageUrl?: string,
-  chatId?: string,
-  replyToTweetId?: string,
-  threadImageForFirstTweetOnly?: boolean,
-): Promise<PublishOutcome> {
-  if (platform === 'linkedin') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    return postToLinkedIn(userId, contentStr, imageUrl)
-  }
-
-  if (platform === 'twitter') {
-    if (Array.isArray(content)) {
-      const result = await postTwitterThread(userId, content, imageUrl)
-      if (result.success) return { success: true, postUrl: result.postUrls, tweetIds: result.tweetIds }
-      return result
-    }
-    const result = await postToTwitter(
-      userId,
-      content,
-      replyToTweetId,
-      threadImageForFirstTweetOnly ? imageUrl : imageUrl,
-    )
-    if (result.success) return { success: true, postUrl: result.postUrl, tweetId: result.tweetId }
-    return result
-  }
-
-  if (platform === 'facebook') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    return postToFacebook(userId, contentStr, imageUrl)
-  }
-
-  if (platform === 'instagram') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    if (!imageUrl) return { success: false, error: 'Instagram requires an image.' }
-    return postToInstagram(userId, contentStr, imageUrl)
-  }
-
-  if (platform === 'telegram') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    if (!chatId) return { success: false, error: 'Telegram chat ID is required.' }
-    const result = await postToTelegram(userId, contentStr, chatId, imageUrl)
-    if (result.success) {
-      return {
-        success: true,
-        postUrl: `https://t.me/${chatId.replace('@', '')}/${result.messageId}`,
-        postId: String(result.messageId),
-      }
-    }
-    return result
-  }
-
-  if (platform === 'threads') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    return postToThreads(userId, contentStr, imageUrl)
-  }
-
-  return { success: false, error: `Unsupported platform: ${platform}` }
-}
-
 // ─── publishHandler ───────────────────────────────────────────────────────────
 
 /**
@@ -103,7 +29,7 @@ export async function publishHandler(jobs: PgBoss.Job<PublishJobData>[]) {
     const { userId, platform, content, imageUrl, chatId } = job.data
     console.log(`[publish] job ${job.id} — ${platform} user ${userId}`)
 
-    const result = await dispatchToPlatform(userId, platform, content, imageUrl, chatId)
+    const result = await dispatchPublish(userId, platform, content, { imageUrl, chatId })
 
     if (!result.success) {
       console.error(`[publish] job ${job.id} failed:`, result.error)
@@ -116,8 +42,9 @@ export async function publishHandler(jobs: PgBoss.Job<PublishJobData>[]) {
 // ─── publishScheduledHandler ──────────────────────────────────────────────────
 
 /**
- * Batch cron handler that fires every minute (same semantics as the Vercel cron it replaces).
- * Finds all Post rows with status='scheduled' and scheduledAt <= now, then publishes them.
+ * Batch cron handler that fires every minute.
+ * Finds Post rows with status='scheduled' and scheduledAt <= now, then publishes them.
+ * Posts with provider='ghl' are skipped — GHL Social Planner owns their schedule.
  */
 export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJobData>[]) {
   console.log(`[publish-scheduled] tick — ${jobs.length} job(s)`)
@@ -128,6 +55,10 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
     where: {
       status: 'scheduled',
       scheduledAt: { lte: now },
+      OR: [
+        { provider: null },
+        { provider: { not: 'ghl' } },
+      ],
     },
     include: {
       user: { select: { id: true } },
@@ -136,7 +67,6 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
     orderBy: { scheduledAt: 'asc' },
   })
 
-  // Sort so thread parent (threadOrder=0) always precedes replies
   const scheduledPosts = scheduledPostsRaw.sort((a, b) => {
     if (a.threadOrder === null && b.threadOrder === null) return 0
     if (a.threadOrder === null) return 1
@@ -154,7 +84,10 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
 
   for (const post of scheduledPosts) {
     try {
-      // For thread replies, ensure parent is already published
+      if (post.provider === 'ghl') {
+        continue
+      }
+
       if (post.parentPostId) {
         const parentPublishedInBatch = published.includes(post.parentPostId)
         if (!parentPublishedInBatch) {
@@ -170,6 +103,8 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
       }
 
       const imageUrl = post.imageUrl || post.draft?.attachedImage || undefined
+      const mediaUrls = post.mediaUrls?.length ? post.mediaUrls : undefined
+      const videoUrl = post.videoUrl ?? undefined
 
       let replyToTweetId: string | undefined
       if (post.platform === 'twitter' && post.parentPostId) {
@@ -179,12 +114,10 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
         })
         replyToTweetId = parent?.tweetId ?? undefined
         if (replyToTweetId && !published.includes(post.parentPostId)) {
-          // Add a small delay so Twitter has time to index the parent tweet
           await new Promise((r) => setTimeout(r, 3000))
         }
       }
 
-      // Only attach image to the root post in a thread
       const attachImage =
         imageUrl && (post.threadOrder === null || post.threadOrder === 0) ? imageUrl : undefined
 
@@ -194,13 +127,19 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
         telegramChatId = settings?.telegramChatId ?? undefined
       }
 
-      const result = await dispatchToPlatform(
+      const result = await dispatchPublish(
         post.user.id,
         post.platform,
         post.content,
-        attachImage,
-        telegramChatId,
-        replyToTweetId,
+        {
+          imageUrl: attachImage,
+          mediaUrls,
+          videoUrl,
+          chatId: telegramChatId,
+          replyToTweetId,
+          postAsStory: post.postAsStory,
+          scheduledAt: post.scheduledAt ?? new Date(),
+        },
       )
 
       if (result.success) {
@@ -214,11 +153,12 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
             postUrl: Array.isArray(result.postUrl) ? result.postUrl[0] : result.postUrl ?? null,
             tweetId: result.tweetId ?? null,
             imageUrl: shouldStoreImage ? attachImage : null,
+            provider: result.provider ?? post.provider,
+            ghlPostId: result.ghlPostId ?? post.ghlPostId,
           },
         })
         published.push(post.id)
 
-        // Update parent draft to 'published' when all platforms are done
         if (post.draftId && !post.parentPostId) {
           const allDraftSummaryPosts = await prisma.post.findMany({
             where: { draftId: post.draftId, parentPostId: null },

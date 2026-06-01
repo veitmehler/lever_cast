@@ -39,6 +39,7 @@ model User {
   errorLogs             ErrorLog[]
   media                 Media[]
   sectionEnrichments    SectionEnrichment[]
+  ghlSettings           GhlSettings?
 
   @@map("users")
 }
@@ -85,6 +86,13 @@ model Post {
   postUrl               String? // URL to the published post (if available from API)
   tweetId               String? // Twitter/X tweet ID (for replies and verification)
   imageUrl              String? // URL of image published with this post (Supabase Storage URL)
+  postType              String? // quote | carousel | video_reel | hook_video | ...
+  mediaUrls             String[]  @default([]) // carousel / multi-image
+  videoUrl              String?
+  postAsStory           Boolean   @default(false)
+  provider              String? // ghl | direct
+  ghlPostId             String?
+  automationRunId       String?
   status                String    @default("published") // published, scheduled, failed, deleted
   errorMsg              String? // If publishing failed, store error
   analyticsLastSyncedAt DateTime? // When analytics were last fetched
@@ -104,7 +112,24 @@ model Post {
   @@index([parentPostId]) // For thread queries
   @@index([tweetId]) // For quick tweet ID lookups
   @@index([draftId, threadOrder]) // For thread ordering
+  @@index([provider, status])
   @@map("posts")
+}
+
+model GhlSettings {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ghlApiKey      String?   @db.Text // AES-256-GCM encrypted Private Integration key
+  ghlLocationId  String?
+  ghlUserId      String? // GHL team member who owns created posts
+  accountIds     Json? // { facebook?: string, instagram?: string, linkedin?: string }
+  lastVerifiedAt DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("ghl_settings")
 }
 
 model ApiKey {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, Save, Check, Loader2, Sparkles, X, Plus, Upload, Building2, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { GhlSettingsPanel } from '@/components/GhlSettingsPanel'
 import { useTheme } from '@/components/ThemeProvider'
 import { toast } from 'sonner'
 
@@ -1646,11 +1647,13 @@ export default function SettingsPage() {
           </Button>
         </div>
 
+        <GhlSettingsPanel />
+
         {/* Connected Accounts */}
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Connected Accounts</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Connect your social media accounts to publish directly from Socioply
+            Twitter, Threads, and Telegram use direct OAuth here. Facebook, Instagram, and LinkedIn publish via Go HighLevel above.
           </p>
           
           {isLoadingConnections ? (
@@ -1660,6 +1663,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-3">
               {['linkedin', 'twitter', 'facebook', 'instagram', 'threads'].map((platform) => {
+                const usesGhl = platform === 'linkedin' || platform === 'facebook' || platform === 'instagram'
                 // For LinkedIn, check for both personal and company connections
                 // For other platforms, find the single connection
                 let connection: typeof socialConnections[0] | undefined
@@ -1794,19 +1798,24 @@ export default function SettingsPage() {
                           </div>
                           {isConnected ? (
                             <div className="text-xs text-primary">
-                              Connected{connection?.platformUsername ? ` as ${connection.platformUsername}` : ''}
-                              {connection?.lastUsed && (
+                              {usesGhl ? 'Publishing via Go HighLevel' : 'Connected'}
+                              {!usesGhl && connection?.platformUsername ? ` as ${connection.platformUsername}` : ''}
+                              {!usesGhl && connection?.lastUsed && (
                                 <span className="text-muted-foreground ml-1">
                                   • Last used {new Date(connection.lastUsed).toLocaleDateString()}
                                 </span>
                               )}
                             </div>
+                          ) : usesGhl ? (
+                            <div className="text-xs text-muted-foreground">Configure in Go HighLevel section above</div>
                           ) : (
                             <div className="text-xs text-muted-foreground">Not connected</div>
                           )}
                         </div>
                       </div>
-                      {platform === 'linkedin' && !isConnected ? (
+                      {usesGhl ? (
+                        <span className="text-xs text-muted-foreground">Managed via Go HighLevel</span>
+                      ) : platform === 'linkedin' && !isConnected ? (
                         // Show two buttons for LinkedIn: Personal Profile and Company Page
                         <div className="flex gap-2">
                           <Button

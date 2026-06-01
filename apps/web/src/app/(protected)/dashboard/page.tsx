@@ -704,6 +704,9 @@ export default function DashboardPage() {
               status: 'published',
               postUrl: postUrl || null,
               tweetId: tweetIds[0] || null,
+              provider: publishResult.provider || null,
+              ghlPostId: publishResult.ghlPostId || null,
+              imageUrl: attachedImage || undefined,
             }),
           })
 

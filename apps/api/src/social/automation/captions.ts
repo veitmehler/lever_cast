@@ -11,7 +11,7 @@ export const FEED_PLATFORMS = [
 
 export const STORY_PLATFORMS = ['facebook', 'instagram'] as const
 
-const PLATFORM_CHAR_LIMITS: Record<string, number> = {
+export const PLATFORM_CHAR_LIMITS: Record<string, number> = {
   twitter: 280,
   threads: 500,
   instagram: 2200,

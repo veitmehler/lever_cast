@@ -15,6 +15,7 @@ import { imageRoutes } from './routes/images'
 import { mediaRoutes } from './routes/media'
 import { ghlRoutes } from './routes/ghl'
 import { socialRoutes } from './routes/social'
+import { socialAutomationRoutes } from './routes/social-automation'
 import { voiceRoutes } from './routes/voice'
 import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
@@ -70,6 +71,7 @@ async function main() {
   await app.register(mediaRoutes, { prefix: '/api' })
   await app.register(ghlRoutes, { prefix: '/api' })
   await app.register(socialRoutes, { prefix: '/api' })
+  await app.register(socialAutomationRoutes, { prefix: '/api' })
   await app.register(voiceRoutes, { prefix: '/api' })
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })

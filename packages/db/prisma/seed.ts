@@ -1475,6 +1475,30 @@ Rules:
 - Do not invent facts not in the content`,
     isActive: true,
   },
+  {
+    stepNumber: 203,
+    stepName: 'social_platform_caption',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 512,
+    systemPrompt:
+      'You write platform-native social media captions. Match the platform tone exactly. Never invent facts not in the source content.',
+    userPrompt: `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
+
+Article title: {{title}}
+Source excerpt:
+{{content}}
+
+Platform tone: {{platformTone}}
+Character limit: {{charLimit}}
+
+Rules:
+- Return ONLY the caption text — no quotes, labels, or JSON
+- Stay under {{charLimit}} characters
+- Do not use markdown
+- Match native {{platform}} posting style`,
+    isActive: true,
+  },
 ]
 
 async function main() {

@@ -96,6 +96,7 @@ model Post {
   ghlPostId             String?
   automationRunId       String?
   automationRun         SocialAutomationRun? @relation(fields: [automationRunId], references: [id], onDelete: SetNull)
+  slotKey               String? // F1..S6 for automation posts
   status                String    @default("published") // published, scheduled, failed, deleted
   errorMsg              String? // If publishing failed, store error
   analyticsLastSyncedAt DateTime? // When analytics were last fetched
@@ -139,11 +140,29 @@ model SocialAutomationRun {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   posts          Post[]
+  specResults    SocialAutomationSpecResult[]
 
   @@index([userId, status])
   @@index([jobId])
   @@index([status, updatedAt])
   @@map("social_automation_runs")
+}
+
+model SocialAutomationSpecResult {
+  id           String              @id @default(cuid())
+  runId        String
+  run          SocialAutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  slotKey      String
+  status       String              @default("pending") // pending | completed | failed
+  error        String?             @db.Text
+  postsCreated Int                 @default(0)
+  assetsJson   Json?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([runId, slotKey])
+  @@index([runId, status])
+  @@map("social_automation_spec_results")
 }
 
 model SocialPostSpec {

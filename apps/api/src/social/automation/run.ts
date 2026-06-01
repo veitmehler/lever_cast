@@ -3,11 +3,17 @@ import { logger } from '../../lib/logger'
 import { SPEC_PROCESS_ORDER } from './default-specs'
 import { ensureDefaultSocialPostSpecs } from './ensure-specs'
 import { buildArticleContentContext } from './content'
-import { slotToUtc } from './schedule'
-import { generateSpecAssets, type SpecAssets } from './generate-spec'
-import { schedulePostsForSpec } from './schedule-posts'
+import {
+  finalizeRunCounts,
+  loadPriorAssets,
+  processAutomationSpec,
+  slotsToProcess,
+} from './spec-processor'
 
-export async function runSocialAutomation(runId: string): Promise<void> {
+export async function runSocialAutomation(
+  runId: string,
+  opts?: { onlySlot?: string },
+): Promise<void> {
   const run = await prisma.socialAutomationRun.findUnique({
     where: { id: runId },
     include: {
@@ -24,7 +30,7 @@ export async function runSocialAutomation(runId: string): Promise<void> {
     where: { id: runId, status: { in: ['pending', 'processing'] } },
     data: { status: 'processing', error: null },
   })
-  if (claim.count === 0) {
+  if (claim.count === 0 && !opts?.onlySlot) {
     logger.info({ runId }, '[social-automation] run already finished or claimed elsewhere')
     return
   }
@@ -39,19 +45,25 @@ export async function runSocialAutomation(runId: string): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { userId: run.userId } })
   const timeZone = settings?.socialTimezone ?? 'America/New_York'
   const articleCtx = buildArticleContentContext(run.sitePage)
-  const priorAssets = new Map<string, SpecAssets>()
+  const priorAssets = opts?.onlySlot ? await loadPriorAssets(runId) : new Map()
 
-  await prisma.socialAutomationRun.update({
-    where: { id: runId },
-    data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: SPEC_PROCESS_ORDER.length },
-  })
+  const slots = slotsToProcess(opts?.onlySlot)
 
-  for (const slotKey of SPEC_PROCESS_ORDER) {
+  if (!opts?.onlySlot) {
+    await prisma.socialAutomationSpecResult.deleteMany({ where: { runId } })
+    await prisma.socialAutomationRun.update({
+      where: { id: runId },
+      data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: SPEC_PROCESS_ORDER.length },
+    })
+  }
+
+  for (const slotKey of slots) {
     const spec = specBySlot.get(slotKey)
     if (!spec) {
-      await prisma.socialAutomationRun.update({
-        where: { id: runId },
-        data: { failedSpecs: { increment: 1 } },
+      await prisma.socialAutomationSpecResult.upsert({
+        where: { runId_slotKey: { runId, slotKey } },
+        create: { runId, slotKey, status: 'failed', error: 'Spec disabled or missing' },
+        update: { status: 'failed', error: 'Spec disabled or missing' },
       })
       continue
     }
@@ -61,76 +73,19 @@ export async function runSocialAutomation(runId: string): Promise<void> {
       data: { currentSpec: slotKey },
     })
 
-    try {
-      const assets = await generateSpecAssets({
-        userId: run.userId,
-        jobId: run.jobId,
-        slotKey,
-        spec,
-        articleCtx,
-        priorAssets,
-      })
-      priorAssets.set(slotKey, assets)
+    const result = await processAutomationSpec({
+      run: { ...run, jobId: run.jobId },
+      slotKey,
+      spec,
+      articleCtx,
+      priorAssets,
+      timeZone,
+    })
 
-      const scheduledAt = slotToUtc(run.scheduledDate, spec.timeHour, spec.timeMinute, timeZone)
-      await schedulePostsForSpec({
-        runId,
-        userId: run.userId,
-        slotKey,
-        spec,
-        assets,
-        scheduledAt,
-        articleCtx,
-      })
-
-      await prisma.socialAutomationRun.update({
-        where: { id: runId },
-        data: { completedSpecs: { increment: 1 } },
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      logger.error({ runId, slotKey, err }, '[social-automation] spec failed')
-
-      await prisma.socialAutomationRun.update({
-        where: { id: runId },
-        data: { failedSpecs: { increment: 1 } },
-      })
-
-      await prisma.errorLog
-        .create({
-          data: {
-            userId: run.userId,
-            jobId: run.jobId,
-            errorType: 'social_automation_spec',
-            errorMessage: `Slot ${slotKey}: ${message}`,
-            context: { runId, slotKey },
-          },
-        })
-        .catch(() => {})
-    }
+    if (result.assets) priorAssets.set(slotKey, result.assets)
   }
 
-  const final = await prisma.socialAutomationRun.findUnique({ where: { id: runId } })
-  const allFailed = (final?.completedSpecs ?? 0) === 0 && (final?.failedSpecs ?? 0) > 0
-
-  await prisma.socialAutomationRun.update({
-    where: { id: runId },
-    data: {
-      status: allFailed ? 'failed' : 'completed',
-      currentSpec: null,
-      error:
-        (final?.failedSpecs ?? 0) > 0
-          ? `${final?.failedSpecs} of ${final?.totalSpecs} spec(s) failed`
-          : null,
-    },
-  })
-
-  logger.info(
-    {
-      runId,
-      completed: final?.completedSpecs,
-      failed: final?.failedSpecs,
-    },
-    '[social-automation] run finished',
-  )
+  await finalizeRunCounts(runId)
 }
+
+export { retryAutomationSpec } from './spec-processor'

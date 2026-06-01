@@ -4,10 +4,6 @@ import { GHL_PLATFORMS } from '../../lib/ghl/types'
 import { isGhlManagedPlatform } from '../dispatcher'
 import { FEED_PLATFORMS, STORY_PLATFORMS } from './captions'
 
-function shouldUseDirectPublish(): boolean {
-  return process.env.USE_DIRECT_SOCIAL_PUBLISH === 'true'
-}
-
 /** Returns true when the platform can receive an automated scheduled post. */
 export async function isPlatformReadyForAutomation(
   userId: string,
@@ -50,5 +46,5 @@ export async function listAutomationPlatforms(
 }
 
 export function isGhlPlatform(platform: string): boolean {
-  return (GHL_PLATFORMS as readonly string[]).includes(platform) && !shouldUseDirectPublish()
+  return (GHL_PLATFORMS as readonly string[]).includes(platform)
 }

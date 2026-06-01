@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { ContentCalendar } from '@/components/ContentCalendar'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
@@ -13,44 +13,70 @@ type Post = {
   publishedAt: string | null
   scheduledAt: string | null
   draftId: string | null
-  draft?: {
+  postType?: string | null
+  slotKey?: string | null
+  automationRunId?: string | null
+  draft?: { id: string; title: string }
+  automationRun?: {
     id: string
-    title: string
-  }
+    scheduledDate: string
+    status: string
+    jobId: string | null
+  } | null
+}
+
+type AutomationRun = {
+  id: string
+  scheduledDate: string
+  status: string
+  completedSpecs: number
+  failedSpecs: number
+  totalSpecs: number
+  currentSpec: string | null
+  error: string | null
+  jobId: string | null
+  specResults: Array<{
+    id: string
+    slotKey: string
+    status: string
+    error: string | null
+    postsCreated: number
+  }>
+  _count?: { posts: number }
+  job?: { id: string; topic: { topic: string } }
 }
 
 export default function CalendarPage() {
   const [postsByDate, setPostsByDate] = useState<Record<string, Post[]>>({})
+  const [runsByDate, setRunsByDate] = useState<Record<string, AutomationRun[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [currentMonth] = useState(new Date())
 
-  useEffect(() => {
-    fetchCalendarPosts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonth])
-
-  const fetchCalendarPosts = async () => {
+  const fetchCalendarPosts = useCallback(async () => {
     try {
       setIsLoading(true)
       const start = startOfMonth(currentMonth)
       const end = endOfMonth(currentMonth)
 
       const response = await fetch(
-        `/api/posts/calendar?startDate=${format(start, 'yyyy-MM-dd')}&endDate=${format(end, 'yyyy-MM-dd')}`
+        `/api/posts/calendar?startDate=${format(start, 'yyyy-MM-dd')}&endDate=${format(end, 'yyyy-MM-dd')}`,
       )
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch calendar posts')
-      }
+      if (!response.ok) throw new Error('Failed to fetch calendar posts')
 
       const data = await response.json()
-      setPostsByDate(data)
+      setPostsByDate(data.postsByDate ?? data)
+      setRunsByDate(data.runsByDate ?? {})
     } catch (error) {
       console.error('Error fetching calendar posts:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentMonth])
+
+  useEffect(() => {
+    void fetchCalendarPosts()
+  }, [fetchCalendarPosts])
 
   if (isLoading) {
     return (
@@ -66,12 +92,15 @@ export default function CalendarPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Content Calendar</h1>
         <p className="text-muted-foreground">
-          View and manage your published and scheduled posts
+          View scheduled posts, automation runs, and retry failed specs
         </p>
       </div>
 
-      <ContentCalendar postsByDate={postsByDate} />
+      <ContentCalendar
+        postsByDate={postsByDate}
+        runsByDate={runsByDate}
+        onRefresh={fetchCalendarPosts}
+      />
     </div>
   )
 }
-

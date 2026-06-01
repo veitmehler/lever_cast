@@ -3,21 +3,23 @@ import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { dispatchPublish, isGhlManagedPlatform } from '../dispatcher'
 import { trimSlidesForPlatform } from '../platform-limits'
+import { generatePlatformCaption } from '../generators/platform-caption'
 import type { ArticleContentContext } from './content'
-import { buildPlatformCaption } from './captions'
 import { listAutomationPlatforms } from './platforms'
+import { sendFailureAlert } from '../../lib/alerts'
 import type { SpecAssets } from './generate-spec'
 
 export async function schedulePostsForSpec(opts: {
   runId: string
   userId: string
+  jobId?: string
   slotKey: string
   spec: SocialPostSpec
   assets: SpecAssets
   scheduledAt: Date
   articleCtx: ArticleContentContext
 }): Promise<{ scheduled: number; skipped: number; failed: number }> {
-  const { runId, userId, slotKey, spec, assets, scheduledAt, articleCtx } = opts
+  const { runId, userId, jobId, slotKey, spec, assets, scheduledAt, articleCtx } = opts
   const platforms = await listAutomationPlatforms(userId, spec.isStory)
 
   let scheduled = 0
@@ -25,7 +27,12 @@ export async function schedulePostsForSpec(opts: {
   let failed = 0
 
   for (const platform of platforms) {
-    const caption = buildPlatformCaption(platform, articleCtx, slotKey)
+    const caption = await generatePlatformCaption({
+      platform,
+      slotKey,
+      postType: assets.postType,
+      articleCtx,
+    })
     const mediaUrls = assets.mediaUrls?.length
       ? trimSlidesForPlatform(assets.mediaUrls, platform)
       : undefined
@@ -50,6 +57,13 @@ export async function schedulePostsForSpec(opts: {
         if (!result.success) {
           failed++
           logger.warn({ runId, slotKey, platform, error: result.error }, '[social-automation] GHL schedule failed')
+          await sendFailureAlert({
+            userId,
+            jobId,
+            errorType: 'social_ghl_schedule',
+            message: `GHL schedule failed for ${platform} (${slotKey}): ${result.error}`,
+            context: { runId, slotKey, platform },
+          })
           continue
         }
 
@@ -68,6 +82,7 @@ export async function schedulePostsForSpec(opts: {
             provider: 'ghl',
             ghlPostId: result.ghlPostId ?? null,
             automationRunId: runId,
+            slotKey,
           },
         })
         scheduled++
@@ -86,13 +101,22 @@ export async function schedulePostsForSpec(opts: {
             postAsStory: spec.isStory,
             provider: 'direct',
             automationRunId: runId,
+            slotKey,
           },
         })
         scheduled++
       }
     } catch (err) {
       failed++
+      const message = err instanceof Error ? err.message : String(err)
       logger.error({ runId, slotKey, platform, err }, '[social-automation] failed to schedule post')
+      await sendFailureAlert({
+        userId,
+        jobId,
+        errorType: 'social_schedule',
+        message: `Failed to schedule ${platform} (${slotKey}): ${message}`,
+        context: { runId, slotKey, platform },
+      })
     }
   }
 

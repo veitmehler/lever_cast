@@ -254,11 +254,11 @@ Per-article orchestration that generates all 12 specs and schedules them (GHL fo
 
 ## Wave 4 — Polish
 
-- [ ] Read-back published status/analytics from GHL (`getGhlPost`) into `Post.analyticsData`.
-- [ ] Failure alerts (reuse `ErrorLog` + email) for generation and GHL post failures.
-- [ ] Per-platform caption prompts (LinkedIn vs IG vs Twitter tone) + char-limit enforcement.
-- [ ] Calendar view shows automation runs + per-spec status; retry a single failed spec.
-- [ ] Feature-flag cleanup: delete dormant direct FB/IG/LinkedIn publishers.
+- [x] Read-back published status/analytics from GHL (`getGhlPost`) into `Post.analyticsData`.
+- [x] Failure alerts (reuse `ErrorLog` + email) for generation and GHL post failures.
+- [x] Per-platform caption prompts (LinkedIn vs IG vs Twitter tone) + char-limit enforcement.
+- [x] Calendar view shows automation runs + per-spec status; retry a single failed spec.
+- [x] Feature-flag cleanup: delete dormant direct FB/IG/LinkedIn publishers.
 
 ---
 
@@ -296,9 +296,10 @@ GHL `media[].url` and all video/image assets must be **publicly fetchable** → 
 - Wave 1: Quote-card + carousel compositors, LLM prompts, manual post types, platform image limits
 - Wave 2: FFmpeg video compositors, Seedance integration, ElevenLabs voice settings + quote video VO
 - Wave 3: Per-article automation engine (12-spec orchestrator, social-generate queue, scheduling, workflow UI)
+- Wave 4: GHL analytics sync, failure alerts, LLM captions, calendar + per-spec retry, direct publisher cleanup
 
 ### Pending Tasks (priority order)
-- W4: Analytics read-back, alerts, per-platform prompts, calendar, cleanup
+- (none — social automation plan complete)
 
 ### Backlog Tasks
 - True generative AI video (beyond hook clips) if desired later

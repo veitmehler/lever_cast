@@ -556,9 +556,16 @@ export default function WorkflowJobPage() {
     error: string | null
     createdAt: string
     _count?: { posts: number }
+    specResults?: Array<{
+      slotKey: string
+      status: string
+      error: string | null
+      postsCreated: number
+    }>
   }
   const [socialRuns, setSocialRuns] = useState<SocialAutomationRunRow[]>([])
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false)
+  const [retryingSpec, setRetryingSpec] = useState<string | null>(null)
 
   useEffect(() => {
     void fetch('/api/wp/connections')
@@ -837,6 +844,21 @@ export default function WorkflowJobPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to generate social set')
     } finally {
       setIsGeneratingSocial(false)
+    }
+  }
+
+  const handleRetrySpec = async (runId: string, slotKey: string) => {
+    setRetryingSpec(`${runId}-${slotKey}`)
+    try {
+      const res = await fetch(`/api/social-automation/${runId}/retry/${slotKey}`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Retry failed')
+      toast.success(`Retried ${slotKey}`)
+      await fetchSocialRuns()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Retry failed')
+    } finally {
+      setRetryingSpec(null)
     }
   }
 
@@ -1622,6 +1644,39 @@ export default function WorkflowJobPage() {
                     </div>
                     {run.error && (
                       <p className="w-full text-xs text-red-500">{run.error}</p>
+                    )}
+                    {(run.specResults?.length ?? 0) > 0 && (
+                      <div className="w-full flex flex-wrap gap-1.5 mt-2">
+                        {run.specResults!.map((spec) => (
+                          <span
+                            key={spec.slotKey}
+                            className="inline-flex items-center gap-1 text-xs rounded border border-border px-2 py-0.5"
+                          >
+                            <span className="font-mono">{spec.slotKey}</span>
+                            <span
+                              className={
+                                spec.status === 'completed'
+                                  ? 'text-green-600'
+                                  : spec.status === 'failed'
+                                    ? 'text-red-500'
+                                    : 'text-muted-foreground'
+                              }
+                            >
+                              {spec.status}
+                            </span>
+                            {spec.status === 'failed' && (
+                              <button
+                                type="button"
+                                className="text-primary hover:underline ml-1"
+                                disabled={retryingSpec === `${run.id}-${spec.slotKey}`}
+                                onClick={() => void handleRetrySpec(run.id, spec.slotKey)}
+                              >
+                                {retryingSpec === `${run.id}-${spec.slotKey}` ? '…' : 'retry'}
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}

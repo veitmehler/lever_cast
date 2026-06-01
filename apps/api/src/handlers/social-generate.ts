@@ -1,5 +1,7 @@
 import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
+import { prisma } from '../lib/prisma'
+import { sendFailureAlert } from '../lib/alerts'
 import { runSocialAutomation } from '../social/automation/run'
 
 export interface SocialGenerateJobData {
@@ -18,7 +20,11 @@ export async function socialGenerateHandler(
     } catch (err) {
       logger.error({ runId, err }, '[social-generate] automation run failed')
 
-      const { prisma } = await import('../lib/prisma')
+      const run = await prisma.socialAutomationRun.findUnique({
+        where: { id: runId },
+        select: { userId: true, jobId: true },
+      })
+
       await prisma.socialAutomationRun
         .update({
           where: { id: runId },
@@ -29,6 +35,16 @@ export async function socialGenerateHandler(
           },
         })
         .catch(() => {})
+
+      if (run) {
+        await sendFailureAlert({
+          userId: run.userId,
+          jobId: run.jobId ?? undefined,
+          errorType: 'social_automation_run_failed',
+          message: err instanceof Error ? err.message : String(err),
+          context: { runId },
+        }).catch(() => {})
+      }
 
       throw err
     }

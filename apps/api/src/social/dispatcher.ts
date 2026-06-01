@@ -1,10 +1,7 @@
 import { createGhlPost } from '../lib/ghl/client'
 import { getGhlCredentials } from '../lib/ghl/settings'
 import { GHL_PLATFORMS, type GhlPlatform } from '../lib/ghl/types'
-import { postToLinkedIn } from '../lib/linkedinApi'
 import { postToTwitter, postTwitterThread } from '../lib/twitterApi'
-import { postToFacebook } from '../lib/facebookApi'
-import { postToInstagram } from '../lib/instagramApi'
 import { postToTelegram } from '../lib/telegramApi'
 import { postToThreads } from '../lib/threadsApi'
 
@@ -28,10 +25,6 @@ export interface DispatchPublishOptions {
   replyToTweetId?: string
   postAsStory?: boolean
   scheduledAt?: Date
-}
-
-function shouldUseDirectPublish(): boolean {
-  return process.env.USE_DIRECT_SOCIAL_PUBLISH === 'true'
 }
 
 function isGhlPlatform(platform: string): platform is GhlPlatform {
@@ -115,12 +108,11 @@ async function publishViaDirect(
 ): Promise<PublishOutcome> {
   const { imageUrl, chatId, replyToTweetId } = options
 
-  if (platform === 'linkedin') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    const result = await postToLinkedIn(userId, contentStr, imageUrl)
-    return result.success
-      ? { success: true, postUrl: result.postUrl, provider: 'direct' }
-      : result
+  if (platform === 'linkedin' || platform === 'facebook' || platform === 'instagram') {
+    return {
+      success: false,
+      error: `${platform} publishing is handled via Go HighLevel. Connect GHL in Settings.`,
+    }
   }
 
   if (platform === 'twitter') {
@@ -134,25 +126,6 @@ async function publishViaDirect(
     const result = await postToTwitter(userId, content, replyToTweetId, imageUrl)
     if (result.success) {
       return { success: true, postUrl: result.postUrl, tweetId: result.tweetId, provider: 'direct' }
-    }
-    return result
-  }
-
-  if (platform === 'facebook') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    const result = await postToFacebook(userId, contentStr, imageUrl)
-    if (result.success) {
-      return { success: true, postUrl: result.postUrl, postId: result.postId, provider: 'direct' }
-    }
-    return result
-  }
-
-  if (platform === 'instagram') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    if (!imageUrl) return { success: false, error: 'Instagram requires an image.' }
-    const result = await postToInstagram(userId, contentStr, imageUrl)
-    if (result.success) {
-      return { success: true, postUrl: result.postUrl, postId: result.postId, provider: 'direct' }
     }
     return result
   }
@@ -190,12 +163,12 @@ export async function dispatchPublish(
   content: string | string[],
   options: DispatchPublishOptions = {},
 ): Promise<PublishOutcome> {
-  if (isGhlPlatform(platform) && !shouldUseDirectPublish()) {
+  if (isGhlPlatform(platform)) {
     return publishViaGhl(userId, platform, content, options)
   }
   return publishViaDirect(userId, platform, content, options)
 }
 
 export function isGhlManagedPlatform(platform: string): boolean {
-  return isGhlPlatform(platform) && !shouldUseDirectPublish()
+  return isGhlPlatform(platform)
 }

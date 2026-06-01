@@ -749,6 +749,7 @@ export async function articleRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
+          specResults: { orderBy: { slotKey: 'asc' } },
           _count: { select: { posts: true } },
         },
       })

@@ -3,6 +3,7 @@ import { logger } from '../../lib/logger'
 import { SPEC_PROCESS_ORDER } from './default-specs'
 import { ensureDefaultSocialPostSpecs } from './ensure-specs'
 import { buildArticleContentContext } from './content'
+import type { AutomationLogContext } from './log-context'
 import {
   finalizeRunCounts,
   loadPriorAssets,
@@ -48,6 +49,21 @@ export async function runSocialAutomation(
   const priorAssets = opts?.onlySlot ? await loadPriorAssets(runId) : new Map()
 
   const slots = slotsToProcess(opts?.onlySlot)
+  const baseCtx: AutomationLogContext = {
+    runId,
+    userId: run.userId,
+    jobId: run.jobId,
+  }
+
+  logger.info(
+    {
+      ...baseCtx,
+      scheduledDate: run.scheduledDate,
+      totalSlots: slots.length,
+      onlySlot: opts?.onlySlot,
+    },
+    '[social-automation] run started',
+  )
 
   if (!opts?.onlySlot) {
     await prisma.socialAutomationSpecResult.deleteMany({ where: { runId } })
@@ -80,6 +96,7 @@ export async function runSocialAutomation(
       articleCtx,
       priorAssets,
       timeZone,
+      logCtx: baseCtx,
     })
 
     if (result.assets) priorAssets.set(slotKey, result.assets)

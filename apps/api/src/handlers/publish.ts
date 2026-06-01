@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss'
 import { prisma } from '../lib/prisma'
+import { logger } from '../lib/logger'
 import { dispatchPublish } from '../social/dispatcher'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,15 +27,22 @@ export interface PublishScheduledJobData {
  */
 export async function publishHandler(jobs: PgBoss.Job<PublishJobData>[]) {
   for (const job of jobs) {
-    const { userId, platform, content, imageUrl, chatId } = job.data
-    console.log(`[publish] job ${job.id} — ${platform} user ${userId}`)
+    const { userId, platform, content, imageUrl, chatId, postIds } = job.data
+    logger.info({ jobId: job.id, platform, userId, postIds }, '[publish] job started')
 
-    const result = await dispatchPublish(userId, platform, content, { imageUrl, chatId })
+    const result = await dispatchPublish(userId, platform, content, {
+      imageUrl,
+      chatId,
+      logCtx: { userId, platform, postId: postIds?.[0] },
+    })
 
     if (!result.success) {
-      console.error(`[publish] job ${job.id} failed:`, result.error)
+      logger.error({ jobId: job.id, platform, userId, error: result.error }, '[publish] job failed')
     } else {
-      console.log(`[publish] job ${job.id} succeeded — postUrl: ${result.postUrl}`)
+      logger.info(
+        { jobId: job.id, platform, userId, postUrl: result.postUrl, provider: result.provider },
+        '[publish] job succeeded',
+      )
     }
   }
 }
@@ -47,7 +55,7 @@ export async function publishHandler(jobs: PgBoss.Job<PublishJobData>[]) {
  * Posts with provider='ghl' are skipped — GHL Social Planner owns their schedule.
  */
 export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJobData>[]) {
-  console.log(`[publish-scheduled] tick — ${jobs.length} job(s)`)
+  logger.info({ jobCount: jobs.length }, '[publish-scheduled] tick')
 
   const now = new Date()
 
@@ -77,7 +85,7 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
     return 0
   })
 
-  console.log(`[publish-scheduled] found ${scheduledPosts.length} post(s) due`)
+  logger.info({ count: scheduledPosts.length }, '[publish-scheduled] posts due')
 
   const published: string[] = []
   const failed: { id: string; error: string }[] = []
@@ -96,7 +104,10 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
             select: { status: true, tweetId: true },
           })
           if (!parent || parent.status !== 'published') {
-            console.log(`[publish-scheduled] skipping reply ${post.id} — parent not published`)
+            logger.debug(
+              { postId: post.id, parentPostId: post.parentPostId },
+              '[publish-scheduled] skipping reply — parent not published',
+            )
             continue
           }
         }
@@ -139,6 +150,13 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
           replyToTweetId,
           postAsStory: post.postAsStory,
           scheduledAt: post.scheduledAt ?? new Date(),
+          logCtx: {
+            userId: post.user.id,
+            platform: post.platform,
+            postId: post.id,
+            ...(post.automationRunId ? { runId: post.automationRunId } : {}),
+            ...(post.slotKey ? { slotKey: post.slotKey } : {}),
+          },
         },
       )
 
@@ -181,11 +199,17 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
             errorMsg: result.error ?? 'Unknown error',
           },
         })
-        if (!isRateLimit) failed.push({ id: post.id, error: result.error ?? 'Unknown error' })
+        if (!isRateLimit) {
+          failed.push({ id: post.id, error: result.error ?? 'Unknown error' })
+          logger.error(
+            { postId: post.id, platform: post.platform, error: result.error },
+            '[publish-scheduled] post failed',
+          )
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[publish-scheduled] post ${post.id} threw:`, msg)
+      logger.error({ postId: post.id, platform: post.platform, err }, '[publish-scheduled] post threw')
       await prisma.post.update({
         where: { id: post.id },
         data: { status: 'failed', errorMsg: msg },
@@ -194,5 +218,8 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
     }
   }
 
-  console.log(`[publish-scheduled] done — published: ${published.length}, failed: ${failed.length}`)
+  logger.info(
+    { published: published.length, failed: failed.length },
+    '[publish-scheduled] done',
+  )
 }

@@ -7,6 +7,7 @@ import { buildArticleContentContext, type ArticleContentContext } from './conten
 import { slotToUtc } from './schedule'
 import { generateSpecAssets, type SpecAssets } from './generate-spec'
 import { schedulePostsForSpec } from './schedule-posts'
+import { type AutomationLogContext, withSlotKey } from './log-context'
 
 export function assetsFromJson(json: unknown): SpecAssets | null {
   if (!json || typeof json !== 'object') return null
@@ -39,8 +40,15 @@ export async function processAutomationSpec(opts: {
   articleCtx: ArticleContentContext
   priorAssets: Map<string, SpecAssets>
   timeZone: string
+  logCtx: AutomationLogContext
 }): Promise<{ ok: boolean; assets?: SpecAssets; error?: string }> {
-  const { run, slotKey, spec, articleCtx, priorAssets, timeZone } = opts
+  const { run, slotKey, spec, articleCtx, priorAssets, timeZone, logCtx } = opts
+  const specCtx = withSlotKey(logCtx, slotKey)
+
+  logger.info(
+    { ...specCtx, postType: spec.postType },
+    '[social-automation] spec started',
+  )
 
   await prisma.socialAutomationSpecResult.upsert({
     where: { runId_slotKey: { runId: run.id, slotKey } },
@@ -56,15 +64,13 @@ export async function processAutomationSpec(opts: {
       spec,
       articleCtx,
       priorAssets,
+      logCtx: specCtx,
     })
     priorAssets.set(slotKey, assets)
 
     const scheduledAt = slotToUtc(run.scheduledDate, spec.timeHour, spec.timeMinute, timeZone)
     const scheduleResult = await schedulePostsForSpec({
-      runId: run.id,
-      userId: run.userId,
-      jobId: run.jobId ?? undefined,
-      slotKey,
+      logCtx: specCtx,
       spec,
       assets,
       scheduledAt,
@@ -74,6 +80,16 @@ export async function processAutomationSpec(opts: {
     if (scheduleResult.failed > 0 && scheduleResult.scheduled === 0) {
       throw new Error(`All ${scheduleResult.failed} platform schedule(s) failed`)
     }
+
+    logger.info(
+      {
+        ...specCtx,
+        scheduled: scheduleResult.scheduled,
+        skipped: scheduleResult.skipped,
+        failed: scheduleResult.failed,
+      },
+      '[social-automation] spec completed',
+    )
 
     await prisma.socialAutomationSpecResult.update({
       where: { runId_slotKey: { runId: run.id, slotKey } },
@@ -97,7 +113,7 @@ export async function processAutomationSpec(opts: {
       jobId: run.jobId ?? undefined,
       errorType: 'social_automation_spec',
       message: `Slot ${slotKey}: ${message}`,
-      context: { runId: run.id, slotKey },
+      context: { ...specCtx },
     })
     return { ok: false, error: message }
   }
@@ -121,6 +137,11 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
   const timeZone = settings?.socialTimezone ?? 'America/New_York'
   const articleCtx = buildArticleContentContext(run.sitePage)
   const priorAssets = await loadPriorAssets(run.id)
+  const logCtx: AutomationLogContext = {
+    runId: run.id,
+    userId: run.userId,
+    jobId: run.jobId,
+  }
 
   await prisma.socialAutomationRun.update({
     where: { id: runId },
@@ -134,6 +155,7 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
     articleCtx,
     priorAssets,
     timeZone,
+    logCtx,
   })
 
   const counts = await prisma.socialAutomationSpecResult.groupBy({
@@ -190,16 +212,31 @@ export async function finalizeRunCounts(runId: string): Promise<void> {
     },
   })
 
+  const run = await prisma.socialAutomationRun.findUnique({ where: { id: runId } })
+  const status = allFailed ? 'failed' : 'completed'
+  const runCtx: AutomationLogContext = {
+    runId,
+    userId: run?.userId ?? '',
+    jobId: run?.jobId ?? undefined,
+  }
+
   if (failed > 0) {
-    const run = await prisma.socialAutomationRun.findUnique({ where: { id: runId } })
     await sendFailureAlert({
       userId: run?.userId,
       jobId: run?.jobId ?? undefined,
       errorType: 'social_automation_run',
       message: `Social automation run finished with ${failed} failed spec(s)`,
-      context: { runId, completed, failed },
+      context: { ...runCtx, completed, failed },
     })
   }
 
-  logger.info({ runId, completed, failed }, '[social-automation] run finished')
+  logger.info(
+    {
+      ...runCtx,
+      completed,
+      failed,
+      status,
+    },
+    '[social-automation] run finished',
+  )
 }

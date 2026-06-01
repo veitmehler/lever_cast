@@ -1,6 +1,7 @@
 import PgBoss from 'pg-boss'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
+import { logger } from '../lib/logger'
 import { getTwitterAnalytics } from '../lib/twitterApi'
 import { getLinkedInAnalytics } from '../lib/linkedinApi'
 import { syncGhlPostFromApi } from '../social/ghl-analytics'
@@ -23,7 +24,7 @@ interface AnalyticsData {
 }
 
 export async function analyticsSyncHandler(jobs: PgBoss.Job<AnalyticsSyncJobData>[]) {
-  console.log(`[analytics-sync] starting — ${jobs.length} job(s)`)
+  logger.info({ jobCount: jobs.length }, '[analytics-sync] starting')
 
   const now = new Date()
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -53,7 +54,7 @@ export async function analyticsSyncHandler(jobs: PgBoss.Job<AnalyticsSyncJobData
     take: 100,
   })
 
-  console.log(`[analytics-sync] ${postsToSync.length} post(s) to sync`)
+  logger.info({ count: postsToSync.length }, '[analytics-sync] posts to sync')
 
   let synced = 0
   let skipped = 0
@@ -63,8 +64,15 @@ export async function analyticsSyncHandler(jobs: PgBoss.Job<AnalyticsSyncJobData
     try {
       if (post.provider === 'ghl' && post.ghlPostId) {
         const ok = await syncGhlPostFromApi(post)
-        if (ok) synced++
-        else skipped++
+        if (ok) {
+          synced++
+        } else {
+          skipped++
+          logger.debug(
+            { postId: post.id, ghlPostId: post.ghlPostId, platform: post.platform, reason: 'ghl_sync_skipped' },
+            '[analytics-sync] GHL post skipped',
+          )
+        }
         await new Promise((r) => setTimeout(r, 500))
         continue
       }
@@ -103,14 +111,18 @@ export async function analyticsSyncHandler(jobs: PgBoss.Job<AnalyticsSyncJobData
         synced++
       } else {
         skipped++
+        logger.debug(
+          { postId: post.id, platform: post.platform, reason: 'no_analytics_source' },
+          '[analytics-sync] post skipped',
+        )
       }
 
       await new Promise((r) => setTimeout(r, 300))
     } catch (err) {
-      console.error(`[analytics-sync] post ${post.id} error:`, err)
+      logger.error({ postId: post.id, platform: post.platform, err }, '[analytics-sync] post error')
       failed++
     }
   }
 
-  console.log(`[analytics-sync] done — synced: ${synced}, skipped: ${skipped}, failed: ${failed}`)
+  logger.info({ synced, skipped, failed }, '[analytics-sync] done')
 }

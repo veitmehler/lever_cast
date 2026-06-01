@@ -163,10 +163,15 @@ export async function dispatchPublish(
   content: string | string[],
   options: DispatchPublishOptions = {},
 ): Promise<PublishOutcome> {
-  if (isGhlPlatform(platform)) {
-    return publishViaGhl(userId, platform, content, options)
+  const result = isGhlPlatform(platform)
+    ? await publishViaGhl(userId, platform, content, options)
+    : await publishViaDirect(userId, platform, content, options)
+
+  if (!result.success) {
+    console.error('[dispatcher] publish failed', { userId, platform, error: result.error })
   }
-  return publishViaDirect(userId, platform, content, options)
+
+  return result
 }
 
 export function isGhlManagedPlatform(platform: string): boolean {

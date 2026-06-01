@@ -12,6 +12,7 @@ import {
 } from '../generate-video-assets'
 import type { ArticleContentContext, SlotContent } from './content'
 import { resolveSlotContent } from './content'
+import type { AutomationLogContext } from './log-context'
 
 export interface SpecAssets {
   postType: string
@@ -28,6 +29,7 @@ export async function generateSpecAssets(opts: {
   spec: SocialPostSpec
   articleCtx: ArticleContentContext
   priorAssets: Map<string, SpecAssets>
+  logCtx: AutomationLogContext
 }): Promise<SpecAssets> {
   const { userId, jobId, slotKey, spec, articleCtx, priorAssets } = opts
   const assetJobId = `${jobId}-${slotKey}`

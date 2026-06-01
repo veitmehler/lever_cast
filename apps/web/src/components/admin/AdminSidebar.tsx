@@ -13,6 +13,7 @@ import {
   MessageSquareText,
   LayoutList,
   Braces,
+  Share2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,7 @@ const navItems = [
   { label: 'Schema Rules',       href: '/admin/schema-rules',       icon: Braces },
   { label: 'Costs', href: '/admin/costs', icon: DollarSign },
   { label: 'Articles', href: '/admin/articles', icon: FileText },
+  { label: 'Social Runs', href: '/admin/social', icon: Share2 },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Errors', href: '/admin/errors', icon: AlertTriangle },
 ]

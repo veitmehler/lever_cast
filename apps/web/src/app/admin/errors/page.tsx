@@ -2,20 +2,46 @@ import { prisma } from '@/lib/prisma'
 import { KpiCard } from '@/components/admin/KpiCard'
 import { ResolveButton } from './ResolveButton'
 import Link from 'next/link'
+import type { Prisma } from '@prisma/client'
+
+const SOCIAL_ERROR_TYPES = [
+  'social_automation_spec',
+  'social_automation_run',
+  'social_automation_run_failed',
+  'social_ghl_schedule',
+  'social_schedule',
+  'social_caption_fallback',
+] as const
+
+function buildQuery(params: { page?: number; resolved?: boolean; type?: string }) {
+  const q = new URLSearchParams()
+  if (params.page && params.page > 1) q.set('page', String(params.page))
+  if (params.resolved) q.set('resolved', 'true')
+  if (params.type) q.set('type', params.type)
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
 
 export default async function ErrorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; resolved?: string }>
+  searchParams: Promise<{ page?: string; resolved?: string; type?: string }>
 }) {
-  const { page: pageStr, resolved: resolvedStr } = await searchParams
+  const { page: pageStr, resolved: resolvedStr, type: typeStr } = await searchParams
   const page = Math.max(1, parseInt(pageStr ?? '1', 10))
   const pageSize = 50
   const skip = (page - 1) * pageSize
 
   const showResolved = resolvedStr === 'true'
+  const errorTypeFilter =
+    typeStr && SOCIAL_ERROR_TYPES.includes(typeStr as (typeof SOCIAL_ERROR_TYPES)[number])
+      ? typeStr
+      : undefined
 
-  const where = { resolved: showResolved }
+  const where: Prisma.ErrorLogWhereInput = {
+    resolved: showResolved,
+    ...(errorTypeFilter ? { errorType: errorTypeFilter } : {}),
+  }
 
   const [errors, total, unresolvedCount] = await Promise.all([
     prisma.errorLog.findMany({
@@ -30,6 +56,7 @@ export default async function ErrorsPage({
   ])
 
   const totalPages = Math.ceil(total / pageSize)
+  const queryBase = { resolved: showResolved, type: errorTypeFilter }
 
   return (
     <div className="space-y-6">
@@ -45,9 +72,9 @@ export default async function ErrorsPage({
         />
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/errors"
+          href={`/admin/errors${buildQuery({ resolved: showResolved, type: errorTypeFilter })}`}
           className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
             !showResolved ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
           }`}
@@ -55,13 +82,35 @@ export default async function ErrorsPage({
           Unresolved ({unresolvedCount})
         </Link>
         <Link
-          href="/admin/errors?resolved=true"
+          href={`/admin/errors${buildQuery({ resolved: true, type: errorTypeFilter })}`}
           className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
             showResolved ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
           }`}
         >
           Resolved
         </Link>
+        <span className="mx-1 self-center text-xs text-muted-foreground">|</span>
+        <Link
+          href={`/admin/errors${buildQuery({ resolved: showResolved })}`}
+          className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+            !errorTypeFilter ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          All types
+        </Link>
+        {SOCIAL_ERROR_TYPES.map((type) => (
+          <Link
+            key={type}
+            href={`/admin/errors${buildQuery({ resolved: showResolved, type })}`}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              errorTypeFilter === type
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {type.replace(/^social_/, '')}
+          </Link>
+        ))}
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -97,6 +146,16 @@ export default async function ErrorsPage({
                         View article job →
                       </Link>
                     )}
+                    {err.context != null && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                          Context
+                        </summary>
+                        <pre className="mt-1 text-xs bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+                          {JSON.stringify(err.context, null, 2)}
+                        </pre>
+                      </details>
+                    )}
                   </div>
                   {!showResolved && (
                     <ResolveButton errorId={err.id} />
@@ -112,7 +171,7 @@ export default async function ErrorsPage({
         <div className="flex items-center justify-center gap-2">
           {page > 1 && (
             <Link
-              href={`/admin/errors?page=${page - 1}${showResolved ? '&resolved=true' : ''}`}
+              href={`/admin/errors${buildQuery({ ...queryBase, page: page - 1 })}`}
               className="rounded px-3 py-1.5 text-xs bg-muted text-muted-foreground hover:text-foreground"
             >
               Previous
@@ -123,7 +182,7 @@ export default async function ErrorsPage({
           </span>
           {page < totalPages && (
             <Link
-              href={`/admin/errors?page=${page + 1}${showResolved ? '&resolved=true' : ''}`}
+              href={`/admin/errors${buildQuery({ ...queryBase, page: page + 1 })}`}
               className="rounded px-3 py-1.5 text-xs bg-muted text-muted-foreground hover:text-foreground"
             >
               Next

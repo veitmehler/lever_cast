@@ -4,7 +4,6 @@ import { GHL_PLATFORMS, type GhlPlatform } from '../lib/ghl/types'
 import { logger } from '../lib/logger'
 import { postToTwitter, postTwitterThread } from '../lib/twitterApi'
 import { postToTelegram } from '../lib/telegramApi'
-import { postToThreads } from '../lib/threadsApi'
 import type { AutomationLogContext } from './automation/log-context'
 
 export type PublishOutcome =
@@ -48,7 +47,7 @@ async function publishViaGhl(
     logger.warn(baseLog, '[dispatcher] GHL not configured')
     return {
       success: false,
-      error: 'Go HighLevel is not configured. Add your GHL API key and location in Settings.',
+      error: 'Omniply is not configured. Add your API key and Location ID in Settings → Omniply.',
     }
   }
 
@@ -57,7 +56,7 @@ async function publishViaGhl(
     logger.warn(baseLog, '[dispatcher] GHL account not mapped for platform')
     return {
       success: false,
-      error: `No Go HighLevel account linked for ${platform}. Map your ${platform} account in Settings → Go HighLevel.`,
+      error: `No Omniply account linked for ${platform}. Map your ${platform} account in Settings → Omniply.`,
     }
   }
 
@@ -129,11 +128,12 @@ async function publishViaDirect(
   const { imageUrl, chatId, replyToTweetId, logCtx } = options
   const baseLog = { userId, platform, provider: 'direct' as const, ...logCtx }
 
-  if (platform === 'linkedin' || platform === 'facebook' || platform === 'instagram') {
-    logger.warn(baseLog, '[dispatcher] platform requires GHL')
+  // GHL-managed platforms should never reach here — isGhlPlatform() routes them first
+  if (platform === 'linkedin' || platform === 'facebook' || platform === 'instagram' || platform === 'threads') {
+    logger.warn(baseLog, '[dispatcher] platform requires Omniply')
     return {
       success: false,
-      error: `${platform} publishing is handled via Go HighLevel. Connect GHL in Settings.`,
+      error: `${platform} publishing is handled via Omniply. Connect Omniply in Settings.`,
     }
   }
 
@@ -173,17 +173,6 @@ async function publishViaDirect(
       }
     }
     logger.error({ ...baseLog, error: result.error }, '[dispatcher] Telegram post failed')
-    return result
-  }
-
-  if (platform === 'threads') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    const result = await postToThreads(userId, contentStr, imageUrl)
-    if (result.success) {
-      logger.info({ ...baseLog, postId: result.postId, postUrl: result.postUrl }, '[dispatcher] Threads post published')
-      return { success: true, postUrl: result.postUrl, postId: result.postId, provider: 'direct' }
-    }
-    logger.error({ ...baseLog, error: result.error }, '[dispatcher] Threads post failed')
     return result
   }
 

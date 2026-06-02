@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import type { GhlAccountIds, GhlSocialAccount } from '@/lib/ghl/types'
 
-const GHL_PLATFORMS = [
+const OMNIPLY_PLATFORMS = [
   { key: 'facebook' as const, label: 'Facebook' },
   { key: 'instagram' as const, label: 'Instagram' },
   { key: 'linkedin' as const, label: 'LinkedIn' },
+  { key: 'threads' as const, label: 'Threads' },
 ]
 
 export function GhlSettingsPanel() {
@@ -42,7 +43,7 @@ export function GhlSettingsPanel() {
       setLastError(data.lastError ?? null)
     } catch (error) {
       console.error(error)
-      toast.error('Failed to load Go HighLevel settings')
+      toast.error('Failed to load Omniply settings')
     } finally {
       setIsLoading(false)
     }
@@ -54,11 +55,11 @@ export function GhlSettingsPanel() {
 
   const handleSave = async () => {
     if (!ghlLocationId.trim() || !ghlUserId.trim()) {
-      toast.error('Location ID and GHL User ID are required')
+      toast.error('Location ID and User ID are required')
       return
     }
     if (!ghlApiKey.trim() && !hasApiKey) {
-      toast.error('GHL API key is required')
+      toast.error('API key is required')
       return
     }
 
@@ -83,9 +84,9 @@ export function GhlSettingsPanel() {
       setMaskedApiKey(data.maskedApiKey ?? '')
       setHasApiKey(true)
       setGhlApiKey('')
-      toast.success('Go HighLevel settings saved')
+      toast.success('Omniply settings saved')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save GHL settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to save Omniply settings')
     } finally {
       setIsSaving(false)
     }
@@ -106,7 +107,7 @@ export function GhlSettingsPanel() {
         toast.warning('No accounts found — see instructions below')
       } else {
         setLastError(null)
-        toast.success(`Loaded ${count} GHL account(s)`)
+        toast.success(`Loaded ${count} connected account(s)`)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load accounts'
@@ -144,10 +145,10 @@ export function GhlSettingsPanel() {
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-card-foreground">Go HighLevel</h2>
+        <h2 className="text-xl font-semibold text-card-foreground">Omniply</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Facebook, Instagram, and LinkedIn publishing is routed through your GHL Social Planner.
-          Connect accounts in GHL, then map them here.
+          Facebook, Instagram, LinkedIn, and Threads publishing is routed through your Omniply Social Planner.
+          Connect accounts in Omniply, then map them here.
         </p>
       </div>
 
@@ -158,7 +159,7 @@ export function GhlSettingsPanel() {
             type="password"
             value={ghlApiKey}
             onChange={(e) => setGhlApiKey(e.target.value)}
-            placeholder={hasApiKey ? maskedApiKey || '••••••••' : 'Paste GHL API key'}
+            placeholder={hasApiKey ? maskedApiKey || '••••••••' : 'Paste API key'}
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
           />
           {hasApiKey && !ghlApiKey && (
@@ -176,7 +177,7 @@ export function GhlSettingsPanel() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-card-foreground mb-1">GHL User ID</label>
+          <label className="block text-sm font-medium text-card-foreground mb-1">User ID</label>
           <input
             type="text"
             value={ghlUserId}
@@ -190,21 +191,21 @@ export function GhlSettingsPanel() {
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => void handleSave()} disabled={isSaving}>
           {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          Save GHL settings
+          Save Omniply settings
         </Button>
         <Button variant="outline" onClick={() => void handleLoadAccounts()} disabled={isLoadingAccounts}>
           {isLoadingAccounts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-          Load accounts from GHL
+          Load connected accounts
         </Button>
       </div>
 
       {lastError && (
-        <p className="text-sm text-destructive">Last GHL error: {lastError}</p>
+        <p className="text-sm text-destructive">Last error: {lastError}</p>
       )}
 
       <div className="space-y-3 pt-2 border-t border-border">
         <p className="text-sm font-medium text-card-foreground">Platform account mapping</p>
-        {GHL_PLATFORMS.map(({ key, label }) => {
+        {OMNIPLY_PLATFORMS.map(({ key, label }) => {
           const options = accountsForPlatform(key)
           return (
             <div key={key} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -219,7 +220,7 @@ export function GhlSettingsPanel() {
                 }
                 className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="">Select GHL account…</option>
+                <option value="">Select Omniply account…</option>
                 {options.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name ?? account.id}
@@ -229,13 +230,13 @@ export function GhlSettingsPanel() {
               </select>
               <Button variant="ghost" size="sm" onClick={() => void openGhlOAuth(key)}>
                 <ExternalLink className="w-4 h-4 mr-1" />
-                Connect in GHL
+                Connect in Omniply
               </Button>
             </div>
           )
         })}
         <p className="text-xs text-muted-foreground">
-          If an account is missing, click &quot;Connect in GHL&quot;, complete OAuth in Go HighLevel, then click &quot;Load accounts from GHL&quot; again.
+          If an account is missing, click &quot;Connect in Omniply&quot;, complete the OAuth flow, then click &quot;Load connected accounts&quot; again.
         </p>
       </div>
     </div>

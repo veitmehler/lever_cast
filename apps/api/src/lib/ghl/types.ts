@@ -1,13 +1,14 @@
 export const GHL_BASE_URL = 'https://services.leadconnectorhq.com'
 export const GHL_API_VERSION = '2021-07-28'
 
-export const GHL_PLATFORMS = ['linkedin', 'facebook', 'instagram'] as const
+export const GHL_PLATFORMS = ['linkedin', 'facebook', 'instagram', 'threads'] as const
 export type GhlPlatform = (typeof GHL_PLATFORMS)[number]
 
 export type GhlAccountIds = {
   facebook?: string
   instagram?: string
   linkedin?: string
+  threads?: string
 }
 
 export type GhlPostType = 'post' | 'story' | 'reel'

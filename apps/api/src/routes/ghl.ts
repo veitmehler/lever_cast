@@ -138,7 +138,7 @@ export async function ghlRoutes(app: FastifyInstance) {
         return {
           accounts,
           warning:
-            'GHL returned 0 accounts. Check that (1) your Location ID is correct, (2) social media profiles are connected in GHL Social Planner → Settings → Integrations for that location, and (3) your Private Integration key has social-media-posting scope.',
+            'Omniply returned 0 accounts. Check that (1) your Location ID is correct, (2) social media profiles are connected in Social Planner → Settings → Integrations for that location, and (3) your Private Integration key has social-media-posting scope.',
         }
       }
 

@@ -30,6 +30,40 @@ function isGhlPlatform(platform: string): platform is GhlPlatform {
   return (GHL_PLATFORMS as readonly string[]).includes(platform)
 }
 
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+
+const VIDEO_MIME_BY_EXT: Record<string, string> = {
+  mp4: 'video/mp4',
+  mov: 'video/mov',
+  webm: 'video/webm',
+}
+
+function inferMimeTypeFromUrl(url: string, kind: 'image' | 'video'): string {
+  const fallback = kind === 'video' ? 'video/mp4' : 'image/jpeg'
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    const ext = pathname.split('.').pop() ?? ''
+    const map = kind === 'video' ? VIDEO_MIME_BY_EXT : IMAGE_MIME_BY_EXT
+    return map[ext] ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+const GHL_MIN_SCHEDULE_LEAD_MS = 10 * 60 * 1000
+
+function ensureFutureScheduleDate(scheduledAt: Date, now = new Date()): Date {
+  const minTime = now.getTime() + GHL_MIN_SCHEDULE_LEAD_MS
+  if (scheduledAt.getTime() >= minTime) return scheduledAt
+  return new Date(minTime)
+}
+
 async function publishViaGhl(
   userId: string,
   platform: GhlPlatform,
@@ -57,13 +91,13 @@ async function publishViaGhl(
 
   if (options.mediaUrls?.length) {
     for (const url of options.mediaUrls) {
-      media.push({ url, type: 'image' })
+      media.push({ url, type: inferMimeTypeFromUrl(url, 'image') })
     }
   } else if (options.imageUrl) {
-    media.push({ url: options.imageUrl, type: 'image' })
+    media.push({ url: options.imageUrl, type: inferMimeTypeFromUrl(options.imageUrl, 'image') })
   }
   if (options.videoUrl) {
-    media.push({ url: options.videoUrl, type: 'video' })
+    media.push({ url: options.videoUrl, type: inferMimeTypeFromUrl(options.videoUrl, 'video') })
   }
 
   if (platform === 'instagram' && media.length === 0) {
@@ -71,7 +105,7 @@ async function publishViaGhl(
   }
 
   const postType = options.postAsStory ? 'story' : options.videoUrl ? 'reel' : 'post'
-  const scheduleDate = (options.scheduledAt ?? new Date()).toISOString()
+  const scheduleDate = ensureFutureScheduleDate(options.scheduledAt ?? new Date()).toISOString()
 
   try {
     const result = await createGhlPost({

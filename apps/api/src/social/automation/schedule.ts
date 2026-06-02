@@ -54,3 +54,13 @@ export function formatScheduledDate(date: Date, timeZone: string): string {
     day: '2-digit',
   }).format(date)
 }
+
+/** GHL rejects schedule dates in the past; require at least this much lead time. */
+export const GHL_MIN_SCHEDULE_LEAD_MS = 10 * 60 * 1000
+
+/** Bump `scheduledAt` forward if it is too soon or already in the past. */
+export function ensureFutureScheduleDate(scheduledAt: Date, now = new Date()): Date {
+  const minTime = now.getTime() + GHL_MIN_SCHEDULE_LEAD_MS
+  if (scheduledAt.getTime() >= minTime) return scheduledAt
+  return new Date(minTime)
+}

@@ -644,6 +644,14 @@ export default function WorkflowJobPage() {
       const res = await fetch(`/api/articles/${jobId}`)
       if (!res.ok) {
         if (res.status === 404) { router.push('/workflow'); return }
+        // Silently swallow transient auth failures when we already have job data.
+        // The Clerk token renews automatically; toasting on every 3-second poll
+        // cycle would spam the user and can cause a visible page disruption.
+        if (res.status === 401 || res.status === 403) {
+          if (jobRef.current) return
+          toast.error('Session expired — please refresh the page')
+          return
+        }
         throw new Error('Failed to load job')
       }
       const data = await res.json()
@@ -653,7 +661,8 @@ export default function WorkflowJobPage() {
         pipelineSteps: j.pipelineSteps ?? j.steps ?? [],
       })
     } catch {
-      toast.error('Failed to load article job')
+      // Only show the error toast on the initial load (no job data yet).
+      if (!jobRef.current) toast.error('Failed to load article job')
     } finally {
       setIsLoading(false)
     }

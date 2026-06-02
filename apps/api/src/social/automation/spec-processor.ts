@@ -4,7 +4,7 @@ import { logger } from '../../lib/logger'
 import { sendFailureAlert } from '../../lib/alerts'
 import { SPEC_PROCESS_ORDER, type SpecSlotKey } from './default-specs'
 import { buildArticleContentContext, type ArticleContentContext } from './content'
-import { slotToUtc } from './schedule'
+import { ensureFutureScheduleDate, slotToUtc } from './schedule'
 import { generateSpecAssets, type SpecAssets } from './generate-spec'
 import { schedulePostsForSpec } from './schedule-posts'
 import { type AutomationLogContext, withSlotKey } from './log-context'
@@ -68,7 +68,9 @@ export async function processAutomationSpec(opts: {
     })
     priorAssets.set(slotKey, assets)
 
-    const scheduledAt = slotToUtc(run.scheduledDate, spec.timeHour, spec.timeMinute, timeZone)
+    const scheduledAt = ensureFutureScheduleDate(
+      slotToUtc(run.scheduledDate, spec.timeHour, spec.timeMinute, timeZone),
+    )
     const scheduleResult = await schedulePostsForSpec({
       logCtx: specCtx,
       spec,

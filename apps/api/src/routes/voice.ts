@@ -51,9 +51,25 @@ export async function voiceRoutes(app: FastifyInstance) {
       voiceoverSimilarity?: number
     }
 
+    let verificationWarning: string | undefined
+
     if (body.elevenLabsApiKey?.trim()) {
       const key = body.elevenLabsApiKey.trim()
-      await verifyElevenLabsKey(key)
+
+      try {
+        await verifyElevenLabsKey(key)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('Invalid ElevenLabs API key')) {
+          return reply.status(400).send({ error: msg })
+        }
+        // Network error, timeout, or unexpected status — save the key anyway so the
+        // user isn't blocked by a transient connectivity issue between the server and
+        // ElevenLabs. Surface a non-blocking warning in the response.
+        verificationWarning = `Key saved, but live verification was skipped: ${msg}`
+        request.log.warn({ err }, '[voice] ElevenLabs key verification failed — saving key anyway')
+      }
+
       const encryptedKey = encrypt(key)
       const existing = await prisma.apiKey.findFirst({
         where: { userId: user.id, provider: 'elevenlabs' },
@@ -83,6 +99,7 @@ export async function voiceRoutes(app: FastifyInstance) {
       similarity: updated.similarity,
       hasApiKey: updated.hasApiKey,
       maskedApiKey: updated.apiKey ? maskApiKey(updated.apiKey) : '',
+      ...(verificationWarning ? { verificationWarning } : {}),
     }
   })
 

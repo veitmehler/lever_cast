@@ -89,7 +89,11 @@ export function VoiceSettingsPanel() {
       const updated = await res.json()
       setSettings(updated)
       setApiKey('')
-      toast.success('Voice settings saved')
+      if (updated.verificationWarning) {
+        toast.warning(`API key saved — ${updated.verificationWarning}`)
+      } else {
+        toast.success('Voice settings saved')
+      }
       if (updated.hasApiKey) await loadVoices()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save voice settings')

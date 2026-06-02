@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
+import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { decrypt, encrypt, maskApiKey } from '../lib/encryption'
 import { getGhlOAuthStartUrl, listGhlAccounts } from '../lib/ghl/client'
@@ -128,9 +129,23 @@ export async function ghlRoutes(app: FastifyInstance) {
         where: { userId: user.id },
         data: { lastVerifiedAt: new Date(), lastError: null },
       })
+
+      if (accounts.length === 0) {
+        logger.warn(
+          { userId: user.id, locationId: row.ghlLocationId },
+          '[ghl] /ghl/accounts returned 0 accounts — likely wrong locationId or missing API key scopes',
+        )
+        return {
+          accounts,
+          warning:
+            'GHL returned 0 accounts. Check that (1) your Location ID is correct, (2) social media profiles are connected in GHL Social Planner → Settings → Integrations for that location, and (3) your Private Integration key has social-media-posting scope.',
+        }
+      }
+
       return { accounts }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      logger.error({ userId: user.id, locationId: row.ghlLocationId, err }, '[ghl] listGhlAccounts threw')
       await prisma.ghlSettings.update({
         where: { userId: user.id },
         data: { lastError: message },

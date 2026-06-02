@@ -6,6 +6,7 @@ import {
   type GhlPostType,
   type GhlSocialAccount,
 } from './types'
+import { logger } from '../logger'
 
 export interface GhlRequestOptions {
   method?: string
@@ -18,8 +19,12 @@ async function ghlRequest<T>(
   options: GhlRequestOptions = {},
 ): Promise<T> {
   const url = `${GHL_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+  const method = options.method ?? 'GET'
+
+  logger.debug({ method, url }, '[ghl] request')
+
   const response = await fetch(url, {
-    method: options.method ?? 'GET',
+    method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       Accept: 'application/json',
@@ -39,27 +44,110 @@ async function ghlRequest<T>(
     }
   }
 
+  const topLevelKeys =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? Object.keys(data as object)
+      : Array.isArray(data)
+        ? ['<array>']
+        : []
+
+  logger.debug(
+    { method, url, status: response.status, topLevelKeys },
+    '[ghl] response',
+  )
+
   if (!response.ok) {
     const message =
       typeof data === 'object' && data !== null && 'message' in data
         ? String((data as { message?: unknown }).message)
         : `GHL API error (${response.status})`
+    logger.error({ method, url, status: response.status, topLevelKeys, message }, '[ghl] request failed')
     throw new Error(message)
   }
 
   return data as T
 }
 
+/**
+ * Extract an array of social accounts from whatever shape GHL returns.
+ * GHL has returned accounts under several different keys across API versions:
+ *   - data.results.accounts  (documented v1 shape)
+ *   - data.accounts          (alternative v1)
+ *   - data.data              (common v2 / LeadConnector pattern)
+ *   - data itself as an array
+ */
+function extractAccountsFromResponse(data: unknown): GhlSocialAccount[] {
+  if (!data || typeof data !== 'object') return []
+
+  if (Array.isArray(data)) return data as GhlSocialAccount[]
+
+  const d = data as Record<string, unknown>
+
+  // Try known nested shapes first
+  const candidates: unknown[] = [
+    d.results && typeof d.results === 'object'
+      ? (d.results as Record<string, unknown>).accounts
+      : undefined,
+    d.accounts,
+    d.data,
+    d.socialMediaAccounts,
+    d.items,
+  ]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate as GhlSocialAccount[]
+    }
+  }
+
+  // Return any non-empty array found under any key
+  for (const val of Object.values(d)) {
+    if (Array.isArray(val) && val.length > 0) {
+      logger.warn(
+        { foundUnderKeys: Object.keys(d).filter((k) => Array.isArray(d[k] as unknown)) },
+        '[ghl] accounts found under unexpected key — parser needs updating',
+      )
+      return val as GhlSocialAccount[]
+    }
+  }
+
+  return []
+}
+
 export async function listGhlAccounts(
   apiKey: string,
   locationId: string,
 ): Promise<GhlSocialAccount[]> {
-  const data = await ghlRequest<{
-    results?: { accounts?: GhlSocialAccount[] }
-    accounts?: GhlSocialAccount[]
-  }>(apiKey, `/social-media-posting/${locationId}/accounts`)
+  const data = await ghlRequest<unknown>(
+    apiKey,
+    `/social-media-posting/${locationId}/accounts`,
+  )
 
-  return data.results?.accounts ?? data.accounts ?? []
+  const accounts = extractAccountsFromResponse(data)
+
+  if (accounts.length === 0) {
+    const topLevelKeys =
+      data && typeof data === 'object' && !Array.isArray(data)
+        ? Object.keys(data as object)
+        : Array.isArray(data)
+          ? ['<array>']
+          : ['<empty>']
+    logger.warn(
+      { locationId, topLevelKeys, rawDataType: typeof data },
+      '[ghl] listGhlAccounts returned 0 accounts — check locationId and API key scopes',
+    )
+  } else {
+    logger.info(
+      {
+        locationId,
+        count: accounts.length,
+        platforms: [...new Set(accounts.map((a) => a.platform).filter(Boolean))],
+      },
+      '[ghl] accounts loaded',
+    )
+  }
+
+  return accounts
 }
 
 export interface CreateGhlPostInput {

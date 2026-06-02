@@ -100,8 +100,14 @@ export function GhlSettingsPanel() {
         throw new Error(data.error || 'Failed to load GHL accounts')
       }
       setAvailableAccounts(data.accounts ?? [])
-      setLastError(null)
-      toast.success(`Loaded ${data.accounts?.length ?? 0} GHL account(s)`)
+      const count = data.accounts?.length ?? 0
+      if (count === 0 && data.warning) {
+        setLastError(data.warning)
+        toast.warning('No accounts found — see instructions below')
+      } else {
+        setLastError(null)
+        toast.success(`Loaded ${count} GHL account(s)`)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load accounts'
       setLastError(message)

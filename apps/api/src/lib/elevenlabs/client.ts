@@ -27,7 +27,7 @@ async function elevenFetch<T>(
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    if (res.status === 401) throw new Error('Invalid ElevenLabs API key')
+    if (res.status === 401) throw new Error(`ElevenLabs auth failed (401): ${body.slice(0, 200) || 'no details'}`)
     if (res.status === 403) {
       throw new Error(
         'ElevenLabs denied this request. Instant Voice Cloning requires a paid ElevenLabs plan.',

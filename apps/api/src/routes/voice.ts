@@ -60,13 +60,11 @@ export async function voiceRoutes(app: FastifyInstance) {
         await verifyElevenLabsKey(key)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('Invalid ElevenLabs API key')) {
-          return reply.status(400).send({ error: msg })
-        }
-        // Network error, timeout, or unexpected status — save the key anyway so the
-        // user isn't blocked by a transient connectivity issue between the server and
-        // ElevenLabs. Surface a non-blocking warning in the response.
-        verificationWarning = `Key saved, but live verification was skipped: ${msg}`
+        // Always save the key even when verification fails. A 401 from ElevenLabs
+        // can mean a rate-limit, IP block, or transient auth issue — not necessarily
+        // a wrong key. The user will get clear feedback when they click "Load Voices"
+        // if the key is genuinely invalid.
+        verificationWarning = `Key saved, but verification failed: ${msg}`
         request.log.warn({ err }, '[voice] ElevenLabs key verification failed — saving key anyway')
       }
 

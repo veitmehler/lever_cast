@@ -14,8 +14,9 @@ import {
   findFirstH2Index,
 } from '../article-pipeline/enrichment/html-parser'
 import { readS3Object } from '../lib/storage'
-import { generateSyndicationArticles } from '../article-pipeline/syndication/generate'
+import { enqueueSyndication } from '../article-pipeline/syndication/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'
+import { logger } from '../lib/logger'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -423,7 +424,10 @@ export async function articleRoutes(app: FastifyInstance) {
     const { jobId } = request.params
     const job = await prisma.articleJob.findFirst({
       where: { id: jobId, userId: user.id },
-      select: { id: true, status: true },
+      include: {
+        topic: { select: { publishingDate: true, scheduledDate: true } },
+        sitePage: { select: { id: true } },
+      },
     })
     if (!job) return reply.status(404).send({ error: 'Article job not found' })
 
@@ -437,6 +441,28 @@ export async function articleRoutes(app: FastifyInstance) {
       where: { id: jobId },
       data: { status: 'published' },
     })
+
+    // Fire-and-forget background generation — both are idempotent with dedup keys
+    if (job.sitePage?.id) {
+      const settings = await prisma.settings.findUnique({ where: { userId: user.id } })
+      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate ?? new Date()
+
+      enqueueSyndication(jobId, user.id).catch((err) =>
+        logger.error({ jobId, err }, '[publish] failed to enqueue syndication'),
+      )
+
+      if (settings?.socialAutomationEnabled !== false) {
+        enqueueSocialAutomation({
+          userId: user.id,
+          jobId,
+          sitePageId: job.sitePage.id,
+          publishingDate,
+          timeZone: settings?.socialTimezone ?? 'America/New_York',
+        }).catch((err) =>
+          logger.error({ jobId, err }, '[publish] failed to enqueue social automation'),
+        )
+      }
+    }
 
     return reply.send({ ok: true })
   })
@@ -646,7 +672,7 @@ export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles/:jobId/diagram-svg/:diagramId — proxy SVG from S3 ─
   // ── POST /api/articles/:jobId/syndication/generate ────────────────────────
   // Generates LinkedIn Article + Medium article from the published main article.
-  // One-shot — no regeneration to prevent abuse. Re-calling overwrites existing rows.
+  // Enqueues async syndication generation. Idempotent — safe to call as manual retry.
   app.post<{ Params: { jobId: string } }>(
     '/articles/:jobId/syndication/generate',
     async (request, reply) => {
@@ -659,6 +685,7 @@ export async function articleRoutes(app: FastifyInstance) {
       const { jobId } = request.params
       const job = await prisma.articleJob.findFirst({
         where: { id: jobId, userId: user.id },
+        select: { id: true, status: true },
       })
       if (!job) return reply.status(404).send({ error: 'Article job not found' })
       if (job.status !== 'published') {
@@ -667,25 +694,8 @@ export async function articleRoutes(app: FastifyInstance) {
         })
       }
 
-      // Check if already generated (idempotent — only allow once)
-      const existing = await prisma.syndicationArticle.findMany({
-        where: { jobId },
-        select: { platform: true, status: true },
-      })
-      if (existing.some((a) => a.status === 'completed')) {
-        return reply.status(409).send({
-          error: 'Platform articles have already been generated for this job.',
-        })
-      }
-
-      try {
-        const results = await generateSyndicationArticles(jobId, user.id)
-        return reply.status(201).send({ articles: results })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        request.log.error({ jobId, err }, '[syndication] generation failed')
-        return reply.status(500).send({ error: `Generation failed: ${msg}` })
-      }
+      const result = await enqueueSyndication(jobId, user.id)
+      return reply.status(result.enqueued ? 201 : 200).send(result)
     },
   )
 
@@ -777,9 +787,9 @@ export async function articleRoutes(app: FastifyInstance) {
         },
       })
       if (!job) return reply.status(404).send({ error: 'Article job not found' })
-      if (job.status !== 'enriched' && job.status !== 'published') {
+      if (job.status !== 'published') {
         return reply.status(400).send({
-          error: `Article must be enriched before generating social posts (current: ${job.status})`,
+          error: `Article must be published before generating social posts (current: ${job.status}). Click Publish first.`,
         })
       }
       if (!job.sitePage?.id) {

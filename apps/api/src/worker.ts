@@ -25,6 +25,8 @@ import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-o
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
 import { socialAutomationSafetyHandler } from './handlers/social-automation-safety'
+import { syndicationGenerateHandler, SyndicationGenerateJobData } from './handlers/syndication-generate'
+import { syndicationSafetyHandler } from './handlers/syndication-safety'
 
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
 function withSentry<T>(
@@ -68,6 +70,7 @@ async function main() {
   await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * 0', {})              // Sunday 03:00 UTC
   await boss.schedule(QUEUES.PG_CONN_MONITOR, '*/15 * * * *', {})     // every 15 min
   await boss.schedule(QUEUES.SOCIAL_AUTOMATION_SAFETY, '*/5 * * * *', {}) // every 5 min
+  await boss.schedule(QUEUES.SYNDICATION_SAFETY, '*/10 * * * *', {})      // every 10 min
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -156,6 +159,21 @@ async function main() {
     { batchSize: 1 },
     withSentry('social-automation-safety', async () => {
       await socialAutomationSafetyHandler()
+    }),
+  )
+
+  // ── Syndication ─────────────────────────────────────────────────────────────
+  await boss.work<SyndicationGenerateJobData>(
+    QUEUES.SYNDICATION_GENERATE,
+    { batchSize: 2 },
+    withSentry('syndication-generate', syndicationGenerateHandler),
+  )
+
+  await boss.work(
+    QUEUES.SYNDICATION_SAFETY,
+    { batchSize: 1 },
+    withSentry('syndication-safety', async () => {
+      await syndicationSafetyHandler()
     }),
   )
 

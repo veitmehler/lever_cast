@@ -521,6 +521,7 @@ export default function WorkflowJobPage() {
   const [isApproving, setIsApproving] = useState(false)
   const [isReEnriching, setIsReEnriching] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
   const [exportingTarget, setExportingTarget] = useState<string | null>(null)
   const [attempts, setAttempts] = useState<OutputAttempt[]>([])
@@ -538,10 +539,11 @@ export default function WorkflowJobPage() {
   const [brandSettings, setBrandSettings] = useState<BrandSettings>({})
   const [wpConnections, setWpConnections] = useState<WpConnectionLite[]>([])
 
-  type SyndicationArticle = { platform: string; title: string; content: string; status: string }
+  type SyndicationArticle = { platform: string; title: string; content: string; status: string; errorMessage?: string | null }
   const [syndicationArticles, setSyndicationArticles] = useState<SyndicationArticle[]>([])
   const [syndicationLoading, setSyndicationLoading] = useState(false)
   const [syndicationGenerated, setSyndicationGenerated] = useState(false)
+  const [syndicationPending, setSyndicationPending] = useState(false)
   const [activeSyndicationTab, setActiveSyndicationTab] = useState<'linkedin' | 'medium'>('linkedin')
   const [copiedSyndication, setCopiedSyndication] = useState<string | null>(null)
 
@@ -574,21 +576,33 @@ export default function WorkflowJobPage() {
       .catch(() => setWpConnections([]))
   }, [])
 
+  const fetchSyndicationStatus = useCallback(async () => {
+    if (!jobId) return
+    try {
+      const r = await fetch(`/api/articles/${jobId}/syndication`)
+      if (!r.ok) return
+      const d = await r.json()
+      const arts: SyndicationArticle[] = d.articles ?? []
+      setSyndicationArticles(arts)
+      const hasCompleted = arts.some((a) => a.status === 'completed')
+      const hasPending = arts.some((a) => a.status === 'pending' || a.status === 'processing')
+      setSyndicationGenerated(hasCompleted)
+      setSyndicationPending(hasPending && !arts.every((a) => a.status === 'completed'))
+    } catch { /* silent */ }
+  }, [jobId])
+
   // Pre-load any previously generated syndication articles
   useEffect(() => {
-    if (!jobId) return
-    void fetch(`/api/articles/${jobId}/syndication`)
-      .then((r) => r.ok ? r.json() : { articles: [] })
-      .then((d) => {
-        const arts: SyndicationArticle[] = d.articles ?? []
-        if (arts.some((a) => a.status === 'completed')) {
-          setSyndicationArticles(arts)
-          setSyndicationGenerated(true)
-        }
-      })
-      .catch(() => {})
+    void fetchSyndicationStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId])
+
+  // Poll every 5s while syndication is pending/processing
+  useEffect(() => {
+    if (!syndicationPending) return
+    const id = setInterval(() => void fetchSyndicationStatus(), 5000)
+    return () => clearInterval(id)
+  }, [syndicationPending, fetchSyndicationStatus])
 
   useEffect(() => {
     setReviewPanelExpandedOverride(undefined)
@@ -933,8 +947,9 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to publish')
       }
-      toast.success('Article published!')
+      toast.success('Article published! Generating LinkedIn, Medium & social posts in the background…')
       await fetchJob()
+      void fetchSyndicationStatus()
       if (autoExportTarget) {
         // Re-fetch WP connections at publish time so we always use the current
         // connectionId, not the one cached at page load (which may be stale if
@@ -1008,16 +1023,10 @@ export default function WorkflowJobPage() {
       const res = await fetch(`/api/articles/${jobId}/syndication`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Generation failed')
-
-      // POST returns in-memory results without status — re-fetch from DB for full rows.
-      const getRes = await fetch(`/api/articles/${jobId}/syndication`)
-      const getData = getRes.ok ? await getRes.json().catch(() => ({})) : {}
-      const arts: SyndicationArticle[] = getData.articles ?? data.articles ?? []
-      setSyndicationArticles(arts)
-      setSyndicationGenerated(arts.some((a) => a.status === 'completed'))
-      toast.success('Platform articles generated!')
+      toast.success('Platform articles queued — generating in background…')
+      await fetchSyndicationStatus()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to generate platform articles')
+      toast.error(err instanceof Error ? err.message : 'Failed to queue platform articles')
     } finally {
       setSyndicationLoading(false)
     }
@@ -1580,11 +1589,7 @@ export default function WorkflowJobPage() {
                     <Button
                       size="default"
                       variant="ghost"
-                      onClick={() =>
-                        void (hasWpConnection && primaryWpConnectionId
-                          ? handlePublish('wordpress', { connectionId: primaryWpConnectionId })
-                          : handlePublish())
-                      }
+                      onClick={() => setShowPublishConfirm(true)}
                       disabled={isPublishing}
                       className="!bg-emerald-600 hover:!bg-emerald-700 !text-white gap-1.5 shadow-md disabled:!opacity-50"
                     >
@@ -1599,7 +1604,7 @@ export default function WorkflowJobPage() {
         )}
 
         {/* ── Social automation (12-post daily set) ───────────────────────── */}
-        {sitePage && ['enriched', 'published'].includes(displayStatus) && (
+        {sitePage && displayStatus === 'published' && (
           <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">
             <div className="flex items-center px-6 py-4 gap-3 flex-wrap border-b border-border">
               <CalendarClock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -1803,6 +1808,50 @@ export default function WorkflowJobPage() {
           </div>
         )}
 
+        {/* ── LinkedIn & Medium articles — pending/processing state ──────── */}
+        {displayStatus === 'published' && syndicationPending && !syndicationGenerated && (
+          <div className="bg-card rounded-xl border border-border p-6 mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <BookMarked className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-card-foreground uppercase tracking-wider flex-1">
+                Platform Articles
+              </h2>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground py-2">
+              <Loader2 className="h-4 w-4 animate-spin flex-shrink-0 text-primary" />
+              <span>Generating LinkedIn and Medium articles in the background…</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── LinkedIn & Medium articles — failed state ─────────────────── */}
+        {displayStatus === 'published' && !syndicationPending && !syndicationGenerated &&
+          syndicationArticles.some((a) => a.status === 'failed') && (
+          <div className="bg-card rounded-xl border border-red-300 dark:border-red-700 p-6 mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <BookMarked className="h-4 w-4 text-red-500" />
+              <h2 className="text-sm font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider flex-1">
+                Platform Articles — Generation Failed
+              </h2>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={() => void handleGenerateSyndication()}
+                disabled={syndicationLoading}
+              >
+                {syndicationLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Retry
+              </Button>
+            </div>
+            {syndicationArticles.filter((a) => a.status === 'failed').map((a) => (
+              <p key={a.platform} className="text-xs text-red-600 dark:text-red-400">
+                {a.platform}: {a.errorMessage ?? 'Unknown error'}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* ── LinkedIn & Medium articles panel ─────────────────────────── */}
         {displayStatus === 'published' && syndicationGenerated && syndicationArticles.length > 0 && (
           <div className="bg-card rounded-xl border border-border p-6 mb-6">
@@ -1928,6 +1977,50 @@ export default function WorkflowJobPage() {
         )}
 
       </div>
+
+      {/* ── Publish confirmation modal ────────────────────────────────────── */}
+      {showPublishConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-background border border-border rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">Publish this article?</h2>
+            <p className="text-sm text-muted-foreground">
+              Publishing is <span className="font-medium text-foreground">irreversible</span>. Once published, we&apos;ll automatically generate in the background:
+            </p>
+            <ul className="text-sm space-y-1.5 pl-4 list-disc text-foreground">
+              <li>LinkedIn Article</li>
+              <li>Medium Article</li>
+              <li>12-post social set (Facebook, Instagram, LinkedIn, Threads, Twitter, Telegram)</li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Social posts will be scheduled via Omniply — you can review and edit them there before they go live.
+            </p>
+            <div className="flex gap-3 pt-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPublishConfirm(false)}
+                disabled={isPublishing}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={isPublishing}
+                className="!bg-emerald-600 hover:!bg-emerald-700 !text-white"
+                onClick={() => {
+                  setShowPublishConfirm(false)
+                  void (hasWpConnection && primaryWpConnectionId
+                    ? handlePublish('wordpress', { connectionId: primaryWpConnectionId })
+                    : handlePublish())
+                }}
+              >
+                {isPublishing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Publish &amp; Generate All Content
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

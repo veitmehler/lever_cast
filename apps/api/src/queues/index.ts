@@ -50,6 +50,8 @@ export const QUEUES = {
   GENERATE_SOCIAL_FROM_ARTICLE: 'generate-social-from-article',
   SOCIAL_GENERATE: 'social-generate',
   SOCIAL_AUTOMATION_SAFETY: 'social-automation-safety',
+  SYNDICATION_GENERATE: 'syndication-generate',
+  SYNDICATION_SAFETY: 'syndication-safety',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

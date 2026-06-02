@@ -11,6 +11,7 @@ const SOCIAL_ERROR_TYPES = [
   'social_ghl_schedule',
   'social_schedule',
   'social_caption_fallback',
+  'syndication_generate_failed',
 ] as const
 
 function buildQuery(params: { page?: number; resolved?: boolean; type?: string }) {

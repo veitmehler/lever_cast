@@ -32,7 +32,7 @@ export function GhlSettingsPanel() {
       setIsLoading(true)
       const response = await fetch('/api/ghl/settings')
       if (!response.ok) {
-        throw new Error('Failed to load GHL settings')
+        throw new Error('Failed to load Omniply settings')
       }
       const data = await response.json()
       setGhlLocationId(data.ghlLocationId ?? '')
@@ -41,17 +41,47 @@ export function GhlSettingsPanel() {
       setHasApiKey(!!data.hasApiKey)
       setAccountIds(data.accountIds ?? {})
       setLastError(data.lastError ?? null)
+      return !!data.hasApiKey && !!data.ghlLocationId
     } catch (error) {
       console.error(error)
       toast.error('Failed to load Omniply settings')
+      return false
     } finally {
       setIsLoading(false)
     }
   }, [])
 
+  const handleLoadAccounts = useCallback(async () => {
+    try {
+      setIsLoadingAccounts(true)
+      const response = await fetch('/api/ghl/accounts')
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load accounts')
+      }
+      setAvailableAccounts(data.accounts ?? [])
+      const count = data.accounts?.length ?? 0
+      if (count === 0 && data.warning) {
+        setLastError(data.warning)
+        toast.warning('No accounts found — see instructions below')
+      } else {
+        setLastError(null)
+        if (count > 0) toast.success(`Loaded ${count} connected account(s)`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load accounts'
+      setLastError(message)
+      toast.error(message)
+    } finally {
+      setIsLoadingAccounts(false)
+    }
+  }, [])
+
   useEffect(() => {
-    void loadSettings()
-  }, [loadSettings])
+    void loadSettings().then((configured) => {
+      if (configured) void handleLoadAccounts()
+    })
+  }, [loadSettings, handleLoadAccounts])
 
   const handleSave = async () => {
     if (!ghlLocationId.trim() || !ghlUserId.trim()) {
@@ -89,32 +119,6 @@ export function GhlSettingsPanel() {
       toast.error(error instanceof Error ? error.message : 'Failed to save Omniply settings')
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  const handleLoadAccounts = async () => {
-    try {
-      setIsLoadingAccounts(true)
-      const response = await fetch('/api/ghl/accounts')
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load GHL accounts')
-      }
-      setAvailableAccounts(data.accounts ?? [])
-      const count = data.accounts?.length ?? 0
-      if (count === 0 && data.warning) {
-        setLastError(data.warning)
-        toast.warning('No accounts found — see instructions below')
-      } else {
-        setLastError(null)
-        toast.success(`Loaded ${count} connected account(s)`)
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load accounts'
-      setLastError(message)
-      toast.error(message)
-    } finally {
-      setIsLoadingAccounts(false)
     }
   }
 

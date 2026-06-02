@@ -1656,7 +1656,7 @@ export default function SettingsPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Connected Accounts</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Twitter, Threads, and Telegram use direct OAuth here. Facebook, Instagram, and LinkedIn publish via Go HighLevel above.
+            Twitter and Telegram use direct OAuth here. Facebook, Instagram, LinkedIn, and Threads publish via Omniply above.
           </p>
           
           {isLoadingConnections ? (
@@ -1666,7 +1666,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-3">
               {['linkedin', 'twitter', 'facebook', 'instagram', 'threads'].map((platform) => {
-                const usesGhl = platform === 'linkedin' || platform === 'facebook' || platform === 'instagram'
+                const usesGhl = platform === 'linkedin' || platform === 'facebook' || platform === 'instagram' || platform === 'threads'
                 // For LinkedIn, check for both personal and company connections
                 // For other platforms, find the single connection
                 let connection: typeof socialConnections[0] | undefined
@@ -1801,7 +1801,7 @@ export default function SettingsPage() {
                           </div>
                           {isConnected ? (
                             <div className="text-xs text-primary">
-                              {usesGhl ? 'Publishing via Go HighLevel' : 'Connected'}
+                              {usesGhl ? 'Publishing via Omniply' : 'Connected'}
                               {!usesGhl && connection?.platformUsername ? ` as ${connection.platformUsername}` : ''}
                               {!usesGhl && connection?.lastUsed && (
                                 <span className="text-muted-foreground ml-1">
@@ -1810,14 +1810,14 @@ export default function SettingsPage() {
                               )}
                             </div>
                           ) : usesGhl ? (
-                            <div className="text-xs text-muted-foreground">Configure in Go HighLevel section above</div>
+                            <div className="text-xs text-muted-foreground">Configure in Omniply section above</div>
                           ) : (
                             <div className="text-xs text-muted-foreground">Not connected</div>
                           )}
                         </div>
                       </div>
                       {usesGhl ? (
-                        <span className="text-xs text-muted-foreground">Managed via Go HighLevel</span>
+                        <span className="text-xs text-muted-foreground">Managed via Omniply</span>
                       ) : platform === 'linkedin' && !isConnected ? (
                         // Show two buttons for LinkedIn: Personal Profile and Company Page
                         <div className="flex gap-2">

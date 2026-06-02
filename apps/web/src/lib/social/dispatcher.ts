@@ -3,7 +3,6 @@ import { getGhlCredentials } from '@/lib/ghl/settings'
 import { GHL_PLATFORMS, type GhlPlatform } from '@/lib/ghl/types'
 import { postToTwitter, postTwitterThread } from '@/lib/twitterApi'
 import { postToTelegram } from '@/lib/telegramApi'
-import { postToThreads } from '@/lib/threadsApi'
 
 export type PublishOutcome =
   | {
@@ -41,7 +40,7 @@ async function publishViaGhl(
   if (!creds) {
     return {
       success: false,
-      error: 'Go HighLevel is not configured. Add your GHL API key and location in Settings.',
+      error: 'Omniply is not configured. Add your API key and Location ID in Settings → Omniply.',
     }
   }
 
@@ -49,7 +48,7 @@ async function publishViaGhl(
   if (!accountId) {
     return {
       success: false,
-      error: `No Go HighLevel account linked for ${platform}. Map your ${platform} account in Settings → Go HighLevel.`,
+      error: `No Omniply account linked for ${platform}. Map your ${platform} account in Settings → Omniply.`,
     }
   }
 
@@ -108,10 +107,10 @@ async function publishViaDirect(
 ): Promise<PublishOutcome> {
   const { imageUrl, chatId, replyToTweetId } = options
 
-  if (platform === 'linkedin' || platform === 'facebook' || platform === 'instagram') {
+  if (platform === 'linkedin' || platform === 'facebook' || platform === 'instagram' || platform === 'threads') {
     return {
       success: false,
-      error: `${platform} publishing is handled via Go HighLevel. Connect GHL in Settings.`,
+      error: `${platform} publishing is handled via Omniply. Connect Omniply in Settings.`,
     }
   }
 
@@ -141,15 +140,6 @@ async function publishViaDirect(
         postId: String(result.messageId),
         provider: 'direct',
       }
-    }
-    return result
-  }
-
-  if (platform === 'threads') {
-    const contentStr = Array.isArray(content) ? content[0] : content
-    const result = await postToThreads(userId, contentStr, imageUrl)
-    if (result.success) {
-      return { success: true, postUrl: result.postUrl, postId: result.postId, provider: 'direct' }
     }
     return result
   }

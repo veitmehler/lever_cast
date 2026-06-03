@@ -48,14 +48,26 @@ export async function proxyToApi(
     if (raw.byteLength > 0) body = raw
   }
 
-  const upstreamResponse = await fetch(upstreamUrl, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': contentType } : {}),
-      Authorization: `Bearer ${token}`,
-    },
-    body,
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetch(upstreamUrl, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': contentType } : {}),
+        Authorization: `Bearer ${token}`,
+      },
+      body,
+    })
+  } catch (err) {
+    // Network-level failure (DNS, TCP, Vercel → DO timeout).
+    // Return a clean 503 so the browser gets a parseable JSON error instead
+    // of an unhandled exception that Next.js would turn into a 500 HTML page.
+    console.error('[api-proxy] upstream fetch failed', err)
+    return NextResponse.json(
+      { error: 'Backend temporarily unavailable — please try again' },
+      { status: 503 },
+    )
+  }
 
   // 4. Return the upstream response body as-is
   const responseBody = await upstreamResponse.arrayBuffer()

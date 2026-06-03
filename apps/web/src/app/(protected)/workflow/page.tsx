@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -84,26 +84,49 @@ export default function WorkflowPage() {
   const [filter, setFilter]         = useState<string>('all')
   const [showForm, setShowForm]     = useState(false)
 
-  const fetchJobs = async (activeFilter = filter) => {
-    setIsLoading(true)
+  // Stable ref so fetch callbacks can check if data already exists without
+  // stale closure issues — avoids showing error toasts on transient auth blips.
+  const jobsRef = useRef<ArticleJob[]>([])
+  useEffect(() => { jobsRef.current = jobs }, [jobs])
+
+  const fetchJobs = async (activeFilter = filter, { silent = false } = {}) => {
+    if (!silent) setIsLoading(true)
     try {
       const url =
         activeFilter === 'all'
           ? '/api/articles'
           : `/api/articles?status=${activeFilter}`
       const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to fetch articles')
+      if (!res.ok) {
+        // Silently swallow transient auth failures when we already have data.
+        // Clerk renews tokens automatically; showing an error toast + empty
+        // list on every mid-refresh poll would confuse users.
+        if ((res.status === 401 || res.status === 403) && jobsRef.current.length > 0) return
+        throw new Error('Failed to fetch articles')
+      }
       const data = await res.json()
       setJobs(data.jobs ?? [])
     } catch {
-      toast.error('Failed to load article jobs')
+      // Only toast when we have no data to fall back on (initial load).
+      if (jobsRef.current.length === 0) {
+        toast.error('Failed to load article jobs')
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
   useEffect(() => {
     fetchJobs(filter)
+  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh every 5 s so in-progress articles update their step count
+  // and the listing recovers automatically after a transient error.
+  useEffect(() => {
+    const id = setInterval(() => {
+      void fetchJobs(filter, { silent: true })
+    }, 5000)
+    return () => clearInterval(id)
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreated = (jobId: string) => {

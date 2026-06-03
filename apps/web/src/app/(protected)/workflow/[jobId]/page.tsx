@@ -597,10 +597,11 @@ export default function WorkflowJobPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId])
 
-  // Poll every 5s while syndication is pending/processing
+  // Poll every 2 s while syndication is pending/processing so the articles
+  // appear promptly after generation completes (was 5 s — too slow).
   useEffect(() => {
     if (!syndicationPending) return
-    const id = setInterval(() => void fetchSyndicationStatus(), 5000)
+    const id = setInterval(() => void fetchSyndicationStatus(), 2000)
     return () => clearInterval(id)
   }, [syndicationPending, fetchSyndicationStatus])
 
@@ -632,6 +633,8 @@ export default function WorkflowJobPage() {
 
   const sseRef             = useRef<EventSource | null>(null)
   const reconnectTimerRef  = useRef<number | null>(null)
+  // Kept so the export poll interval can be cleared on unmount.
+  const exportPollRef      = useRef<ReturnType<typeof setInterval> | null>(null)
   // Stable ref mirrors job state so onerror callbacks can read status without
   // causing stale-closure or side-effect-in-state-updater issues.
   const jobRef             = useRef<ArticleJob | null>(null)
@@ -777,6 +780,16 @@ export default function WorkflowJobPage() {
     }
   }, [job?.id, job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clean up the export poll interval on page unmount.
+  useEffect(() => {
+    return () => {
+      if (exportPollRef.current !== null) {
+        clearInterval(exportPollRef.current)
+        exportPollRef.current = null
+      }
+    }
+  }, [])
+
   // Fallback poll every 3 s while Phase A is running. SSE is the primary real-time
   // channel; this poll ensures the UI recovers quickly if SSE is temporarily down.
   useEffect(() => {
@@ -848,10 +861,12 @@ export default function WorkflowJobPage() {
     if (job?.status === 'enriched' || job?.status === 'published') fetchSocialRuns()
   }, [job?.status, fetchSocialRuns])
 
+  // Poll every 2 s while social automation is running so run status updates
+  // appear quickly (was 5 s — too slow).
   useEffect(() => {
     const active = socialRuns.some((r) => r.status === 'pending' || r.status === 'processing')
     if (!active) return
-    const id = setInterval(fetchSocialRuns, 5000)
+    const id = setInterval(fetchSocialRuns, 2000)
     return () => clearInterval(id)
   }, [socialRuns, fetchSocialRuns])
 
@@ -896,11 +911,19 @@ export default function WorkflowJobPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Export failed')
       toast.success(`${target.charAt(0).toUpperCase() + target.slice(1)} export queued`)
+      // Clear any previously running export poll before starting a new one.
+      if (exportPollRef.current !== null) {
+        clearInterval(exportPollRef.current)
+        exportPollRef.current = null
+      }
       let polls = 0
-      const poll = setInterval(async () => {
+      exportPollRef.current = setInterval(async () => {
         await fetchAttempts()
         polls++
-        if (polls > 20) clearInterval(poll)
+        if (polls > 20) {
+          clearInterval(exportPollRef.current!)
+          exportPollRef.current = null
+        }
       }, 3000)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export failed')
@@ -959,6 +982,15 @@ export default function WorkflowJobPage() {
       toast.success('Article published! Generating LinkedIn, Medium & social posts in the background…')
       await fetchJob()
       void fetchSyndicationStatus()
+      void fetchSocialRuns()
+      // Burst-poll for the first 20 s after publish so syndication and social
+      // run states appear as soon as the pg-boss workers pick them up.
+      let burstCount = 0
+      const burstId = setInterval(async () => {
+        burstCount++
+        await Promise.all([fetchSyndicationStatus(), fetchSocialRuns()])
+        if (burstCount >= 10) clearInterval(burstId)
+      }, 2000)
       if (autoExportTarget) {
         // Re-fetch WP connections at publish time so we always use the current
         // connectionId, not the one cached at page load (which may be stale if

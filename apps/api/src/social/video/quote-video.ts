@@ -1,6 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { assertStoryVideoConstraints, loopVideo, withTempDir } from './ffmpeg'
+import { assertStoryVideoConstraints, cropCenterToStoryAspect, loopVideo, withTempDir } from './ffmpeg'
 import { buildSlideshowVideo } from './slideshow-video'
 import { synthesizeSpeech } from '../../lib/elevenlabs/client'
 import { getVoiceSettings } from '../../lib/elevenlabs/settings'
@@ -60,8 +60,11 @@ export async function buildLoopedStoryReel(
   return withTempDir('loop-reel-', async (tmpDir) => {
     const { downloadToFile, probeVideo } = await import('./ffmpeg')
     const sourcePath = path.join(tmpDir, 'source.mp4')
+    const croppedPath = path.join(tmpDir, 'story-cropped.mp4')
     await downloadToFile(sourceVideoUrl, sourcePath)
-    await loopVideo(sourcePath, outputPath, loopCount)
+    // F2 feed reels are 1:1; Stories require 9:16 before looping.
+    await cropCenterToStoryAspect(sourcePath, croppedPath)
+    await loopVideo(croppedPath, outputPath, loopCount)
     const probe = await probeVideo(outputPath)
     assertStoryVideoConstraints(probe)
     return probe

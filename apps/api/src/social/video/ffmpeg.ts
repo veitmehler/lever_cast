@@ -93,6 +93,25 @@ export async function concatVideos(segmentPaths: string[], outputPath: string): 
   await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath])
 }
 
+/**
+ * Center-crop (then scale) to 540×960 so feed reels (e.g. 1:1 F2) satisfy story constraints.
+ */
+export async function cropCenterToStoryAspect(
+  inputPath: string,
+  outputPath: string,
+): Promise<VideoProbe> {
+  await runFfmpeg([
+    '-i',
+    inputPath,
+    '-vf',
+    'scale=540:960:force_original_aspect_ratio=increase,crop=540:960',
+    '-c:a',
+    'copy',
+    outputPath,
+  ])
+  return probeVideo(outputPath)
+}
+
 export async function loopVideo(inputPath: string, outputPath: string, times: number): Promise<void> {
   if (times < 2) {
     await fs.copyFile(inputPath, outputPath)

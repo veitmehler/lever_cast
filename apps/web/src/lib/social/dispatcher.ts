@@ -86,7 +86,13 @@ async function publishViaGhl(
     }
   }
 
-  const summary = Array.isArray(content) ? content[0] : content
+  // Facebook and Instagram Stories reject caption text via API (Meta constraint).
+  const summary =
+    options.postAsStory && (platform === 'facebook' || platform === 'instagram')
+      ? ''
+      : Array.isArray(content)
+        ? content[0]
+        : content
   const media: Array<{ url: string; type?: string }> = []
 
   if (options.mediaUrls?.length) {

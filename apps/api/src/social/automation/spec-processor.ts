@@ -7,6 +7,7 @@ import { buildArticleContentContext, type ArticleContentContext } from './conten
 import { ensureFutureScheduleDate, slotToUtc } from './schedule'
 import { generateSpecAssets, type SpecAssets } from './generate-spec'
 import { buildPostsForSpec } from './schedule-posts'
+import { ensureRunSlideCount } from './slide-count'
 import { type AutomationLogContext, withSlotKey } from './log-context'
 
 export function assetsFromJson(json: unknown): SpecAssets | null {
@@ -40,9 +41,10 @@ export async function processAutomationSpec(opts: {
   articleCtx: ArticleContentContext
   priorAssets: Map<string, SpecAssets>
   timeZone: string
+  slideCount: number
   logCtx: AutomationLogContext
 }): Promise<{ ok: boolean; assets?: SpecAssets; error?: string }> {
-  const { run, slotKey, spec, articleCtx, priorAssets, timeZone, logCtx } = opts
+  const { run, slotKey, spec, articleCtx, priorAssets, timeZone, slideCount, logCtx } = opts
   const specCtx = withSlotKey(logCtx, slotKey)
 
   logger.info(
@@ -64,6 +66,7 @@ export async function processAutomationSpec(opts: {
       spec,
       articleCtx,
       priorAssets,
+      slideCount,
       logCtx: specCtx,
     })
     priorAssets.set(slotKey, assets)
@@ -140,6 +143,7 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
   const timeZone = settings?.socialTimezone ?? 'America/New_York'
   const articleCtx = buildArticleContentContext(run.sitePage)
   const priorAssets = await loadPriorAssets(run.id)
+  const slideCount = await ensureRunSlideCount(runId)
   const logCtx: AutomationLogContext = {
     runId: run.id,
     userId: run.userId,
@@ -162,6 +166,7 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
     articleCtx,
     priorAssets,
     timeZone,
+    slideCount,
     logCtx,
   })
 

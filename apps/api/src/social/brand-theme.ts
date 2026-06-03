@@ -24,7 +24,7 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     textColor: brand?.diagramTextColor?.trim() || '#1F2937',
     fontFamily,
     organizationName: brand?.organizationName?.trim() || 'Your Brand',
-    logoUrl: brand?.organizationLogoUrl ?? null,
+    logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
   }
 }
 

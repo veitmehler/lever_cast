@@ -23,8 +23,8 @@ const DEF_SYS =
 const DEF_USER = `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
 
 Article title: {{title}}
-Source excerpt:
-{{content}}
+Section text (this slot's source):
+{{sectionText}}
 
 Platform tone: {{platformTone}}
 Character limit: {{charLimit}}
@@ -52,15 +52,17 @@ export async function generatePlatformCaption(opts: {
     const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 
     const slotContent = resolveSlotContent(slotKey, articleCtx)
-    const sourceText = slotContent.text.slice(0, 4000)
+    const sectionText = slotContent.text.slice(0, 4000)
+    const sectionTitle = slotContent.title ?? articleCtx.title
 
     const userPrompt = (t?.userPrompt ?? DEF_USER)
       .replace(/\{\{platform\}\}/g, platform)
       .replace(/\{\{slotKey\}\}/g, slotKey)
       .replace(/\{\{postType\}\}/g, postType)
       .replace(/\{\{title\}\}/g, articleCtx.title)
-      .replace(/\{\{content\}\}/g, sourceText)
-      .replace(/\{\{sectionText\}\}/g, sourceText)
+      .replace(/\{\{sectionText\}\}/g, sectionText)
+      .replace(/\{\{sectionTitle\}\}/g, sectionTitle)
+      .replace(/\{\{content\}\}/g, sectionText)
       .replace(/\{\{platformTone\}\}/g, platformTone)
       .replace(/\{\{charLimit\}\}/g, String(charLimit))
 

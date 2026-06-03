@@ -10,6 +10,7 @@ import {
   type GeneratedCarousel,
 } from './generate-assets'
 import { extractReelBullets } from './generators/reel-bullets'
+import { generateQuoteVideoNarration } from './generators/quote-video-narration'
 import { loadSocialBrandTheme } from './brand-theme'
 
 function generationId(): string {
@@ -112,15 +113,17 @@ export async function generateHookVideoAsset(opts: {
   userId: string
   content: string
   title?: string
+  slideCount?: number
   jobId?: string
 }): Promise<GeneratedHookVideo> {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
+  const slideCount = Math.min(Math.max(6, opts.slideCount ?? 6), 12)
 
   const carousel: GeneratedCarousel = await generateCarouselAssets({
     userId: opts.userId,
     content: opts.content,
-    slideCount: 4,
+    slideCount,
     jobId,
   })
 
@@ -156,6 +159,7 @@ export async function generateQuoteVideoAsset(opts: {
   content: string
   quoteCount?: number
   jobId?: string
+  useNarrationPrompt?: boolean
 }): Promise<GeneratedQuoteVideo> {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
@@ -164,6 +168,15 @@ export async function generateQuoteVideoAsset(opts: {
   return withTempDir('quote-video-', async (tmpDir) => {
     const quoteUrls: string[] = []
     let narration = ''
+
+    if (opts.useNarrationPrompt) {
+      try {
+        narration = await generateQuoteVideoNarration(opts.userId, opts.content)
+      } catch {
+        narration = ''
+      }
+    }
+
     for (let i = 0; i < quoteCount; i++) {
       const card = await generateQuoteCardAsset({
         userId: opts.userId,
@@ -172,7 +185,9 @@ export async function generateQuoteVideoAsset(opts: {
         jobId,
       })
       quoteUrls.push(card.imageUrl)
-      narration += `${card.quoteText}. `
+      if (!narration) {
+        narration += `${card.quoteText}. `
+      }
     }
 
     const outputPath = path.join(tmpDir, 'quote-video.mp4')

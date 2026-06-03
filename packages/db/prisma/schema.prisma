@@ -137,6 +137,7 @@ model SocialAutomationRun {
   currentSpec    String?
   error          String?   @db.Text
   groupId        String?
+  slideCount     Int? // shared F4/F6 carousel + hook slide count (6–12), set once per run
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   posts          Post[]

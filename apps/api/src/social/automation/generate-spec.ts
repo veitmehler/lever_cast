@@ -29,9 +29,10 @@ export async function generateSpecAssets(opts: {
   spec: SocialPostSpec
   articleCtx: ArticleContentContext
   priorAssets: Map<string, SpecAssets>
+  slideCount: number
   logCtx: AutomationLogContext
 }): Promise<SpecAssets> {
-  const { userId, jobId, slotKey, spec, articleCtx, priorAssets } = opts
+  const { userId, jobId, slotKey, spec, articleCtx, priorAssets, slideCount } = opts
   const assetJobId = `${jobId}-${slotKey}`
   const content: SlotContent = resolveSlotContent(slotKey, articleCtx)
 
@@ -52,7 +53,7 @@ export async function generateSpecAssets(opts: {
       const carousel = await generateCarouselAssets({
         userId,
         content: content.text,
-        slideCount: 6,
+        slideCount,
         jobId: assetJobId,
       })
       return {
@@ -87,6 +88,7 @@ export async function generateSpecAssets(opts: {
         userId,
         content: content.text,
         title: content.title ?? articleCtx.h2Title,
+        slideCount,
         jobId: assetJobId,
       })
       return { postType: 'hook_video', videoUrl: hook.videoUrl, title: hook.title }
@@ -97,6 +99,7 @@ export async function generateSpecAssets(opts: {
         userId,
         content: content.text,
         jobId: assetJobId,
+        useNarrationPrompt: true,
       })
       return { postType: 'quote_video', videoUrl: qv.videoUrl }
     }

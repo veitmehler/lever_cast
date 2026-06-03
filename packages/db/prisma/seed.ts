@@ -1486,8 +1486,9 @@ Rules:
     userPrompt: `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
 
 Article title: {{title}}
-Source excerpt:
-{{content}}
+Section title: {{sectionTitle}}
+Section text (this slot's source):
+{{sectionText}}
 
 Platform tone: {{platformTone}}
 Character limit: {{charLimit}}
@@ -1497,6 +1498,48 @@ Rules:
 - Stay under {{charLimit}} characters
 - Do not use markdown
 - Match native {{platform}} posting style`,
+    isActive: true,
+  },
+  {
+    stepNumber: 204,
+    stepName: 'social_reel_bullets',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 256,
+    systemPrompt:
+      'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 60 characters.',
+    userPrompt: `Extract 3–5 bullet points from the content below for a video reel text overlay.
+
+Content:
+{{content}}
+
+Return ONLY valid JSON: { "bullets": ["...", "..."] }
+- 3–5 bullets
+- Each ≤ 60 characters
+- Declarative, scannable
+- No hashtags or emojis`,
+    isActive: true,
+  },
+  {
+    stepNumber: 205,
+    stepName: 'social_quote_video_narration',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 256,
+    systemPrompt:
+      'You write short spoken narration scripts for social media quote videos. The script must sound natural when read aloud by text-to-speech.',
+    userPrompt: `Write a spoken narration script for a short story quote video based on the section below.
+
+Section content:
+{{content}}
+
+Organization: {{organizationName}}
+
+Rules:
+- Return ONLY valid JSON: { "narration": "..." }
+- 2–4 sentences, conversational, under 400 characters total
+- Summarize the theme; do not list quotes verbatim
+- No hashtags, emojis, or markdown`,
     isActive: true,
   },
 ]

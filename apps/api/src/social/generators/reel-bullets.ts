@@ -1,5 +1,6 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
+import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 
 const DEF_SYS =
   'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 60 characters.'
@@ -16,11 +17,20 @@ Return ONLY valid JSON: { "bullets": ["...", "..."] }
 - No hashtags or emojis`
 
 export async function extractReelBullets(content: string): Promise<string[]> {
-  const adapter = getLLMAdapter('anthropic')
+  const t = await loadPromptTemplate(204)
+  const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
+  const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
+
+  const userPrompt = (t?.userPrompt ?? DEF_USER).replace(
+    /\{\{content\}\}/g,
+    content.slice(0, 8000),
+  )
+
+  const adapter = getLLMAdapter(provider)
   const run = await adapter.call({
-    systemPrompt: DEF_SYS,
-    userPrompt: DEF_USER.replace(/\{\{content\}\}/g, content.slice(0, 8000)),
-    model: 'claude-sonnet-4-5-20250929',
+    systemPrompt: t?.systemPrompt ?? DEF_SYS,
+    userPrompt,
+    model,
     temperature: 0.35,
     maxTokens: 256,
     jsonMode: true,

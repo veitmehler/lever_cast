@@ -73,6 +73,12 @@ const STEP_LABELS: Record<string, string> = {
   // Platform syndication
   generate_linkedin_article:      '1. LinkedIn Article',
   generate_medium_article:        '2. Medium Article',
+  // Social media posts
+  social_quote_selection:         '1. Quote selection',
+  social_carousel_plan:           '2. Carousel plan',
+  social_platform_caption:        '3. Platform caption',
+  social_reel_bullets:            '4. Reel bullets',
+  social_quote_video_narration:   '5. Quote video narration',
 }
 
 /** Maps DB stepNumber → visual display number shown in the badge. */
@@ -87,6 +93,8 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
   101: '19', 102: '20', 103: '21', 104: '22', 107: '23', 20: '24', 108: '25',
   // Platform syndication
   30: '1', 31: '2',
+  // Social media posts
+  201: '1', 202: '2', 203: '3', 204: '4', 205: '5',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
@@ -108,6 +116,10 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   {
     label: 'Platform Syndication — LinkedIn & Medium',
     steps: [30, 31],
+  },
+  {
+    label: 'Social Media Posts',
+    steps: [201, 202, 203, 204, 205],
   },
 ]
 

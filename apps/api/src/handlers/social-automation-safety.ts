@@ -7,6 +7,10 @@ const PROCESSING_STUCK_MS = 15 * 60 * 1000
 const PENDING_STUCK_MS = 5 * 60 * 1000
 const SCHEDULING_STUCK_MS = 15 * 60 * 1000
 
+/**
+ * Recovery for stuck automation runs only.
+ * `ready` is terminal for generation (awaits user approval) — never re-enqueued here.
+ */
 export async function socialAutomationSafetyHandler(): Promise<void> {
   const now = Date.now()
   const processingCutoff = new Date(now - PROCESSING_STUCK_MS)

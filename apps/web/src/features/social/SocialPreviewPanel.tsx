@@ -68,6 +68,7 @@ export type SocialAutomationRunRow = {
   failedSpecs: number
   currentSpec: string | null
   error: string | null
+  slideCount?: number | null
   _count?: { posts: number }
   specResults?: SocialSpecResultRow[]
 }
@@ -267,6 +268,7 @@ export function SocialPreviewPanel({
                 <span className="font-medium capitalize">{run.status}</span>
                 <span className="text-muted-foreground ml-2">
                   {run.scheduledDate} · {run.completedSpecs}/{run.totalSpecs} specs
+                  {run.slideCount ? ` · ${run.slideCount} slides (F4/F6)` : ''}
                   {run.currentSpec ? ` · ${run.currentSpec}` : ''}
                 </span>
               </div>

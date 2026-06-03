@@ -237,23 +237,32 @@ auto-publishes to Omniply.
 ## 11. Task Tracking
 
 ### Completed Tasks
-- (none yet)
-
-### Pending Tasks (priority order)
 - T1. Schema + migration: run/post `ready` status, `previewJson`, `approvedAt`, `socialLogoUrl`
 - T2. Split generation from dispatch (`buildPostsForSpec`, `dispatch-run.ts`)
-- T3. SOCIAL_DISPATCH queue + handler + watchdog
+- T3. SOCIAL_DISPATCH queue + handler + watchdog (scheduling recovery; `ready` not re-enqueued)
 - T4. Approve/regenerate API routes (run + slot) + Next.js proxies
 - T5. Workflow preview panel (media + captions + approve/regenerate/schedule)
 - T6. H2 section variety in `content.ts` (distinct section per slot)
-- T7. Randomized slide count 6–12 shared by F4/F6
-- T8. Surface social prompts 201–203 in admin; seed 204 (reel bullets) + 205 (quote-video narration)
-- T9. Per-slot caption source in `platform-caption.ts`
-- T10. `socialLogoUrl` override + settings upload field
+- T7. Randomized slide count 6–12 shared by F4/F6 (`SocialAutomationRun.slideCount`)
+- T8. Surface social prompts 201–205 in admin; seed 204 (reel bullets) + 205 (quote-video narration)
+- T9. Per-slot caption source in `platform-caption.ts` (`sectionText` / `sectionTitle`)
+- T10. `socialLogoUrl` override + settings upload (`/api/brand-settings/social-logo`)
 - T11. Publish modal copy update (preview-first wording)
+
+### Pending Tasks
+- (none — plan complete)
 
 ### Backlog Tasks
 - Inline caption editing in preview before scheduling
 - Per-platform media variants (e.g. true 9:16 native for IG vs cropped)
 - True generative video beyond hook clips
 - Multi-language social variants
+
+---
+
+## 12. Deploy checklist
+
+1. `prisma migrate deploy` — `20260603150000_social_preview_first` + `20260603160000_social_slide_count`
+2. Restart the **worker** so `SOCIAL_DISPATCH` is registered
+3. Run DB seed (or `reseed:v3`) to create prompt steps **204** and **205** if missing
+4. Publish flow: article → social run ends **`ready`** → review on workflow → **Approve & schedule** → Omniply

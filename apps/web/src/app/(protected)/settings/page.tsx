@@ -191,8 +191,11 @@ export default function SettingsPage() {
   const [organizationEmail, setOrganizationEmail]       = useState('')
   const [organizationPhone, setOrganizationPhone]       = useState('')
   const [organizationLogoUrl, setOrganizationLogoUrl]   = useState('')
+  const [socialLogoUrl, setSocialLogoUrl]               = useState('')
   const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
+  const [isUploadingSocialLogo, setIsUploadingSocialLogo] = useState(false)
   const logoFileInputRef                                = useRef<HTMLInputElement>(null)
+  const socialLogoFileInputRef                          = useRef<HTMLInputElement>(null)
   // Structured address sub-fields
   const [addressLine1, setAddressLine1]                 = useState('')
   const [addressLine2, setAddressLine2]                 = useState('')
@@ -262,6 +265,7 @@ export default function SettingsPage() {
           if (brand.organizationEmail)    setOrganizationEmail(brand.organizationEmail)
           if (brand.organizationPhone)    setOrganizationPhone(brand.organizationPhone)
           if (brand.organizationLogoUrl)  setOrganizationLogoUrl(brand.organizationLogoUrl)
+          if (brand.socialLogoUrl)        setSocialLogoUrl(brand.socialLogoUrl)
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -675,6 +679,48 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSocialLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+    if (!allowed.includes(file.type)) {
+      toast.error('Please upload a PNG, JPG, or WebP image.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo must be smaller than 2 MB')
+      return
+    }
+
+    setIsUploadingSocialLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/brand-settings/social-logo', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      setSocialLogoUrl(data.url)
+      toast.success('Social post logo uploaded')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload social logo')
+    } finally {
+      setIsUploadingSocialLogo(false)
+    }
+  }
+
+  const handleRemoveSocialLogo = async () => {
+    try {
+      const res = await fetch('/api/brand-settings/social-logo', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to remove social logo')
+      setSocialLogoUrl('')
+      toast.success('Social post logo removed')
+    } catch {
+      toast.error('Failed to remove social logo')
+    }
+  }
+
   const handleSaveBrandProfile = async () => {
     setIsSavingBrand(true)
     try {
@@ -700,6 +746,7 @@ export default function SettingsPage() {
           organizationEmail: organizationEmail || null,
           organizationPhone: organizationPhone || null,
           organizationLogoUrl: organizationLogoUrl.trim() || null,
+          socialLogoUrl: socialLogoUrl.trim() || null,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -1241,6 +1288,72 @@ export default function SettingsPage() {
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                       <p className="text-xs text-muted-foreground">PNG, JPG or WebP · Max 2 MB · SVG not supported by Google</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social post logo */}
+                <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-1">
+                    Social post logo (optional)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Used on quote cards and branded social compositors. When empty, the organization logo above is used.
+                  </p>
+                  <div className="flex items-start gap-4">
+                    <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {socialLogoUrl || organizationLogoUrl ? (
+                        <img
+                          src={socialLogoUrl || organizationLogoUrl}
+                          alt="Social logo preview"
+                          className="w-full h-full object-contain p-1"
+                          onError={() => setSocialLogoUrl('')}
+                        />
+                      ) : (
+                        <Building2 className="w-8 h-8 text-muted-foreground/40" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <input
+                          ref={socialLogoFileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={handleSocialLogoUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => socialLogoFileInputRef.current?.click()}
+                          disabled={isUploadingSocialLogo}
+                        >
+                          {isUploadingSocialLogo ? (
+                            <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading…</>
+                          ) : (
+                            <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload file</>
+                          )}
+                        </Button>
+                        {socialLogoUrl && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveSocialLogo}
+                            disabled={isUploadingSocialLogo}
+                          >
+                            <X className="w-3.5 h-3.5 mr-1.5" />Remove
+                          </Button>
+                        )}
+                      </div>
+                      <input
+                        type="url"
+                        value={socialLogoUrl}
+                        onChange={(e) => setSocialLogoUrl(e.target.value)}
+                        placeholder="or paste social logo URL…"
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
                     </div>
                   </div>
                 </div>

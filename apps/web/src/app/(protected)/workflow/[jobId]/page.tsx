@@ -2007,7 +2007,7 @@ export default function WorkflowJobPage() {
                 }}
               >
                 {isPublishing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
-                Publish &amp; Generate All Content
+                Publish &amp; Generate Previews
               </Button>
             </div>
           </div>

@@ -10,6 +10,7 @@ import {
   processAutomationSpec,
   slotsToProcess,
 } from './spec-processor'
+import { ensureRunSlideCount } from './slide-count'
 
 export async function runSocialAutomation(
   runId: string,
@@ -60,6 +61,7 @@ export async function runSocialAutomation(
   const priorAssets = opts?.onlySlot ? await loadPriorAssets(runId) : new Map()
 
   const slots = slotsToProcess(opts?.onlySlot)
+  const slideCount = await ensureRunSlideCount(runId, { reset: !opts?.onlySlot })
   const baseCtx: AutomationLogContext = {
     runId,
     userId: run.userId,
@@ -72,6 +74,7 @@ export async function runSocialAutomation(
       scheduledDate: run.scheduledDate,
       totalSlots: slots.length,
       onlySlot: opts?.onlySlot,
+      slideCount,
     },
     '[social-automation] run started',
   )
@@ -113,6 +116,7 @@ export async function runSocialAutomation(
       articleCtx,
       priorAssets,
       timeZone,
+      slideCount,
       logCtx: baseCtx,
     })
 

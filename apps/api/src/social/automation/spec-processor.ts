@@ -6,7 +6,7 @@ import { SPEC_PROCESS_ORDER, type SpecSlotKey } from './default-specs'
 import { buildArticleContentContext, type ArticleContentContext } from './content'
 import { ensureFutureScheduleDate, slotToUtc } from './schedule'
 import { generateSpecAssets, type SpecAssets } from './generate-spec'
-import { schedulePostsForSpec } from './schedule-posts'
+import { buildPostsForSpec } from './schedule-posts'
 import { type AutomationLogContext, withSlotKey } from './log-context'
 
 export function assetsFromJson(json: unknown): SpecAssets | null {
@@ -71,7 +71,7 @@ export async function processAutomationSpec(opts: {
     const scheduledAt = ensureFutureScheduleDate(
       slotToUtc(run.scheduledDate, spec.timeHour, spec.timeMinute, timeZone),
     )
-    const scheduleResult = await schedulePostsForSpec({
+    const buildResult = await buildPostsForSpec({
       logCtx: specCtx,
       spec,
       assets,
@@ -79,27 +79,28 @@ export async function processAutomationSpec(opts: {
       articleCtx,
     })
 
-    if (scheduleResult.failed > 0 && scheduleResult.scheduled === 0) {
-      throw new Error(`All ${scheduleResult.failed} platform schedule(s) failed`)
+    if (buildResult.failed > 0 && buildResult.built === 0) {
+      throw new Error(`All ${buildResult.failed} platform build(s) failed`)
     }
 
     logger.info(
       {
         ...specCtx,
-        scheduled: scheduleResult.scheduled,
-        skipped: scheduleResult.skipped,
-        failed: scheduleResult.failed,
+        built: buildResult.built,
+        skipped: buildResult.skipped,
+        failed: buildResult.failed,
       },
-      '[social-automation] spec completed',
+      '[social-automation] spec preview ready',
     )
 
     await prisma.socialAutomationSpecResult.update({
       where: { runId_slotKey: { runId: run.id, slotKey } },
       data: {
         status: 'completed',
-        postsCreated: scheduleResult.scheduled,
+        postsCreated: buildResult.built,
         assetsJson: assets as object,
-        error: scheduleResult.failed > 0 ? `${scheduleResult.failed} platform(s) failed` : null,
+        previewJson: buildResult.preview as object,
+        error: buildResult.failed > 0 ? `${buildResult.failed} platform(s) failed` : null,
       },
     })
 
@@ -145,6 +146,10 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
     jobId: run.jobId,
   }
 
+  await prisma.post.deleteMany({
+    where: { automationRunId: runId, slotKey, status: 'ready' },
+  })
+
   await prisma.socialAutomationRun.update({
     where: { id: runId },
     data: { status: 'processing', currentSpec: slotKey },
@@ -160,24 +165,7 @@ export async function retryAutomationSpec(runId: string, slotKey: string): Promi
     logCtx,
   })
 
-  const counts = await prisma.socialAutomationSpecResult.groupBy({
-    by: ['status'],
-    where: { runId },
-    _count: true,
-  })
-  const completed = counts.find((c) => c.status === 'completed')?._count ?? 0
-  const failed = counts.find((c) => c.status === 'failed')?._count ?? 0
-
-  await prisma.socialAutomationRun.update({
-    where: { id: runId },
-    data: {
-      status: failed > 0 && completed === 0 ? 'failed' : 'completed',
-      currentSpec: null,
-      completedSpecs: completed,
-      failedSpecs: failed,
-      error: failed > 0 ? `${failed} spec(s) failed` : null,
-    },
-  })
+  await finalizeGenerationCounts(runId)
 
   if (!result.ok) throw new Error(result.error ?? 'Spec retry failed')
 }
@@ -192,7 +180,7 @@ export function slotsToProcess(onlySlot?: string): SpecSlotKey[] {
   return [...SPEC_PROCESS_ORDER]
 }
 
-export async function finalizeRunCounts(runId: string): Promise<void> {
+export async function finalizeGenerationCounts(runId: string): Promise<void> {
   const counts = await prisma.socialAutomationSpecResult.groupBy({
     by: ['status'],
     where: { runId },
@@ -205,7 +193,7 @@ export async function finalizeRunCounts(runId: string): Promise<void> {
   await prisma.socialAutomationRun.update({
     where: { id: runId },
     data: {
-      status: allFailed ? 'failed' : 'completed',
+      status: allFailed ? 'failed' : 'ready',
       currentSpec: null,
       completedSpecs: completed,
       failedSpecs: failed,
@@ -215,7 +203,7 @@ export async function finalizeRunCounts(runId: string): Promise<void> {
   })
 
   const run = await prisma.socialAutomationRun.findUnique({ where: { id: runId } })
-  const status = allFailed ? 'failed' : 'completed'
+  const status = allFailed ? 'failed' : 'ready'
   const runCtx: AutomationLogContext = {
     runId,
     userId: run?.userId ?? '',
@@ -227,7 +215,7 @@ export async function finalizeRunCounts(runId: string): Promise<void> {
       userId: run?.userId,
       jobId: run?.jobId ?? undefined,
       errorType: 'social_automation_run',
-      message: `Social automation run finished with ${failed} failed spec(s)`,
+      message: `Social automation generation finished with ${failed} failed spec(s)`,
       context: { ...runCtx, completed, failed },
     })
   }
@@ -239,6 +227,6 @@ export async function finalizeRunCounts(runId: string): Promise<void> {
       failed,
       status,
     },
-    '[social-automation] run finished',
+    '[social-automation] generation finished — awaiting approval',
   )
 }

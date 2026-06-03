@@ -864,7 +864,12 @@ export default function WorkflowJobPage() {
   // Poll every 2 s while social automation is running so run status updates
   // appear quickly (was 5 s — too slow).
   useEffect(() => {
-    const active = socialRuns.some((r) => r.status === 'pending' || r.status === 'processing')
+    const active = socialRuns.some(
+      (r) =>
+        r.status === 'pending' ||
+        r.status === 'processing' ||
+        r.status === 'scheduling',
+    )
     if (!active) return
     const id = setInterval(fetchSocialRuns, 2000)
     return () => clearInterval(id)
@@ -1661,7 +1666,12 @@ export default function WorkflowJobPage() {
                 onClick={() => void handleGenerateSocialSet()}
                 disabled={
                   isGeneratingSocial ||
-                  socialRuns.some((r) => r.status === 'pending' || r.status === 'processing')
+                  socialRuns.some(
+                    (r) =>
+                      r.status === 'pending' ||
+                      r.status === 'processing' ||
+                      r.status === 'scheduling',
+                  )
                 }
                 className="gap-1.5"
               >
@@ -1685,7 +1695,8 @@ export default function WorkflowJobPage() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {run._count?.posts ?? 0} scheduled posts
+                      {run._count?.posts ?? 0}{' '}
+                      {run.status === 'ready' ? 'preview posts' : 'posts'}
                       {run.failedSpecs > 0 ? ` · ${run.failedSpecs} failed` : ''}
                     </div>
                     {run.error && (

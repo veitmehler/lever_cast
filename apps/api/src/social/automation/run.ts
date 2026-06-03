@@ -5,7 +5,7 @@ import { ensureDefaultSocialPostSpecs } from './ensure-specs'
 import { buildArticleContentContext } from './content'
 import type { AutomationLogContext } from './log-context'
 import {
-  finalizeRunCounts,
+  finalizeGenerationCounts,
   loadPriorAssets,
   processAutomationSpec,
   slotsToProcess,
@@ -27,13 +27,24 @@ export async function runSocialAutomation(
     throw new Error(`Social automation run missing article context: ${runId}`)
   }
 
-  const claim = await prisma.socialAutomationRun.updateMany({
-    where: { id: runId, status: { in: ['pending', 'processing'] } },
-    data: { status: 'processing', error: null },
-  })
-  if (claim.count === 0 && !opts?.onlySlot) {
-    logger.info({ runId }, '[social-automation] run already finished or claimed elsewhere')
-    return
+  if (opts?.onlySlot) {
+    const reclaimed = await prisma.socialAutomationRun.updateMany({
+      where: { id: runId, status: { in: ['ready', 'processing', 'completed', 'failed'] } },
+      data: { status: 'processing', error: null },
+    })
+    if (reclaimed.count === 0) {
+      logger.info({ runId }, '[social-automation] single-slot retry skipped — run not reclaimable')
+      return
+    }
+  } else {
+    const claim = await prisma.socialAutomationRun.updateMany({
+      where: { id: runId, status: { in: ['pending', 'processing'] } },
+      data: { status: 'processing', error: null },
+    })
+    if (claim.count === 0) {
+      logger.info({ runId }, '[social-automation] run already finished or claimed elsewhere')
+      return
+    }
   }
 
   await ensureDefaultSocialPostSpecs(run.userId)
@@ -67,9 +78,15 @@ export async function runSocialAutomation(
 
   if (!opts?.onlySlot) {
     await prisma.socialAutomationSpecResult.deleteMany({ where: { runId } })
+    await prisma.post.deleteMany({ where: { automationRunId: runId, status: 'ready' } })
     await prisma.socialAutomationRun.update({
       where: { id: runId },
       data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: SPEC_PROCESS_ORDER.length },
+    })
+  } else {
+    const slots = slotsToProcess(opts.onlySlot)
+    await prisma.post.deleteMany({
+      where: { automationRunId: runId, slotKey: { in: slots }, status: 'ready' },
     })
   }
 
@@ -102,7 +119,8 @@ export async function runSocialAutomation(
     if (result.assets) priorAssets.set(slotKey, result.assets)
   }
 
-  await finalizeRunCounts(runId)
+  await finalizeGenerationCounts(runId)
 }
 
 export { retryAutomationSpec } from './spec-processor'
+export { dispatchSocialAutomationRun } from './dispatch-run'

@@ -1,28 +1,47 @@
 import type { SocialPostSpec } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
-import { dispatchPublish, isGhlManagedPlatform } from '../dispatcher'
+import { isGhlManagedPlatform } from '../dispatcher'
 import { trimSlidesForPlatform } from '../platform-limits'
 import { generatePlatformCaption } from '../generators/platform-caption'
 import type { ArticleContentContext } from './content'
 import { listAutomationPlatforms } from './platforms'
-import { sendFailureAlert } from '../../lib/alerts'
 import type { SpecAssets } from './generate-spec'
 import { type AutomationLogContext, withPlatform, withPost } from './log-context'
+import type { SpecPreviewPayload } from './preview-types'
 
-export async function schedulePostsForSpec(opts: {
+export async function buildPostsForSpec(opts: {
   logCtx: AutomationLogContext
   spec: SocialPostSpec
   assets: SpecAssets
   scheduledAt: Date
   articleCtx: ArticleContentContext
-}): Promise<{ scheduled: number; skipped: number; failed: number }> {
+}): Promise<{
+  built: number
+  skipped: number
+  failed: number
+  preview: SpecPreviewPayload
+}> {
   const { logCtx, spec, assets, scheduledAt, articleCtx } = opts
   const platforms = await listAutomationPlatforms(logCtx.userId, spec.isStory)
 
-  let scheduled = 0
+  let built = 0
   let skipped = 0
   let failed = 0
+
+  const preview: SpecPreviewPayload = {
+    slotKey: logCtx.slotKey ?? '',
+    postType: assets.postType,
+    isStory: spec.isStory,
+    scheduledAt: scheduledAt.toISOString(),
+    platforms: [],
+    assets: {
+      imageUrl: assets.imageUrl,
+      mediaUrls: assets.mediaUrls,
+      videoUrl: assets.videoUrl,
+      title: assets.title,
+    },
+  }
 
   for (const platform of platforms) {
     const platformCtx = withPlatform(logCtx, platform)
@@ -43,103 +62,55 @@ export async function schedulePostsForSpec(opts: {
     }
 
     try {
-      if (isGhlManagedPlatform(platform)) {
-        const result = await dispatchPublish(logCtx.userId, platform, caption, {
-          imageUrl: mediaUrls ? undefined : imageUrl,
-          mediaUrls,
-          videoUrl,
-          postAsStory: spec.isStory,
+      const provider = isGhlManagedPlatform(platform) ? 'ghl' : 'direct'
+      const created = await prisma.post.create({
+        data: {
+          userId: logCtx.userId,
+          platform,
+          content: caption,
+          status: 'ready',
           scheduledAt,
-          logCtx: platformCtx,
-        })
+          imageUrl: mediaUrls ? null : imageUrl ?? null,
+          mediaUrls: mediaUrls ?? [],
+          videoUrl: videoUrl ?? null,
+          postType: assets.postType,
+          postAsStory: spec.isStory,
+          provider,
+          automationRunId: logCtx.runId,
+          slotKey: logCtx.slotKey,
+        },
+      })
 
-        if (!result.success) {
-          failed++
-          logger.warn({ ...platformCtx, error: result.error }, '[social-automation] GHL schedule failed')
-          await sendFailureAlert({
-            userId: logCtx.userId,
-            jobId: logCtx.jobId,
-            errorType: 'social_ghl_schedule',
-            message: `GHL schedule failed for ${platform} (${logCtx.slotKey}): ${result.error}`,
-            context: { ...platformCtx },
-          })
-          continue
-        }
+      preview.platforms.push({
+        platform,
+        caption,
+        imageUrl: mediaUrls ? undefined : imageUrl,
+        mediaUrls,
+        videoUrl,
+        status: 'ready',
+        postId: created.id,
+      })
 
-        const created = await prisma.post.create({
-          data: {
-            userId: logCtx.userId,
-            platform,
-            content: caption,
-            status: 'scheduled',
-            scheduledAt,
-            imageUrl: mediaUrls ? null : imageUrl ?? null,
-            mediaUrls: mediaUrls ?? [],
-            videoUrl: videoUrl ?? null,
-            postType: assets.postType,
-            postAsStory: spec.isStory,
-            provider: 'ghl',
-            ghlPostId: result.ghlPostId ?? null,
-            automationRunId: logCtx.runId,
-            slotKey: logCtx.slotKey,
-          },
-        })
-        logger.info(
-          {
-            ...withPost(platformCtx, created.id, result.ghlPostId ?? undefined),
-            scheduledAt,
-            provider: 'ghl',
-            postType: assets.postType,
-          },
-          '[social-automation] post scheduled',
-        )
-        scheduled++
-      } else {
-        const created = await prisma.post.create({
-          data: {
-            userId: logCtx.userId,
-            platform,
-            content: caption,
-            status: 'scheduled',
-            scheduledAt,
-            imageUrl: mediaUrls ? null : imageUrl ?? null,
-            mediaUrls: mediaUrls ?? [],
-            videoUrl: videoUrl ?? null,
-            postType: assets.postType,
-            postAsStory: spec.isStory,
-            provider: 'direct',
-            automationRunId: logCtx.runId,
-            slotKey: logCtx.slotKey,
-          },
-        })
-        logger.info(
-          {
-            ...withPost(platformCtx, created.id),
-            scheduledAt,
-            provider: 'direct',
-            postType: assets.postType,
-          },
-          '[social-automation] post scheduled',
-        )
-        scheduled++
-      }
+      logger.info(
+        {
+          ...withPost(platformCtx, created.id),
+          scheduledAt,
+          provider,
+          postType: assets.postType,
+        },
+        '[social-automation] post ready for preview',
+      )
+      built++
     } catch (err) {
       failed++
       const message = err instanceof Error ? err.message : String(err)
-      logger.error({ ...platformCtx, err }, '[social-automation] failed to schedule post')
-      await sendFailureAlert({
-        userId: logCtx.userId,
-        jobId: logCtx.jobId,
-        errorType: 'social_schedule',
-        message: `Failed to schedule ${platform} (${logCtx.slotKey}): ${message}`,
-        context: { ...platformCtx },
-      })
+      logger.error({ ...platformCtx, err }, '[social-automation] failed to build ready post')
     }
   }
 
-  if (scheduled === 0 && platforms.length === 0) {
+  if (built === 0 && platforms.length === 0) {
     logger.info(logCtx, '[social-automation] no platforms configured for slot')
   }
 
-  return { scheduled, skipped, failed }
+  return { built, skipped, failed, preview }
 }

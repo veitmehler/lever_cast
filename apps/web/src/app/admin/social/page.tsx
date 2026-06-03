@@ -6,12 +6,14 @@ import Link from 'next/link'
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-muted text-muted-foreground',
   processing: 'bg-yellow-500/20 text-yellow-400',
+  ready: 'bg-blue-500/20 text-blue-400',
+  scheduling: 'bg-yellow-500/20 text-yellow-400',
   completed: 'bg-green-500/20 text-green-400',
   failed: 'bg-red-500/20 text-red-400',
   cancelled: 'bg-muted text-muted-foreground',
 }
 
-const STATUSES = ['pending', 'processing', 'completed', 'failed'] as const
+const STATUSES = ['pending', 'processing', 'ready', 'scheduling', 'completed', 'failed'] as const
 
 function buildQuery(params: { page?: number; status?: string; email?: string }) {
   const q = new URLSearchParams()

@@ -16,6 +16,7 @@ import {
 import { readS3Object } from '../lib/storage'
 import { enqueueSyndication } from '../article-pipeline/syndication/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'
+import { enqueueSocialDispatch } from '../social/automation/enqueue-dispatch'
 import { logger } from '../lib/logger'
 
 function calculateReadingTimeFromHtml(html: string): number {
@@ -765,6 +766,30 @@ export async function articleRoutes(app: FastifyInstance) {
       })
 
       return reply.send({ runs })
+    },
+  )
+
+  // ── POST /api/articles/:jobId/social-automation/:runId/approve ────────────
+  app.post<{ Params: { jobId: string; runId: string } }>(
+    '/articles/:jobId/social-automation/:runId/approve',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId, runId } = request.params
+      const run = await prisma.socialAutomationRun.findFirst({
+        where: { id: runId, jobId, userId: user.id },
+      })
+      if (!run) return reply.status(404).send({ error: 'Automation run not found' })
+
+      const result = await enqueueSocialDispatch(runId)
+      if (!result.enqueued) {
+        return reply.status(400).send({ error: result.message ?? 'Dispatch not enqueued' })
+      }
+      return reply.status(202).send({ ok: true, enqueued: true })
     },
   )
 

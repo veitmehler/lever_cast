@@ -6,17 +6,21 @@ import { runSocialAutomation } from '../social/automation/run'
 
 export interface SocialGenerateJobData {
   runId: string
+  onlySlot?: string
 }
 
 export async function socialGenerateHandler(
   jobs: PgBoss.Job<SocialGenerateJobData>[],
 ): Promise<void> {
   for (const job of jobs) {
-    const { runId } = job.data
-    logger.info({ runId, pgBossJobId: job.id }, '[social-generate] starting automation run')
+    const { runId, onlySlot } = job.data
+    logger.info(
+      { runId, onlySlot, pgBossJobId: job.id },
+      '[social-generate] starting automation run',
+    )
 
     try {
-      await runSocialAutomation(runId)
+      await runSocialAutomation(runId, onlySlot ? { onlySlot } : undefined)
     } catch (err) {
       logger.error({ runId, err }, '[social-generate] automation run failed')
 

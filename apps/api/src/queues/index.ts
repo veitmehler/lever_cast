@@ -49,6 +49,7 @@ export const QUEUES = {
   ARTICLE_OUTPUT: 'article-output',
   GENERATE_SOCIAL_FROM_ARTICLE: 'generate-social-from-article',
   SOCIAL_GENERATE: 'social-generate',
+  SOCIAL_DISPATCH: 'social-dispatch',
   SOCIAL_AUTOMATION_SAFETY: 'social-automation-safety',
   SYNDICATION_GENERATE: 'syndication-generate',
   SYNDICATION_SAFETY: 'syndication-safety',

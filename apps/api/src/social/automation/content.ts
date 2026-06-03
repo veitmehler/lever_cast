@@ -1,12 +1,28 @@
 import type { SitePage } from '@prisma/client'
 import { extractH2Sections, stripTags } from '../../article-pipeline/enrichment/html-parser'
 
+export interface H2Section {
+  heading: string
+  text: string
+}
+
 export interface ArticleContentContext {
   title: string
   introText: string
   keyTakeawaysText: string
+  h2Sections: H2Section[]
+  /** First H2 section (legacy helpers). */
   h2Title: string
   h2SectionText: string
+}
+
+/** Round-robin section index per H2-based slot (plan §4). */
+const H2_SLOT_SECTION_INDEX: Record<string, number> = {
+  F4: 0,
+  F5: 1,
+  F6: 2,
+  S4: 3,
+  S6: 4,
 }
 
 function extractIntro(bodyHtml: string, excerpt?: string | null): string {
@@ -16,10 +32,20 @@ function extractIntro(bodyHtml: string, excerpt?: string | null): string {
   return stripTags(bodyHtml).slice(0, 800)
 }
 
+function sectionAt(sections: H2Section[], index: number): H2Section | undefined {
+  if (sections.length === 0) return undefined
+  return sections[index % sections.length]
+}
+
 export function buildArticleContentContext(sitePage: SitePage): ArticleContentContext {
   const bodyHtml = sitePage.bodyHtml ?? ''
-  const sections = extractH2Sections(bodyHtml)
-  const first = sections[0]
+  const rawSections = extractH2Sections(bodyHtml)
+  const h2Sections: H2Section[] = rawSections.map((s) => ({
+    heading: s.heading,
+    text: stripTags(s.sectionHtml).slice(0, 3000),
+  }))
+  const first = h2Sections[0]
+  const fallbackText = stripTags(bodyHtml).slice(0, 3000)
 
   return {
     title: sitePage.title,
@@ -27,8 +53,9 @@ export function buildArticleContentContext(sitePage: SitePage): ArticleContentCo
     keyTakeawaysText: sitePage.keyTakeawaysHtml
       ? stripTags(sitePage.keyTakeawaysHtml).slice(0, 2000)
       : extractIntro(bodyHtml, sitePage.excerpt),
+    h2Sections,
     h2Title: first?.heading ?? sitePage.title,
-    h2SectionText: first ? stripTags(first.sectionHtml).slice(0, 3000) : stripTags(bodyHtml).slice(0, 3000),
+    h2SectionText: first?.text ?? fallbackText,
   }
 }
 
@@ -36,6 +63,17 @@ export interface SlotContent {
   text: string
   title?: string
   quoteText?: string
+}
+
+function h2SlotContent(slotKey: string, ctx: ArticleContentContext): SlotContent {
+  const index = H2_SLOT_SECTION_INDEX[slotKey] ?? 0
+  const sec = sectionAt(ctx.h2Sections, index)
+  const text = sec?.text ?? ctx.h2SectionText
+  const title = sec?.heading ?? ctx.h2Title
+  if (slotKey === 'F5') {
+    return { text, quoteText: title }
+  }
+  return { text, title }
 }
 
 /** Map each slot to the article section used for generation. */
@@ -52,15 +90,13 @@ export function resolveSlotContent(slotKey: string, ctx: ArticleContentContext):
       return { text: ctx.keyTakeawaysText || ctx.h2SectionText }
     case 'F4':
     case 'F6':
-      return { text: ctx.h2SectionText, title: ctx.h2Title }
+    case 'S4':
+    case 'S6':
+      return h2SlotContent(slotKey, ctx)
     case 'F5':
-      return { text: ctx.h2SectionText, quoteText: ctx.h2Title }
+      return h2SlotContent(slotKey, ctx)
     case 'S2':
       return { text: ctx.keyTakeawaysText || ctx.introText }
-    case 'S4':
-      return { text: ctx.h2SectionText, title: ctx.h2Title }
-    case 'S6':
-      return { text: ctx.h2SectionText, title: ctx.h2Title }
     default:
       return { text: ctx.introText }
   }

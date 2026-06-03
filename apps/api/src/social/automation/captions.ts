@@ -1,4 +1,5 @@
 import type { ArticleContentContext } from './content'
+import { resolveSlotContent } from './content'
 
 export const FEED_PLATFORMS = [
   'linkedin',
@@ -31,22 +32,26 @@ export function buildPlatformCaption(
   slotKey: string,
 ): string {
   const limit = PLATFORM_CHAR_LIMITS[platform] ?? 2000
+  const slot = resolveSlotContent(slotKey, ctx)
+  const sectionTitle = slot.title ?? ctx.title
+  const firstSentence = slot.text.split(/[.!?]/)[0]?.trim() ?? ctx.title
+
   const hooks: Record<string, string> = {
     F1: ctx.introText,
     F2: `Key takeaways from "${ctx.title}"`,
-    F3: ctx.keyTakeawaysText.split(/[.!?]/)[0] ?? ctx.title,
-    F4: ctx.h2Title,
-    F5: ctx.h2Title,
-    F6: ctx.h2Title,
+    F3: firstSentence,
+    F4: sectionTitle,
+    F5: sectionTitle,
+    F6: sectionTitle,
     S1: ctx.introText,
     S2: `Watch: ${ctx.title}`,
-    S3: ctx.keyTakeawaysText.split(/[.!?]/)[0] ?? ctx.title,
-    S4: `New carousel: ${ctx.h2Title}`,
-    S5: ctx.keyTakeawaysText.split(/[.!?]/)[0] ?? ctx.title,
-    S6: `New video: ${ctx.h2Title}`,
+    S3: firstSentence,
+    S4: `New carousel: ${sectionTitle}`,
+    S5: firstSentence,
+    S6: `New video: ${sectionTitle}`,
   }
 
-  const base = hooks[slotKey] ?? ctx.title
+  const base = hooks[slotKey] ?? (slot.text.slice(0, 200) || ctx.title)
   const withTitle = platform === 'twitter' || platform === 'threads'
     ? base
     : `${base}\n\n${ctx.title}`

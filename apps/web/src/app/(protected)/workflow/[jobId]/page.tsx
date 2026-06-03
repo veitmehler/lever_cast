@@ -11,6 +11,10 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import {
+  SocialPreviewPanel,
+  type SocialAutomationRunRow,
+} from '@/features/social/SocialPreviewPanel'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -547,24 +551,6 @@ export default function WorkflowJobPage() {
   const [activeSyndicationTab, setActiveSyndicationTab] = useState<'linkedin' | 'medium'>('linkedin')
   const [copiedSyndication, setCopiedSyndication] = useState<string | null>(null)
 
-  type SocialAutomationRunRow = {
-    id: string
-    status: string
-    scheduledDate: string
-    totalSpecs: number
-    completedSpecs: number
-    failedSpecs: number
-    currentSpec: string | null
-    error: string | null
-    createdAt: string
-    _count?: { posts: number }
-    specResults?: Array<{
-      slotKey: string
-      status: string
-      error: string | null
-      postsCreated: number
-    }>
-  }
   const [socialRuns, setSocialRuns] = useState<SocialAutomationRunRow[]>([])
   const [isGeneratingSocial, setIsGeneratingSocial] = useState(false)
   const [retryingSpec, setRetryingSpec] = useState<string | null>(null)
@@ -984,7 +970,7 @@ export default function WorkflowJobPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to publish')
       }
-      toast.success('Article published! Generating LinkedIn, Medium & social posts in the background…')
+      toast.success('Article published! Generating LinkedIn, Medium & social previews in the background…')
       await fetchJob()
       void fetchSyndicationStatus()
       void fetchSocialRuns()
@@ -1657,7 +1643,7 @@ export default function WorkflowJobPage() {
               <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-semibold text-card-foreground">Social media set</h2>
                 <p className="text-xs text-muted-foreground">
-                  Generate 12 branded posts (6 feed + 6 story) and schedule across your connected platforms.
+                  Generate 12 branded posts (6 feed + 6 story), preview captions and media here, then approve to schedule via Omniply.
                 </p>
               </div>
               <Button
@@ -1670,7 +1656,8 @@ export default function WorkflowJobPage() {
                     (r) =>
                       r.status === 'pending' ||
                       r.status === 'processing' ||
-                      r.status === 'scheduling',
+                      r.status === 'scheduling' ||
+                      r.status === 'ready',
                   )
                 }
                 className="gap-1.5"
@@ -1684,60 +1671,13 @@ export default function WorkflowJobPage() {
               </Button>
             </div>
             {socialRuns.length > 0 && (
-              <div className="divide-y divide-border">
-                {socialRuns.map((run) => (
-                  <div key={run.id} className="px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <div>
-                      <span className="font-medium capitalize">{run.status}</span>
-                      <span className="text-muted-foreground ml-2">
-                        {run.scheduledDate} · {run.completedSpecs}/{run.totalSpecs} specs
-                        {run.currentSpec ? ` · ${run.currentSpec}` : ''}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {run._count?.posts ?? 0}{' '}
-                      {run.status === 'ready' ? 'preview posts' : 'posts'}
-                      {run.failedSpecs > 0 ? ` · ${run.failedSpecs} failed` : ''}
-                    </div>
-                    {run.error && (
-                      <p className="w-full text-xs text-red-500">{run.error}</p>
-                    )}
-                    {(run.specResults?.length ?? 0) > 0 && (
-                      <div className="w-full flex flex-wrap gap-1.5 mt-2">
-                        {run.specResults!.map((spec) => (
-                          <span
-                            key={spec.slotKey}
-                            className="inline-flex items-center gap-1 text-xs rounded border border-border px-2 py-0.5"
-                          >
-                            <span className="font-mono">{spec.slotKey}</span>
-                            <span
-                              className={
-                                spec.status === 'completed'
-                                  ? 'text-green-600'
-                                  : spec.status === 'failed'
-                                    ? 'text-red-500'
-                                    : 'text-muted-foreground'
-                              }
-                            >
-                              {spec.status}
-                            </span>
-                            {spec.status === 'failed' && (
-                              <button
-                                type="button"
-                                className="text-primary hover:underline ml-1"
-                                disabled={retryingSpec === `${run.id}-${spec.slotKey}`}
-                                onClick={() => void handleRetrySpec(run.id, spec.slotKey)}
-                              >
-                                {retryingSpec === `${run.id}-${spec.slotKey}` ? '…' : 'retry'}
-                              </button>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <SocialPreviewPanel
+                jobId={jobId}
+                runs={socialRuns}
+                onRefresh={fetchSocialRuns}
+                onRetryFailed={handleRetrySpec}
+                retryingSpec={retryingSpec}
+              />
             )}
           </div>
         )}
@@ -2041,10 +1981,10 @@ export default function WorkflowJobPage() {
             <ul className="text-sm space-y-1.5 pl-4 list-disc text-foreground">
               <li>LinkedIn Article</li>
               <li>Medium Article</li>
-              <li>12-post social set (Facebook, Instagram, LinkedIn, Threads, Twitter, Telegram)</li>
+              <li>12-post social preview set (Facebook, Instagram, LinkedIn, Threads, Twitter, Telegram)</li>
             </ul>
             <p className="text-xs text-muted-foreground">
-              Social posts will be scheduled via Omniply — you can review and edit them there before they go live.
+              Social posts are generated for preview on this page first. After you review, click Approve &amp; schedule to send them to Omniply.
             </p>
             <div className="flex gap-3 pt-2 justify-end">
               <Button

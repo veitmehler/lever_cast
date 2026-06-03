@@ -123,4 +123,7 @@ export async function runSocialAutomation(
 }
 
 export { retryAutomationSpec } from './spec-processor'
-export { dispatchSocialAutomationRun } from './dispatch-run'
+export {
+  dispatchSocialAutomationRun,
+  dispatchSocialAutomationSlot,
+} from './dispatch-run'

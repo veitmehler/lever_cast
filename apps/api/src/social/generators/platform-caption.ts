@@ -5,6 +5,7 @@ import { sendFailureAlert } from '../../lib/alerts'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from '../automation/log-context'
 import type { ArticleContentContext } from '../automation/content'
+import { resolveSlotContent } from '../automation/content'
 import { buildPlatformCaption, PLATFORM_CHAR_LIMITS } from '../automation/captions'
 
 const PLATFORM_TONE: Record<string, string> = {
@@ -50,14 +51,8 @@ export async function generatePlatformCaption(opts: {
     const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
     const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 
-    const sourceText = [
-      articleCtx.introText,
-      articleCtx.keyTakeawaysText,
-      articleCtx.h2SectionText,
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-      .slice(0, 4000)
+    const slotContent = resolveSlotContent(slotKey, articleCtx)
+    const sourceText = slotContent.text.slice(0, 4000)
 
     const userPrompt = (t?.userPrompt ?? DEF_USER)
       .replace(/\{\{platform\}\}/g, platform)
@@ -65,6 +60,7 @@ export async function generatePlatformCaption(opts: {
       .replace(/\{\{postType\}\}/g, postType)
       .replace(/\{\{title\}\}/g, articleCtx.title)
       .replace(/\{\{content\}\}/g, sourceText)
+      .replace(/\{\{sectionText\}\}/g, sourceText)
       .replace(/\{\{platformTone\}\}/g, platformTone)
       .replace(/\{\{charLimit\}\}/g, String(charLimit))
 

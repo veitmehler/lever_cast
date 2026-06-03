@@ -53,7 +53,7 @@ export async function processAutomationSpec(opts: {
   await prisma.socialAutomationSpecResult.upsert({
     where: { runId_slotKey: { runId: run.id, slotKey } },
     create: { runId: run.id, slotKey, status: 'pending' },
-    update: { status: 'pending', error: null, postsCreated: 0 },
+    update: { status: 'pending', error: null, postsCreated: 0, approvedAt: null },
   })
 
   try {

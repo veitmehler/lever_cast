@@ -24,6 +24,7 @@ import { articleEnrichmentHandler, ArticleEnrichmentJobData } from './handlers/a
 import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-output'
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
+import { socialDispatchHandler, SocialDispatchJobData } from './handlers/social-dispatch'
 import { socialAutomationSafetyHandler } from './handlers/social-automation-safety'
 import { syndicationGenerateHandler, SyndicationGenerateJobData } from './handlers/syndication-generate'
 import { syndicationSafetyHandler } from './handlers/syndication-safety'
@@ -152,6 +153,12 @@ async function main() {
     QUEUES.SOCIAL_GENERATE,
     { batchSize: 1 },
     withSentry('social-generate', socialGenerateHandler),
+  )
+
+  await boss.work<SocialDispatchJobData>(
+    QUEUES.SOCIAL_DISPATCH,
+    { batchSize: 1 },
+    withSentry('social-dispatch', socialDispatchHandler),
   )
 
   await boss.work(

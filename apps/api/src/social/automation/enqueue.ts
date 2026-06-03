@@ -16,21 +16,32 @@ export async function enqueueSocialAutomation(
   const timeZone = opts.timeZone ?? 'America/New_York'
   const scheduledDate = formatScheduledDate(opts.publishingDate, timeZone)
 
-  const existing = await prisma.socialAutomationRun.findFirst({
+  const inProgress = await prisma.socialAutomationRun.findFirst({
     where: {
       jobId: opts.jobId,
-      status: { in: ['pending', 'processing'] },
+      status: { in: ['pending', 'processing', 'scheduling'] },
     },
   })
-  if (existing) {
-    return { runId: existing.id, enqueued: false, message: 'Social automation already in progress' }
+  if (inProgress) {
+    return { runId: inProgress.id, enqueued: false, message: 'Social automation already in progress' }
+  }
+
+  const awaitingApproval = await prisma.socialAutomationRun.findFirst({
+    where: { jobId: opts.jobId, status: 'ready' },
+  })
+  if (awaitingApproval) {
+    return {
+      runId: awaitingApproval.id,
+      enqueued: false,
+      message: 'Social preview ready — approve to schedule to Omniply',
+    }
   }
 
   const completed = await prisma.socialAutomationRun.findFirst({
     where: { jobId: opts.jobId, status: 'completed' },
   })
   if (completed) {
-    return { runId: completed.id, enqueued: false, message: 'Social set already generated for this article' }
+    return { runId: completed.id, enqueued: false, message: 'Social set already scheduled for this article' }
   }
 
   const run = await prisma.socialAutomationRun.create({

@@ -185,7 +185,52 @@ export async function finalizeDispatchCounts(runId: string): Promise<void> {
   )
 }
 
-/** Dispatch all ready posts for a run (approval step — wired from routes/queue in T3). */
+async function markSlotApproved(runId: string, slotKey: string): Promise<void> {
+  await prisma.socialAutomationSpecResult.updateMany({
+    where: { runId, slotKey },
+    data: { approvedAt: new Date() },
+  })
+}
+
+/** After partial or full dispatch, set run to ready (more slots pending) or completed/failed. */
+export async function reconcileRunDispatchState(runId: string): Promise<void> {
+  const readyPosts = await prisma.post.count({
+    where: { automationRunId: runId, status: 'ready' },
+  })
+  if (readyPosts > 0) {
+    await prisma.socialAutomationRun.update({
+      where: { id: runId },
+      data: { status: 'ready', currentSpec: null },
+    })
+    return
+  }
+  await finalizeDispatchCounts(runId)
+}
+
+/** Dispatch ready posts for one slot; run stays ready until all slots are dispatched. */
+export async function dispatchSocialAutomationSlot(
+  runId: string,
+  slotKey: string,
+): Promise<{ dispatched: number; failed: number }> {
+  const run = await prisma.socialAutomationRun.findUnique({
+    where: { id: runId },
+    select: { status: true },
+  })
+  if (!run) throw new Error(`Automation run not found: ${runId}`)
+  if (run.status !== 'ready' && run.status !== 'scheduling') {
+    throw new Error(`Run is not ready for dispatch (status: ${run.status})`)
+  }
+
+  await markSlotApproved(runId, slotKey)
+
+  const result = await dispatchReadyPostsForRun(runId, { slotKey })
+  logger.info({ runId, slotKey, ...result }, '[social-automation] slot dispatch complete')
+
+  await reconcileRunDispatchState(runId)
+  return result
+}
+
+/** Dispatch all ready posts for a run (full approval). */
 export async function dispatchSocialAutomationRun(runId: string): Promise<void> {
   const claim = await prisma.socialAutomationRun.updateMany({
     where: { id: runId, status: 'ready' },
@@ -196,12 +241,23 @@ export async function dispatchSocialAutomationRun(runId: string): Promise<void> 
     return
   }
 
+  const specs = await prisma.socialAutomationSpecResult.findMany({
+    where: { runId },
+    select: { slotKey: true },
+  })
+  if (specs.length > 0) {
+    await prisma.socialAutomationSpecResult.updateMany({
+      where: { runId },
+      data: { approvedAt: new Date() },
+    })
+  }
+
   logger.info({ runId }, '[social-automation] dispatch started')
 
   try {
     const result = await dispatchReadyPostsForRun(runId)
     logger.info({ runId, ...result }, '[social-automation] dispatch pass complete')
   } finally {
-    await finalizeDispatchCounts(runId)
+    await reconcileRunDispatchState(runId)
   }
 }

@@ -7,11 +7,19 @@ export const runtime = 'edge'
 const DO_API_BASE = process.env.DO_API_BASE ?? 'https://api.socioply.com'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> },
 ) {
-  const { getToken } = await auth()
-  const token = await getToken()
+  // Prefer a client-minted token passed as a query param. EventSource cannot
+  // set request headers, so the browser appends `?token=<fresh JWT>` obtained
+  // from `useAuth().getToken()`. This keeps the SSE connection authenticated
+  // even when Clerk's cookie refresh has stalled on a backgrounded tab.
+  // Fall back to the cookie-derived session token when no param is supplied.
+  let token = request.nextUrl.searchParams.get('token')
+  if (!token) {
+    const { getToken } = await auth()
+    token = await getToken()
+  }
   if (!token) {
     return new Response('Unauthorized', { status: 401 })
   }

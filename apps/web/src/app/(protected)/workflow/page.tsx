@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { NewArticleForm } from '@/components/article/NewArticleForm'
+import { useAuthedFetch } from '@/lib/use-authed-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ function ProgressBar({ currentStep }: { currentStep: number }) {
 
 export default function WorkflowPage() {
   const router = useRouter()
+  const { authedFetch } = useAuthedFetch()
   const [jobs, setJobs]             = useState<ArticleJob[]>([])
   const [isLoading, setIsLoading]   = useState(true)
   const [filter, setFilter]         = useState<string>('all')
@@ -96,7 +98,7 @@ export default function WorkflowPage() {
         activeFilter === 'all'
           ? '/api/articles'
           : `/api/articles?status=${activeFilter}`
-      const res = await fetch(url)
+      const res = await authedFetch(url)
       if (!res.ok) {
         // Swallow any non-2xx error when we already have data to display.
         // This covers 401/403 (Clerk token rotation), 404 (transient middleware

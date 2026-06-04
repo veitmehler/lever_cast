@@ -29,7 +29,11 @@ export async function requireAuth(
   }
 
   try {
-    const payload = await verifyToken(token, { secretKey })
+    // Allow a small clock-skew tolerance so tokens that are valid but sit right
+    // at the expiry boundary (network latency, minor server clock drift) aren't
+    // rejected. Clerk session tokens are short-lived (~60s); without leeway a
+    // borderline-expired token produces spurious 401s on a long-lived page.
+    const payload = await verifyToken(token, { secretKey, clockSkewInMs: 10_000 })
     Sentry.setUser({ id: payload.sub })
     return payload.sub // Clerk user ID
   } catch (err) {

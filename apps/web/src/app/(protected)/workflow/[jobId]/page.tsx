@@ -15,6 +15,7 @@ import {
   SocialPreviewPanel,
   type SocialAutomationRunRow,
 } from '@/features/social/SocialPreviewPanel'
+import { useAuthedFetch } from '@/lib/use-authed-fetch'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -518,6 +519,10 @@ function StatusBadge({ status, busy }: { status: string; busy?: boolean }) {
 export default function WorkflowJobPage() {
   const { jobId } = useParams<{ jobId: string }>()
   const router = useRouter()
+  // Authenticated fetch that mints a fresh Clerk token per request and retries
+  // once on auth failure. Replaces bare fetch() for all /api calls so a stale
+  // session-token cookie (background-tab throttling) can't 401 the page.
+  const { authedFetch, getFreshToken } = useAuthedFetch()
 
   const [job, setJob] = useState<ArticleJob | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -556,16 +561,16 @@ export default function WorkflowJobPage() {
   const [retryingSpec, setRetryingSpec] = useState<string | null>(null)
 
   useEffect(() => {
-    void fetch('/api/wp/connections')
+    void authedFetch('/api/wp/connections')
       .then((r) => r.json())
       .then((d) => setWpConnections((d.connections ?? []) as WpConnectionLite[]))
       .catch(() => setWpConnections([]))
-  }, [])
+  }, [authedFetch])
 
   const fetchSyndicationStatus = useCallback(async () => {
     if (!jobId) return
     try {
-      const r = await fetch(`/api/articles/${jobId}/syndication`)
+      const r = await authedFetch(`/api/articles/${jobId}/syndication`)
       if (!r.ok) return
       const d = await r.json()
       const arts: SyndicationArticle[] = d.articles ?? []
@@ -575,7 +580,7 @@ export default function WorkflowJobPage() {
       setSyndicationGenerated(hasCompleted)
       setSyndicationPending(hasPending && !arts.every((a) => a.status === 'completed'))
     } catch { /* silent */ }
-  }, [jobId])
+  }, [jobId, authedFetch])
 
   // Pre-load any previously generated syndication articles
   useEffect(() => {
@@ -632,9 +637,9 @@ export default function WorkflowJobPage() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchJob = useCallback(async () => {
+  const fetchJob = useCallback(async (): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/articles/${jobId}`)
+      const res = await authedFetch(`/api/articles/${jobId}`)
       if (!res.ok) {
         if (res.status === 404) {
           // Distinguish an authoritative API 404 ({"error":"Article job not found"})
@@ -649,20 +654,21 @@ export default function WorkflowJobPage() {
 
           if (isAuthoritativeNotFound) {
             notFoundCountRef.current += 1
-            if (notFoundCountRef.current >= 3) { router.push('/workflow'); return }
+            if (notFoundCountRef.current >= 3) { router.push('/workflow'); return false }
           } else {
             notFoundCountRef.current = 0
           }
-          return
+          return false
         }
         notFoundCountRef.current = 0
-        // Silently swallow transient auth failures when we already have job data.
-        // The Clerk token renews automatically; toasting on every 3-second poll
-        // cycle would spam the user and can cause a visible page disruption.
+        // authedFetch already retried once with a force-refreshed token, so a
+        // 401/403 here is a genuine (if usually transient) auth failure. Swallow
+        // it silently when we already have job data — the next poll recovers —
+        // and only surface a toast on a cold load with nothing to show.
         if (res.status === 401 || res.status === 403) {
-          if (jobRef.current) return
+          if (jobRef.current) return false
           toast.error('Session expired — please refresh the page')
-          return
+          return false
         }
         throw new Error('Failed to load job')
       }
@@ -673,13 +679,15 @@ export default function WorkflowJobPage() {
         ...j,
         pipelineSteps: j.pipelineSteps ?? j.steps ?? [],
       })
+      return true
     } catch {
       // Only show the error toast on the initial load (no job data yet).
       if (!jobRef.current) toast.error('Failed to load article job')
+      return false
     } finally {
       setIsLoading(false)
     }
-  }, [jobId, router])
+  }, [jobId, router, authedFetch])
 
   useEffect(() => { fetchJob() }, [fetchJob])
 
@@ -700,7 +708,7 @@ export default function WorkflowJobPage() {
 
   // Fetch brand settings once for the review block
   useEffect(() => {
-    fetch('/api/brand-settings')
+    authedFetch('/api/brand-settings')
       .then((r) => r.ok ? r.json() : ({} as BrandSettings))
       .then((d: BrandSettings) => setBrandSettings({
         defaultAuthorName:    d.defaultAuthorName    ?? '',
@@ -709,13 +717,46 @@ export default function WorkflowJobPage() {
         ourExperience:        d.ourExperience        ?? '',
       }))
       .catch(() => {/* silent */})
-  }, [])
+  }, [authedFetch])
+
+  // When the job reaches a terminal post-enrichment state, the enriched bodyHtml
+  // (Key Takeaways + Table of Contents merged in) is only loaded into state via
+  // fetchJob. The single SSE 'done' → fetchJob() call can blip on a transient
+  // auth failure, leaving the "Final article review" textarea showing stale
+  // pre-enrichment content until a manual reload. Retry a few times on the
+  // transition to guarantee the final content lands.
+  const prevStatusForEnrichedRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevStatusForEnrichedRef.current
+    const status = job?.status
+    prevStatusForEnrichedRef.current = status
+    if (prev === status) return
+    if (status !== 'enriched' && status !== 'published') return
+
+    let cancelled = false
+    ;(async () => {
+      for (const delay of [0, 1500, 4000]) {
+        if (cancelled) return
+        if (delay) await new Promise((r) => setTimeout(r, delay))
+        if (cancelled) return
+        await fetchJob()
+      }
+    })()
+    return () => { cancelled = true }
+  }, [job?.status, fetchJob])
 
   // ── SSE ────────────────────────────────────────────────────────────────────
 
-  const startSSE = useCallback(() => {
+  const startSSE = useCallback(async () => {
     sseRef.current?.close()
-    const es = new EventSource(`/api/articles/${jobId}/events`)
+    // EventSource can't set headers, so pass a freshly-minted Clerk token as a
+    // query param. This keeps the SSE auth valid even when the cookie session
+    // token has gone stale on a backgrounded tab.
+    const token = await getFreshToken()
+    const url = token
+      ? `/api/articles/${jobId}/events?token=${encodeURIComponent(token)}`
+      : `/api/articles/${jobId}/events`
+    const es = new EventSource(url)
     sseRef.current = es
 
     es.onmessage = (e) => {
@@ -769,17 +810,17 @@ export default function WorkflowJobPage() {
       reconnectTimerRef.current = window.setTimeout(() => {
         const j = jobRef.current
         if (j && (ACTIVE_STATUSES.has(j.status) || ENRICHMENT_ACTIVE.has(j.status))) {
-          startSSE()
+          void startSSE()
         }
       }, 3000)
     }
-  }, [jobId, fetchJob])
+  }, [jobId, fetchJob, getFreshToken])
 
   // Start SSE when job is actively running OR in enrichment
   useEffect(() => {
     if (!job) return
     if (ACTIVE_STATUSES.has(job.status) || ENRICHMENT_ACTIVE.has(job.status)) {
-      startSSE()
+      void startSSE()
     }
     return () => {
       if (reconnectTimerRef.current !== null) {
@@ -832,7 +873,7 @@ export default function WorkflowJobPage() {
   const handleResume = async () => {
     setIsResuming(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/resume`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/resume`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to resume')
       toast.success('Pipeline resumed')
       await fetchJob()
@@ -845,13 +886,13 @@ export default function WorkflowJobPage() {
 
   const fetchAttempts = useCallback(async () => {
     try {
-      const res = await fetch(`/api/articles/${jobId}/output/attempts`)
+      const res = await authedFetch(`/api/articles/${jobId}/output/attempts`)
       if (res.ok) {
         const data = await res.json()
         setAttempts(data.attempts ?? [])
       }
     } catch { /* silent */ }
-  }, [jobId])
+  }, [jobId, authedFetch])
 
   useEffect(() => {
     if (job?.status === 'enriched' || job?.status === 'published') fetchAttempts()
@@ -859,13 +900,13 @@ export default function WorkflowJobPage() {
 
   const fetchSocialRuns = useCallback(async () => {
     try {
-      const res = await fetch(`/api/articles/${jobId}/social-automation`)
+      const res = await authedFetch(`/api/articles/${jobId}/social-automation`)
       if (res.ok) {
         const data = await res.json()
         setSocialRuns(data.runs ?? [])
       }
     } catch { /* silent */ }
-  }, [jobId])
+  }, [jobId, authedFetch])
 
   useEffect(() => {
     if (job?.status === 'enriched' || job?.status === 'published') fetchSocialRuns()
@@ -888,7 +929,7 @@ export default function WorkflowJobPage() {
   const handleGenerateSocialSet = async () => {
     setIsGeneratingSocial(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/generate-social-set`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/generate-social-set`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to start social automation')
       toast.success(data.message ?? (data.enqueued ? 'Generating 12-post social set…' : 'Social set already queued'))
@@ -903,7 +944,7 @@ export default function WorkflowJobPage() {
   const handleRetrySpec = async (runId: string, slotKey: string) => {
     setRetryingSpec(`${runId}-${slotKey}`)
     try {
-      const res = await fetch(`/api/social-automation/${runId}/retry/${slotKey}`, { method: 'POST' })
+      const res = await authedFetch(`/api/social-automation/${runId}/retry/${slotKey}`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Retry failed')
       toast.success(`Retried ${slotKey}`)
@@ -918,7 +959,7 @@ export default function WorkflowJobPage() {
   const handleExport = async (target: string, config: Record<string, unknown> = {}) => {
     setExportingTarget(target)
     try {
-      const res = await fetch(`/api/articles/${jobId}/output/${target}`, {
+      const res = await authedFetch(`/api/articles/${jobId}/output/${target}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -950,14 +991,14 @@ export default function WorkflowJobPage() {
   const handleReEnrich = async () => {
     setIsReEnriching(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/re-enrich`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/re-enrich`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to re-enrich')
       }
       toast.success('Processing started…')
       await fetchJob()
-      startSSE()
+      void startSSE()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to re-enrich')
     } finally {
@@ -968,14 +1009,14 @@ export default function WorkflowJobPage() {
   const handleRewrite = async () => {
     setIsRewriting(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/rewrite`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/rewrite`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to start rewrite')
       }
       toast.success('Rewrite started…')
       await fetchJob()
-      startSSE()
+      void startSSE()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to rewrite')
     } finally {
@@ -989,7 +1030,7 @@ export default function WorkflowJobPage() {
   ) => {
     setIsPublishing(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/publish`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/publish`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to publish')
@@ -1012,7 +1053,7 @@ export default function WorkflowJobPage() {
         // the user changed their WordPress connection while the page was open).
         let freshConfig = exportConfig ?? {}
         if (autoExportTarget === 'wordpress') {
-          const connsRes = await fetch('/api/wp/connections').catch(() => null)
+          const connsRes = await authedFetch('/api/wp/connections').catch(() => null)
           const connsData = connsRes?.ok ? await connsRes.json().catch(() => ({})) : {}
           const freshConnections: WpConnectionLite[] = connsData.connections ?? []
           setWpConnections(freshConnections)
@@ -1076,7 +1117,7 @@ export default function WorkflowJobPage() {
   const handleGenerateSyndication = async () => {
     setSyndicationLoading(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/syndication`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/syndication`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Generation failed')
       toast.success('Platform articles queued — generating in background…')
@@ -1101,13 +1142,13 @@ export default function WorkflowJobPage() {
   const handleApprove = async () => {
     setIsApproving(true)
     try {
-      const res = await fetch(`/api/articles/${jobId}/approve`, { method: 'POST' })
+      const res = await authedFetch(`/api/articles/${jobId}/approve`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Failed to start approval')
       }
       toast.success('Processing started…')
-      startSSE()
+      void startSSE()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start approval')
       setIsApproving(false)

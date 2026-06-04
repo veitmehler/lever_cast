@@ -23,14 +23,29 @@ export async function proxyToApi(
   path: string,
   options: { method?: string } = {},
 ): Promise<NextResponse> {
-  // 1. Authenticate the caller
-  const { userId, getToken } = await auth()
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // 1. Resolve the Clerk JWT to forward to the DO API.
+  //
+  // Prefer a client-supplied `Authorization: Bearer` token when present. The
+  // browser mints this with `useAuth().getToken()`, which actively refreshes
+  // the session token on demand — this sidesteps the stale-cookie problem on
+  // long-lived pages (background-tab timer throttling stalls Clerk's cookie
+  // refresh, so the server-side `auth()` cookie token can be expired even
+  // though the session is still valid). The DO API verifies the token itself,
+  // so a forwarded client token is just as trustworthy as a cookie-derived one.
+  //
+  // Fall back to the cookie-derived token for callers that don't attach one.
+  const clientAuth = request.headers.get('authorization')
+  let token: string | null = null
+  if (clientAuth?.startsWith('Bearer ')) {
+    token = clientAuth.slice(7)
+  } else {
+    const { userId, getToken } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    token = await getToken()
   }
 
-  // 2. Get a Clerk JWT to forward to the DO API
-  const token = await getToken()
   if (!token) {
     return NextResponse.json({ error: 'Could not obtain auth token' }, { status: 401 })
   }

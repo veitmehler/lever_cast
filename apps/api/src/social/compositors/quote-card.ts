@@ -95,8 +95,8 @@ function buildQuoteCardSvg(
   <!-- Account name (medium weight) -->
   <text x="${nameX}" y="${nameY}" font-family="${font}" font-size="${NAME_FONT_SIZE}" font-weight="500" fill="#1A1A1A">${nameText}</text>
   ${verifiedBadge}
-  <!-- Quote body (light weight) -->
-  <text font-family="${font}" font-size="${fontSize}" font-weight="300" fill="#1A1A1A">
+  <!-- Quote body (thin weight) -->
+  <text font-family="${font}" font-size="${fontSize}" font-weight="100" fill="#1A1A1A">
     ${leftAlignedTextLines(lines, PADDING, textStartY, lineHeight)}
   </text>
 </svg>`

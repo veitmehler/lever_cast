@@ -19,8 +19,10 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
   const brand = await prisma.brandSettings.findUnique({ where: { userId } })
   const theme = themeFromBrand(brand)
 
-  const fontFamily =
-    (brand?.articleFontFamily?.trim() || brand?.diagramFontFamily?.trim() || theme.fontFamily)
+  // Social compositors have their own bundled font (Helvetica Neue) and should
+  // not inherit article or diagram font settings — those are unrelated concerns.
+  // A dedicated socialFontFamily field can be added later for per-account control.
+  const fontFamily = theme.fontFamily
 
   const organizationName = brand?.organizationName?.trim() || 'Your Brand'
   return {

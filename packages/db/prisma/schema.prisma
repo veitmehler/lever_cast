@@ -732,6 +732,8 @@ model BrandSettings {
   organizationCountryCode String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
   organizationLogoUrl      String? // CDN URL for the business logo (used in schema publisher.logo)
   socialLogoUrl            String? // optional override for social quote cards / compositors; falls back to organizationLogoUrl
+  socialAccountName        String? // social handle / display name for quote cards (e.g. "hormozi"); falls back to organizationName
+  instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD
   socialMediaLinks          Json?   // [{ platform: string, url: string }]
 

@@ -192,6 +192,8 @@ export default function SettingsPage() {
   const [organizationPhone, setOrganizationPhone]       = useState('')
   const [organizationLogoUrl, setOrganizationLogoUrl]   = useState('')
   const [socialLogoUrl, setSocialLogoUrl]               = useState('')
+  const [socialAccountName, setSocialAccountName]       = useState('')
+  const [instagramVerified, setInstagramVerified]       = useState(false)
   const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
   const [isUploadingSocialLogo, setIsUploadingSocialLogo] = useState(false)
   const logoFileInputRef                                = useRef<HTMLInputElement>(null)
@@ -266,6 +268,8 @@ export default function SettingsPage() {
           if (brand.organizationPhone)    setOrganizationPhone(brand.organizationPhone)
           if (brand.organizationLogoUrl)  setOrganizationLogoUrl(brand.organizationLogoUrl)
           if (brand.socialLogoUrl)        setSocialLogoUrl(brand.socialLogoUrl)
+          if (brand.socialAccountName)    setSocialAccountName(brand.socialAccountName)
+          if (brand.instagramVerified != null) setInstagramVerified(Boolean(brand.instagramVerified))
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -747,6 +751,8 @@ export default function SettingsPage() {
           organizationPhone: organizationPhone || null,
           organizationLogoUrl: organizationLogoUrl.trim() || null,
           socialLogoUrl: socialLogoUrl.trim() || null,
+          socialAccountName: socialAccountName.trim() || null,
+          instagramVerified,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -1292,72 +1298,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Social post logo */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-1">
-                    Social post logo (optional)
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Used on quote cards and branded social compositors. When empty, the organization logo above is used.
-                  </p>
-                  <div className="flex items-start gap-4">
-                    <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {socialLogoUrl || organizationLogoUrl ? (
-                        <img
-                          src={socialLogoUrl || organizationLogoUrl}
-                          alt="Social logo preview"
-                          className="w-full h-full object-contain p-1"
-                          onError={() => setSocialLogoUrl('')}
-                        />
-                      ) : (
-                        <Building2 className="w-8 h-8 text-muted-foreground/40" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex gap-2 flex-wrap">
-                        <input
-                          ref={socialLogoFileInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={handleSocialLogoUpload}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => socialLogoFileInputRef.current?.click()}
-                          disabled={isUploadingSocialLogo}
-                        >
-                          {isUploadingSocialLogo ? (
-                            <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading…</>
-                          ) : (
-                            <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload file</>
-                          )}
-                        </Button>
-                        {socialLogoUrl && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleRemoveSocialLogo}
-                            disabled={isUploadingSocialLogo}
-                          >
-                            <X className="w-3.5 h-3.5 mr-1.5" />Remove
-                          </Button>
-                        )}
-                      </div>
-                      <input
-                        type="url"
-                        value={socialLogoUrl}
-                        onChange={(e) => setSocialLogoUrl(e.target.value)}
-                        placeholder="or paste social logo URL…"
-                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 {/* Name + Website */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -1558,6 +1498,151 @@ export default function SettingsPage() {
                 {isSavingBrand
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
                   : <><Save className="w-4 h-4 mr-2" />Save Brand Profile</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Social Media Posts ────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold text-card-foreground mb-2">Social Media Posts</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Settings used when generating branded social images (quote cards, reels, carousels).
+          </p>
+
+          <div className="space-y-6">
+            {/* Profile photo */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-1">
+                Profile photo
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Shown as a circular avatar on quote cards. Use a square image — it will be cropped to a circle.
+                When empty, the organization logo from your Brand Profile is used.
+              </p>
+              <div className="flex items-start gap-5">
+                {/* Circular preview — mirrors the compositor output exactly */}
+                <div className="w-20 h-20 rounded-full border-2 border-border bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {socialLogoUrl || organizationLogoUrl ? (
+                    <img
+                      src={socialLogoUrl || organizationLogoUrl}
+                      alt="Social profile photo preview"
+                      className="w-full h-full object-cover"
+                      onError={() => setSocialLogoUrl('')}
+                    />
+                  ) : (
+                    <Building2 className="w-8 h-8 text-muted-foreground/40" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      ref={socialLogoFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={handleSocialLogoUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => socialLogoFileInputRef.current?.click()}
+                      disabled={isUploadingSocialLogo}
+                    >
+                      {isUploadingSocialLogo ? (
+                        <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading…</>
+                      ) : (
+                        <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload photo</>
+                      )}
+                    </Button>
+                    {socialLogoUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveSocialLogo}
+                        disabled={isUploadingSocialLogo}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1.5" />Remove
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={socialLogoUrl}
+                    onChange={(e) => setSocialLogoUrl(e.target.value)}
+                    placeholder="or paste image URL…"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="text-xs text-muted-foreground">PNG, JPG or WebP · Max 2 MB · Square images work best</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Account name */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-1">
+                Social account name
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                The display name shown next to your profile photo on quote cards (e.g. <span className="font-medium">hormozi</span> or <span className="font-medium">yourbrand</span>).
+                Defaults to your Organization Name when left blank.
+              </p>
+              <input
+                type="text"
+                value={socialAccountName}
+                onChange={(e) => setSocialAccountName(e.target.value)}
+                placeholder={organizationName || 'yourusername'}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+
+            {/* Verified badge */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-1">
+                Verified account
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Shows the Instagram blue verified badge next to your account name on quote cards.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={instagramVerified}
+                  onClick={() => setInstagramVerified((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                    instagramVerified ? 'bg-blue-500' : 'bg-muted-foreground/30'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                      instagramVerified ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-card-foreground">
+                  {instagramVerified ? 'Verified — blue badge will appear on quote cards' : 'Not verified'}
+                </span>
+              </div>
+              {instagramVerified && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md px-3 py-2">
+                  Only enable this if your Instagram account is officially verified by Meta. Adding a blue checkmark to an unverified account violates Instagram&apos;s Terms of Service.
+                </p>
+              )}
+            </div>
+
+            {/* Save */}
+            <div className="flex justify-end pt-2">
+              <Button
+                type="button"
+                onClick={handleSaveBrandProfile}
+                disabled={isSavingBrand}
+              >
+                {isSavingBrand
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                  : <><Save className="w-4 h-4 mr-2" />Save Social Settings</>}
               </Button>
             </div>
           </div>

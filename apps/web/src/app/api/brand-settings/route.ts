@@ -52,6 +52,8 @@ export async function GET() {
         organizationCountryCode: null,
         organizationLogoUrl: null,
         socialLogoUrl: null,
+        socialAccountName: null,
+        instagramVerified: false,
         googleBusinessProfileUrl: null,
         socialMediaLinks: null,
         diagramPrimaryColor: null,
@@ -110,6 +112,7 @@ export async function PATCH(request: NextRequest) {
       'organizationCountryCode',
       'organizationLogoUrl',
       'socialLogoUrl',
+      'socialAccountName',
       'googleBusinessProfileUrl',
       'diagramPrimaryColor',
       'diagramSecondaryColor',
@@ -145,6 +148,11 @@ export async function PATCH(request: NextRequest) {
     if (data.organizationCountryCode != null && typeof data.organizationCountryCode === 'string') {
       const code = data.organizationCountryCode.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 2)
       data.organizationCountryCode = code.length === 2 ? code : null
+    }
+
+    // Boolean field — can't go through the string coercion loop above
+    if ('instagramVerified' in body) {
+      data.instagramVerified = Boolean(body.instagramVerified)
     }
 
     // socialMediaLinks is a JSON array: [{ platform: string, url: string }]

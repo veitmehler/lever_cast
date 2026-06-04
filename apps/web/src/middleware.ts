@@ -61,7 +61,12 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   // ── Clerk auth protection (applies on app domain + localhost) ──
-  if (!isPublicRoute(request)) {
+  // API routes are explicitly excluded: each handler calls auth() itself and
+  // returns a JSON 401. Letting auth.protect() intercept /api/* would make
+  // Clerk return an HTML error page on auth failures, causing SyntaxErrors on
+  // the client and masking real 401s as confusing 404s.
+  const isApiRoute = pathname.startsWith('/api/')
+  if (!isPublicRoute(request) && !isApiRoute) {
     await auth.protect()
   }
 })

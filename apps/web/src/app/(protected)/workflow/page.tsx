@@ -98,16 +98,17 @@ export default function WorkflowPage() {
           : `/api/articles?status=${activeFilter}`
       const res = await fetch(url)
       if (!res.ok) {
-        // Silently swallow transient auth failures when we already have data.
-        // Clerk renews tokens automatically; showing an error toast + empty
-        // list on every mid-refresh poll would confuse users.
-        if ((res.status === 401 || res.status === 403) && jobsRef.current.length > 0) return
+        // Swallow any non-2xx error when we already have data to display.
+        // This covers 401/403 (Clerk token rotation), 404 (transient middleware
+        // blip returning HTML before Fix #1 takes effect everywhere), and 5xx
+        // (backend restart). The 5-second auto-poll will recover silently.
+        if (jobsRef.current.length > 0) return
+        // Cold start with no data: only toast so the user knows to retry.
         throw new Error('Failed to fetch articles')
       }
       const data = await res.json()
       setJobs(data.jobs ?? [])
     } catch {
-      // Only toast when we have no data to fall back on (initial load).
       if (jobsRef.current.length === 0) {
         toast.error('Failed to load article jobs')
       }

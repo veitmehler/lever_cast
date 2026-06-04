@@ -625,6 +625,10 @@ export default function WorkflowJobPage() {
   // causing stale-closure or side-effect-in-state-updater issues.
   const jobRef             = useRef<ArticleJob | null>(null)
   useEffect(() => { jobRef.current = job ?? null }, [job])
+  // Counts consecutive *authoritative* 404s (JSON body, not HTML). We only
+  // redirect after 3 in a row so a single transient middleware blip can't
+  // evict the user from a live generation.
+  const notFoundCountRef   = useRef(0)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -632,7 +636,26 @@ export default function WorkflowJobPage() {
     try {
       const res = await fetch(`/api/articles/${jobId}`)
       if (!res.ok) {
-        if (res.status === 404) { router.push('/workflow'); return }
+        if (res.status === 404) {
+          // Distinguish an authoritative API 404 ({"error":"Article job not found"})
+          // from a transient middleware/HTML 404 (Clerk auth blip returns <!DOCTYPE>).
+          // Only redirect after 3 consecutive confirmed JSON 404s so a single
+          // token-rotation glitch can't evict the user from a live generation.
+          let isAuthoritativeNotFound = false
+          try {
+            const body = await res.clone().json() as { error?: string }
+            if (typeof body?.error === 'string') isAuthoritativeNotFound = true
+          } catch { /* HTML body — transient, ignore */ }
+
+          if (isAuthoritativeNotFound) {
+            notFoundCountRef.current += 1
+            if (notFoundCountRef.current >= 3) { router.push('/workflow'); return }
+          } else {
+            notFoundCountRef.current = 0
+          }
+          return
+        }
+        notFoundCountRef.current = 0
         // Silently swallow transient auth failures when we already have job data.
         // The Clerk token renews automatically; toasting on every 3-second poll
         // cycle would spam the user and can cause a visible page disruption.
@@ -643,6 +666,7 @@ export default function WorkflowJobPage() {
         }
         throw new Error('Failed to load job')
       }
+      notFoundCountRef.current = 0
       const data = await res.json()
       const j = data.job as ArticleJob
       setJob({

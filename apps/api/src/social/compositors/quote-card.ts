@@ -22,18 +22,18 @@ const DIMENSIONS: Record<QuoteCardVariant, { width: number; height: number }> = 
 // bold account name in black, large left-aligned quote text below.
 
 const PADDING       = 80   // left/right margin
-const LOGO_SIZE     = 200  // diameter of the circular profile photo
+const LOGO_SIZE     = 150  // diameter of the circular profile photo (≈2.2× name size)
 const LOGO_TOP_FEED  = 80
 const LOGO_TOP_STORY = 140
 const HEADER_GAP     = 24  // gap between logo right edge and name text
 
-const NAME_FONT_SIZE  = 64  // account name next to the logo
-const QUOTE_FONT_FEED  = 72
-const QUOTE_FONT_STORY = 66
+const NAME_FONT_SIZE  = 68  // account name next to the logo (bold)
+const QUOTE_FONT_FEED  = 64  // body quote text (regular weight)
+const QUOTE_FONT_STORY = 60
 
-// Instagram verified badge: blue circle with a white checkmark tick, SVG.
-// Dimensions are scaled to sit neatly after the account name.
-const BADGE_SIZE = 56 // px — matches NAME_FONT_SIZE proportionally
+// Instagram verified badge: blue circle with white tick.
+// Scaled to sit neatly after the account name (≈0.85 × NAME_FONT_SIZE).
+const BADGE_SIZE = 58 // px
 
 function buildVerifiedBadgeSvg(size: number): string {
   const r = size / 2
@@ -56,16 +56,18 @@ function buildQuoteCardSvg(
   const headerBottom = logoTop + LOGO_SIZE + 56 // breathing room below header row
 
   const fontSize   = isStory ? QUOTE_FONT_STORY : QUOTE_FONT_FEED
-  const lineHeight = Math.round(fontSize * 1.45)
-  const maxChars   = isStory ? 20 : 22
+  const lineHeight = Math.round(fontSize * 1.22)
+  const maxChars   = isStory ? 22 : 26
   const maxLines   = isStory ? 16 : 10
 
   const lines = wrapText(input.quoteText, maxChars, maxLines)
   const textBlockHeight = lines.length * lineHeight
 
-  // Vertically centre the quote in the space below the header
+  // Vertically centre the quote in the space below the header.
+  // Clamp so long quotes top-align below the header rather than overlapping it.
   const availableHeight = height - headerBottom - PADDING
-  const textStartY = headerBottom + Math.round((availableHeight - textBlockHeight) / 2) + fontSize
+  const centredOffset = Math.round((availableHeight - textBlockHeight) / 2)
+  const textStartY = headerBottom + Math.max(0, centredOffset) + fontSize
 
   const font      = escapeXml(input.brand.fontFamily)
   const nameText  = escapeXml(input.brand.socialAccountName)
@@ -93,8 +95,8 @@ function buildQuoteCardSvg(
   <!-- Account name -->
   <text x="${nameX}" y="${nameY}" font-family="${font}" font-size="${NAME_FONT_SIZE}" font-weight="700" fill="#1A1A1A">${nameText}</text>
   ${verifiedBadge}
-  <!-- Quote body -->
-  <text font-family="${font}" font-size="${fontSize}" font-weight="700" fill="#1A1A1A">
+  <!-- Quote body (regular weight — name above stays bold) -->
+  <text font-family="${font}" font-size="${fontSize}" font-weight="400" fill="#1A1A1A">
     ${leftAlignedTextLines(lines, PADDING, textStartY, lineHeight)}
   </text>
 </svg>`

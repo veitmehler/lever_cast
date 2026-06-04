@@ -21,7 +21,7 @@ const DEFAULTS: DiagramTheme = {
   primaryColor: '#3B82F6',
   secondaryColor: '#8B5CF6',
   lineColor: '#6B7280',
-  fontFamily: 'Nimbus Sans, Helvetica, Arial, sans-serif',
+  fontFamily: 'HelveticaNeue, Helvetica, Arial, sans-serif',
 }
 
 const DARK_LINE = '#6C7086'

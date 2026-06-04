@@ -29,10 +29,15 @@ FROM node:20-alpine AS runtime
 
 # Phase 9: postgresql-client for pg_dump (DB backup handler)
 # Article pipeline: Chromium + Mermaid CLI
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont font-liberation font-urw-base35 postgresql16-client ffmpeg
+RUN apk add --no-cache chromium nss freetype fontconfig harfbuzz ca-certificates ttf-freefont font-liberation postgresql16-client ffmpeg
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     CHROME_BIN=/usr/bin/chromium-browser
+
+# Bundle Helvetica Neue (Thin/Light/Regular/Medium/Bold) for social compositors
+# and register it with fontconfig so librsvg/sharp can resolve it.
+COPY apps/api/fonts/ /usr/share/fonts/helvetica-neue/
+RUN fc-cache -f
 
 RUN npm install -g @mermaid-js/mermaid-cli
 

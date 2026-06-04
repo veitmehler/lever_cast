@@ -155,20 +155,98 @@ function escapeDrawtext(text: string): string {
     .replace(/%/g, '\\%')
 }
 
+/** Minimal word-wrap used for title overlay sizing (mirrors svg-utils wrapText). */
+function wrapTitle(text: string, maxChars: number, maxLines: number): string[] {
+  const words = text.trim().split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= maxChars) {
+      current = candidate
+    } else {
+      if (current) lines.push(current)
+      current = word
+      if (lines.length >= maxLines) break
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current)
+  return lines.slice(0, maxLines)
+}
+
+/**
+ * Overlay the article title on a video clip using the carousel title-slide
+ * design: a dark semi-transparent box sized only around the text (not a
+ * full-frame veil), centred slightly above the vertical midpoint.
+ *
+ * Layout values are scaled to the actual video dimensions so the design holds
+ * for both 720×720 Seedance clips and 1080×1080 slideshow frames.
+ */
 export async function overlayTitleOnVideo(
   inputPath: string,
   outputPath: string,
   title: string,
   fontPath: string = defaultFontPath(),
 ): Promise<void> {
+  const { width, height } = await probeVideo(inputPath)
+  const scale = height / 1080
+
+  const lines = wrapTitle(title, 22, 5)
+  const fontSize  = Math.round(52  * scale)
+  const lineH     = Math.round(68  * scale)
+  const boxPadV   = Math.round(36  * scale)
+  const boxPadH   = Math.round(60  * scale)
+  const boxW      = width - 2 * boxPadH
+  const boxH      = lines.length * lineH + 2 * boxPadV
+  const boxX      = boxPadH
+  // Slightly above vertical centre, matching the carousel title slide
+  const boxY      = Math.round((height - boxH) / 2) - Math.round(40 * scale)
+
+  const darkBox = `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`
+
+  const textFilters = lines.map((line, i) => {
+    const y = boxY + boxPadV + fontSize + i * lineH
+    return `drawtext=fontfile=${fontPath}:text='${escapeDrawtext(line)}':fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+  })
+
+  const vf = [darkBox, ...textFilters].join(',')
+  await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
+}
+
+/**
+ * Overlay a full-frame dark veil + title + ✓ bullet list on a video (F2 Video Reel).
+ * Layout mirrors the reference design: all text is top-anchored at 150 px.
+ */
+export async function overlayTitleAndBulletsOnVideo(
+  inputPath: string,
+  outputPath: string,
+  title: string,
+  bullets: string[],
+  fontPath: string = defaultFontPath(),
+): Promise<void> {
+  const titleFontSize = 52
+  const bulletFontSize = 36
+  const titleY = 150
+  const titleBulletGap = 76
+  const bulletLineHeight = 72
+
   const safeTitle = escapeDrawtext(title.slice(0, 80))
-  await runFfmpeg([
-    '-i',
-    inputPath,
-    '-vf',
-    `drawtext=fontfile=${fontPath}:text='${safeTitle}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h*0.12:box=1:boxcolor=black@0.45:boxborderw=12`,
-    '-c:a',
-    'copy',
-    outputPath,
-  ])
+
+  const bulletFilters = bullets.slice(0, 6).map((bullet, i) => {
+    const text = escapeDrawtext(`\u2713 ${bullet}`.slice(0, 65))
+    const y = titleY + titleFontSize + titleBulletGap + i * bulletLineHeight
+    return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
+  })
+
+  // Single -vf chain:
+  //   1. drawbox fills the entire frame with black@0.55 (dark veil)
+  //   2. drawtext for the centred title at y=150
+  //   3. drawtext for each ✓ bullet, left-aligned, stacked below the title
+  const vf = [
+    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill`,
+    `drawtext=fontfile=${fontPath}:text='${safeTitle}':fontcolor=white:fontsize=${titleFontSize}:x=(w-text_w)/2:y=${titleY}`,
+    ...bulletFilters,
+  ].join(',')
+
+  await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
 }

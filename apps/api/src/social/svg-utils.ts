@@ -43,3 +43,18 @@ export function centeredTextLines(
     })
     .join('')
 }
+
+/** Build SVG tspans for left-aligned multi-line text. */
+export function leftAlignedTextLines(
+  lines: string[],
+  x: number,
+  startY: number,
+  lineHeight: number,
+): string {
+  return lines
+    .map((line, i) => {
+      const y = startY + i * lineHeight
+      return `<tspan x="${x}" y="${y}">${escapeXml(line)}</tspan>`
+    })
+    .join('')
+}

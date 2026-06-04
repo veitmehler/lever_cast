@@ -78,6 +78,7 @@ export async function generateSpecAssets(opts: {
       const reel = await generateVideoReelAsset({
         userId,
         content: content.text,
+        title: articleCtx.title,
         jobId: assetJobId,
       })
       return { postType: 'video_reel', videoUrl: reel.videoUrl }

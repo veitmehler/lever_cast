@@ -3,7 +3,6 @@ import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { logger } from '../../lib/logger'
 
 const execFileAsync = promisify(execFile)
 
@@ -164,12 +163,18 @@ export async function mergeAudioVideo(
   ])
 }
 
+/**
+ * Escape text for use as a single-quoted `drawtext=text='...'` value when the
+ * filter uses `expansion=none`. With expansion disabled, ffmpeg prints the text
+ * verbatim, so `%`, `:`, `\`, `{`, `}` etc. are all safe inside the single
+ * quotes and must NOT be backslash-escaped (doing so previously caused
+ * "Stray %" failures that silently dropped any line containing a percent sign).
+ *
+ * The only character that can break a single-quoted value is the single quote
+ * itself; we close the quote, emit a literal escaped quote, and reopen: '\''.
+ */
 function escapeDrawtext(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
+  return text.replace(/'/g, "'\\''")
 }
 
 /** Minimal word-wrap used for title overlay sizing (mirrors svg-utils wrapText). */
@@ -223,7 +228,7 @@ export async function overlayTitleOnVideo(
 
   const textFilters = lines.map((line, i) => {
     const y = boxY + boxPadV + fontSize + i * lineH
-    return `drawtext=fontfile=${fontPath}:text='${escapeDrawtext(line)}':fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    return `drawtext=fontfile=${fontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
   })
 
   const vf = [darkBox, ...textFilters].join(',')
@@ -281,15 +286,6 @@ export async function overlayBulletsOnVideo(
   const list = bullets.slice(0, 6)
   const wrappedBullets = list.map((b) => wrapBulletLines(b, 28))
 
-  logger.info(
-    {
-      rawBullets: bullets,
-      rawBulletCount: bullets.length,
-      wrappedBullets,
-    },
-    '[video-reel] overlayBulletsOnVideo bullets',
-  )
-
   // Total block height: all wrapped lines + one gap between each bullet pair.
   const totalLines = wrappedBullets.reduce((n, lines) => n + lines.length, 0)
   const totalGaps  = wrappedBullets.length - 1
@@ -302,7 +298,7 @@ export async function overlayBulletsOnVideo(
     for (const line of wrappedBullets[bi]) {
       const text = escapeDrawtext(line)
       bulletFilters.push(
-        `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
+        `drawtext=fontfile=${fontPath}:text='${text}':expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
       )
       currentY += bulletLineHeight
     }
@@ -339,7 +335,7 @@ export async function overlayTitleAndBulletsOnVideo(
   const bulletFilters = bullets.slice(0, 6).map((bullet, i) => {
     const text = escapeDrawtext(`- ${bullet.slice(0, 28)}`)
     const y = titleY + titleFontSize + titleBulletGap + i * bulletLineHeight
-    return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
+    return `drawtext=fontfile=${fontPath}:text='${text}':expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
   })
 
   // Single -vf chain:
@@ -348,7 +344,7 @@ export async function overlayTitleAndBulletsOnVideo(
   //   3. drawtext for each ✓ bullet, left-aligned, stacked below the title
   const vf = [
     `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill`,
-    `drawtext=fontfile=${fontPath}:text='${safeTitle}':fontcolor=white:fontsize=${titleFontSize}:x=(w-text_w)/2:y=${titleY}`,
+    `drawtext=fontfile=${fontPath}:text='${safeTitle}':expansion=none:fontcolor=white:fontsize=${titleFontSize}:x=(w-text_w)/2:y=${titleY}`,
     ...bulletFilters,
   ].join(',')
 

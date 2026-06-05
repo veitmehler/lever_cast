@@ -172,29 +172,24 @@ export async function mergeAudioVideo(
 }
 
 /**
- * Escape text for an UNQUOTED `drawtext=text=...` value used with `expansion=none`.
+ * Write a drawtext string to a temp file and return its path, so the text can be
+ * referenced via `drawtext=textfile=<path>` instead of `text=<inline>`.
  *
- * We deliberately avoid single-quote wrapping because FFmpeg's filtergraph parser
- * does NOT support `\'` as an escaped single-quote inside a single-quoted string —
- * it treats the `'` as closing the string, causing everything after it (including
- * subsequent filter options) to be absorbed into the text value.
+ * This sidesteps FFmpeg's two-level filtergraph escaping entirely: file contents
+ * are rendered verbatim and never pass through either the filtergraph parser
+ * (which splits on `,` `;` `[` `]` and processes `\` `'`) or the option parser
+ * (which splits on `:`). As a result, arbitrary LLM-generated text — apostrophes,
+ * colons, commas, percent signs, em-dashes, brackets, emoji — renders correctly
+ * with zero escaping. Combined with `expansion=none`, even `%` and `\` are literal.
  *
- * Without quoting, we must backslash-escape every character that is special at
- * either the filtergraph level (`,` `;` `[` `]`) or the option-value level
- * (`\` `:` `'`).
- *
- * `%` is deliberately NOT escaped: with `expansion=none` it prints verbatim,
- * whereas `\%` triggers a "Stray %" error that silently drops the line.
+ * Files live inside the per-render temp directory (dirname of the output path),
+ * which `withTempDir` removes after the job completes, so no manual cleanup is needed.
  */
-function escapeDrawtext(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')   // backslash first (must be first)
-    .replace(/'/g, "\\'")     // single quote
-    .replace(/:/g, '\\:')     // option separator
-    .replace(/,/g, '\\,')     // filtergraph filter separator
-    .replace(/;/g, '\\;')     // filtergraph chain separator
-    .replace(/\[/g, '\\[')   // filtergraph pad reference
-    .replace(/\]/g, '\\]')
+let drawtextFileSeq = 0
+async function writeDrawtextFile(dir: string, text: string): Promise<string> {
+  const filePath = path.join(dir, `drawtext-${drawtextFileSeq++}.txt`)
+  await fs.writeFile(filePath, text, 'utf8')
+  return filePath
 }
 
 /** Minimal word-wrap used for title overlay sizing (mirrors svg-utils wrapText). */
@@ -246,10 +241,14 @@ export async function overlayTitleOnVideo(
 
   const darkBox = `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`
 
-  const textFilters = lines.map((line, i) => {
-    const y = boxY + boxPadV + fontSize + i * lineH
-    return `drawtext=fontfile=${fontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
-  })
+  const dir = path.dirname(outputPath)
+  const textFilters = await Promise.all(
+    lines.map(async (line, i) => {
+      const y = boxY + boxPadV + fontSize + i * lineH
+      const tf = await writeDrawtextFile(dir, line)
+      return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    }),
+  )
 
   const vf = [darkBox, ...textFilters].join(',')
   await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
@@ -339,13 +338,14 @@ export async function overlayBulletsOnVideo(
   const bulletBlockHeight = totalLines * bulletLineHeight + totalGaps * interBulletGap
   const startY = Math.round((height - bulletBlockHeight) / 2)
 
+  const dir = path.dirname(outputPath)
   const bulletFilters: string[] = []
   let currentY = startY
   for (let bi = 0; bi < wrappedBullets.length; bi++) {
     for (const line of wrappedBullets[bi]) {
-      const text = escapeDrawtext(line)
+      const tf = await writeDrawtextFile(dir, line)
       bulletFilters.push(
-        `drawtext=fontfile=${fontPath}:text=${text}:expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
+        `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
       )
       currentY += bulletLineHeight
     }
@@ -395,18 +395,20 @@ export async function overlayTitleAndBulletsOnVideo(
 
   const xMargin = 'w*0.08'
   const xText   = `w*0.08+${CHECK_OFFSET}`
+  const dir = path.dirname(outputPath)
 
   const filters: string[] = [
     `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,
   ]
 
   // Title lines
-  titleLines.forEach((line, i) => {
+  for (let i = 0; i < titleLines.length; i++) {
     const y = TOP_PAD + i * TITLE_LH
+    const tf = await writeDrawtextFile(dir, titleLines[i])
     filters.push(
-      `drawtext=fontfile=${titleFontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${TITLE_FS}:x=${xMargin}:y=${y}`,
+      `drawtext=fontfile=${titleFontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${TITLE_FS}:x=${xMargin}:y=${y}`,
     )
-  })
+  }
 
   // Bullet block starts below the title
   const bulletStartY = TOP_PAD + titleLines.length * TITLE_LH + TITLE_GAP
@@ -414,19 +416,21 @@ export async function overlayTitleAndBulletsOnVideo(
   let currentY = bulletStartY
   for (let bi = 0; bi < wrappedBullets.length; bi++) {
     const lines = wrappedBullets[bi]
-    lines.forEach((line, li) => {
+    for (let li = 0; li < lines.length; li++) {
       const y = currentY + li * BULLET_LH
       if (li === 0) {
-        // ✓ glyph in DejaVu
+        // ✓ glyph in DejaVu. The checkmark (U+2713) carries no ffmpeg-special
+        // characters, so it stays safe inline without a textfile.
         filters.push(
           `drawtext=fontfile=${checkFontPath}:text=✓:expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xMargin}:y=${y}`,
         )
       }
       // Bullet text in Helvetica Neue Light (all lines, including first)
+      const tf = await writeDrawtextFile(dir, lines[li])
       filters.push(
-        `drawtext=fontfile=${bulletFontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xText}:y=${y}`,
+        `drawtext=fontfile=${bulletFontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xText}:y=${y}`,
       )
-    })
+    }
     currentY += lines.length * BULLET_LH
     if (bi < wrappedBullets.length - 1) currentY += INTER_GAP
   }

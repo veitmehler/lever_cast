@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import { logger } from '../../lib/logger'
 
 const execFileAsync = promisify(execFile)
 
@@ -279,6 +280,15 @@ export async function overlayBulletsOnVideo(
 
   const list = bullets.slice(0, 6)
   const wrappedBullets = list.map((b) => wrapBulletLines(b, 28))
+
+  logger.info(
+    {
+      rawBullets: bullets,
+      rawBulletCount: bullets.length,
+      wrappedBullets,
+    },
+    '[video-reel] overlayBulletsOnVideo bullets',
+  )
 
   // Total block height: all wrapped lines + one gap between each bullet pair.
   const totalLines = wrappedBullets.reduce((n, lines) => n + lines.length, 0)

@@ -32,7 +32,7 @@ export async function extractReelBullets(content: string): Promise<string[]> {
     userPrompt,
     model,
     temperature: 0.35,
-    maxTokens: 256,
+    maxTokens: 2048,
     jsonMode: true,
   })
 

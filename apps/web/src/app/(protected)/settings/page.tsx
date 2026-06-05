@@ -1642,7 +1642,7 @@ export default function SettingsPage() {
                 Video &amp; Image Special Instructions
               </label>
               <p className="text-xs text-muted-foreground mb-2">
-                These instructions are injected into every Fal.ai video reel prompt. Use them to enforce your visual style, restrict unwanted content, or specify requirements for your brand (e.g. "Always show outdoor urban scenes" or "Never use dark backgrounds").
+                These instructions are injected into every Fal.ai video reel prompt. Use them to enforce your visual style, restrict unwanted content, or specify requirements for your brand (e.g. &ldquo;Always show outdoor urban scenes&rdquo; or &ldquo;Never use dark backgrounds&rdquo;).
               </p>
               <textarea
                 value={videoSpecialInstructions}

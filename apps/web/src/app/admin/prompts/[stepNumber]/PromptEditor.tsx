@@ -92,6 +92,11 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'article_topic',      description: '[Enrichment] Article topic string',             steps: [20] },
   { name: 'section_title',      description: '[Enrichment] H2 section heading',               steps: [20] },
   { name: 'section_html',       description: '[Enrichment] HTML content of the H2 section',  steps: [20] },
+  // Video reel prompt (step 206)
+  { name: 'topic',              description: '[Video Reel] Article title / topic',            steps: [206] },
+  { name: 'details',            description: '[Video Reel] First H2 section text from the article', steps: [206] },
+  { name: 'special_instructions', description: '[Video Reel] Client video instructions from Social Settings', steps: [206] },
+  { name: 'video_model',        description: '[Video Reel] Fal.ai video model slug from Step 207', steps: [206] },
 ]
 
 const STEP_LABELS: Record<number, string> = {
@@ -125,10 +130,18 @@ const STEP_LABELS: Record<number, string> = {
   107: 'Phase C · Step 23 — Key Takeaways & TOC',
   20:  'Phase C · Step 24 — Mermaid Diagram (prompt slot)',
   108: 'Phase C · Step 25 — WP Category (conditional, runs last)',
+  // Social media posts
+  201: 'Social · Step 1 — Quote selection',
+  202: 'Social · Step 2 — Carousel plan',
+  203: 'Social · Step 3 — Platform caption',
+  204: 'Social · Step 4 — Reel bullets',
+  205: 'Social · Step 5 — Quote video narration',
+  206: 'Social · Step 6 — Video Reel Prompt (LLM)',
+  207: 'Social · Step 7 — Video Reel — Fal.ai Model',
 }
 
 /** Steps that only configure a model, not a prompt. */
-const MODEL_ONLY_STEPS = new Set([150])
+const MODEL_ONLY_STEPS = new Set([150, 207])
 
 const PROVIDER_OPTIONS = [
   { value: 'gemini',     label: 'Gemini (Google)' },
@@ -210,6 +223,11 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: stri
     { value: 'fal-ai/flux-realism',                            label: 'FLUX Realism',                       group: 'Specialised' },
     { value: 'fal-ai/recraft-v3',                              label: 'Recraft v3',                         group: 'Specialised' },
     { value: 'fal-ai/stable-diffusion-xl',                     label: 'Stable Diffusion XL',                group: 'Specialised' },
+    // ── ByteDance Seedance (Video Generation — Step 207) ─────────────────
+    { value: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',  label: 'Seedance v1 Lite — Text-to-Video',   group: 'Seedance Video' },
+    { value: 'fal-ai/bytedance/seedance/v1/lite/image-to-video', label: 'Seedance v1 Lite — Image-to-Video',  group: 'Seedance Video' },
+    { value: 'fal-ai/bytedance/seedance/v1/pro/text-to-video',   label: 'Seedance v1 Pro — Text-to-Video',    group: 'Seedance Video' },
+    { value: 'fal-ai/bytedance/seedance/v1/pro/image-to-video',  label: 'Seedance v1 Pro — Image-to-Video',   group: 'Seedance Video' },
   ],
 }
 
@@ -474,11 +492,19 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
               <Info className="h-5 w-5 flex-shrink-0 text-amber-500 mt-0.5" />
               <div className="text-sm text-amber-800 dark:text-amber-300">
                 <p className="font-semibold mb-1">Prompt-free step — model selection only</p>
-                <p className="text-xs leading-relaxed">
-                  The image prompt is generated automatically by <strong>Step 15</strong> using the article
-                  topic and summary. Only the <strong>Fal.ai model</strong> selected above controls which
-                  image generation model renders that prompt.
-                </p>
+                {template.stepNumber === 207 ? (
+                  <p className="text-xs leading-relaxed">
+                    The video description is generated automatically by <strong>Step 206</strong> using the article
+                    topic and H2 section content. Only the <strong>Fal.ai video model</strong> selected above controls
+                    which text-to-video model renders that prompt.
+                  </p>
+                ) : (
+                  <p className="text-xs leading-relaxed">
+                    The image prompt is generated automatically by <strong>Step 15</strong> using the article
+                    topic and summary. Only the <strong>Fal.ai model</strong> selected above controls which
+                    image generation model renders that prompt.
+                  </p>
+                )}
               </div>
             </div>
           ) : (

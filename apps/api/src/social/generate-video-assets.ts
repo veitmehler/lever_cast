@@ -10,8 +10,10 @@ import {
   type GeneratedCarousel,
 } from './generate-assets'
 import { extractReelBullets } from './generators/reel-bullets'
+import { generateVideoReelPrompt } from './generators/video-reel-prompt'
 import { generateQuoteVideoNarration } from './generators/quote-video-narration'
 import { loadSocialBrandTheme } from './brand-theme'
+import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
 
 function generationId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -70,29 +72,45 @@ async function uploadVideoFile(opts: {
 export async function generateVideoReelAsset(opts: {
   userId: string
   content: string
+  /** Article title / topic — used as {{topic}} in the video prompt. Falls back to first line of content. */
+  topic?: string
+  /** First H2 section text — used as {{details}} in the video prompt. Falls back to content slice. */
+  h2Content?: string
   jobId?: string
 }): Promise<GeneratedVideoReel> {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
-  const brand = await loadSocialBrandTheme(opts.userId)
-  const bullets = await extractReelBullets(opts.content)
 
-  const carousel = await generateCarouselAssets({
-    userId: opts.userId,
-    content: opts.content,
-    slideCount: 1,
-    jobId,
+  const [brand, bullets, videoModelTemplate] = await Promise.all([
+    loadSocialBrandTheme(opts.userId),
+    extractReelBullets(opts.content),
+    loadPromptTemplate(207),
+  ])
+
+  const falModel = videoModelTemplate?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
+
+  // Derive topic and details from provided params or content fallback
+  const topic = opts.topic?.trim() ||
+    opts.content.replace(/<[^>]+>/g, ' ').split(/[\n.!?]/)[0]?.trim().slice(0, 200) ||
+    brand.organizationName
+  const details = opts.h2Content?.trim() ||
+    opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500)
+
+  const videoPrompt = await generateVideoReelPrompt({
+    topic,
+    details,
+    specialInstructions: brand.videoSpecialInstructions,
+    videoModel: falModel,
   })
-  const backgroundImageUrl = carousel.imageUrls[0]
 
   return withTempDir('video-reel-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'reel.mp4')
     const probe = await buildVideoReel({
-      prompt: `Cinematic subtle motion for ${brand.organizationName}: ${bullets[0]}`,
-      backgroundImageUrl,
+      prompt: videoPrompt,
       bullets,
       outputPath,
       tmpDir,
+      falModel,
     })
 
     const uploaded = await uploadVideoFile({

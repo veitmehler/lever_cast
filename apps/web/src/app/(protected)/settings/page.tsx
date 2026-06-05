@@ -194,6 +194,7 @@ export default function SettingsPage() {
   const [socialLogoUrl, setSocialLogoUrl]               = useState('')
   const [socialAccountName, setSocialAccountName]       = useState('')
   const [instagramVerified, setInstagramVerified]       = useState(false)
+  const [videoSpecialInstructions, setVideoSpecialInstructions] = useState('')
   const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
   const [isUploadingSocialLogo, setIsUploadingSocialLogo] = useState(false)
   const logoFileInputRef                                = useRef<HTMLInputElement>(null)
@@ -270,6 +271,7 @@ export default function SettingsPage() {
           if (brand.socialLogoUrl)        setSocialLogoUrl(brand.socialLogoUrl)
           if (brand.socialAccountName)    setSocialAccountName(brand.socialAccountName)
           if (brand.instagramVerified != null) setInstagramVerified(Boolean(brand.instagramVerified))
+          if (brand.videoSpecialInstructions) setVideoSpecialInstructions(brand.videoSpecialInstructions)
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -753,6 +755,7 @@ export default function SettingsPage() {
           socialLogoUrl: socialLogoUrl.trim() || null,
           socialAccountName: socialAccountName.trim() || null,
           instagramVerified,
+          videoSpecialInstructions: videoSpecialInstructions.trim() || null,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -1631,6 +1634,23 @@ export default function SettingsPage() {
                   Only enable this if your Instagram account is officially verified by Meta. Adding a blue checkmark to an unverified account violates Instagram&apos;s Terms of Service.
                 </p>
               )}
+            </div>
+
+            {/* Video & Image Special Instructions */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Video &amp; Image Special Instructions
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                These instructions are injected into every Fal.ai video reel prompt. Use them to enforce your visual style, restrict unwanted content, or specify requirements for your brand (e.g. "Always show outdoor urban scenes" or "Never use dark backgrounds").
+              </p>
+              <textarea
+                value={videoSpecialInstructions}
+                onChange={(e) => setVideoSpecialInstructions(e.target.value)}
+                rows={4}
+                placeholder="e.g. Always use bright, modern settings. No dark or moody visuals. Avoid close-up faces."
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
             </div>
 
             {/* Save */}

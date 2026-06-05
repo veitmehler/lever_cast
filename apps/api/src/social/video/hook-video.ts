@@ -50,13 +50,16 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
 
 export interface VideoReelOptions {
   prompt: string
-  backgroundImageUrl: string
+  /** Optional background image sent to Seedance for image-to-video. Omit for pure text-to-video. */
+  backgroundImageUrl?: string
   bullets: string[]
   outputPath: string
   tmpDir: string
+  /** Override the Fal.ai model slug. Defaults to Seedance v1 Lite text-to-video. */
+  falModel?: string
 }
 
-/** F2: 9:16 Seedance background + dark veil + centred ✓ bullets (no title). */
+/** F2: 9:16 Seedance background + dark veil + centred bullet list (no title). */
 export async function buildVideoReel(opts: VideoReelOptions): Promise<VideoProbe> {
   const seedanceUrl = await generateSeedanceClip({
     prompt: opts.prompt,
@@ -64,12 +67,13 @@ export async function buildVideoReel(opts: VideoReelOptions): Promise<VideoProbe
     duration: '6',
     resolution: '720p',
     aspectRatio: '9:16',
+    model: opts.falModel,
   })
 
   const rawPath = path.join(opts.tmpDir, 'reel-raw.mp4')
   const finalPath = path.join(opts.tmpDir, 'reel-overlay.mp4')
   await downloadSeedanceClip(seedanceUrl, rawPath)
-  await overlayBulletsOnVideo(rawPath, finalPath, opts.bullets, defaultFontPath())
+  await overlayBulletsOnVideo(rawPath, finalPath, opts.bullets)
   await fs.copyFile(finalPath, opts.outputPath)
   return probeVideo(opts.outputPath)
 }

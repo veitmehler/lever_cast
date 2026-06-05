@@ -13,6 +13,8 @@ export interface SeedanceOptions {
   resolution?: '480p' | '720p'
   aspectRatio?: '1:1' | '9:16' | '16:9'
   jobId?: string
+  /** Override the Fal.ai model slug. Defaults to the appropriate Seedance T2V or I2V model. */
+  model?: string
 }
 
 interface SeedanceResult {
@@ -34,7 +36,7 @@ export async function generateSeedanceClip(opts: SeedanceOptions): Promise<strin
   const apiKey = await getSystemApiKey('fal-ai')
   if (!apiKey) throw new Error('No Fal.ai system API key configured')
 
-  const model = opts.imageUrl ? DEFAULT_SEEDANCE_I2V_MODEL : DEFAULT_SEEDANCE_T2V_MODEL
+  const model = opts.model ?? (opts.imageUrl ? DEFAULT_SEEDANCE_I2V_MODEL : DEFAULT_SEEDANCE_T2V_MODEL)
   fal.config({ credentials: apiKey })
 
   const input = {

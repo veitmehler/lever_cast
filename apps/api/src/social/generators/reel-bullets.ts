@@ -3,7 +3,7 @@ import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/outpu
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 
 const DEF_SYS =
-  'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 60 characters.'
+  'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 28 characters.'
 
 const DEF_USER = `Extract 3–5 bullet points from the content below for a video reel text overlay.
 
@@ -12,7 +12,7 @@ Content:
 
 Return ONLY valid JSON: { "bullets": ["...", "..."] }
 - 3–5 bullets
-- Each ≤ 60 characters
+- Each ≤ 28 characters
 - Declarative, scannable
 - No hashtags or emojis`
 

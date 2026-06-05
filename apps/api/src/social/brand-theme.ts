@@ -13,6 +13,8 @@ export interface SocialBrandTheme {
   /** When true, an Instagram-style blue verified badge is rendered on quote cards. */
   instagramVerified: boolean
   logoUrl: string | null
+  /** Client-specific instructions injected into the Fal.ai video reel prompt (e.g. style, restrictions). */
+  videoSpecialInstructions: string
 }
 
 export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandTheme> {
@@ -34,6 +36,7 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     socialAccountName: brand?.socialAccountName?.trim() || organizationName,
     instagramVerified: brand?.instagramVerified ?? false,
     logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
+    videoSpecialInstructions: brand?.videoSpecialInstructions?.trim() ?? '',
   }
 }
 

@@ -18,6 +18,14 @@ export function defaultFontPath(): string {
   return process.env.FFMPEG_FONT_PATH || '/usr/share/fonts/liberation/LiberationSans-Bold.ttf'
 }
 
+/** Bundled Helvetica Neue Regular — used for F2/S2 video reel bullet overlays. */
+export function helveticaNeueRegularFontPath(): string {
+  return (
+    process.env.HELVETICA_NEUE_REGULAR_FONT_PATH ||
+    '/usr/share/fonts/helvetica-neue/HelveticaNeue-Regular.ttf'
+  )
+}
+
 export async function runFfmpeg(args: string[]): Promise<void> {
   await execFileAsync(ffmpegBin(), ['-y', ...args], {
     maxBuffer: 64 * 1024 * 1024,
@@ -221,20 +229,24 @@ export async function overlayBulletsOnVideo(
   inputPath: string,
   outputPath: string,
   bullets: string[],
-  fontPath: string = defaultFontPath(),
+  fontPath: string = helveticaNeueRegularFontPath(),
 ): Promise<void> {
   const { height } = await probeVideo(inputPath)
   const scale = height / 1080
 
   const bulletFontSize = Math.round(36 * scale)
   const bulletLineHeight = Math.round(52 * scale)
+  // Empty-line gap after each bullet = one line height
+  const bulletSpacing = bulletLineHeight * 2
   const list = bullets.slice(0, 6)
-  const bulletBlockHeight = list.length * bulletLineHeight
+  // Block height: each bullet + gap, minus the trailing gap on the last bullet
+  const bulletBlockHeight = list.length * bulletLineHeight + (list.length - 1) * bulletLineHeight
   const startY = Math.round((height - bulletBlockHeight) / 2)
 
   const bulletFilters = list.map((bullet, i) => {
-    const text = escapeDrawtext(`\u2713 ${bullet}`.slice(0, 65))
-    const y = startY + bulletFontSize + i * bulletLineHeight
+    // Prefix is "- " (2 chars, ASCII); bullet text capped at 28 chars → 30 total
+    const text = escapeDrawtext(`- ${bullet.slice(0, 28)}`)
+    const y = startY + i * bulletSpacing
     return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
   })
 
@@ -266,7 +278,7 @@ export async function overlayTitleAndBulletsOnVideo(
   const safeTitle = escapeDrawtext(title.slice(0, 80))
 
   const bulletFilters = bullets.slice(0, 6).map((bullet, i) => {
-    const text = escapeDrawtext(`\u2713 ${bullet}`.slice(0, 65))
+    const text = escapeDrawtext(`- ${bullet.slice(0, 28)}`)
     const y = titleY + titleFontSize + titleBulletGap + i * bulletLineHeight
     return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
   })

@@ -34,6 +34,14 @@ export function helveticaNeweLightFontPath(): string {
   )
 }
 
+/** Bundled DejaVu Sans — used to render ✓ glyphs that Helvetica Neue lacks. */
+export function dejaVuSansFontPath(): string {
+  return (
+    process.env.DEJAVU_SANS_FONT_PATH ||
+    '/usr/share/fonts/helvetica-neue/DejaVuSans.ttf'
+  )
+}
+
 export async function runFfmpeg(args: string[]): Promise<void> {
   await execFileAsync(ffmpegBin(), ['-y', ...args], {
     maxBuffer: 64 * 1024 * 1024,
@@ -246,6 +254,7 @@ export async function overlayTitleOnVideo(
  * Word-wrap a single bullet into display lines of at most `maxChars` content
  * characters each. The first line is prefixed with "- " and continuation lines
  * with "  " so the text stays aligned under the first character after the dash.
+ * Used by `overlayBulletsOnVideo` (no-headline variant).
  */
 function wrapBulletLines(text: string, maxChars: number): string[] {
   const words = text.trim().split(/\s+/)
@@ -269,6 +278,32 @@ function wrapBulletLines(text: string, maxChars: number): string[] {
   if (current) contentLines.push(current)
 
   return contentLines.map((line, i) => (i === 0 ? `- ${line}` : `  ${line}`))
+}
+
+/**
+ * Word-wrap text into plain lines (no prefix). Used for ✓-prefixed bullets
+ * where the checkmark is rendered as a separate drawtext layer.
+ */
+function wrapTextLines(text: string, maxChars: number): string[] {
+  const words = text.trim().split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const w = word.slice(0, maxChars)
+    if (!current) {
+      current = w
+    } else {
+      const candidate = `${current} ${w}`
+      if (candidate.length <= maxChars) {
+        current = candidate
+      } else {
+        lines.push(current)
+        current = w
+      }
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
 
 /**
@@ -321,39 +356,76 @@ export async function overlayBulletsOnVideo(
 }
 
 /**
- * Overlay a full-frame dark veil + title + ✓ bullet list on a video (F2 Video Reel).
- * Layout mirrors the reference design: all text is top-anchored at 150 px.
+ * Overlay a full-frame dark veil + headline + ✓ bullet list on a video (F2/S2 Video Reel).
+ *
+ * - Full-frame black@0.75 dark veil
+ * - Headline: Helvetica Neue Regular, 32 px, left-aligned, word-wrapped at 30 chars
+ * - Bullets: ✓ glyph rendered with DejaVu Sans (which carries the glyph) and the
+ *   bullet text rendered side-by-side with Helvetica Neue Light, both 24 px.
+ *   Continuation lines are indented to align with the text start.
+ * - Word-wrap at 28 chars per line for bullet text; up to 7 bullets.
+ * - Empty-line gap between consecutive bullets.
  */
 export async function overlayTitleAndBulletsOnVideo(
   inputPath: string,
   outputPath: string,
   title: string,
   bullets: string[],
-  fontPath: string = defaultFontPath(),
+  titleFontPath: string = helveticaNeueRegularFontPath(),
+  bulletFontPath: string = helveticaNeweLightFontPath(),
+  checkFontPath: string = dejaVuSansFontPath(),
 ): Promise<void> {
-  const titleFontSize = 52
-  const bulletFontSize = 36
-  const titleY = 150
-  const titleBulletGap = 76
-  const bulletLineHeight = 72
+  const TITLE_FS     = 32
+  const BULLET_FS    = 24
+  const TITLE_LH     = 40   // px per title line
+  const BULLET_LH    = 30   // px per bullet line
+  const INTER_GAP    = 18   // empty-line gap between consecutive bullets
+  const CHECK_OFFSET = 24   // px the bullet text is shifted right of the ✓
+  const TOP_PAD      = 80   // px from top of frame to first title line
+  const TITLE_GAP    = 28   // px between last title line and first bullet
 
-  const safeTitle = escapeDrawtext(title.slice(0, 80))
+  const titleLines = wrapTitle(title, 30, 3)
+  const list = bullets.slice(0, 7)
+  const wrappedBullets = list.map((b) => wrapTextLines(b, 28))
 
-  const bulletFilters = bullets.slice(0, 6).map((bullet, i) => {
-    const text = escapeDrawtext(`- ${bullet.slice(0, 28)}`)
-    const y = titleY + titleFontSize + titleBulletGap + i * bulletLineHeight
-    return `drawtext=fontfile=${fontPath}:text='${text}':expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
+  const xMargin = 'w*0.08'
+  const xText   = `w*0.08+${CHECK_OFFSET}`
+
+  const filters: string[] = [
+    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,
+  ]
+
+  // Title lines
+  titleLines.forEach((line, i) => {
+    const y = TOP_PAD + i * TITLE_LH
+    filters.push(
+      `drawtext=fontfile=${titleFontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${TITLE_FS}:x=${xMargin}:y=${y}`,
+    )
   })
 
-  // Single -vf chain:
-  //   1. drawbox fills the entire frame with black@0.55 (dark veil)
-  //   2. drawtext for the centred title at y=150
-  //   3. drawtext for each ✓ bullet, left-aligned, stacked below the title
-  const vf = [
-    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill`,
-    `drawtext=fontfile=${fontPath}:text='${safeTitle}':expansion=none:fontcolor=white:fontsize=${titleFontSize}:x=(w-text_w)/2:y=${titleY}`,
-    ...bulletFilters,
-  ].join(',')
+  // Bullet block starts below the title
+  const bulletStartY = TOP_PAD + titleLines.length * TITLE_LH + TITLE_GAP
 
+  let currentY = bulletStartY
+  for (let bi = 0; bi < wrappedBullets.length; bi++) {
+    const lines = wrappedBullets[bi]
+    lines.forEach((line, li) => {
+      const y = currentY + li * BULLET_LH
+      if (li === 0) {
+        // ✓ glyph in DejaVu
+        filters.push(
+          `drawtext=fontfile=${checkFontPath}:text='✓':expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xMargin}:y=${y}`,
+        )
+      }
+      // Bullet text in Helvetica Neue Light (all lines, including first)
+      filters.push(
+        `drawtext=fontfile=${bulletFontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xText}:y=${y}`,
+      )
+    })
+    currentY += lines.length * BULLET_LH
+    if (bi < wrappedBullets.length - 1) currentY += INTER_GAP
+  }
+
+  const vf = filters.join(',')
   await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
 }

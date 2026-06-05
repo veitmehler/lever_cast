@@ -81,32 +81,39 @@ export async function generateVideoReelAsset(opts: {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
 
-  const [brand, bullets, videoModelTemplate] = await Promise.all([
+  const [brand, videoModelTemplate] = await Promise.all([
     loadSocialBrandTheme(opts.userId),
-    extractReelBullets(opts.content),
     loadPromptTemplate(207),
   ])
 
   const falModel = videoModelTemplate?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
 
-  // Derive topic and details from provided params or content fallback
   const topic = opts.topic?.trim() ||
     opts.content.replace(/<[^>]+>/g, ' ').split(/[\n.!?]/)[0]?.trim().slice(0, 200) ||
     brand.organizationName
   const details = opts.h2Content?.trim() ||
     opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500)
 
-  const videoPrompt = await generateVideoReelPrompt({
-    topic,
-    details,
-    specialInstructions: brand.videoSpecialInstructions,
-    videoModel: falModel,
-  })
+  const [{ headline, bullets }, videoPrompt] = await Promise.all([
+    extractReelBullets({
+      content: opts.content,
+      topic,
+      details,
+      specialInstructions: brand.videoSpecialInstructions,
+    }),
+    generateVideoReelPrompt({
+      topic,
+      details,
+      specialInstructions: brand.videoSpecialInstructions,
+      videoModel: falModel,
+    }),
+  ])
 
   return withTempDir('video-reel-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'reel.mp4')
     const probe = await buildVideoReel({
       prompt: videoPrompt,
+      headline,
       bullets,
       outputPath,
       tmpDir,

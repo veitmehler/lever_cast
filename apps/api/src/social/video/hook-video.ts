@@ -4,6 +4,7 @@ import {
   concatVideos,
   defaultFontPath,
   overlayBulletsOnVideo,
+  overlayTitleAndBulletsOnVideo,
   overlayTitleOnVideo,
   probeVideo,
   type VideoProbe,
@@ -52,6 +53,8 @@ export interface VideoReelOptions {
   prompt: string
   /** Optional background image sent to Seedance for image-to-video. Omit for pure text-to-video. */
   backgroundImageUrl?: string
+  /** Headline displayed above the bullets using Helvetica Neue Regular. */
+  headline?: string
   bullets: string[]
   outputPath: string
   tmpDir: string
@@ -59,7 +62,7 @@ export interface VideoReelOptions {
   falModel?: string
 }
 
-/** F2: 9:16 Seedance background + dark veil + centred bullet list (no title). */
+/** F2/S2: 9:16 Seedance background + dark veil + headline + ✓ bullet list. */
 export async function buildVideoReel(opts: VideoReelOptions): Promise<VideoProbe> {
   const seedanceUrl = await generateSeedanceClip({
     prompt: opts.prompt,
@@ -73,7 +76,13 @@ export async function buildVideoReel(opts: VideoReelOptions): Promise<VideoProbe
   const rawPath = path.join(opts.tmpDir, 'reel-raw.mp4')
   const finalPath = path.join(opts.tmpDir, 'reel-overlay.mp4')
   await downloadSeedanceClip(seedanceUrl, rawPath)
-  await overlayBulletsOnVideo(rawPath, finalPath, opts.bullets)
+
+  if (opts.headline) {
+    await overlayTitleAndBulletsOnVideo(rawPath, finalPath, opts.headline, opts.bullets)
+  } else {
+    await overlayBulletsOnVideo(rawPath, finalPath, opts.bullets)
+  }
+
   await fs.copyFile(finalPath, opts.outputPath)
   return probeVideo(opts.outputPath)
 }

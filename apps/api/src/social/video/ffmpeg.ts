@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { REEL_HEADLINE_MAX_CHARS } from '../generators/reel-bullets'
+import { REEL_HEADLINE_MAX_CHARS, REEL_HEADLINE_MAX_LINES } from '../generators/reel-bullets'
 import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -365,7 +365,7 @@ export async function overlayBulletsOnVideo(
  * Overlay a full-frame dark veil + headline + ✓ bullet list on a video (F2/S2 Video Reel).
  *
  * - Full-frame black@0.75 dark veil
- * - Headline: Helvetica Neue Regular, 32 px, left-aligned, max 38 characters (one line)
+ * - Headline: Helvetica Neue Regular, 32 px, left-aligned, word-wraps at 38 chars/line (max 3 lines)
  * - Bullets: ✓ glyph rendered with DejaVu Sans (which carries the glyph) and the
  *   bullet text rendered side-by-side with Helvetica Neue Light, both 24 px.
  *   Continuation lines are indented to align with the text start.
@@ -390,7 +390,7 @@ export async function overlayTitleAndBulletsOnVideo(
   const TOP_PAD      = 80   // px from top of frame to first title line
   const TITLE_GAP    = 28   // px between last title line and first bullet
 
-  const titleLines = wrapTitle(title, REEL_HEADLINE_MAX_CHARS, 1)
+  const titleLines = wrapTitle(title, REEL_HEADLINE_MAX_CHARS, REEL_HEADLINE_MAX_LINES)
   const list = bullets.slice(0, 7)
   const wrappedBullets = list.map((b) => wrapTextLines(b, 50))
 

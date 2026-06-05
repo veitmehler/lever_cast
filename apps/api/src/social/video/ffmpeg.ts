@@ -175,11 +175,13 @@ export async function mergeAudioVideo(
  * Escape text for a single-quoted `drawtext=text='...'` value used together
  * with `expansion=none`.
  *
- * The libavfilter parser splits filter options on `:` even inside single
- * quotes, so the colon (and backslash and quote) must be backslash-escaped at
- * the filtergraph level; the parser consumes those backslashes, so nothing is
- * rendered literally. The surrounding single quotes are still required to
- * preserve leading spaces (continuation-line indentation) and any commas.
+ * FFmpeg's filtergraph parser operates at two levels:
+ *  - Level 1 (option value): `:` splits options, `'...'` quoting protects against this.
+ *  - Level 2 (filtergraph): `,` and `;` split filters/chains even INSIDE single quotes.
+ *
+ * So `:` and `'` are protected by surrounding single quotes (but must still be
+ * backslash-escaped at option level), while `,` must be backslash-escaped
+ * at the filtergraph level regardless of quoting.
  *
  * `%` is deliberately NOT escaped: with `expansion=none` it prints verbatim,
  * whereas the old `\%` escaping triggered a "Stray %" error that silently
@@ -188,6 +190,7 @@ export async function mergeAudioVideo(
 function escapeDrawtext(text: string): string {
   return text
     .replace(/\\/g, '\\\\')
+    .replace(/,/g, '\\,')
     .replace(/:/g, '\\:')
     .replace(/'/g, "\\'")
 }

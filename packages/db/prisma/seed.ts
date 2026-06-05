@@ -1507,7 +1507,7 @@ Rules:
     defaultModel: 'claude-sonnet-4-5-20250929',
     maxTokens: 256,
     systemPrompt:
-      'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 28 characters.',
+      'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 50 characters.',
     userPrompt: `Extract 3–5 bullet points from the content below for a video reel text overlay.
 
 Content:
@@ -1515,7 +1515,7 @@ Content:
 
 Return ONLY valid JSON: { "bullets": ["...", "..."] }
 - 3–5 bullets
-- Each ≤ 28 characters
+- Each ≤ 50 characters
 - Declarative, scannable
 - No hashtags or emojis`,
     isActive: true,

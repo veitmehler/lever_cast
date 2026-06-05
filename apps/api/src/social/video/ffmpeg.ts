@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { REEL_HEADLINE_MAX_CHARS } from '../generators/reel-bullets'
 import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -312,7 +313,7 @@ function wrapTextLines(text: string, maxChars: number): string[] {
 
 /**
  * Overlay a full-frame dark veil + vertically centred bullet list (F2/S2 Video Reel).
- * Bullet text word-wraps at 28 characters per line; continuation lines are indented
+ * Bullet text word-wraps at 50 characters per line; continuation lines are indented
  * to align with the text after the "- " prefix. An empty-line gap separates bullets.
  */
 export async function overlayBulletsOnVideo(
@@ -330,7 +331,7 @@ export async function overlayBulletsOnVideo(
   const interBulletGap = bulletLineHeight
 
   const list = bullets.slice(0, 6)
-  const wrappedBullets = list.map((b) => wrapBulletLines(b, 28))
+  const wrappedBullets = list.map((b) => wrapBulletLines(b, 50))
 
   // Total block height: all wrapped lines + one gap between each bullet pair.
   const totalLines = wrappedBullets.reduce((n, lines) => n + lines.length, 0)
@@ -364,11 +365,11 @@ export async function overlayBulletsOnVideo(
  * Overlay a full-frame dark veil + headline + ✓ bullet list on a video (F2/S2 Video Reel).
  *
  * - Full-frame black@0.75 dark veil
- * - Headline: Helvetica Neue Regular, 32 px, left-aligned, word-wrapped at 30 chars
+ * - Headline: Helvetica Neue Regular, 32 px, left-aligned, max 38 characters (one line)
  * - Bullets: ✓ glyph rendered with DejaVu Sans (which carries the glyph) and the
  *   bullet text rendered side-by-side with Helvetica Neue Light, both 24 px.
  *   Continuation lines are indented to align with the text start.
- * - Word-wrap at 28 chars per line for bullet text; up to 7 bullets.
+ * - Word-wrap at 50 chars per line for bullet text; up to 7 bullets.
  * - Empty-line gap between consecutive bullets.
  */
 export async function overlayTitleAndBulletsOnVideo(
@@ -389,9 +390,9 @@ export async function overlayTitleAndBulletsOnVideo(
   const TOP_PAD      = 80   // px from top of frame to first title line
   const TITLE_GAP    = 28   // px between last title line and first bullet
 
-  const titleLines = wrapTitle(title, 30, 3)
+  const titleLines = wrapTitle(title, REEL_HEADLINE_MAX_CHARS, 1)
   const list = bullets.slice(0, 7)
-  const wrappedBullets = list.map((b) => wrapTextLines(b, 28))
+  const wrappedBullets = list.map((b) => wrapTextLines(b, 50))
 
   const xMargin = 'w*0.08'
   const xText   = `w*0.08+${CHECK_OFFSET}`

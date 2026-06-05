@@ -7,8 +7,11 @@ export interface ReelBulletsResult {
   bullets: string[]
 }
 
+/** Max characters for the F2/S2 video reel headline overlay. */
+export const REEL_HEADLINE_MAX_CHARS = 38
+
 const DEF_SYS =
-  'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 28 characters.'
+  'You extract concise bullet points from article content for a short social media video reel overlay. Each bullet must be ≤ 50 characters.'
 
 const DEF_USER = `Extract 3–5 bullet points from the content below for a video reel text overlay.
 
@@ -16,8 +19,8 @@ Content:
 {{content}}
 
 Return ONLY valid JSON: { "headline": "...", "bullets": ["...", "..."] }
-- 1 headline (max 8 words)
-- 3–5 bullets, each ≤ 28 characters
+- 1 headline (≤ ${REEL_HEADLINE_MAX_CHARS} characters)
+- 3–5 bullets, each ≤ 50 characters
 - Declarative, scannable
 - No hashtags or emojis`
 
@@ -64,7 +67,10 @@ export async function extractReelBullets(opts: {
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { headline?: string; bullets?: string[] }
 
-  const headline = (data.headline ?? '').replace(/\s+/g, ' ').trim()
+  const headline = (data.headline ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, REEL_HEADLINE_MAX_CHARS)
 
   const bullets = (data.bullets ?? [])
     .map((b) => stripCheckmark(b.replace(/\s+/g, ' ').trim()))

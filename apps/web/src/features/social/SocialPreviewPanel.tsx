@@ -111,6 +111,7 @@ function SlotMedia({ preview }: { preview: SpecPreviewPayload }) {
   if (videoUrl) {
     return (
       <video
+        key={videoUrl}
         src={videoUrl}
         controls
         playsInline
@@ -137,6 +138,7 @@ function SlotMedia({ preview }: { preview: SpecPreviewPayload }) {
   if (imageUrl) {
     return (
       <img
+        key={imageUrl}
         src={imageUrl}
         alt=""
         className="w-full max-h-80 rounded-lg object-contain border border-border bg-muted"

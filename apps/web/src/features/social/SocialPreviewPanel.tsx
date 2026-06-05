@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import {
   Loader2,
   CheckCircle2,
@@ -185,6 +186,7 @@ export function SocialPreviewPanel({
   onRetryFailed,
   retryingSpec,
 }: SocialPreviewPanelProps) {
+  const { getToken } = useAuth()
   const [approvingAllRunId, setApprovingAllRunId] = useState<string | null>(null)
   const [approvingSlot, setApprovingSlot] = useState<string | null>(null)
   const [regeneratingSlot, setRegeneratingSlot] = useState<string | null>(null)
@@ -203,9 +205,13 @@ export function SocialPreviewPanel({
   const handleApproveRun = async (runId: string) => {
     setApprovingAllRunId(runId)
     try {
+      const token = await getToken()
       const res = await fetch(
         `/api/articles/${jobId}/social-automation/${runId}/approve`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
       )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Failed to schedule posts')
@@ -222,9 +228,13 @@ export function SocialPreviewPanel({
     const key = `${runId}-${slotKey}`
     setApprovingSlot(key)
     try {
+      const token = await getToken()
       const res = await fetch(
         `/api/social-automation/${runId}/approve/${slotKey}`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
       )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Failed to approve slot')
@@ -241,9 +251,13 @@ export function SocialPreviewPanel({
     const key = `${runId}-${slotKey}`
     setRegeneratingSlot(key)
     try {
+      const token = await getToken()
       const res = await fetch(
         `/api/social-automation/${runId}/regenerate/${slotKey}`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
       )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Failed to regenerate')

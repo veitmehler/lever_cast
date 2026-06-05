@@ -18,17 +18,17 @@ const DIMENSIONS: Record<QuoteCardVariant, { width: number; height: number }> = 
 }
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-// Matches the reference design: white background, large circular profile photo,
-// bold account name in black, large left-aligned quote text below.
+// White background, large circular profile photo, account name in black,
+// large left-aligned quote text. The header row (logo + name) floats directly
+// above the body text with a fixed gap; the combined block is vertically centred.
 
-const PADDING       = 80   // left/right margin
-const LOGO_SIZE     = 150  // diameter of the circular profile photo (≈2.2× name size)
-const LOGO_TOP_FEED  = 80
-const LOGO_TOP_STORY = 140
-const HEADER_GAP     = 24  // gap between logo right edge and name text
+const PADDING      = 80   // left/right margin
+const LOGO_SIZE    = 150  // diameter of the circular profile photo
+const HEADER_GAP   = 24   // gap between logo right edge and name text
+const HEADER_TEXT_GAP = 50 // vertical gap between bottom of header row and top of body text
 
-const NAME_FONT_SIZE  = 68  // account name next to the logo (bold)
-const QUOTE_FONT_FEED  = 64  // body quote text (regular weight)
+const NAME_FONT_SIZE   = 68  // account name
+const QUOTE_FONT_FEED  = 64  // body quote text
 const QUOTE_FONT_STORY = 60
 
 // Instagram verified badge: blue circle with white tick.
@@ -45,15 +45,16 @@ function buildVerifiedBadgeSvg(size: number): string {
 </svg>`
 }
 
+/**
+ * Returns { svg, logoTop } so the compositor can position the logo circle
+ * at the same vertical offset that was used when building the SVG.
+ */
 function buildQuoteCardSvg(
   input: QuoteCardInput,
-  namePxWidth: number, // estimated pixel width of the name text (for badge placement)
-): string {
+  namePxWidth: number,
+): { svg: string; logoTop: number } {
   const { width, height } = DIMENSIONS[input.variant]
   const isStory = input.variant === 'story'
-
-  const logoTop     = isStory ? LOGO_TOP_STORY : LOGO_TOP_FEED
-  const headerBottom = logoTop + LOGO_SIZE + 56 // breathing room below header row
 
   const fontSize   = isStory ? QUOTE_FONT_STORY : QUOTE_FONT_FEED
   const lineHeight = Math.round(fontSize * 1.22)
@@ -63,25 +64,25 @@ function buildQuoteCardSvg(
   const lines = wrapText(input.quoteText, maxChars, maxLines)
   const textBlockHeight = lines.length * lineHeight
 
-  // Vertically centre the quote in the space below the header.
-  // Clamp so long quotes top-align below the header rather than overlapping it.
-  const availableHeight = height - headerBottom - PADDING
-  const centredOffset = Math.round((availableHeight - textBlockHeight) / 2)
-  const textStartY = headerBottom + Math.max(0, centredOffset) + fontSize
+  // Combined block: header row (LOGO_SIZE tall) + gap + body text.
+  // Centre the whole block vertically on the canvas with PADDING top/bottom guard.
+  const combinedHeight = LOGO_SIZE + HEADER_TEXT_GAP + textBlockHeight
+  const blockTop = Math.max(
+    PADDING,
+    Math.round((height - combinedHeight) / 2),
+  )
+  const logoTop    = blockTop
+  const textStartY = blockTop + LOGO_SIZE + HEADER_TEXT_GAP + fontSize
 
-  const font      = escapeXml(input.brand.fontFamily)
-  const nameText  = escapeXml(input.brand.socialAccountName)
+  const font     = escapeXml(input.brand.fontFamily)
+  const nameText = escapeXml(input.brand.socialAccountName)
 
-  // Name baseline: optical centre of the logo circle.
-  // cap-height ≈ 0.72 × font-size; to centre the cap on the logo midline we
-  // shift down by (logo_centre_from_top) + (cap_height / 2).
-  const logoCentreY  = logoTop + LOGO_SIZE / 2
+  // Name baseline: optically centred on the logo circle's midline.
+  const logoCentreY   = logoTop + LOGO_SIZE / 2
   const capHalfHeight = Math.round(NAME_FONT_SIZE * 0.72 / 2)
   const nameY = logoCentreY + capHalfHeight
   const nameX = PADDING + LOGO_SIZE + HEADER_GAP
 
-  // Verified badge: placed immediately after the name text.
-  // namePxWidth is the measured/estimated advance width; add a small gap.
   const badgeX   = nameX + namePxWidth + 12
   const badgeTop = Math.round(logoCentreY - BADGE_SIZE / 2)
 
@@ -89,7 +90,7 @@ function buildQuoteCardSvg(
     ? `<image href="data:image/svg+xml;base64,${Buffer.from(buildVerifiedBadgeSvg(BADGE_SIZE)).toString('base64')}" x="${badgeX}" y="${badgeTop}" width="${BADGE_SIZE}" height="${BADGE_SIZE}"/>`
     : ''
 
-  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <!-- White background -->
   <rect width="${width}" height="${height}" fill="#FFFFFF"/>
   <!-- Account name (regular weight) -->
@@ -100,6 +101,8 @@ function buildQuoteCardSvg(
     ${leftAlignedTextLines(lines, PADDING, textStartY, lineHeight)}
   </text>
 </svg>`
+
+  return { svg, logoTop }
 }
 
 /** Estimate the rendered pixel advance width of a string at the given font size.
@@ -109,14 +112,13 @@ function estimateTextWidth(text: string, fontSize: number): number {
   return Math.round(text.length * fontSize * 0.58)
 }
 
-/** Composite the logo as a circle in the upper-left header area. */
+/** Composite the logo circle at the computed logoTop position. */
 async function compositeLogo(
   pngBuffer: Buffer,
   logoBuffer: Buffer | null | undefined,
-  variant: QuoteCardVariant,
+  logoTop: number,
   brand: SocialBrandTheme,
 ): Promise<Buffer> {
-  const logoTop  = variant === 'story' ? LOGO_TOP_STORY : LOGO_TOP_FEED
   const logoLeft = PADDING
 
   if (!logoBuffer) {
@@ -156,9 +158,9 @@ async function compositeLogo(
 /** Render a branded quote card PNG (1:1 feed or 9:16 story). */
 export async function renderQuoteCard(input: QuoteCardInput): Promise<Buffer> {
   const namePxWidth = estimateTextWidth(input.brand.socialAccountName, NAME_FONT_SIZE)
-  const svg  = buildQuoteCardSvg(input, namePxWidth)
+  const { svg, logoTop } = buildQuoteCardSvg(input, namePxWidth)
   const base = await sharp(Buffer.from(svg)).png().toBuffer()
-  return compositeLogo(base, input.logoBuffer, input.variant, input.brand)
+  return compositeLogo(base, input.logoBuffer, logoTop, input.brand)
 }
 
 export function quoteCardDimensions(variant: QuoteCardVariant): { width: number; height: number } {

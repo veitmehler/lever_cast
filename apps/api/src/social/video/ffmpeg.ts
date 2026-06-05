@@ -18,11 +18,19 @@ export function defaultFontPath(): string {
   return process.env.FFMPEG_FONT_PATH || '/usr/share/fonts/liberation/LiberationSans-Bold.ttf'
 }
 
-/** Bundled Helvetica Neue Regular — used for F2/S2 video reel bullet overlays. */
+/** Bundled Helvetica Neue Regular. */
 export function helveticaNeueRegularFontPath(): string {
   return (
     process.env.HELVETICA_NEUE_REGULAR_FONT_PATH ||
     '/usr/share/fonts/helvetica-neue/HelveticaNeue-Regular.ttf'
+  )
+}
+
+/** Bundled Helvetica Neue Light — used for F2/S2 video reel bullet overlays. */
+export function helveticaNeweLightFontPath(): string {
+  return (
+    process.env.HELVETICA_NEUE_LIGHT_FONT_PATH ||
+    '/usr/share/fonts/helvetica-neue/HelveticaNeue-Light.ttf'
   )
 }
 
@@ -229,7 +237,7 @@ export async function overlayBulletsOnVideo(
   inputPath: string,
   outputPath: string,
   bullets: string[],
-  fontPath: string = helveticaNeueRegularFontPath(),
+  fontPath: string = helveticaNeweLightFontPath(),
 ): Promise<void> {
   const { height } = await probeVideo(inputPath)
   const scale = height / 1080
@@ -251,7 +259,7 @@ export async function overlayBulletsOnVideo(
   })
 
   const vf = [
-    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill`,
+    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,
     ...bulletFilters,
   ].join(',')
 

@@ -92,11 +92,11 @@ function buildQuoteCardSvg(
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <!-- White background -->
   <rect width="${width}" height="${height}" fill="#FFFFFF"/>
-  <!-- Account name (light weight) -->
-  <text x="${nameX}" y="${nameY}" font-family="${font}" font-size="${NAME_FONT_SIZE}" font-weight="300" fill="#1A1A1A">${nameText}</text>
+  <!-- Account name (regular weight) -->
+  <text x="${nameX}" y="${nameY}" font-family="${font}" font-size="${NAME_FONT_SIZE}" font-weight="400" fill="#1A1A1A">${nameText}</text>
   ${verifiedBadge}
-  <!-- Quote body (regular weight) -->
-  <text font-family="${font}" font-size="${fontSize}" font-weight="400" fill="#1A1A1A">
+  <!-- Quote body (light weight) -->
+  <text font-family="${font}" font-size="${fontSize}" font-weight="300" fill="#1A1A1A">
     ${leftAlignedTextLines(lines, PADDING, textStartY, lineHeight)}
   </text>
 </svg>`

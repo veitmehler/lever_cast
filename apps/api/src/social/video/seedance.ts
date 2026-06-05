@@ -9,7 +9,7 @@ export const DEFAULT_SEEDANCE_T2V_MODEL = 'fal-ai/bytedance/seedance/v1/lite/tex
 export interface SeedanceOptions {
   prompt: string
   imageUrl?: string
-  duration?: '5' | '10'
+  duration?: '5' | '6' | '7' | '8' | '9' | '10'
   resolution?: '480p' | '720p'
   aspectRatio?: '1:1' | '9:16' | '16:9'
   jobId?: string

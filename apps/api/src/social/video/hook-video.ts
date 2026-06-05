@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import {
   concatVideos,
   defaultFontPath,
-  overlayTitleAndBulletsOnVideo,
+  overlayBulletsOnVideo,
   overlayTitleOnVideo,
   probeVideo,
   type VideoProbe,
@@ -51,32 +51,25 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
 export interface VideoReelOptions {
   prompt: string
   backgroundImageUrl: string
-  title: string
   bullets: string[]
   outputPath: string
   tmpDir: string
 }
 
-/** F2: Seedance background + full-frame dark overlay + title + ✓ bullets. */
+/** F2: 9:16 Seedance background + dark veil + centred ✓ bullets (no title). */
 export async function buildVideoReel(opts: VideoReelOptions): Promise<VideoProbe> {
   const seedanceUrl = await generateSeedanceClip({
     prompt: opts.prompt,
     imageUrl: opts.backgroundImageUrl,
-    duration: '5',
+    duration: '6',
     resolution: '720p',
-    aspectRatio: '1:1',
+    aspectRatio: '9:16',
   })
 
   const rawPath = path.join(opts.tmpDir, 'reel-raw.mp4')
   const finalPath = path.join(opts.tmpDir, 'reel-overlay.mp4')
   await downloadSeedanceClip(seedanceUrl, rawPath)
-  await overlayTitleAndBulletsOnVideo(
-    rawPath,
-    finalPath,
-    opts.title,
-    opts.bullets,
-    defaultFontPath(),
-  )
+  await overlayBulletsOnVideo(rawPath, finalPath, opts.bullets, defaultFontPath())
   await fs.copyFile(finalPath, opts.outputPath)
   return probeVideo(opts.outputPath)
 }

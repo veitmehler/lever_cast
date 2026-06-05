@@ -214,6 +214,39 @@ export async function overlayTitleOnVideo(
 }
 
 /**
+ * Overlay a full-frame dark veil + vertically centred ✓ bullet list (F2/S2 Video Reel).
+ * No title — background video + veil + bullets only.
+ */
+export async function overlayBulletsOnVideo(
+  inputPath: string,
+  outputPath: string,
+  bullets: string[],
+  fontPath: string = defaultFontPath(),
+): Promise<void> {
+  const { height } = await probeVideo(inputPath)
+  const scale = height / 1080
+
+  const bulletFontSize = Math.round(36 * scale)
+  const bulletLineHeight = Math.round(52 * scale)
+  const list = bullets.slice(0, 6)
+  const bulletBlockHeight = list.length * bulletLineHeight
+  const startY = Math.round((height - bulletBlockHeight) / 2)
+
+  const bulletFilters = list.map((bullet, i) => {
+    const text = escapeDrawtext(`\u2713 ${bullet}`.slice(0, 65))
+    const y = startY + bulletFontSize + i * bulletLineHeight
+    return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
+  })
+
+  const vf = [
+    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.55:t=fill`,
+    ...bulletFilters,
+  ].join(',')
+
+  await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
+}
+
+/**
  * Overlay a full-frame dark veil + title + ✓ bullet list on a video (F2 Video Reel).
  * Layout mirrors the reference design: all text is top-anchored at 150 px.
  */

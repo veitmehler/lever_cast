@@ -70,7 +70,6 @@ async function uploadVideoFile(opts: {
 export async function generateVideoReelAsset(opts: {
   userId: string
   content: string
-  title?: string
   jobId?: string
 }): Promise<GeneratedVideoReel> {
   const genId = generationId()
@@ -85,14 +84,12 @@ export async function generateVideoReelAsset(opts: {
     jobId,
   })
   const backgroundImageUrl = carousel.imageUrls[0]
-  const title = opts.title?.trim() || carousel.slides[0]?.headline || brand.organizationName
 
   return withTempDir('video-reel-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'reel.mp4')
     const probe = await buildVideoReel({
       prompt: `Cinematic subtle motion for ${brand.organizationName}: ${bullets[0]}`,
       backgroundImageUrl,
-      title,
       bullets,
       outputPath,
       tmpDir,

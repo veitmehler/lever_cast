@@ -230,8 +230,38 @@ export async function overlayTitleOnVideo(
 }
 
 /**
- * Overlay a full-frame dark veil + vertically centred ✓ bullet list (F2/S2 Video Reel).
- * No title — background video + veil + bullets only.
+ * Word-wrap a single bullet into display lines of at most `maxChars` content
+ * characters each. The first line is prefixed with "- " and continuation lines
+ * with "  " so the text stays aligned under the first character after the dash.
+ */
+function wrapBulletLines(text: string, maxChars: number): string[] {
+  const words = text.trim().split(/\s+/)
+  const contentLines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    const w = word.slice(0, maxChars) // guard against a single word longer than the limit
+    if (!current) {
+      current = w
+    } else {
+      const candidate = `${current} ${w}`
+      if (candidate.length <= maxChars) {
+        current = candidate
+      } else {
+        contentLines.push(current)
+        current = w
+      }
+    }
+  }
+  if (current) contentLines.push(current)
+
+  return contentLines.map((line, i) => (i === 0 ? `- ${line}` : `  ${line}`))
+}
+
+/**
+ * Overlay a full-frame dark veil + vertically centred bullet list (F2/S2 Video Reel).
+ * Bullet text word-wraps at 28 characters per line; continuation lines are indented
+ * to align with the text after the "- " prefix. An empty-line gap separates bullets.
  */
 export async function overlayBulletsOnVideo(
   inputPath: string,
@@ -244,19 +274,30 @@ export async function overlayBulletsOnVideo(
 
   const bulletFontSize = Math.round(36 * scale)
   const bulletLineHeight = Math.round(52 * scale)
-  // Empty-line gap after each bullet = one line height
-  const bulletSpacing = bulletLineHeight * 2
+  // One extra line-height of blank space between consecutive bullets.
+  const interBulletGap = bulletLineHeight
+
   const list = bullets.slice(0, 6)
-  // Block height: each bullet + gap, minus the trailing gap on the last bullet
-  const bulletBlockHeight = list.length * bulletLineHeight + (list.length - 1) * bulletLineHeight
+  const wrappedBullets = list.map((b) => wrapBulletLines(b, 28))
+
+  // Total block height: all wrapped lines + one gap between each bullet pair.
+  const totalLines = wrappedBullets.reduce((n, lines) => n + lines.length, 0)
+  const totalGaps  = wrappedBullets.length - 1
+  const bulletBlockHeight = totalLines * bulletLineHeight + totalGaps * interBulletGap
   const startY = Math.round((height - bulletBlockHeight) / 2)
 
-  const bulletFilters = list.map((bullet, i) => {
-    // Prefix is "- " (2 chars, ASCII); bullet text capped at 28 chars → 30 total
-    const text = escapeDrawtext(`- ${bullet.slice(0, 28)}`)
-    const y = startY + i * bulletSpacing
-    return `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${y}`
-  })
+  const bulletFilters: string[] = []
+  let currentY = startY
+  for (let bi = 0; bi < wrappedBullets.length; bi++) {
+    for (const line of wrappedBullets[bi]) {
+      const text = escapeDrawtext(line)
+      bulletFilters.push(
+        `drawtext=fontfile=${fontPath}:text='${text}':fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
+      )
+      currentY += bulletLineHeight
+    }
+    if (bi < wrappedBullets.length - 1) currentY += interBulletGap
+  }
 
   const vf = [
     `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,

@@ -172,27 +172,29 @@ export async function mergeAudioVideo(
 }
 
 /**
- * Escape text for a single-quoted `drawtext=text='...'` value used together
- * with `expansion=none`.
+ * Escape text for an UNQUOTED `drawtext=text=...` value used with `expansion=none`.
  *
- * FFmpeg's filtergraph parser operates at two levels:
- *  - Level 1 (option value): `:` splits options, `'...'` quoting protects against this.
- *  - Level 2 (filtergraph): `,` and `;` split filters/chains even INSIDE single quotes.
+ * We deliberately avoid single-quote wrapping because FFmpeg's filtergraph parser
+ * does NOT support `\'` as an escaped single-quote inside a single-quoted string —
+ * it treats the `'` as closing the string, causing everything after it (including
+ * subsequent filter options) to be absorbed into the text value.
  *
- * So `:` and `'` are protected by surrounding single quotes (but must still be
- * backslash-escaped at option level), while `,` must be backslash-escaped
- * at the filtergraph level regardless of quoting.
+ * Without quoting, we must backslash-escape every character that is special at
+ * either the filtergraph level (`,` `;` `[` `]`) or the option-value level
+ * (`\` `:` `'`).
  *
  * `%` is deliberately NOT escaped: with `expansion=none` it prints verbatim,
- * whereas the old `\%` escaping triggered a "Stray %" error that silently
- * dropped any line containing a percent sign.
+ * whereas `\%` triggers a "Stray %" error that silently drops the line.
  */
 function escapeDrawtext(text: string): string {
   return text
-    .replace(/\\/g, '\\\\')
-    .replace(/,/g, '\\,')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
+    .replace(/\\/g, '\\\\')   // backslash first (must be first)
+    .replace(/'/g, "\\'")     // single quote
+    .replace(/:/g, '\\:')     // option separator
+    .replace(/,/g, '\\,')     // filtergraph filter separator
+    .replace(/;/g, '\\;')     // filtergraph chain separator
+    .replace(/\[/g, '\\[')   // filtergraph pad reference
+    .replace(/\]/g, '\\]')
 }
 
 /** Minimal word-wrap used for title overlay sizing (mirrors svg-utils wrapText). */
@@ -246,7 +248,7 @@ export async function overlayTitleOnVideo(
 
   const textFilters = lines.map((line, i) => {
     const y = boxY + boxPadV + fontSize + i * lineH
-    return `drawtext=fontfile=${fontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    return `drawtext=fontfile=${fontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
   })
 
   const vf = [darkBox, ...textFilters].join(',')
@@ -343,7 +345,7 @@ export async function overlayBulletsOnVideo(
     for (const line of wrappedBullets[bi]) {
       const text = escapeDrawtext(line)
       bulletFilters.push(
-        `drawtext=fontfile=${fontPath}:text='${text}':expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
+        `drawtext=fontfile=${fontPath}:text=${text}:expansion=none:fontcolor=white:fontsize=${bulletFontSize}:x=w*0.08:y=${currentY}`,
       )
       currentY += bulletLineHeight
     }
@@ -402,7 +404,7 @@ export async function overlayTitleAndBulletsOnVideo(
   titleLines.forEach((line, i) => {
     const y = TOP_PAD + i * TITLE_LH
     filters.push(
-      `drawtext=fontfile=${titleFontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${TITLE_FS}:x=${xMargin}:y=${y}`,
+      `drawtext=fontfile=${titleFontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${TITLE_FS}:x=${xMargin}:y=${y}`,
     )
   })
 
@@ -417,12 +419,12 @@ export async function overlayTitleAndBulletsOnVideo(
       if (li === 0) {
         // ✓ glyph in DejaVu
         filters.push(
-          `drawtext=fontfile=${checkFontPath}:text='✓':expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xMargin}:y=${y}`,
+          `drawtext=fontfile=${checkFontPath}:text=✓:expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xMargin}:y=${y}`,
         )
       }
       // Bullet text in Helvetica Neue Light (all lines, including first)
       filters.push(
-        `drawtext=fontfile=${bulletFontPath}:text='${escapeDrawtext(line)}':expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xText}:y=${y}`,
+        `drawtext=fontfile=${bulletFontPath}:text=${escapeDrawtext(line)}:expansion=none:fontcolor=white:fontsize=${BULLET_FS}:x=${xText}:y=${y}`,
       )
     })
     currentY += lines.length * BULLET_LH

@@ -65,7 +65,9 @@ export async function enqueueSocialRegenerate(
   }
 
   const boss = await getBoss()
-  await boss.send(
+  // boss.send() returns null when singletonKey prevents duplicate insertion.
+  // Treat that as already-enqueued rather than a silent no-op.
+  const jobId = await boss.send(
     QUEUES.SOCIAL_GENERATE,
     { runId, onlySlot: normalized },
     {
@@ -73,6 +75,10 @@ export async function enqueueSocialRegenerate(
       expireInSeconds: 60 * 60 * 3,
     },
   )
+
+  if (jobId == null) {
+    return { enqueued: false, message: 'A regeneration for this slot is already queued — please wait for it to finish' }
+  }
 
   return { enqueued: true }
 }

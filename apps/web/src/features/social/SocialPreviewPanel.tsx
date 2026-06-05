@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Loader2,
   CheckCircle2,
@@ -188,6 +188,17 @@ export function SocialPreviewPanel({
   const [approvingAllRunId, setApprovingAllRunId] = useState<string | null>(null)
   const [approvingSlot, setApprovingSlot] = useState<string | null>(null)
   const [regeneratingSlot, setRegeneratingSlot] = useState<string | null>(null)
+  const burstPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Clear burst poll on unmount
+  useEffect(() => {
+    return () => {
+      if (burstPollRef.current !== null) {
+        clearInterval(burstPollRef.current)
+        burstPollRef.current = null
+      }
+    }
+  }, [])
 
   const handleApproveRun = async (runId: string) => {
     setApprovingAllRunId(runId)
@@ -238,6 +249,20 @@ export function SocialPreviewPanel({
       if (!res.ok) throw new Error(data.error ?? 'Failed to regenerate')
       toast.success(`Regenerating ${slotKey}…`)
       await onRefresh()
+      // The job is async — the parent polling loop only activates when a run
+      // is pending/processing/scheduling, but by the time onRefresh() fires
+      // the run is still "ready" (worker not started yet). Burst-poll for
+      // 90 s so the updated result appears as soon as the worker finishes.
+      if (burstPollRef.current !== null) clearInterval(burstPollRef.current)
+      let polls = 0
+      burstPollRef.current = setInterval(async () => {
+        polls++
+        await onRefresh()
+        if (polls >= 30) {
+          clearInterval(burstPollRef.current!)
+          burstPollRef.current = null
+        }
+      }, 3000)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Regenerate failed')
     } finally {

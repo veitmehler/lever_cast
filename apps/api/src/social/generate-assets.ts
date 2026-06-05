@@ -71,7 +71,7 @@ export async function generateQuoteCardAsset(opts: {
   })
 
   const genId = generationId()
-  const s3Key = `social/${opts.userId}/${opts.jobId ?? genId}/quote-${variant}.png`
+  const s3Key = `social/${opts.userId}/${opts.jobId ?? genId}/quote-${variant}-${genId}.png`
   const registered = await registerSocialMedia({
     userId: opts.userId,
     buffer,
@@ -128,7 +128,7 @@ export async function generateCarouselAssets(opts: {
     const registered = await registerSocialMedia({
       userId: opts.userId,
       buffer,
-      s3Key: `social/${opts.userId}/${jobId}/carousel-${i + 1}.png`,
+      s3Key: `social/${opts.userId}/${jobId}/carousel-${i + 1}-${genId}.png`,
       title: `Carousel slide ${i + 1} — ${plan.headline.slice(0, 40)}`,
       altText: plan.headline,
       source: 'carousel_slide',
@@ -172,7 +172,7 @@ export async function generatePitchStoryAssets(opts: {
     const registered = await registerSocialMedia({
       userId: opts.userId,
       buffer: buffers[i],
-      s3Key: `social/${opts.userId}/${jobId}/pitch-${opts.pitchType}-${i + 1}.png`,
+      s3Key: `social/${opts.userId}/${jobId}/pitch-${opts.pitchType}-${i + 1}-${genId}.png`,
       title: `Pitch ${opts.pitchType} slide ${i + 1}`,
       altText: i === 0 ? opts.title : 'View profile CTA',
       source: 'pitch_story',

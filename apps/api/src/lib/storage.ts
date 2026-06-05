@@ -162,6 +162,26 @@ export async function uploadBufferWithKey(
 }
 
 /**
+ * Delete a specific list of S3 keys in one (or more) batched DeleteObjects calls.
+ * Safe to call with an empty array — returns immediately.
+ * Silently ignores keys that no longer exist.
+ */
+export async function deleteS3Keys(keys: string[]): Promise<void> {
+  if (keys.length === 0) return
+  const s3 = getS3Client()
+  const bucket = getBucket()
+  for (let i = 0; i < keys.length; i += 1000) {
+    const batch = keys.slice(i, i + 1000).map((Key) => ({ Key }))
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: batch, Quiet: true },
+      }),
+    )
+  }
+}
+
+/**
  * Delete all S3 objects whose keys start with `prefix`.
  * Processes up to 1000 objects per ListObjectsV2 page (S3 max per DeleteObjects call).
  * Safe to call even if no objects exist under the prefix.

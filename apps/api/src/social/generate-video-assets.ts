@@ -116,7 +116,7 @@ export async function generateVideoReelAsset(opts: {
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
       filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/video-reel.mp4`,
+      s3Key: `social/${opts.userId}/${jobId}/video-reel-${genId}.mp4`,
       title: 'Video reel',
       width: probe.width,
       height: probe.height,
@@ -161,7 +161,7 @@ export async function generateHookVideoAsset(opts: {
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
       filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/hook-video.mp4`,
+      s3Key: `social/${opts.userId}/${jobId}/hook-video-${genId}.mp4`,
       title: `Hook video — ${title.slice(0, 40)}`,
       width: probe.width,
       height: probe.height,
@@ -220,7 +220,7 @@ export async function generateQuoteVideoAsset(opts: {
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
       filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/quote-video.mp4`,
+      s3Key: `social/${opts.userId}/${jobId}/quote-video-${genId}.mp4`,
       title: 'Quote video',
       width: probe.width,
       height: probe.height,
@@ -248,7 +248,7 @@ export async function generateLoopedReelAsset(opts: {
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
       filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/loop-reel.mp4`,
+      s3Key: `social/${opts.userId}/${jobId}/loop-reel-${genId}.mp4`,
       title: `Looped reel (${loopCount}×)`,
       width: probe.width,
       height: probe.height,

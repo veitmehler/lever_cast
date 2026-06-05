@@ -2,6 +2,7 @@ import type { SocialAutomationRun, SocialPostSpec, SitePage } from '@prisma/clie
 import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { sendFailureAlert } from '../../lib/alerts'
+import { deleteS3Keys } from '../../lib/storage'
 import { SPEC_PROCESS_ORDER, type SpecSlotKey } from './default-specs'
 import { buildArticleContentContext, type ArticleContentContext } from './content'
 import { ensureFutureScheduleDate, slotToUtc } from './schedule'
@@ -58,6 +59,20 @@ export async function processAutomationSpec(opts: {
     update: { status: 'pending', error: null, postsCreated: 0, approvedAt: null },
   })
 
+  // Snapshot existing media records for this slot so we can delete them from S3
+  // and the DB after a successful regeneration. We do this before generating new
+  // assets so that even if both old and new files share the same folder prefix,
+  // we only delete the specific keys that existed before this run.
+  const s3SlotPrefix = run.jobId
+    ? `social/${run.userId}/${run.jobId}-${slotKey}/`
+    : null
+  const oldMediaRecords = s3SlotPrefix
+    ? await prisma.media.findMany({
+        where: { s3Key: { startsWith: s3SlotPrefix } },
+        select: { id: true, s3Key: true },
+      })
+    : []
+
   try {
     const assets = await generateSpecAssets({
       userId: run.userId,
@@ -106,6 +121,24 @@ export async function processAutomationSpec(opts: {
         error: buildResult.failed > 0 ? `${buildResult.failed} platform(s) failed` : null,
       },
     })
+
+    // Clean up previous generation's S3 objects and Media records now that the
+    // new assets are committed to the DB. Best-effort — a failure here doesn't
+    // affect the user-visible result.
+    if (oldMediaRecords.length > 0) {
+      await deleteS3Keys(oldMediaRecords.map((r) => r.s3Key)).catch((err) =>
+        logger.warn({ ...specCtx, err }, '[social-automation] old S3 cleanup failed (non-fatal)'),
+      )
+      await prisma.media
+        .deleteMany({ where: { id: { in: oldMediaRecords.map((r) => r.id) } } })
+        .catch((err) =>
+          logger.warn({ ...specCtx, err }, '[social-automation] old Media DB cleanup failed (non-fatal)'),
+        )
+      logger.info(
+        { ...specCtx, deletedCount: oldMediaRecords.length },
+        '[social-automation] cleaned up old slot media',
+      )
+    }
 
     return { ok: true, assets }
   } catch (err) {

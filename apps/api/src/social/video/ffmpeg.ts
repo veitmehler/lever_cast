@@ -164,17 +164,24 @@ export async function mergeAudioVideo(
 }
 
 /**
- * Escape text for use as a single-quoted `drawtext=text='...'` value when the
- * filter uses `expansion=none`. With expansion disabled, ffmpeg prints the text
- * verbatim, so `%`, `:`, `\`, `{`, `}` etc. are all safe inside the single
- * quotes and must NOT be backslash-escaped (doing so previously caused
- * "Stray %" failures that silently dropped any line containing a percent sign).
+ * Escape text for a single-quoted `drawtext=text='...'` value used together
+ * with `expansion=none`.
  *
- * The only character that can break a single-quoted value is the single quote
- * itself; we close the quote, emit a literal escaped quote, and reopen: '\''.
+ * The libavfilter parser splits filter options on `:` even inside single
+ * quotes, so the colon (and backslash and quote) must be backslash-escaped at
+ * the filtergraph level; the parser consumes those backslashes, so nothing is
+ * rendered literally. The surrounding single quotes are still required to
+ * preserve leading spaces (continuation-line indentation) and any commas.
+ *
+ * `%` is deliberately NOT escaped: with `expansion=none` it prints verbatim,
+ * whereas the old `\%` escaping triggered a "Stray %" error that silently
+ * dropped any line containing a percent sign.
  */
 function escapeDrawtext(text: string): string {
-  return text.replace(/'/g, "'\\''")
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
 }
 
 /** Minimal word-wrap used for title overlay sizing (mirrors svg-utils wrapText). */

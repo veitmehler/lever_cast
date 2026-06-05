@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import sharp from 'sharp'
 import type { SocialBrandTheme } from '../brand-theme'
 import { escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
@@ -35,6 +37,52 @@ const QUOTE_FONT_STORY = 60
 // Scaled to sit neatly after the account name (≈0.85 × NAME_FONT_SIZE).
 const BADGE_SIZE = 58 // px
 
+// ── Embedded font cache ───────────────────────────────────────────────────────
+// We embed HelveticaNeue-Light (300) and HelveticaNeue-Regular (400) directly
+// inside the SVG as @font-face data-URIs. librsvg processes @font-face before
+// consulting fontconfig, so weight resolution is fully deterministic regardless
+// of the system font configuration. Fonts are read once and cached.
+
+type EmbeddedFonts = { light: string; regular: string }
+
+let _fontCache: EmbeddedFonts | null = null
+let _fontCachePromise: Promise<EmbeddedFonts | null> | null = null
+
+function helveticaFontDir(): string {
+  return process.env.HELVETICA_NEUE_FONT_DIR ?? '/usr/share/fonts/helvetica-neue'
+}
+
+async function loadEmbeddedFonts(): Promise<EmbeddedFonts | null> {
+  if (_fontCache) return _fontCache
+  if (_fontCachePromise) return _fontCachePromise
+  _fontCachePromise = (async () => {
+    try {
+      const dir = helveticaFontDir()
+      const [lightBuf, regularBuf] = await Promise.all([
+        fs.readFile(path.join(dir, 'HelveticaNeue-Light.ttf')),
+        fs.readFile(path.join(dir, 'HelveticaNeue-Regular.ttf')),
+      ])
+      _fontCache = {
+        light: lightBuf.toString('base64'),
+        regular: regularBuf.toString('base64'),
+      }
+      return _fontCache
+    } catch {
+      // Font files unavailable (e.g. local dev without system fonts installed).
+      // Fall back to fontconfig-based resolution.
+      return null
+    }
+  })()
+  return _fontCachePromise
+}
+
+function buildFontFaceBlock(fonts: EmbeddedFonts): string {
+  return `<defs><style>
+    @font-face { font-family: 'HelveticaNeue'; font-weight: 300; src: url('data:font/truetype;base64,${fonts.light}'); }
+    @font-face { font-family: 'HelveticaNeue'; font-weight: 400; src: url('data:font/truetype;base64,${fonts.regular}'); }
+  </style></defs>`
+}
+
 function buildVerifiedBadgeSvg(size: number): string {
   const r = size / 2
   // The tick path is hand-tuned to look like Instagram's verified badge.
@@ -48,10 +96,13 @@ function buildVerifiedBadgeSvg(size: number): string {
 /**
  * Returns { svg, logoTop } so the compositor can position the logo circle
  * at the same vertical offset that was used when building the SVG.
+ * fontFaceBlock: pre-built <defs><style>@font-face…</style></defs> string,
+ * or empty string when falling back to system fonts.
  */
 function buildQuoteCardSvg(
   input: QuoteCardInput,
   namePxWidth: number,
+  fontFaceBlock: string,
 ): { svg: string; logoTop: number } {
   const { width, height } = DIMENSIONS[input.variant]
   const isStory = input.variant === 'story'
@@ -91,12 +142,13 @@ function buildQuoteCardSvg(
     : ''
 
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  ${fontFaceBlock}
   <!-- White background -->
   <rect width="${width}" height="${height}" fill="#FFFFFF"/>
-  <!-- Account name (regular weight) -->
+  <!-- Account name: font-weight 400 maps to the embedded Regular face -->
   <text x="${nameX}" y="${nameY}" font-family="${font}" font-size="${NAME_FONT_SIZE}" font-weight="400" fill="#1A1A1A">${nameText}</text>
   ${verifiedBadge}
-  <!-- Quote body (light weight) -->
+  <!-- Quote body: font-weight 300 maps to the embedded Light face -->
   <text font-family="${font}" font-size="${fontSize}" font-weight="300" fill="#1A1A1A">
     ${leftAlignedTextLines(lines, PADDING, textStartY, lineHeight)}
   </text>
@@ -157,8 +209,12 @@ async function compositeLogo(
 
 /** Render a branded quote card PNG (1:1 feed or 9:16 story). */
 export async function renderQuoteCard(input: QuoteCardInput): Promise<Buffer> {
-  const namePxWidth = estimateTextWidth(input.brand.socialAccountName, NAME_FONT_SIZE)
-  const { svg, logoTop } = buildQuoteCardSvg(input, namePxWidth)
+  const [namePxWidth, fonts] = await Promise.all([
+    Promise.resolve(estimateTextWidth(input.brand.socialAccountName, NAME_FONT_SIZE)),
+    loadEmbeddedFonts(),
+  ])
+  const fontFaceBlock = fonts ? buildFontFaceBlock(fonts) : ''
+  const { svg, logoTop } = buildQuoteCardSvg(input, namePxWidth, fontFaceBlock)
   const base = await sharp(Buffer.from(svg)).png().toBuffer()
   return compositeLogo(base, input.logoBuffer, logoTop, input.brand)
 }

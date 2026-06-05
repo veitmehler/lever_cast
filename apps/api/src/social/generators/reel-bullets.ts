@@ -38,7 +38,7 @@ export async function extractReelBullets(content: string): Promise<string[]> {
 
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { bullets?: string[] }
-  const bullets = (data.bullets ?? []).map((b) => b.trim()).filter(Boolean).slice(0, 5)
+  const bullets = (data.bullets ?? []).map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 5)
   if (bullets.length === 0) throw new Error('Could not extract reel bullets from content')
   return bullets
 }

@@ -5,10 +5,16 @@ import {
   downloadToFile,
   overlayTitleAndBulletsOnVideo,
   overlayBulletsOnVideo,
+  overlayTitleOnVideoFadeIn,
+  rescaleVideo,
   probeVideo,
+  concatVideos,
+  defaultFontPath,
 } from './video/ffmpeg'
 import { buildVideoReel, buildHookVideo } from './video/hook-video'
 import { buildQuoteVideo, buildLoopedStoryReel } from './video/quote-video'
+import { buildSlideshowVideo } from './video/slideshow-video'
+import { generateSeedanceClip, downloadSeedanceClip } from './video/seedance'
 import { registerSocialVideo } from './media-register'
 import {
   generateCarouselAssets,
@@ -42,6 +48,8 @@ export interface GeneratedHookVideo {
   videoUrl: string
   mediaId: string
   title: string
+  /** Carousel image URLs generated for this hook video (index 0 = hook slide, 1+ = content). */
+  carouselImageUrls: string[]
 }
 
 export interface GeneratedQuoteVideo {
@@ -330,7 +338,7 @@ export async function generateHookVideoAsset(opts: {
       jobId,
     })
 
-    return { postType: 'hook_video', ...uploaded, title }
+    return { postType: 'hook_video', ...uploaded, title, carouselImageUrls: carousel.imageUrls }
   })
 }
 
@@ -390,6 +398,135 @@ export async function generateQuoteVideoAsset(opts: {
     })
 
     return { postType: 'quote_video' as const, ...uploaded, voiceoverUsed }
+  })
+}
+
+/**
+ * S4: 9:16 story video built from F4's first two carousel images (hook + content).
+ * Both slides are already rendered with overlays baked in; we just time them and
+ * letterbox them into a 1080×1920 story format.
+ */
+export async function generateStoryCarouselVideo(opts: {
+  userId: string
+  /** imageUrls[0] = hook (title) slide, imageUrls[1] = first content slide. */
+  imageUrls: string[]
+  jobId?: string
+}): Promise<{ postType: 'pitch_carousel'; videoUrl: string; mediaId: string }> {
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+
+  // Use first two images; fall back gracefully if only one is available
+  const slideImages = opts.imageUrls.slice(0, 2)
+  if (slideImages.length === 0) throw new Error('generateStoryCarouselVideo: no imageUrls provided')
+
+  // Random 4–7 s per slide
+  const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
+
+  return withTempDir('story-carousel-', async (tmpDir) => {
+    const outputPath = path.join(tmpDir, 'story-carousel.mp4')
+
+    const probe = await buildSlideshowVideo({
+      imageUrls: slideImages,
+      outputPath,
+      variant: 'story',
+      secondsPerSlide,
+    })
+
+    const uploaded = await uploadVideoFile({
+      userId: opts.userId,
+      filePath: outputPath,
+      s3Key: `social/${opts.userId}/${jobId}/story-carousel-${genId}.mp4`,
+      title: 'Story carousel video',
+      width: probe.width,
+      height: probe.height,
+      jobId,
+    })
+
+    return { postType: 'pitch_carousel', ...uploaded }
+  })
+}
+
+/**
+ * S6: 9:16 story video with a fresh Fal.ai T2V intro clip (title fade-in) followed
+ * by one content slide from F6.
+ *
+ * Flow:
+ *  1. Generate Seedance T2V at 9:16 (720×1280)
+ *  2. Overlay title with fade-in via overlayTitleOnVideoFadeIn
+ *  3. Rescale to 1080×1920 to match the content slideshow
+ *  4. Build a single-image slideshow (story, 1080×1920) from contentImageUrl
+ *  5. Concat intro + content slide
+ */
+export async function generateStoryHookVideo(opts: {
+  userId: string
+  title: string
+  /** Used to generate the Seedance video prompt via the step-206 LLM. */
+  content: string
+  /** F6's carousel imageUrls[1] — first content slide after the hook. */
+  contentImageUrl: string
+  jobId?: string
+}): Promise<{ postType: 'pitch_hook'; videoUrl: string; mediaId: string }> {
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+
+  const brand = await loadSocialBrandTheme(opts.userId)
+
+  const hookVideoPrompt = await generateVideoReelPrompt({
+    topic: opts.title,
+    details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
+    specialInstructions: brand.videoSpecialInstructions,
+    videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+  })
+
+  // Random 4–7 s for the content slide
+  const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
+
+  return withTempDir('story-hook-', async (tmpDir) => {
+    const hookRaw    = path.join(tmpDir, 'hook-raw.mp4')
+    const hookTitled = path.join(tmpDir, 'hook-titled.mp4')
+    const hookScaled = path.join(tmpDir, 'hook-scaled.mp4')
+    const bodyPath   = path.join(tmpDir, 'hook-body.mp4')
+    const outputPath = path.join(tmpDir, 'story-hook.mp4')
+
+    // Step 1 — Seedance T2V at 9:16 (720×1280)
+    const seedanceUrl = await generateSeedanceClip({
+      prompt: hookVideoPrompt,
+      duration: '5',
+      resolution: '720p',
+      aspectRatio: '9:16',
+      jobId,
+    })
+    await downloadSeedanceClip(seedanceUrl, hookRaw)
+
+    // Step 2 — Title fade-in overlay (result stays at 720×1280)
+    await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
+
+    // Step 3 — Upscale to 1080×1920 so concat matches the slideshow dimensions
+    await rescaleVideo(hookTitled, hookScaled, 1080, 1920)
+
+    // Step 4 — Single content slide (letterboxed 1080×1920)
+    await buildSlideshowVideo({
+      imageUrls: [opts.contentImageUrl],
+      outputPath: bodyPath,
+      variant: 'story',
+      secondsPerSlide,
+    })
+
+    // Step 5 — Concat intro clip + content slide
+    await concatVideos([hookScaled, bodyPath], outputPath)
+    const probe = await probeVideo(outputPath)
+
+    const uploaded = await uploadVideoFile({
+      userId: opts.userId,
+      filePath: outputPath,
+      s3Key: `social/${opts.userId}/${jobId}/story-hook-${genId}.mp4`,
+      title: `Story hook — ${opts.title.slice(0, 40)}`,
+      width: probe.width,
+      height: probe.height,
+      jobId,
+    })
+
+    return { postType: 'pitch_hook', ...uploaded }
   })
 }
 

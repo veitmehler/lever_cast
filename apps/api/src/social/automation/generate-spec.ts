@@ -2,13 +2,14 @@ import type { SocialPostSpec } from '@prisma/client'
 import {
   generateQuoteCardAsset,
   generateCarouselAssets,
-  generatePitchStoryAssets,
 } from '../generate-assets'
 import {
   generateVideoReelAsset,
   generateHookVideoAsset,
   generateQuoteVideoAsset,
   generateStoriesReelAsset,
+  generateStoryCarouselVideo,
+  generateStoryHookVideo,
 } from '../generate-video-assets'
 import type { ArticleContentContext, SlotContent } from './content'
 import { resolveSlotContent } from './content'
@@ -103,7 +104,13 @@ export async function generateSpecAssets(opts: {
         slideCount,
         jobId: assetJobId,
       })
-      return { postType: 'hook_video', videoUrl: hook.videoUrl, title: hook.title }
+      // Store carousel images in mediaUrls so the pitch_hook (S6) slot can reuse them.
+      return {
+        postType: 'hook_video',
+        videoUrl: hook.videoUrl,
+        title: hook.title,
+        mediaUrls: hook.carouselImageUrls,
+      }
     }
 
     case 'quote_video': {
@@ -117,37 +124,31 @@ export async function generateSpecAssets(opts: {
     }
 
     case 'pitch_carousel': {
+      // S4 — 9:16 story video using F4's first two pre-rendered carousel slides.
       const f4 = priorAssets.get('F4')
-      const title = f4?.title ?? articleCtx.h2Title
-      const pitch = await generatePitchStoryAssets({
+      if (!f4?.mediaUrls?.length) throw new Error('F4 carousel images are required before S4')
+      const s4 = await generateStoryCarouselVideo({
         userId,
-        title,
-        pitchType: 'carousel',
+        imageUrls: f4.mediaUrls,
         jobId: assetJobId,
       })
-      return {
-        postType: 'pitch_carousel',
-        mediaUrls: pitch.imageUrls,
-        imageUrl: pitch.imageUrls[0],
-        title,
-      }
+      return { postType: 'pitch_carousel', videoUrl: s4.videoUrl }
     }
 
     case 'pitch_hook': {
+      // S6 — 9:16 story video: fresh Fal.ai T2V clip (F6 title) + F6 content image #1.
       const f6 = priorAssets.get('F6')
-      const title = f6?.title ?? articleCtx.h2Title
-      const pitch = await generatePitchStoryAssets({
+      const title = f6?.title ?? content.title ?? articleCtx.h2Title
+      const contentImageUrl = f6?.mediaUrls?.[1] ?? f6?.mediaUrls?.[0]
+      if (!contentImageUrl) throw new Error('F6 carousel images are required before S6')
+      const s6 = await generateStoryHookVideo({
         userId,
         title,
-        pitchType: 'hook',
+        content: content.text,
+        contentImageUrl,
         jobId: assetJobId,
       })
-      return {
-        postType: 'pitch_hook',
-        mediaUrls: pitch.imageUrls,
-        imageUrl: pitch.imageUrls[0],
-        title,
-      }
+      return { postType: 'pitch_hook', videoUrl: s6.videoUrl, title }
     }
 
     default:

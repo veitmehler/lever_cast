@@ -145,6 +145,26 @@ export async function cropCenterToStoryAspect(
   return probeVideo(outputPath)
 }
 
+/**
+ * Scale and letterbox/pillarbox a video to an exact target resolution.
+ * The source is shrunk to fit inside the target box and centred over a black
+ * background — preserving aspect ratio without cropping.
+ */
+export async function rescaleVideo(
+  inputPath: string,
+  outputPath: string,
+  width: number,
+  height: number,
+): Promise<VideoProbe> {
+  await runFfmpeg([
+    '-i', inputPath,
+    '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black`,
+    '-c:a', 'copy',
+    outputPath,
+  ])
+  return probeVideo(outputPath)
+}
+
 export async function loopVideo(inputPath: string, outputPath: string, times: number): Promise<void> {
   if (times < 2) {
     await fs.copyFile(inputPath, outputPath)

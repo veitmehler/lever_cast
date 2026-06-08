@@ -27,6 +27,14 @@ export function helveticaNeueRegularFontPath(): string {
   )
 }
 
+/** Bundled Helvetica Neue Medium — used for F2/S2 video reel headline overlays. */
+export function helveticaNeueMediumFontPath(): string {
+  return (
+    process.env.HELVETICA_NEUE_MEDIUM_FONT_PATH ||
+    '/usr/share/fonts/helvetica-neue/HelveticaNeue-Medium.ttf'
+  )
+}
+
 /** Bundled Helvetica Neue Light — used for F2/S2 video reel bullet overlays. */
 export function helveticaNeweLightFontPath(): string {
   return (
@@ -365,7 +373,7 @@ export async function overlayBulletsOnVideo(
  * Overlay a full-frame dark veil + headline + ✓ bullet list on a video (F2/S2 Video Reel).
  *
  * - Full-frame black@0.75 dark veil
- * - Headline: Helvetica Neue Regular, 32 px, left-aligned, word-wraps at 38 chars/line (max 3 lines)
+ * - Headline: Helvetica Neue Medium, 32 px, left-aligned, word-wraps at 38 chars/line (max 3 lines)
  * - Bullets: ✓ glyph rendered with DejaVu Sans (which carries the glyph) and the
  *   bullet text rendered side-by-side with Helvetica Neue Light, both 24 px.
  *   Continuation lines are indented to align with the text start.
@@ -377,7 +385,7 @@ export async function overlayTitleAndBulletsOnVideo(
   outputPath: string,
   title: string,
   bullets: string[],
-  titleFontPath: string = helveticaNeueRegularFontPath(),
+  titleFontPath: string = helveticaNeueMediumFontPath(),
   bulletFontPath: string = helveticaNeweLightFontPath(),
   checkFontPath: string = dejaVuSansFontPath(),
 ): Promise<void> {

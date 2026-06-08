@@ -20,6 +20,8 @@ import { generateVideoReelPrompt } from './generators/video-reel-prompt'
 import { generateQuoteVideoNarration } from './generators/quote-video-narration'
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
+import { synthesizeSpeech } from '../lib/elevenlabs/client'
+import { getVoiceSettings } from '../lib/elevenlabs/settings'
 
 function generationId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -236,7 +238,7 @@ export async function generateHookVideoAsset(opts: {
   const jobId = opts.jobId ?? genId
   const slideCount = Math.min(Math.max(6, opts.slideCount ?? 6), 12)
 
-  const [carousel, brand] = await Promise.all([
+  const [carousel, brand, voice] = await Promise.all([
     generateCarouselAssets({
       userId: opts.userId,
       content: opts.content,
@@ -244,36 +246,78 @@ export async function generateHookVideoAsset(opts: {
       jobId,
     }),
     loadSocialBrandTheme(opts.userId),
+    getVoiceSettings(opts.userId),
   ])
 
   const title = opts.title?.trim() || carousel.slides[0]?.headline || 'Watch this'
 
-  // Use the LLM-generated cinematic scene description (same step 206 as video reels)
-  // so Seedance receives a proper visual prompt, not a title string.
+  // Content slides are everything after the hook/title slide (index 0).
+  // The title is overlaid directly on the Seedance intro clip, so slide 0 is not
+  // needed in the slideshow and would create a duplicate title frame.
+  const contentSlideUrls = carousel.imageUrls.slice(1)
+
   const topic = title
   const details = opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500)
-  const hookVideoPrompt = await generateVideoReelPrompt({
-    topic,
-    details,
-    specialInstructions: brand.videoSpecialInstructions,
-    videoModel: 'fal-ai/bytedance/seedance/v1/lite/image-to-video',
-  })
+
+  // Generate Seedance video prompt and voiceover narration in parallel
+  const [hookVideoPrompt, narrationText] = await Promise.all([
+    generateVideoReelPrompt({
+      topic,
+      details,
+      specialInstructions: brand.videoSpecialInstructions,
+      videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+    }),
+    generateQuoteVideoNarration(opts.userId, opts.content).catch(() => ''),
+  ])
 
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')
+
+    // Voiceover: synthesize if enabled, then derive slide duration from audio length
+    let voiceAudioPath: string | undefined
+    let secondsPerSlide = 4
+
+    const canUseVoice =
+      narrationText &&
+      voice.voiceoverEnabled &&
+      voice.apiKey &&
+      voice.voiceId
+
+    if (canUseVoice) {
+      try {
+        const mp3Buffer = await synthesizeSpeech({
+          apiKey: voice.apiKey!,
+          voiceId: voice.voiceId!,
+          text: narrationText,
+          modelId: voice.modelId,
+          stability: voice.stability,
+          similarityBoost: voice.similarity,
+        })
+        const audioFilePath = path.join(tmpDir, 'narration.mp3')
+        await fs.writeFile(audioFilePath, mp3Buffer)
+        // Measure the actual audio duration so slides fit the narration exactly
+        const audioProbe = await probeVideo(audioFilePath)
+        const audioDuration = audioProbe.duration
+        if (audioDuration > 0 && contentSlideUrls.length > 0) {
+          secondsPerSlide = audioDuration / contentSlideUrls.length
+        }
+        voiceAudioPath = audioFilePath
+      } catch {
+        // Non-fatal — fall back to silent slideshow with default timing
+      }
+    }
+
     const probe = await buildHookVideo({
       title,
       hookPrompt: hookVideoPrompt,
-      // No hookImageUrl — pure T2V so Seedance doesn't receive an image with
-      // baked-in headline text as its reference frame.
+      // Pure T2V — no image input so Seedance has a clean background without
+      // any baked-in text from the carousel hook slide.
       hookImageUrl: undefined,
-      // Pass all carousel slides (including slide 0 which has its own text overlay)
-      slideshowImageUrls: carousel.imageUrls,
+      slideshowImageUrls: contentSlideUrls,
       outputPath,
       tmpDir,
-      // Title overlay is redundant now — the hook slide in the slideshow already
-      // has the headline rendered via the carousel SVG compositor.
-      skipTitleOverlay: true,
+      secondsPerSlide,
+      voiceAudioPath,
     })
 
     const uploaded = await uploadVideoFile({

@@ -264,6 +264,75 @@ export async function overlayTitleOnVideo(
 }
 
 /**
+ * Same as overlayTitleOnVideo but the title box + text fade in smoothly.
+ *
+ * Implementation: splits the video into two streams — a clean base and a
+ * fully-overlaid copy — then blends them using a time-based ramp so the
+ * overlay is invisible before `fadeStart`, fully opaque after
+ * `fadeStart + fadeDuration`, and cross-fades linearly in between.
+ *
+ * Uses `-filter_complex` with FFmpeg's `blend` filter.
+ */
+export async function overlayTitleOnVideoFadeIn(
+  inputPath: string,
+  outputPath: string,
+  title: string,
+  fontPath: string = defaultFontPath(),
+  fadeStart = 1.0,
+  fadeDuration = 0.5,
+): Promise<void> {
+  const { width, height } = await probeVideo(inputPath)
+  const scale = height / 1080
+
+  const lines = wrapTitle(title, 22, 5)
+  const fontSize = Math.round(52 * scale)
+  const lineH    = Math.round(68 * scale)
+  const boxPadV  = Math.round(36 * scale)
+  const boxPadH  = Math.round(60 * scale)
+  const boxW     = width - 2 * boxPadH
+  const boxH     = lines.length * lineH + 2 * boxPadV
+  const boxX     = boxPadH
+  const boxY     = Math.round((height - boxH) / 2) - Math.round(40 * scale)
+
+  const dir = path.dirname(outputPath)
+
+  // Write each text line to a temp file (avoids all filtergraph escaping issues)
+  const textFilters = await Promise.all(
+    lines.map(async (line, i) => {
+      const y = boxY + boxPadV + fontSize + i * lineH
+      const tf = await writeDrawtextFile(dir, line)
+      return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    }),
+  )
+
+  const overlayChain = [
+    `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`,
+    ...textFilters,
+  ].join(',')
+
+  // Blend ramp: 0 → base (clean), 1 → overlaid.
+  // clip((T - fadeStart) / fadeDuration, 0, 1) gives 0 before fade, 1 after.
+  // Commas inside the clip() call must be escaped as \\, inside the expression string.
+  const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
+  const blendExpr = `A*(1-${ramp})+B*${ramp}`
+
+  const filterComplex = [
+    `[0:v]split[base][dup]`,
+    `[dup]${overlayChain}[overlaid]`,
+    `[base][overlaid]blend=all_expr='${blendExpr}'[out]`,
+  ].join(';')
+
+  await runFfmpeg([
+    '-i', inputPath,
+    '-filter_complex', filterComplex,
+    '-map', '[out]',
+    '-map', '0:a?',
+    '-c:a', 'copy',
+    outputPath,
+  ])
+}
+
+/**
  * Word-wrap a single bullet into display lines of at most `maxChars` content
  * characters each. The first line is prefixed with "- " and continuation lines
  * with "  " so the text stays aligned under the first character after the dash.

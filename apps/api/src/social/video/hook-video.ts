@@ -5,7 +5,7 @@ import {
   defaultFontPath,
   overlayBulletsOnVideo,
   overlayTitleAndBulletsOnVideo,
-  overlayTitleOnVideo,
+  overlayTitleOnVideoFadeIn,
   probeVideo,
   type VideoProbe,
 } from './ffmpeg'
@@ -20,11 +20,15 @@ export interface HookVideoOptions {
   outputPath: string
   tmpDir: string
   hookDuration?: '5'
-  /** When true, skip the FFmpeg title text overlay on the intro clip. Defaults to false for backward compat. */
-  skipTitleOverlay?: boolean
+  /** Seconds each content slide is held. If voiceAudioPath is set this should
+   *  be derived from the audio duration. Defaults to 4. */
+  secondsPerSlide?: number
+  /** Path to an ElevenLabs MP3 narration file. When provided it is merged into
+   *  the slideshow body (not the Seedance intro clip). */
+  voiceAudioPath?: string
 }
 
-/** F6: Seedance intro clip + carousel slideshow body. */
+/** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover. */
 export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe> {
   const hookUrl = await generateSeedanceClip({
     prompt: opts.hookPrompt,
@@ -34,25 +38,22 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
     aspectRatio: '1:1',
   })
 
-  const hookRaw = path.join(opts.tmpDir, 'hook-raw.mp4')
+  const hookRaw    = path.join(opts.tmpDir, 'hook-raw.mp4')
+  const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
   await downloadSeedanceClip(hookUrl, hookRaw)
-
-  let hookFinal = hookRaw
-  if (!opts.skipTitleOverlay) {
-    const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
-    await overlayTitleOnVideo(hookRaw, hookTitled, opts.title, defaultFontPath())
-    hookFinal = hookTitled
-  }
+  // Always overlay the title using the fade-in variant (starts at t=1s, 0.5s fade)
+  await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
 
   const bodyPath = path.join(opts.tmpDir, 'hook-body.mp4')
   await buildSlideshowVideo({
     imageUrls: opts.slideshowImageUrls,
     outputPath: bodyPath,
     variant: 'feed',
-    secondsPerSlide: 3,
+    secondsPerSlide: opts.secondsPerSlide ?? 4,
+    audioPath: opts.voiceAudioPath,
   })
 
-  await concatVideos([hookFinal, bodyPath], opts.outputPath)
+  await concatVideos([hookTitled, bodyPath], opts.outputPath)
   return probeVideo(opts.outputPath)
 }
 

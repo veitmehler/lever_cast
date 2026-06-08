@@ -80,19 +80,15 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 // Optional headline: HelveticaNeue Medium 42px, 22 chars/line.
 // Body text: HelveticaNeue Light 24px, 29 chars/line; paragraphs split on \n.
 function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
-  const { slide, slideIndex, totalSlides, brand } = input
+  const { slide, slideIndex, brand } = input
   const watermark = escapeXml(brand.organizationName)
-  const counter   = escapeXml(`${slideIndex + 1}/${totalSlides}`)
 
   // Alternate: odd slideIndex = left panel, even = right panel.
   // (slideIndex 0 is the hook, so first content slide is index 1 → left.)
   const isRightPanel = slideIndex % 2 === 0
 
-  const panelX  = isRightPanel ? SLIDE_SIZE / 2 : 0
-  const textX   = isRightPanel ? SLIDE_SIZE / 2 + 52 : 52
-  // Counter sits on the image half (opposite side to the panel)
-  const counterX = isRightPanel ? 32 : SLIDE_SIZE - 32
-  const counterAnchor = isRightPanel ? 'start' : 'end'
+  const panelX = isRightPanel ? SLIDE_SIZE / 2 : 0
+  const textX  = isRightPanel ? SLIDE_SIZE / 2 + 52 : 52
 
   const startY         = 68
   const headlineFontSz = 42
@@ -141,7 +137,6 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   <rect x="${panelX}" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.65"/>
   ${tspans.join('\n  ')}
   ${bodyBlock}
-  <text x="${counterX}" y="52" text-anchor="${counterAnchor}" font-family="${FONT_MEDIUM}" font-size="26" fill="#FFFFFF">${counter}</text>
   <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`
 }

@@ -46,14 +46,28 @@ export async function selectQuoteForCard(opts: {
     jsonMode: true,
   })
 
-  const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
-  const data = parsed.data as { quote?: string; attribution?: string }
+  let quote = ''
+  let attributionRaw: string | undefined
 
-  const quote = (data.quote ?? '').trim()
+  try {
+    const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
+    const data = parsed.data as { quote?: string; attribution?: string }
+    quote = (data.quote ?? '').trim()
+    attributionRaw = data.attribution?.trim()
+  } catch {
+    // LLM returned plain text instead of JSON — treat it as the quote directly
+    const plain = cleanTextOutput(run.content).trim()
+    if (plain.length > 0 && plain.length <= 400) {
+      quote = plain
+    } else {
+      throw new Error(`LLM did not return a valid quote or JSON: ${run.content.slice(0, 120)}`)
+    }
+  }
+
   if (!quote) throw new Error('LLM did not return a quote')
 
   return {
     quote: quote.slice(0, 280),
-    attribution: data.attribution?.trim() || undefined,
+    attribution: attributionRaw || undefined,
   }
 }

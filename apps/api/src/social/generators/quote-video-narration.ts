@@ -42,9 +42,20 @@ export async function generateQuoteVideoNarration(
     jsonMode: true,
   })
 
-  const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
-  const data = parsed.data as { narration?: string }
-  const narration = data.narration?.trim()
+  let narration = ''
+
+  try {
+    const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
+    const data = parsed.data as { narration?: string }
+    narration = data.narration?.trim() ?? ''
+  } catch {
+    // LLM returned plain text instead of JSON — use it directly as narration
+    const plain = cleanTextOutput(run.content).trim()
+    if (plain.length > 0 && plain.length <= 500) {
+      narration = plain
+    }
+  }
+
   if (!narration) throw new Error('Empty quote video narration')
   return narration.slice(0, 500)
 }

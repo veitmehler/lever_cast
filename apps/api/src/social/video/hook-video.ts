@@ -20,9 +20,11 @@ export interface HookVideoOptions {
   outputPath: string
   tmpDir: string
   hookDuration?: '5'
+  /** When true, skip the FFmpeg title text overlay on the intro clip. Defaults to false for backward compat. */
+  skipTitleOverlay?: boolean
 }
 
-/** F6: fal hook clip with title overlay + carousel slideshow body. */
+/** F6: Seedance intro clip + carousel slideshow body. */
 export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe> {
   const hookUrl = await generateSeedanceClip({
     prompt: opts.hookPrompt,
@@ -33,9 +35,14 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
   })
 
   const hookRaw = path.join(opts.tmpDir, 'hook-raw.mp4')
-  const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
   await downloadSeedanceClip(hookUrl, hookRaw)
-  await overlayTitleOnVideo(hookRaw, hookTitled, opts.title, defaultFontPath())
+
+  let hookFinal = hookRaw
+  if (!opts.skipTitleOverlay) {
+    const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
+    await overlayTitleOnVideo(hookRaw, hookTitled, opts.title, defaultFontPath())
+    hookFinal = hookTitled
+  }
 
   const bodyPath = path.join(opts.tmpDir, 'hook-body.mp4')
   await buildSlideshowVideo({
@@ -45,7 +52,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
     secondsPerSlide: 3,
   })
 
-  await concatVideos([hookTitled, bodyPath], opts.outputPath)
+  await concatVideos([hookFinal, bodyPath], opts.outputPath)
   return probeVideo(opts.outputPath)
 }
 

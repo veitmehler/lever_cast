@@ -74,6 +74,8 @@ export async function planCarouselSlides(opts: {
 
   if (rawSlides.length === 0) throw new Error('LLM did not return carousel slides')
 
+  const lastIdx = Math.min(rawSlides.length, opts.slideCount) - 1
+
   return rawSlides.slice(0, opts.slideCount).map((s, i): CarouselSlidePlan => {
     // Support both new (headlineText/bodyText/type) and old (headline/bullets) formats
     const headlineText = (s.headlineText !== undefined ? s.headlineText : s.headline ?? null)
@@ -81,15 +83,29 @@ export async function planCarouselSlides(opts: {
       ? s.bodyText
       : s.bullets?.join('\n') ?? null
 
-    // Derive type: use explicit field when present, else infer from position
-    let type: CarouselSlideType = (s.type as CarouselSlideType) ?? 'content'
-    if (!['hook', 'content', 'cta'].includes(type)) {
-      type = i === 0 ? 'hook' : i === rawSlides.length - 1 ? 'cta' : 'content'
+    // Always force position-based types: first slide = hook, last = cta.
+    // This overrides any LLM-returned type to prevent mismatched rendering.
+    let type: CarouselSlideType
+    if (i === 0) {
+      type = 'hook'
+    } else if (i === lastIdx) {
+      type = 'cta'
+    } else {
+      type = 'content'
     }
+
+    const resolvedHeadline = typeof headlineText === 'string' && headlineText.trim()
+      ? headlineText.trim()
+      : null
+
+    // Hook slides must have a visible headline — fall back to topic if LLM omitted it
+    const finalHeadline = (type === 'hook' && !resolvedHeadline)
+      ? (opts.topic?.trim().slice(0, 60) ?? null)
+      : resolvedHeadline
 
     return {
       type,
-      headlineText: typeof headlineText === 'string' && headlineText.trim() ? headlineText.trim() : null,
+      headlineText: finalHeadline,
       bodyText: typeof bodyText === 'string' && bodyText.trim() ? bodyText.trim() : null,
       imagePrompt: (s.imagePrompt ?? '').trim().slice(0, 500),
     }

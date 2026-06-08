@@ -41,30 +41,42 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
   const maxChars   = 22
   const maxLines   = 5
 
-  const lines = wrapText(slide.headlineText ?? '', maxChars, maxLines)
+  // If headlineText is absent, fall back to the first line of bodyText so the
+  // hook slide always has visible text even when the LLM omitted the headline.
+  const displayText = slide.headlineText?.trim() || slide.bodyText?.split('\n')[0]?.trim() || ''
+
+  const lines = wrapText(displayText, maxChars, maxLines)
   const textBlockHeight = lines.length * lineHeight
 
   const boxPadV = 40
   const boxPadH = 60
   const boxW    = SLIDE_SIZE - 2 * boxPadH
-  const boxH    = textBlockHeight + 2 * boxPadV
+  const boxH    = Math.max(textBlockHeight + 2 * boxPadV, 2 * boxPadV + fontSize)
   const boxX    = boxPadH
   const boxY    = Math.round((SLIDE_SIZE - boxH) / 2) - 40
   const textStartY = boxY + boxPadV + fontSize
 
   const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, textStartY, lineHeight)
 
+  // Don't render a box if there's genuinely nothing to show
+  const boxSvg = displayText
+    ? `<rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="0.65"/>`
+    : ''
+  const textElement = displayText
+    ? `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">\n    ${textSvg}\n  </text>`
+    : ''
+
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="0.65"/>
-  <text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">
-    ${textSvg}
-  </text>
+  ${boxSvg}
+  ${textElement}
   <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`
 }
 
 // ── Content slides ───────────────────────────────────────────────────────────
-// Left-half dark overlay + text. Right half shows image.
+// Dark half-panel alternates left/right based on slideIndex (1st content = left,
+// 2nd = right, etc.). Hook is index 0 so content slides start at index 1 — odd
+// content indices are left panels, even content indices are right panels.
 // Optional headline: HelveticaNeue Medium 42px, 22 chars/line.
 // Body text: HelveticaNeue Light 24px, 29 chars/line; paragraphs split on \n.
 function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
@@ -72,7 +84,16 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const watermark = escapeXml(brand.organizationName)
   const counter   = escapeXml(`${slideIndex + 1}/${totalSlides}`)
 
-  const textX          = 52
+  // Alternate: odd slideIndex = left panel, even = right panel.
+  // (slideIndex 0 is the hook, so first content slide is index 1 → left.)
+  const isRightPanel = slideIndex % 2 === 0
+
+  const panelX  = isRightPanel ? SLIDE_SIZE / 2 : 0
+  const textX   = isRightPanel ? SLIDE_SIZE / 2 + 52 : 52
+  // Counter sits on the image half (opposite side to the panel)
+  const counterX = isRightPanel ? 32 : SLIDE_SIZE - 32
+  const counterAnchor = isRightPanel ? 'start' : 'end'
+
   const startY         = 68
   const headlineFontSz = 42
   const headlineLineH  = 54
@@ -117,10 +138,10 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
     : ''
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.65"/>
+  <rect x="${panelX}" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.65"/>
   ${tspans.join('\n  ')}
   ${bodyBlock}
-  <text x="${SLIDE_SIZE - 32}" y="52" text-anchor="end" font-family="${FONT_MEDIUM}" font-size="26" fill="#FFFFFF">${counter}</text>
+  <text x="${counterX}" y="52" text-anchor="${counterAnchor}" font-family="${FONT_MEDIUM}" font-size="26" fill="#FFFFFF">${counter}</text>
   <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`
 }

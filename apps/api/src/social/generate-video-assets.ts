@@ -145,24 +145,44 @@ export async function generateHookVideoAsset(opts: {
   const jobId = opts.jobId ?? genId
   const slideCount = Math.min(Math.max(6, opts.slideCount ?? 6), 12)
 
-  const carousel: GeneratedCarousel = await generateCarouselAssets({
-    userId: opts.userId,
-    content: opts.content,
-    slideCount,
-    jobId,
-  })
+  const [carousel, brand] = await Promise.all([
+    generateCarouselAssets({
+      userId: opts.userId,
+      content: opts.content,
+      slideCount,
+      jobId,
+    }),
+    loadSocialBrandTheme(opts.userId),
+  ])
 
   const title = opts.title?.trim() || carousel.slides[0]?.headline || 'Watch this'
+
+  // Use the LLM-generated cinematic scene description (same step 206 as video reels)
+  // so Seedance receives a proper visual prompt, not a title string.
+  const topic = title
+  const details = opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500)
+  const hookVideoPrompt = await generateVideoReelPrompt({
+    topic,
+    details,
+    specialInstructions: brand.videoSpecialInstructions,
+    videoModel: 'fal-ai/bytedance/seedance/v1/lite/image-to-video',
+  })
 
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')
     const probe = await buildHookVideo({
       title,
-      hookPrompt: `Dynamic opening hook: ${title}`,
-      hookImageUrl: carousel.imageUrls[0],
-      slideshowImageUrls: carousel.imageUrls.slice(1),
+      hookPrompt: hookVideoPrompt,
+      // No hookImageUrl — pure T2V so Seedance doesn't receive an image with
+      // baked-in headline text as its reference frame.
+      hookImageUrl: undefined,
+      // Pass all carousel slides (including slide 0 which has its own text overlay)
+      slideshowImageUrls: carousel.imageUrls,
       outputPath,
       tmpDir,
+      // Title overlay is redundant now — the hook slide in the slideshow already
+      // has the headline rendered via the carousel SVG compositor.
+      skipTitleOverlay: true,
     })
 
     const uploaded = await uploadVideoFile({

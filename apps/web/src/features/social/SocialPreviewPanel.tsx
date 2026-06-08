@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import {
   Loader2,
@@ -8,6 +8,9 @@ import {
   Clock,
   RefreshCw,
   Send,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -95,7 +98,122 @@ function formatScheduledAt(iso: string): string {
   }
 }
 
+// ── Carousel lightbox ────────────────────────────────────────────────────────
+
+function CarouselLightbox({
+  urls,
+  startIndex,
+  onClose,
+}: {
+  urls: string[]
+  startIndex: number
+  onClose: () => void
+}) {
+  const [current, setCurrent] = useState(startIndex)
+
+  const prev = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setCurrent((c) => (c - 1 + urls.length) % urls.length)
+    },
+    [urls.length],
+  )
+
+  const next = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setCurrent((c) => (c + 1) % urls.length)
+    },
+    [urls.length],
+  )
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') setCurrent((c) => (c - 1 + urls.length) % urls.length)
+      if (e.key === 'ArrowRight') setCurrent((c) => (c + 1) % urls.length)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, urls.length])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+      onClick={onClose}
+    >
+      {/* Close */}
+      <button
+        className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        onClick={onClose}
+        aria-label="Close"
+      >
+        <X className="h-5 w-5" />
+      </button>
+
+      {/* Slide counter */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium">
+        {current + 1} / {urls.length}
+      </div>
+
+      {/* Prev */}
+      {urls.length > 1 && (
+        <button
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          onClick={prev}
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="h-7 w-7" />
+        </button>
+      )}
+
+      {/* Image */}
+      <img
+        src={urls[current]}
+        alt={`Slide ${current + 1}`}
+        className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+
+      {/* Next */}
+      {urls.length > 1 && (
+        <button
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          onClick={next}
+          aria-label="Next slide"
+        >
+          <ChevronRight className="h-7 w-7" />
+        </button>
+      )}
+
+      {/* Thumbnail strip */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-[90vw] px-2 pb-1">
+        {urls.map((url, i) => (
+          <button
+            key={`${url}-${i}`}
+            onClick={(e) => { e.stopPropagation(); setCurrent(i) }}
+            className={`flex-shrink-0 rounded border-2 transition-all ${
+              i === current ? 'border-white opacity-100' : 'border-transparent opacity-50 hover:opacity-80'
+            }`}
+          >
+            <img
+              src={url}
+              alt={`Slide ${i + 1}`}
+              className="h-12 w-12 rounded object-cover"
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Slot media ────────────────────────────────────────────────────────────────
+
 function SlotMedia({ preview }: { preview: SpecPreviewPayload }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+
   const videoUrl =
     preview.assets.videoUrl ??
     preview.platforms.find((p) => p.videoUrl)?.videoUrl
@@ -122,27 +240,56 @@ function SlotMedia({ preview }: { preview: SpecPreviewPayload }) {
 
   if (mediaUrls && mediaUrls.length > 1) {
     return (
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {mediaUrls.map((url, i) => (
-          <img
-            key={`${url}-${i}`}
-            src={url}
-            alt={`Slide ${i + 1}`}
-            className="h-32 w-32 flex-shrink-0 rounded-md object-cover border border-border"
+      <>
+        {lightboxIndex !== null && (
+          <CarouselLightbox
+            urls={mediaUrls}
+            startIndex={lightboxIndex}
+            onClose={() => setLightboxIndex(null)}
           />
-        ))}
-      </div>
+        )}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {mediaUrls.map((url, i) => (
+            <button
+              key={`${url}-${i}`}
+              onClick={() => setLightboxIndex(i)}
+              className="flex-shrink-0 rounded-md overflow-hidden border border-border hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+              title={`View slide ${i + 1} of ${mediaUrls.length}`}
+            >
+              <img
+                src={url}
+                alt={`Slide ${i + 1}`}
+                className="h-32 w-32 object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      </>
     )
   }
 
   if (imageUrl) {
     return (
-      <img
-        key={imageUrl}
-        src={imageUrl}
-        alt=""
-        className="w-full max-h-80 rounded-lg object-contain border border-border bg-muted"
-      />
+      <>
+        {lightboxIndex !== null && (
+          <CarouselLightbox
+            urls={[imageUrl]}
+            startIndex={0}
+            onClose={() => setLightboxIndex(null)}
+          />
+        )}
+        <button
+          onClick={() => setLightboxIndex(0)}
+          className="w-full rounded-lg overflow-hidden border border-border bg-muted hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <img
+            key={imageUrl}
+            src={imageUrl}
+            alt=""
+            className="w-full max-h-80 object-contain"
+          />
+        </button>
+      </>
     )
   }
 

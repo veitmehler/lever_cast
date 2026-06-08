@@ -8,7 +8,7 @@ import {
   generateVideoReelAsset,
   generateHookVideoAsset,
   generateQuoteVideoAsset,
-  generateLoopedReelAsset,
+  generateStoriesReelAsset,
 } from '../generate-video-assets'
 import type { ArticleContentContext, SlotContent } from './content'
 import { resolveSlotContent } from './content'
@@ -19,6 +19,8 @@ export interface SpecAssets {
   imageUrl?: string
   mediaUrls?: string[]
   videoUrl?: string
+  /** Pre-overlay raw Seedance background video URL — stored so S2 can reuse F2's background. */
+  rawVideoUrl?: string
   title?: string
 }
 
@@ -69,13 +71,15 @@ export async function generateSpecAssets(opts: {
     case 'video_reel': {
       if (slotKey === 'S2') {
         const f2 = priorAssets.get('F2')
-        if (!f2?.videoUrl) throw new Error('F2 video reel is required before S2')
-        const looped = await generateLoopedReelAsset({
+        if (!f2?.rawVideoUrl) throw new Error('F2 raw background video is required before S2')
+        const reel = await generateStoriesReelAsset({
           userId,
-          sourceVideoUrl: f2.videoUrl,
+          rawVideoUrl: f2.rawVideoUrl,
+          content: content.text,
+          topic: articleCtx.title,
           jobId: assetJobId,
         })
-        return { postType: 'video_reel', videoUrl: looped.videoUrl }
+        return { postType: 'video_reel', videoUrl: reel.videoUrl, rawVideoUrl: reel.rawVideoUrl }
       }
       const reel = await generateVideoReelAsset({
         userId,
@@ -84,7 +88,11 @@ export async function generateSpecAssets(opts: {
         h2Content: articleCtx.h2SectionText,
         jobId: assetJobId,
       })
-      return { postType: 'video_reel', videoUrl: reel.videoUrl }
+      return {
+        postType: 'video_reel',
+        videoUrl: reel.videoUrl,
+        rawVideoUrl: reel.rawVideoUrl,
+      }
     }
 
     case 'hook_video': {

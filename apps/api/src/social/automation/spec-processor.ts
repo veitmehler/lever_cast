@@ -19,6 +19,7 @@ export function assetsFromJson(json: unknown): SpecAssets | null {
     imageUrl: typeof o.imageUrl === 'string' ? o.imageUrl : undefined,
     mediaUrls: Array.isArray(o.mediaUrls) ? (o.mediaUrls as string[]) : undefined,
     videoUrl: typeof o.videoUrl === 'string' ? o.videoUrl : undefined,
+    rawVideoUrl: typeof o.rawVideoUrl === 'string' ? o.rawVideoUrl : undefined,
     title: typeof o.title === 'string' ? o.title : undefined,
   }
 }

@@ -1,6 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { withTempDir } from './video/ffmpeg'
+import {
+  withTempDir,
+  downloadToFile,
+  overlayTitleAndBulletsOnVideo,
+  overlayBulletsOnVideo,
+  probeVideo,
+} from './video/ffmpeg'
 import { buildVideoReel, buildHookVideo } from './video/hook-video'
 import { buildQuoteVideo, buildLoopedStoryReel } from './video/quote-video'
 import { registerSocialVideo } from './media-register'
@@ -24,6 +30,9 @@ export interface GeneratedVideoReel {
   videoUrl: string
   mediaId: string
   bullets: string[]
+  /** Pre-overlay Seedance background URL — stored so S2 can reuse F2's background. */
+  rawVideoUrl: string
+  rawMediaId: string
 }
 
 export interface GeneratedHookVideo {
@@ -120,17 +129,99 @@ export async function generateVideoReelAsset(opts: {
       falModel,
     })
 
+    // Upload the raw (pre-overlay) background so S2 can reuse it with fresh bullets.
+    const rawPath = path.join(tmpDir, 'reel-raw.mp4')
+    const [uploaded, rawUploaded] = await Promise.all([
+      uploadVideoFile({
+        userId: opts.userId,
+        filePath: outputPath,
+        s3Key: `social/${opts.userId}/${jobId}/video-reel-${genId}.mp4`,
+        title: 'Video reel',
+        width: probe.width,
+        height: probe.height,
+        jobId,
+      }),
+      uploadVideoFile({
+        userId: opts.userId,
+        filePath: rawPath,
+        s3Key: `social/${opts.userId}/${jobId}/video-reel-raw-${genId}.mp4`,
+        title: 'Video reel (raw background)',
+        width: probe.width,
+        height: probe.height,
+        jobId,
+      }),
+    ])
+
+    return {
+      postType: 'video_reel' as const,
+      ...uploaded,
+      bullets,
+      rawVideoUrl: rawUploaded.videoUrl,
+      rawMediaId: rawUploaded.mediaId,
+    }
+  })
+}
+
+/**
+ * S2: reuse F2's raw Seedance background but generate fresh bullets from a
+ * different content section, producing a unique story video.
+ */
+export async function generateStoriesReelAsset(opts: {
+  userId: string
+  /** Raw (pre-overlay) background video URL from F2. */
+  rawVideoUrl: string
+  /** Content for this slot's bullet generation (different H2 section from F2). */
+  content: string
+  topic?: string
+  jobId?: string
+}): Promise<GeneratedVideoReel> {
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+
+  const brand = await loadSocialBrandTheme(opts.userId)
+
+  const topic = opts.topic?.trim() ||
+    opts.content.replace(/<[^>]+>/g, ' ').split(/[\n.!?]/)[0]?.trim().slice(0, 200) ||
+    brand.organizationName
+
+  const { headline, bullets } = await extractReelBullets({
+    content: opts.content,
+    topic,
+    details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
+    specialInstructions: brand.videoSpecialInstructions,
+  })
+
+  return withTempDir('stories-reel-', async (tmpDir) => {
+    const rawPath  = path.join(tmpDir, 'reel-raw.mp4')
+    const finalPath = path.join(tmpDir, 'reel-overlay.mp4')
+
+    await downloadToFile(opts.rawVideoUrl, rawPath)
+
+    if (headline) {
+      await overlayTitleAndBulletsOnVideo(rawPath, finalPath, headline, bullets)
+    } else {
+      await overlayBulletsOnVideo(rawPath, finalPath, bullets)
+    }
+
+    const probe = await probeVideo(finalPath)
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/video-reel-${genId}.mp4`,
-      title: 'Video reel',
+      filePath: finalPath,
+      s3Key: `social/${opts.userId}/${jobId}/stories-reel-${genId}.mp4`,
+      title: 'Stories reel',
       width: probe.width,
       height: probe.height,
       jobId,
     })
 
-    return { postType: 'video_reel', ...uploaded, bullets }
+    return {
+      postType: 'video_reel' as const,
+      ...uploaded,
+      bullets,
+      rawVideoUrl: opts.rawVideoUrl,
+      rawMediaId: '',
+    }
   })
 }
 

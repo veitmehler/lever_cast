@@ -53,6 +53,8 @@ export async function generateSpecAssets(opts: {
       const carousel = await generateCarouselAssets({
         userId,
         content: content.text,
+        topic: articleCtx.title,
+        articleUrl: '',
         slideCount,
         jobId: assetJobId,
       })

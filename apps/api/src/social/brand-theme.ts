@@ -15,10 +15,18 @@ export interface SocialBrandTheme {
   logoUrl: string | null
   /** Client-specific instructions injected into the Fal.ai video reel prompt (e.g. style, restrictions). */
   videoSpecialInstructions: string
+  /** Brand voice fields — injected into caption and carousel prompts. */
+  writingStyle: string
+  businessDescription: string
+  who: string
+  industry: string
 }
 
 export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandTheme> {
-  const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+  const [brand, settings] = await Promise.all([
+    prisma.brandSettings.findUnique({ where: { userId } }),
+    prisma.settings.findUnique({ where: { userId } }),
+  ])
   const theme = themeFromBrand(brand)
 
   // Social compositors always use the bundled Helvetica Neue — never inherit
@@ -36,6 +44,10 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     instagramVerified: brand?.instagramVerified ?? false,
     logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
     videoSpecialInstructions: brand?.videoSpecialInstructions?.trim() ?? '',
+    writingStyle: settings?.writingStyle?.trim() ?? '',
+    businessDescription: brand?.businessDescription?.trim() ?? '',
+    who: brand?.who?.trim() ?? '',
+    industry: brand?.industry?.trim() ?? '',
   }
 }
 

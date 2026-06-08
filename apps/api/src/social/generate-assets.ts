@@ -95,6 +95,8 @@ export async function generateQuoteCardAsset(opts: {
 export async function generateCarouselAssets(opts: {
   userId: string
   content: string
+  topic?: string
+  articleUrl?: string
   platforms?: string[]
   slideCount?: number
   jobId?: string
@@ -107,16 +109,19 @@ export async function generateCarouselAssets(opts: {
 
   const slidePlans = await planCarouselSlides({
     content: opts.content,
+    topic: opts.topic,
     organizationName: brand.organizationName,
-    industry: undefined,
+    industry: brand.industry || undefined,
     slideCount,
+    articleUrl: opts.articleUrl ?? '',
+    specialInstructions: brand.videoSpecialInstructions || undefined,
   })
 
   const slides: GeneratedCarousel['slides'] = []
 
   for (let i = 0; i < slidePlans.length; i++) {
     const plan = slidePlans[i]
-    const bg = await generateCarouselBackground(plan.imagePrompt || plan.headline, jobId)
+    const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,
       slideIndex: i,
@@ -129,8 +134,8 @@ export async function generateCarouselAssets(opts: {
       userId: opts.userId,
       buffer,
       s3Key: `social/${opts.userId}/${jobId}/carousel-${i + 1}-${genId}.png`,
-      title: `Carousel slide ${i + 1} — ${plan.headline.slice(0, 40)}`,
-      altText: plan.headline,
+      title: `Carousel slide ${i + 1} — ${(plan.headlineText ?? plan.bodyText ?? '').slice(0, 40)}`,
+      altText: plan.headlineText ?? plan.bodyText ?? `Slide ${i + 1}`,
       source: 'carousel_slide',
       jobId,
     })
@@ -138,7 +143,7 @@ export async function generateCarouselAssets(opts: {
     slides.push({
       imageUrl: registered.url,
       mediaId: registered.mediaId,
-      headline: plan.headline,
+      headline: plan.headlineText ?? plan.bodyText?.split('\n')[0] ?? `Slide ${i + 1}`,
     })
   }
 

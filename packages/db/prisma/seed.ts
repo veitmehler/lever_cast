@@ -1454,25 +1454,25 @@ Rules:
     stepName: 'social_carousel_plan',
     defaultProvider: 'anthropic',
     defaultModel: 'claude-sonnet-4-5-20250929',
-    maxTokens: 2048,
+    maxTokens: 4096,
     systemPrompt:
-      'You are a social media designer planning image carousel slides. Each slide needs a punchy headline, 1–3 short bullet points, and a detailed image prompt for AI image generation (no text in the image).',
-    userPrompt: `Plan an image carousel with exactly {{slideCount}} slides based on the content below.
+      'You are a social media designer planning image carousel slides. Each slide has a type (hook/content/cta), optional headline, body text paragraphs, and a detailed image prompt for AI image generation (no text in the image).',
+    userPrompt: `Plan an image carousel with exactly {{slide_count}} slides based on the content below.
+
+Topic: {{topic}}
 
 Content:
-{{content}}
+{{details}}
 
-Organization: {{organizationName}}
-Industry context: {{industry}}
+Special image instructions: {{special_instructions}}
 
 Rules:
-- Return ONLY valid JSON: { "slides": [ { "headline": "...", "bullets": ["..."], "imagePrompt": "..." } ] }
-- Exactly {{slideCount}} slides
-- headline: ≤ 60 characters
-- bullets: 1–3 items, each ≤ 80 characters
-- imagePrompt: descriptive scene for flux image gen, no text/words/logos/watermarks, photorealistic or editorial style
-- Slide 1 should hook the reader; final slide should summarize or CTA
-- Do not invent facts not in the content`,
+- Return ONLY valid JSON: { "slides": [ { "index": 1, "type": "hook|content|cta", "headlineText": "...", "bodyText": "...", "imagePrompt": "..." } ] }
+- Exactly {{slide_count}} slides
+- First slide type must be "hook", last must be "cta", all others "content"
+- headlineText: max 22 characters per line; set to null for content slides that lead with body text only
+- bodyText: 1-4 short paragraphs separated by \\n; null for hook slides
+- imagePrompt: photorealistic scene for flux image gen, no text/words/logos/watermarks`,
     isActive: true,
   },
   {
@@ -1482,22 +1482,28 @@ Rules:
     defaultModel: 'claude-sonnet-4-5-20250929',
     maxTokens: 512,
     systemPrompt:
-      'You write platform-native social media captions. Match the platform tone exactly. Never invent facts not in the source content.',
+      'You write platform-native social media captions. Match the platform tone and brand voice exactly. Never invent facts not in the source content.',
     userPrompt: `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
 
 Article title: {{title}}
-Section title: {{sectionTitle}}
 Section text (this slot's source):
 {{sectionText}}
 
 Platform tone: {{platformTone}}
 Character limit: {{charLimit}}
 
+Brand voice:
+- Organization: {{organizationName}}
+- Business: {{businessDescription}}
+- Target audience: {{who}}
+- Writing style: {{writingStyle}}
+
 Rules:
 - Return ONLY the caption text — no quotes, labels, or JSON
 - Stay under {{charLimit}} characters
 - Do not use markdown
-- Match native {{platform}} posting style`,
+- Match native {{platform}} posting style
+- Apply the brand writing style above; if writing style is empty, default to the platform tone`,
     isActive: true,
   },
   {

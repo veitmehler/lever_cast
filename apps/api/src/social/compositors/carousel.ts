@@ -4,11 +4,14 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { logger } from '../../lib/logger'
 import { generateFeaturedImage } from '../../article-pipeline/image-generation'
 import type { SocialBrandTheme } from '../brand-theme'
-import { centeredTextLines, escapeXml, wrapText } from '../svg-utils'
+import { centeredTextLines, escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
+
+export type CarouselSlideType = 'hook' | 'content' | 'cta'
 
 export interface CarouselSlidePlan {
-  headline: string
-  bullets: string[]
+  type: CarouselSlideType
+  headlineText: string | null
+  bodyText: string | null
   imagePrompt: string
 }
 
@@ -22,80 +25,171 @@ export interface CarouselSlideInput {
 
 const SLIDE_SIZE = 1080
 
-// ── Title slide (index 0) ────────────────────────────────────────────────────
-// Full background image is visible. A dark semi-transparent rounded rectangle
-// sits only behind the title text. Small watermark in the bottom-right corner.
-function buildTitleSlideOverlaySvg(input: CarouselSlideInput): string {
-  const { slide, brand } = input
-  const font = escapeXml(brand.fontFamily)
-  const fontSize = 58
-  const lineHeight = 74
-  const maxChars = 22
+// Patched per-weight Helvetica Neue family names (registered with fontconfig).
+const FONT_MEDIUM = 'HelveticaNeue Medium'
+const FONT_LIGHT  = 'HelveticaNeue Light'
 
-  const lines = wrapText(slide.headline, maxChars, 5)
+// ── Hook slide ───────────────────────────────────────────────────────────────
+// Full background visible. Dark semi-transparent rounded box sits only behind
+// the headline. Headline centered, HelveticaNeue Medium 52px, 22 chars/line.
+function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
+  const { slide, brand } = input
+  const watermark = escapeXml(brand.organizationName)
+
+  const fontSize   = 52
+  const lineHeight = 68
+  const maxChars   = 22
+  const maxLines   = 5
+
+  const lines = wrapText(slide.headlineText ?? '', maxChars, maxLines)
   const textBlockHeight = lines.length * lineHeight
 
-  // Box metrics
-  const boxPadV = 38
-  const boxW = SLIDE_SIZE - 120 // 60px margin each side
-  const boxH = textBlockHeight + boxPadV * 2
-  const boxX = 60
-  // Position box slightly above vertical centre
-  const boxY = Math.round((SLIDE_SIZE - boxH) / 2) - 40
-  // First text baseline is boxY + top padding + fontSize
+  const boxPadV = 40
+  const boxPadH = 60
+  const boxW    = SLIDE_SIZE - 2 * boxPadH
+  const boxH    = textBlockHeight + 2 * boxPadV
+  const boxX    = boxPadH
+  const boxY    = Math.round((SLIDE_SIZE - boxH) / 2) - 40
   const textStartY = boxY + boxPadV + fontSize
 
   const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, textStartY, lineHeight)
-  const watermark = escapeXml(brand.organizationName)
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
   <rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="0.65"/>
-  <text text-anchor="middle" font-family="${font}" font-size="${fontSize}" font-weight="700" fill="#FFFFFF">
+  <text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">
     ${textSvg}
   </text>
-  <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${font}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
+  <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`
 }
 
-// ── Content slides (index 1+) ─────────────────────────────────────────────────
-// Left half: dark overlay + paragraph text (each bullet = one paragraph block).
-// Right half: the background image shows naturally — no overlay.
-// Slide counter top-right, watermark bottom-right.
+// ── Content slides ───────────────────────────────────────────────────────────
+// Left-half dark overlay + text. Right half shows image.
+// Optional headline: HelveticaNeue Medium 42px, 22 chars/line.
+// Body text: HelveticaNeue Light 24px, 29 chars/line; paragraphs split on \n.
 function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, slideIndex, totalSlides, brand } = input
-  const font = escapeXml(brand.fontFamily)
-  const fontSize = 28
-  const lineHeight = 44
-  const paragraphGap = 26
-  // Left-half text area: from x=52 with ~30px right margin before the mid-point
-  const textX = 52
-  const maxChars = 30 // ~460px usable width at 28px
-  const maxLinesPerBullet = 7
-  const startY = 68
+  const watermark = escapeXml(brand.organizationName)
+  const counter   = escapeXml(`${slideIndex + 1}/${totalSlides}`)
 
-  // Build tspan elements for each bullet (paragraph)
-  let currentY = startY + fontSize
+  const textX          = 52
+  const startY         = 68
+  const headlineFontSz = 42
+  const headlineLineH  = 54
+  const headlineMaxC   = 22
+  const headlineMaxL   = 3
+  const bodyFontSz     = 24
+  const bodyLineH      = 34
+  const bodyMaxChars   = 29
+  const bodyMaxLines   = 7
+  const paragraphGap   = 18
+  const headBodyGap    = 26
+
+  let currentY = startY
   const tspans: string[] = []
-  for (const bullet of slide.bullets.slice(0, 6)) {
-    const lines = wrapText(bullet, maxChars, maxLinesPerBullet)
+
+  // Optional headline
+  if (slide.headlineText) {
+    const headLines = wrapText(slide.headlineText, headlineMaxC, headlineMaxL)
+    tspans.push(
+      `<text font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="#FFFFFF">` +
+      leftAlignedTextLines(headLines, textX, currentY + headlineFontSz, headlineLineH) +
+      `</text>`,
+    )
+    currentY += headLines.length * headlineLineH + headBodyGap
+  }
+
+  // Body paragraphs (split on \n)
+  const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
+  const bodyTspans: string[] = []
+  for (const para of paragraphs) {
+    const lines = wrapText(para.trim(), bodyMaxChars, bodyMaxLines)
     for (const line of lines) {
-      tspans.push(`<tspan x="${textX}" y="${currentY}">${escapeXml(line)}</tspan>`)
-      currentY += lineHeight
+      bodyTspans.push(`<tspan x="${textX}" y="${currentY + bodyFontSz}">${escapeXml(line)}</tspan>`)
+      currentY += bodyLineH
     }
     currentY += paragraphGap
     if (currentY > SLIDE_SIZE - 60) break
   }
 
-  const counter = escapeXml(`${slideIndex + 1}/${totalSlides}`)
-  const watermark = escapeXml(brand.organizationName)
+  const bodyBlock = bodyTspans.length > 0
+    ? `<text font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="#FFFFFF">${bodyTspans.join('')}</text>`
+    : ''
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.65"/>
-  <text font-family="${font}" font-size="${fontSize}" fill="#FFFFFF">
-    ${tspans.join('\n    ')}
-  </text>
-  <text x="${SLIDE_SIZE - 32}" y="52" text-anchor="end" font-family="${font}" font-size="26" font-weight="600" fill="#FFFFFF">${counter}</text>
-  <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${font}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
+  ${tspans.join('\n  ')}
+  ${bodyBlock}
+  <text x="${SLIDE_SIZE - 32}" y="52" text-anchor="end" font-family="${FONT_MEDIUM}" font-size="26" fill="#FFFFFF">${counter}</text>
+  <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
+</svg>`
+}
+
+// ── CTA slide ────────────────────────────────────────────────────────────────
+// Full-frame dark overlay. Headline centered, HelveticaNeue Medium 48px,
+// 22 chars/line. Body text HelveticaNeue Light 24px, 35 chars/line.
+function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
+  const { slide, brand } = input
+  const watermark = escapeXml(brand.organizationName)
+
+  const textX          = 80
+  const headlineFontSz = 48
+  const headlineLineH  = 62
+  const headlineMaxC   = 22
+  const headlineMaxL   = 3
+  const bodyFontSz     = 24
+  const bodyLineH      = 34
+  const bodyMaxChars   = 35
+  const bodyMaxLines   = 6
+  const paragraphGap   = 14
+  const headBodyGap    = 32
+
+  // Build headline lines first to compute total block height for centering
+  const headLines = slide.headlineText
+    ? wrapText(slide.headlineText, headlineMaxC, headlineMaxL)
+    : []
+  const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
+  const bodyLineGroups = paragraphs.map((p) => wrapText(p.trim(), bodyMaxChars, bodyMaxLines))
+  const totalBodyLines = bodyLineGroups.reduce((n, g) => n + g.length, 0)
+  const totalBodyGaps  = bodyLineGroups.length > 0 ? bodyLineGroups.length - 1 : 0
+
+  const headlineBlockH = headLines.length * headlineLineH
+  const bodyBlockH     = totalBodyLines * bodyLineH + totalBodyGaps * paragraphGap
+  const gapH           = headLines.length > 0 && totalBodyLines > 0 ? headBodyGap : 0
+  const totalH         = headlineBlockH + gapH + bodyBlockH
+
+  let currentY = Math.round((SLIDE_SIZE - totalH) / 2)
+
+  const elements: string[] = []
+
+  if (headLines.length > 0) {
+    elements.push(
+      `<text text-anchor="left" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="#FFFFFF">` +
+      leftAlignedTextLines(headLines, textX, currentY + headlineFontSz, headlineLineH) +
+      `</text>`,
+    )
+    currentY += headlineBlockH + headBodyGap
+  }
+
+  const bodyTspans: string[] = []
+  for (const lines of bodyLineGroups) {
+    for (const line of lines) {
+      bodyTspans.push(`<tspan x="${textX}" y="${currentY + bodyFontSz}">${escapeXml(line)}</tspan>`)
+      currentY += bodyLineH
+    }
+    currentY += paragraphGap
+  }
+
+  if (bodyTspans.length > 0) {
+    elements.push(
+      `<text font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="#FFFFFF">${bodyTspans.join('')}</text>`,
+    )
+  }
+
+  return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.70"/>
+  ${elements.join('\n  ')}
+  <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`
 }
 
@@ -141,17 +235,28 @@ export async function generateCarouselBackground(
 /**
  * Composite one carousel slide: fal background + text overlay.
  *
- * Slide 0 (title): full image visible, dark rounded box only behind the title.
- * Slides 1+: left-half dark overlay with paragraph text, right half shows the
- * image naturally, slide counter top-right, watermark bottom-right.
+ * Routes to the correct overlay function based on slide.type:
+ *   hook    → centered headline box (full image visible)
+ *   content → left-half dark overlay with optional headline + body paragraphs
+ *   cta     → full-frame dark overlay with headline + body
  */
 export async function renderCarouselSlide(
   backgroundBuffer: Buffer,
   input: CarouselSlideInput,
 ): Promise<Buffer> {
-  const overlaySvg = input.slideIndex === 0
-    ? buildTitleSlideOverlaySvg(input)
-    : buildContentSlideOverlaySvg(input)
+  let overlaySvg: string
+  switch (input.slide.type) {
+    case 'hook':
+      overlaySvg = buildHookSlideOverlaySvg(input)
+      break
+    case 'cta':
+      overlaySvg = buildCtaSlideOverlaySvg(input)
+      break
+    case 'content':
+    default:
+      overlaySvg = buildContentSlideOverlaySvg(input)
+      break
+  }
 
   const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()
 

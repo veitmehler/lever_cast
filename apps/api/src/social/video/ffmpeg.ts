@@ -353,6 +353,69 @@ export async function overlayTitleOnVideoFadeIn(
 }
 
 /**
+ * Same as overlayTitleOnVideoFadeIn but uses a full-width horizontal strip
+ * instead of a narrower box.
+ *
+ * The strip spans the full video width, is vertically centred, and its height
+ * is sized around the wrapped title lines.  Layout is anchored to video WIDTH
+ * (not height) so that 9:16 story videos (1080×1920) get the same font size
+ * as 1:1 feed videos — using height-based scale would produce enormous text on
+ * portrait clips.
+ */
+export async function overlayTitleOnVideoStripFadeIn(
+  inputPath: string,
+  outputPath: string,
+  title: string,
+  fontPath: string = defaultFontPath(),
+  fadeStart = 1.0,
+  fadeDuration = 0.5,
+): Promise<void> {
+  const { width, height } = await probeVideo(inputPath)
+  // Anchor to width so 9:16 and 1:1 clips get the same font size
+  const scale = width / 1080
+
+  const lines    = wrapTitle(title, 30, 3)
+  const fontSize = Math.round(52 * scale)
+  const lineH    = Math.round(68 * scale)
+  const padV     = Math.round(40 * scale)
+  const stripH   = lines.length * lineH + 2 * padV
+  const stripY   = Math.round((height - stripH) / 2)
+
+  const dir = path.dirname(outputPath)
+
+  const textFilters = await Promise.all(
+    lines.map(async (line, i) => {
+      const y = stripY + padV + fontSize + i * lineH
+      const tf = await writeDrawtextFile(dir, line)
+      return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    }),
+  )
+
+  const overlayChain = [
+    `drawbox=x=0:y=${stripY}:w=iw:h=${stripH}:color=black@0.65:t=fill`,
+    ...textFilters,
+  ].join(',')
+
+  const ramp       = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
+  const blendExpr  = `A*(1-${ramp})+B*${ramp}`
+
+  const filterComplex = [
+    `[0:v]split[base][dup]`,
+    `[dup]${overlayChain}[overlaid]`,
+    `[base][overlaid]blend=all_expr='${blendExpr}'[out]`,
+  ].join(';')
+
+  await runFfmpeg([
+    '-i', inputPath,
+    '-filter_complex', filterComplex,
+    '-map', '[out]',
+    '-map', '0:a?',
+    '-c:a', 'copy',
+    outputPath,
+  ])
+}
+
+/**
  * Word-wrap a single bullet into display lines of at most `maxChars` content
  * characters each. The first line is prefixed with "- " and continuation lines
  * with "  " so the text stays aligned under the first character after the dash.

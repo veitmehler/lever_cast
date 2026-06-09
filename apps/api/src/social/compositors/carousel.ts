@@ -293,8 +293,17 @@ export function carouselSlideDimensions(): { width: number; height: number } {
 
 const STORY_W = 1080
 const STORY_H = 1920
-// Font for the pitch slide body text
-const FONT_REGULAR = 'HelveticaNeue Regular'
+
+/**
+ * Center-crop a source image buffer to 1080×1920 (9:16) using Sharp.
+ * Used by S4/S6 to prepare a raw background before converting to video.
+ */
+export async function cropBufferToStoryAspect(buf: Buffer): Promise<Buffer> {
+  return sharp(buf)
+    .resize(STORY_W, STORY_H, { fit: 'cover', position: 'centre' })
+    .png()
+    .toBuffer()
+}
 
 /**
  * Composite a 9:16 story pitch slide: center-crop the source background to
@@ -315,7 +324,7 @@ export async function buildPitchSlidePng(
   const fontSize  = 42
   const lineH     = 60
   const paraGap   = 20
-  const maxChars  = 22
+  const maxChars  = 36
   const maxLines  = 5
   const centerX   = STORY_W / 2
 
@@ -352,7 +361,7 @@ export async function buildPitchSlidePng(
 <svg xmlns="http://www.w3.org/2000/svg" width="${STORY_W}" height="${STORY_H}">
   <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.72)"/>
   <text
-    font-family="${FONT_REGULAR}"
+    font-family="${FONT_MEDIUM}"
     font-size="${fontSize}"
     fill="#FFFFFF"
     text-anchor="middle"

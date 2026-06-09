@@ -6,10 +6,12 @@ import {
   overlayTitleAndBulletsOnVideo,
   overlayBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
+  overlayTitleOnVideoStripFadeIn,
   cropCenterToStoryAspect,
   rescaleVideo,
   probeVideo,
   concatVideos,
+  runFfmpeg,
   defaultFontPath,
 } from './video/ffmpeg'
 import { buildVideoReel, buildHookVideo } from './video/hook-video'
@@ -25,7 +27,7 @@ import { extractReelBullets } from './generators/reel-bullets'
 import { generateVideoReelPrompt } from './generators/video-reel-prompt'
 import { generateQuoteVideoNarration } from './generators/quote-video-narration'
 import { generatePitchSlideText } from './generators/pitch-slide-text'
-import { buildPitchSlidePng } from './compositors/carousel'
+import { buildPitchSlidePng, cropBufferToStoryAspect } from './compositors/carousel'
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
 import { synthesizeSpeech } from '../lib/elevenlabs/client'
@@ -429,15 +431,18 @@ export async function generateQuoteVideoAsset(opts: {
 
 /**
  * S4: 9:16 story video.
- * Slide 1 = F4 hook carousel image (pre-baked title overlay), letterboxed to story.
+ * Slide 1 = F4 raw hook background, center-cropped to 1080×1920, with title
+ *   overlaid as a full-width strip (fade-in).
  * Slide 2 = F4 raw background (content slide 1) center-cropped to 9:16 with a
  *   full-frame dark overlay + uniquely LLM-generated pitch text (centered, white).
  */
 export async function generateStoryCarouselVideo(opts: {
   userId: string
-  /** imageUrls[0] = pre-baked F4 hook slide. */
+  /** Title to overlay on the first slide (S4 title screen). */
+  title: string
+  /** imageUrls[0] = pre-baked F4 hook slide (unused for title, only for fallback). */
   imageUrls: string[]
-  /** backgroundImageUrls[1] = raw background for F4 content slide 1. */
+  /** backgroundImageUrls[0] = raw hook background; [1] = raw background for content slide 1. */
   backgroundImageUrls: string[]
   /** S4's own article section text — used to generate the pitch copy. */
   content: string
@@ -447,24 +452,29 @@ export async function generateStoryCarouselVideo(opts: {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
 
-  const hookImageUrl  = opts.imageUrls[0]
-  const rawBgUrl      = opts.backgroundImageUrls[1] ?? opts.backgroundImageUrls[0]
-  if (!hookImageUrl) throw new Error('generateStoryCarouselVideo: no imageUrls provided')
-  if (!rawBgUrl)     throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
+  // Raw background for the title slide (slide 0) and the pitch slide (slide 1)
+  const titleBgUrl = opts.backgroundImageUrls[0] ?? opts.imageUrls[0]
+  const pitchBgUrl = opts.backgroundImageUrls[1] ?? opts.backgroundImageUrls[0]
+  if (!titleBgUrl) throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
+  if (!pitchBgUrl) throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
 
-  // Generate unique pitch text for this S4 run
-  const pitchText = await generatePitchSlideText({
-    topic: opts.topic,
-    content: opts.content,
-  })
+  // Fetch both backgrounds in parallel, and generate the pitch text
+  const [titleBgResp, pitchBgResp, pitchText] = await Promise.all([
+    fetch(titleBgUrl),
+    fetch(pitchBgUrl),
+    generatePitchSlideText({ topic: opts.topic, content: opts.content }),
+  ])
 
-  // Download raw background and composite the pitch slide PNG
-  const bgResp   = await fetch(rawBgUrl)
-  const bgBuffer = Buffer.from(await bgResp.arrayBuffer())
-  const pitchPng = await buildPitchSlidePng(bgBuffer, pitchText)
+  const [titleBgBuffer, pitchBgBuffer] = await Promise.all([
+    titleBgResp.arrayBuffer().then(Buffer.from),
+    pitchBgResp.arrayBuffer().then(Buffer.from),
+  ])
 
-  // Random 4–7 s per slide
-  const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
+  // Crop title background to 1080×1920, composite pitch slide overlay
+  const [titleBgCropped, pitchPng] = await Promise.all([
+    cropBufferToStoryAspect(titleBgBuffer),
+    buildPitchSlidePng(pitchBgBuffer, pitchText),
+  ])
 
   // Register pitch PNG to S3 so buildSlideshowVideo can download it by URL
   const pitchRegistered = await registerSocialMedia({
@@ -479,15 +489,36 @@ export async function generateStoryCarouselVideo(opts: {
     height: 1920,
   })
 
-  return withTempDir('story-carousel-', async (tmpDir) => {
-    const outputPath = path.join(tmpDir, 'story-carousel.mp4')
+  const titleDur = 4 + Math.floor(Math.random() * 4)
+  const pitchDur = 4 + Math.floor(Math.random() * 4)
 
-    const probe = await buildSlideshowVideo({
-      imageUrls: [hookImageUrl, pitchRegistered.url],
-      outputPath,
+  return withTempDir('story-carousel-', async (tmpDir) => {
+    // --- Slide 1: title screen ---
+    const titleBgPng    = path.join(tmpDir, 'title-bg.png')
+    const titleVideoRaw = path.join(tmpDir, 'title-raw.mp4')
+    const titleVideoOut = path.join(tmpDir, 'title-titled.mp4')
+    await fs.writeFile(titleBgPng, titleBgCropped)
+    await runFfmpeg([
+      '-loop', '1', '-t', String(titleDur),
+      '-i', titleBgPng,
+      '-pix_fmt', 'yuv420p', '-r', '30',
+      titleVideoRaw,
+    ])
+    await overlayTitleOnVideoStripFadeIn(titleVideoRaw, titleVideoOut, opts.title, defaultFontPath())
+
+    // --- Slide 2: pitch slide ---
+    const pitchVideoPath = path.join(tmpDir, 'pitch-slide.mp4')
+    await buildSlideshowVideo({
+      imageUrls: [pitchRegistered.url],
+      outputPath: pitchVideoPath,
       variant: 'story',
-      secondsPerSlide,
+      secondsPerSlide: pitchDur,
     })
+
+    // --- Concat ---
+    const outputPath = path.join(tmpDir, 'story-carousel.mp4')
+    await concatVideos([titleVideoOut, pitchVideoPath], outputPath)
+    const probe = await probeVideo(outputPath)
 
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
@@ -568,8 +599,8 @@ export async function generateStoryHookVideo(opts: {
     await cropCenterToStoryAspect(hookDownloaded, hookCropped)
     await rescaleVideo(hookCropped, hookScaled, 1080, 1920)
 
-    // Step 3 — Overlay title with fade-in (identical treatment to F6)
-    await overlayTitleOnVideoFadeIn(hookScaled, hookTitled, opts.title, defaultFontPath())
+    // Step 3 — Overlay title as a full-width strip with fade-in (9:16 strip design)
+    await overlayTitleOnVideoStripFadeIn(hookScaled, hookTitled, opts.title, defaultFontPath())
 
     // Step 4 — Pitch slide as a timed clip (already 1080×1920)
     await buildSlideshowVideo({

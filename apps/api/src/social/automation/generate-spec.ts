@@ -137,6 +137,7 @@ export async function generateSpecAssets(opts: {
       if (!f4?.backgroundImageUrls?.length) throw new Error('F4 background images are required before S4')
       const s4 = await generateStoryCarouselVideo({
         userId,
+        title: f4.title ?? content.title ?? articleCtx.h2Title,
         imageUrls: f4.mediaUrls,
         backgroundImageUrls: f4.backgroundImageUrls,
         content: content.text,

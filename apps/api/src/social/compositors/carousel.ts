@@ -305,38 +305,92 @@ export async function cropBufferToStoryAspect(buf: Buffer): Promise<Buffer> {
     .toBuffer()
 }
 
+/** Word-wrap without a line cap — used for pitch auto-fit. */
+function wrapTextUnlimited(text: string, maxCharsPerLine: number): string[] {
+  return wrapText(text, maxCharsPerLine, 99)
+}
+
+/** Downward-pointing arrow (vector path, no glyph dependency). */
+function buildDownArrowSvg(cx: number, cy: number): string {
+  const shaftTop = cy - 28
+  const shaftBot = cy + 8
+  const headY    = cy + 28
+  return `<path
+    d="M ${cx} ${shaftTop} L ${cx} ${shaftBot} M ${cx - 18} ${headY - 18} L ${cx} ${headY} L ${cx + 18} ${headY - 18}"
+    stroke="#FFFFFF"
+    stroke-width="5"
+    fill="none"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />`
+}
+
+const PITCH_REGION_TOP    = 280
+const PITCH_REGION_BOTTOM = 1380
+const PITCH_MAX_HEIGHT    = PITCH_REGION_BOTTOM - PITCH_REGION_TOP
+const CTA_FONT_SIZE       = 36
+const CTA_LINE_H          = 48
+const CTA_MAX_CHARS       = 28
+const CTA_MAX_LINES       = 2
+const CTA_FIRST_LINE_Y    = STORY_H - 340
+const ARROW_CY            = STORY_H - 200
+
 /**
  * Composite a 9:16 story pitch slide: center-crop the source background to
- * 1080×1920, apply a full-frame dark overlay, then render centered white text.
- *
- * The pitchText is short (2–5 lines). Each \n in pitchText becomes a new
- * paragraph with extra gap between them.
+ * 1080×1920, apply a full-frame dark overlay, then render:
+ *   - pitch body (upper-center, auto-fit font so nothing is truncated)
+ *   - CTA line anchored near the bottom
+ *   - drawn downward arrow below the CTA
  */
 export async function buildPitchSlidePng(
   backgroundBuffer: Buffer,
   pitchText: string,
+  ctaText: string,
 ): Promise<Buffer> {
   const bg = await sharp(backgroundBuffer)
     .resize(STORY_W, STORY_H, { fit: 'cover', position: 'centre' })
     .png()
     .toBuffer()
 
-  const fontSize  = 48
-  const lineH     = 66
-  const maxChars  = 32
-  const maxLines  = 6
-  const centerX   = STORY_W / 2
+  const centerX = STORY_W / 2
 
-  // Collapse the LLM's line breaks into one block and wrap uniformly, so every
-  // line uses the full target width regardless of how the model broke its output.
-  // (wrapText already normalises all whitespace, including newlines, to spaces.)
-  const lines = wrapText(pitchText, maxChars, maxLines)
+  // Auto-fit pitch: shrink font until the full text fits the upper region.
+  let pitchFontSize = 48
+  let pitchLineH    = 66
+  let pitchLines: string[] = []
+  let pitchStartY   = PITCH_REGION_TOP
 
-  const textHeight = lines.length * lineH
-  const startY     = Math.max(60, (STORY_H - textHeight) / 2)
+  for (let fs = 48; fs >= 30; fs -= 2) {
+    const lineH    = Math.round(fs * 1.375)
+    const maxChars = Math.max(20, Math.round(32 * (fs / 48)))
+    const lines    = wrapTextUnlimited(pitchText, maxChars)
+    const height   = lines.length * lineH
+    if (height <= PITCH_MAX_HEIGHT) {
+      pitchFontSize = fs
+      pitchLineH    = lineH
+      pitchLines    = lines
+      pitchStartY   = PITCH_REGION_TOP + Math.round((PITCH_MAX_HEIGHT - height) / 2)
+      break
+    }
+    if (fs === 30) {
+      pitchFontSize = fs
+      pitchLineH    = lineH
+      pitchLines    = lines
+      pitchStartY   = PITCH_REGION_TOP
+    }
+  }
 
-  const tspans = lines
-    .map((line, i) => `<tspan x="${centerX}" y="${startY + fontSize + i * lineH}">${escapeXml(line)}</tspan>`)
+  const pitchTspans = pitchLines
+    .map((line, i) =>
+      `<tspan x="${centerX}" y="${pitchStartY + pitchFontSize + i * pitchLineH}">${escapeXml(line)}</tspan>`,
+    )
+    .join('')
+
+  const ctaLines = wrapText(ctaText, CTA_MAX_CHARS, CTA_MAX_LINES)
+  const ctaTspans = ctaLines
+    .map((line, i) =>
+      `<tspan x="${centerX}" y="${CTA_FIRST_LINE_Y + CTA_FONT_SIZE + i * CTA_LINE_H}">${escapeXml(line)}</tspan>`,
+    )
     .join('')
 
   const overlaySvg = `
@@ -344,11 +398,20 @@ export async function buildPitchSlidePng(
   <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.72)"/>
   <text
     font-family="${FONT_MEDIUM}"
-    font-size="${fontSize}"
+    font-size="${pitchFontSize}"
     fill="#FFFFFF"
     text-anchor="middle"
     dominant-baseline="auto"
-  >${tspans}</text>
+  >${pitchTspans}</text>
+  <text
+    font-family="${FONT_MEDIUM}"
+    font-size="${CTA_FONT_SIZE}"
+    fill="#FFFFFF"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    opacity="0.95"
+  >${ctaTspans}</text>
+  ${buildDownArrowSvg(centerX, ARROW_CY)}
 </svg>`
 
   const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()

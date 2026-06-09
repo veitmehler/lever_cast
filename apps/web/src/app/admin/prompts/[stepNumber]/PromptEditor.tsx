@@ -120,8 +120,9 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'special_instructions', description: '[Video Reel] Client video instructions from Social Settings', steps: [206] },
   { name: 'video_model',        description: '[Video Reel] Fal.ai video model slug from Step 207', steps: [206] },
   // Story pitch slide (step 208)
-  { name: 'topic',   description: '[Pitch Slide] Article title / topic',                      steps: [208] },
-  { name: 'content', description: '[Pitch Slide] Article section text for this story slot',   steps: [208] },
+  { name: 'topic',       description: '[Pitch Slide] Article title / topic',                      steps: [208] },
+  { name: 'content',     description: '[Pitch Slide] Article section text for this story slot',   steps: [208] },
+  { name: 'cta_action',  description: '[Pitch Slide] Base CTA phrase (S4 carousel / S6 video)',   steps: [208] },
 ]
 
 const STEP_LABELS: Record<number, string> = {

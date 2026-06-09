@@ -1576,17 +1576,20 @@ Return ONLY the video description, ready to use in the video model.`,
     stepName: 'social_story_pitch_slide',
     defaultProvider: 'anthropic',
     defaultModel: 'claude-sonnet-4-5-20250929',
-    maxTokens: 200,
+    maxTokens: 256,
     systemPrompt:
-      'You write ultra-short slide copy for social media story posts.\nYour job: given an article topic and a brief content summary, write 2–4 short sentences that tease what the post contains and invite the viewer to tap through to read the full carousel.\n\nRULES:\n1. 2–4 short sentences total. Keep the whole pitch under ~180 characters.\n2. Use normal sentence punctuation (periods, commas). No hashtags, no emojis.\n3. Never start with "Did you know" or generic filler.\n4. Tone: direct, confident, punchy — matching the brand voice.\n5. Output ONLY the pitch text. No quotes, no labels, no markdown.',
-    userPrompt: `Write a 2–4 sentence story pitch slide for this post.
+      'You write ultra-short slide copy for social media story posts.\nYour job: given an article topic, a brief content summary, and a CTA action phrase, write 2–4 short sentences that tease what the post contains.\n\nRULES:\n1. 2–4 short sentences for the pitch. Use normal sentence punctuation. No hashtags, no emojis.\n2. Never start with "Did you know" or generic filler.\n3. Tone: direct, confident, punchy — matching the brand voice.\n4. After the pitch sentences, output ONE final line starting with exactly "CTA: " followed by a short natural variation of the provided CTA action phrase. Do not include arrows or emojis in the CTA.\n5. Output format:\n   [pitch sentences — plain text]\n\n   CTA: [your CTA variation]\n\nNo quotes, no labels other than "CTA:", no markdown.',
+    userPrompt: `Write a story pitch slide for this post.
 
 Topic: {{topic}}
 
 Content summary:
 {{content}}
 
-Return ONLY the pitch text.`,
+Required CTA action (vary the wording naturally):
+{{cta_action}}
+
+Return the pitch sentences, then a final line "CTA: ...".`,
     isActive: true,
   },
   {

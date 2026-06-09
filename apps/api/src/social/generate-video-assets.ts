@@ -459,10 +459,10 @@ export async function generateStoryCarouselVideo(opts: {
   if (!pitchBgUrl) throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
 
   // Fetch both backgrounds in parallel, and generate the pitch text
-  const [titleBgResp, pitchBgResp, pitchText] = await Promise.all([
+  const [titleBgResp, pitchBgResp, pitchCopy] = await Promise.all([
     fetch(titleBgUrl),
     fetch(pitchBgUrl),
-    generatePitchSlideText({ topic: opts.topic, content: opts.content }),
+    generatePitchSlideText({ topic: opts.topic, content: opts.content, pitchType: 'carousel' }),
   ])
 
   const [titleBgBuffer, pitchBgBuffer] = await Promise.all([
@@ -473,7 +473,7 @@ export async function generateStoryCarouselVideo(opts: {
   // Crop title background to 1080×1920, composite pitch slide overlay
   const [titleBgCropped, pitchPng] = await Promise.all([
     cropBufferToStoryAspect(titleBgBuffer),
-    buildPitchSlidePng(pitchBgBuffer, pitchText),
+    buildPitchSlidePng(pitchBgBuffer, pitchCopy.pitch, pitchCopy.cta),
   ])
 
   // Register pitch PNG to S3 so buildSlideshowVideo can download it by URL
@@ -482,7 +482,7 @@ export async function generateStoryCarouselVideo(opts: {
     buffer: pitchPng,
     s3Key: `social/${opts.userId}/${jobId}/story-pitch-${genId}.png`,
     title: 'Story pitch slide',
-    altText: pitchText,
+    altText: `${pitchCopy.pitch} ${pitchCopy.cta}`,
     source: 'carousel_slide',
     jobId,
     width: 1080,
@@ -561,12 +561,16 @@ export async function generateStoryHookVideo(opts: {
   const jobId = opts.jobId ?? genId
 
   // Generate pitch text while we prepare the video assets
-  const pitchText = await generatePitchSlideText({ topic: opts.topic, content: opts.content })
+  const pitchCopy = await generatePitchSlideText({
+    topic: opts.topic,
+    content: opts.content,
+    pitchType: 'hook',
+  })
 
   // Download raw background and composite the 9:16 pitch slide PNG
   const bgResp   = await fetch(opts.backgroundImageUrl)
   const bgBuffer = Buffer.from(await bgResp.arrayBuffer())
-  const pitchPng = await buildPitchSlidePng(bgBuffer, pitchText)
+  const pitchPng = await buildPitchSlidePng(bgBuffer, pitchCopy.pitch, pitchCopy.cta)
 
   // Register pitch PNG to S3 so buildSlideshowVideo can download it by URL
   const pitchRegistered = await registerSocialMedia({
@@ -574,7 +578,7 @@ export async function generateStoryHookVideo(opts: {
     buffer: pitchPng,
     s3Key: `social/${opts.userId}/${jobId}/story-pitch-${genId}.png`,
     title: 'Story pitch slide',
-    altText: pitchText,
+    altText: `${pitchCopy.pitch} ${pitchCopy.cta}`,
     source: 'carousel_slide',
     jobId,
     width: 1080,

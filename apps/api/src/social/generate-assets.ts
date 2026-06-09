@@ -115,6 +115,7 @@ export async function generateCarouselAssets(opts: {
     organizationName: brand.organizationName,
     industry: brand.industry || undefined,
     writingStyle: brand.writingStyle || undefined,
+    callToAction: brand.socialCallToAction || undefined,
     slideCount,
     articleUrl: opts.articleUrl ?? '',
     specialInstructions: brand.videoSpecialInstructions || undefined,

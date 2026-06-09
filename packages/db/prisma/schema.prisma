@@ -735,6 +735,7 @@ model BrandSettings {
   socialAccountName        String? // social handle / display name for quote cards (e.g. "hormozi"); falls back to organizationName
   instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards
   videoSpecialInstructions String? @db.Text         // client-specific instructions injected into the Fal.ai video prompt (e.g. style, restrictions)
+  socialCallToAction       String? @db.Text         // what the social posts should promote / drive toward (injected as {{call_to_action}})
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD
   socialMediaLinks          Json?   // [{ platform: string, url: string }]
 

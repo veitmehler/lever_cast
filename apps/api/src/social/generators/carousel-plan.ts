@@ -27,6 +27,7 @@ export async function planCarouselSlides(opts: {
   organizationName: string
   industry?: string
   writingStyle?: string
+  callToAction?: string
   slideCount: number
   articleUrl?: string
   specialInstructions?: string
@@ -47,6 +48,8 @@ export async function planCarouselSlides(opts: {
     .replace(/\{\{industry\}\}/g, opts.industry ?? 'general business')
     .replace(/\{\{writingStyle\}\}/g, opts.writingStyle || 'Not specified')
     .replace(/\{\{writing_style\}\}/g, opts.writingStyle || 'Not specified')
+    .replace(/\{\{call_to_action\}\}/g, opts.callToAction || '')
+    .replace(/\{\{callToAction\}\}/g, opts.callToAction || '')
     .replace(/\{\{article_url\}\}/g, opts.articleUrl ?? '')
     .replace(/\{\{special_instructions\}\}/g, (opts.specialInstructions ?? '').slice(0, 800))
 

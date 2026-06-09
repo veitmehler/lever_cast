@@ -195,6 +195,7 @@ export default function SettingsPage() {
   const [socialAccountName, setSocialAccountName]       = useState('')
   const [instagramVerified, setInstagramVerified]       = useState(false)
   const [videoSpecialInstructions, setVideoSpecialInstructions] = useState('')
+  const [socialCallToAction, setSocialCallToAction]             = useState('')
   const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
   const [isUploadingSocialLogo, setIsUploadingSocialLogo] = useState(false)
   const logoFileInputRef                                = useRef<HTMLInputElement>(null)
@@ -272,6 +273,7 @@ export default function SettingsPage() {
           if (brand.socialAccountName)    setSocialAccountName(brand.socialAccountName)
           if (brand.instagramVerified != null) setInstagramVerified(Boolean(brand.instagramVerified))
           if (brand.videoSpecialInstructions) setVideoSpecialInstructions(brand.videoSpecialInstructions)
+          if (brand.socialCallToAction)       setSocialCallToAction(brand.socialCallToAction)
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -756,6 +758,7 @@ export default function SettingsPage() {
           socialAccountName: socialAccountName.trim() || null,
           instagramVerified,
           videoSpecialInstructions: videoSpecialInstructions.trim() || null,
+          socialCallToAction: socialCallToAction.trim() || null,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -1634,6 +1637,24 @@ export default function SettingsPage() {
                   Only enable this if your Instagram account is officially verified by Meta. Adding a blue checkmark to an unverified account violates Instagram&apos;s Terms of Service.
                 </p>
               )}
+            </div>
+
+            {/* Call to Action */}
+            <div>
+              <label className="block text-sm font-medium text-card-foreground mb-1">
+                Call to Action
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Describe what you want your social media posts to promote or drive people toward. This is injected into carousel and caption prompts as <code className="font-mono bg-muted px-1 rounded">{'{{call_to_action}}'}</code>.
+                <br />Example: <span className="italic">&ldquo;Book a free consultation at acme.com&rdquo;</span> or <span className="italic">&ldquo;Download our free AI productivity guide&rdquo;</span>.
+              </p>
+              <textarea
+                value={socialCallToAction}
+                onChange={(e) => setSocialCallToAction(e.target.value)}
+                rows={3}
+                placeholder="e.g. Book a free strategy call at acme.com/call"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
             </div>
 
             {/* Video & Image Special Instructions */}

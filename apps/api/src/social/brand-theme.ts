@@ -15,6 +15,8 @@ export interface SocialBrandTheme {
   logoUrl: string | null
   /** Client-specific instructions injected into the Fal.ai video reel prompt (e.g. style, restrictions). */
   videoSpecialInstructions: string
+  /** What the social posts should promote or drive toward — injected as {{call_to_action}}. */
+  socialCallToAction: string
   /** Brand voice fields — injected into caption and carousel prompts. */
   writingStyle: string
   businessDescription: string
@@ -44,6 +46,7 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     instagramVerified: brand?.instagramVerified ?? false,
     logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
     videoSpecialInstructions: brand?.videoSpecialInstructions?.trim() ?? '',
+    socialCallToAction: brand?.socialCallToAction?.trim() ?? '',
     writingStyle: settings?.writingStyle?.trim() ?? '',
     businessDescription: brand?.businessDescription?.trim() ?? '',
     who: brand?.who?.trim() ?? '',

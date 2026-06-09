@@ -82,6 +82,8 @@ export async function generatePlatformCaption(opts: {
       .replace(/\{\{who\}\}/g, brand.who || 'Not specified')
       .replace(/\{\{writingStyle\}\}/g, brand.writingStyle || 'Not specified')
       .replace(/\{\{industry\}\}/g, brand.industry || 'general business')
+      .replace(/\{\{call_to_action\}\}/g, brand.socialCallToAction || '')
+      .replace(/\{\{callToAction\}\}/g, brand.socialCallToAction || '')
 
     const adapter = getLLMAdapter(provider)
     const run = await adapter.call({

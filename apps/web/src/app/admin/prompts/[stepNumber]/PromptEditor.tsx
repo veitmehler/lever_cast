@@ -101,6 +101,7 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'organizationName',   description: '[Carousel] Brand / organization name',                      steps: [202] },
   { name: 'industry',           description: '[Carousel] Industry from brand settings',                   steps: [202] },
   { name: 'writingStyle',       description: '[Carousel] Brand writing style / voice (from Settings)',    steps: [202] },
+  { name: 'call_to_action',    description: '[Carousel] Call to action from Social Settings',             steps: [202] },
   // Platform caption (step 203)
   { name: 'platform',           description: '[Caption] Target platform (linkedin, instagram, etc.)',     steps: [203] },
   { name: 'slotKey',            description: '[Caption] Post slot key (F1, F4, etc.)',                    steps: [203] },
@@ -115,6 +116,7 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'who',                description: '[Caption] Target audience description (from Settings)',     steps: [203] },
   { name: 'writingStyle',       description: '[Caption] Brand writing style / voice (from Settings)',     steps: [203] },
   { name: 'industry',           description: '[Caption] Industry from brand settings',                   steps: [203] },
+  { name: 'call_to_action',    description: '[Caption] Call to action from Social Settings',             steps: [203] },
   // Video reel prompt (step 206)
   { name: 'topic',              description: '[Video Reel] Article title / topic',            steps: [206] },
   { name: 'details',            description: '[Video Reel] First H2 section text from the article', steps: [206] },

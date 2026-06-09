@@ -1645,7 +1645,7 @@ export default function SettingsPage() {
                 Call to Action
               </label>
               <p className="text-xs text-muted-foreground mb-2">
-                Describe what you want your social media posts to promote or drive people toward. This is injected into carousel and caption prompts as <code className="font-mono bg-muted px-1 rounded">{'{{call_to_action}}'}</code>.
+                Describe what you want your social media posts to promote or drive people toward.
                 <br />Example: <span className="italic">&ldquo;Book a free consultation at acme.com&rdquo;</span> or <span className="italic">&ldquo;Download our free AI productivity guide&rdquo;</span>.
               </p>
               <textarea

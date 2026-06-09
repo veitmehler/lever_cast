@@ -78,7 +78,7 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 // 2nd = right, etc.). Hook is index 0 so content slides start at index 1 — odd
 // content indices are left panels, even content indices are right panels.
 // Optional headline: HelveticaNeue Medium 42px, 22 chars/line.
-// Body text: HelveticaNeue Light 24px, 29 chars/line; paragraphs split on \n.
+// Body text: HelveticaNeue Light 28px, 29 chars/line; paragraphs split on \n.
 function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, slideIndex, brand } = input
   const watermark = escapeXml(brand.organizationName)
@@ -95,8 +95,8 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const headlineLineH  = 54
   const headlineMaxC   = 22
   const headlineMaxL   = 3
-  const bodyFontSz     = 24
-  const bodyLineH      = 34
+  const bodyFontSz     = 28
+  const bodyLineH      = 40
   const bodyMaxChars   = 29
   const bodyMaxLines   = 7
   const paragraphGap   = 18
@@ -143,7 +143,7 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
 
 // ── CTA slide ────────────────────────────────────────────────────────────────
 // Full-frame dark overlay. Headline centered, HelveticaNeue Medium 48px,
-// 22 chars/line. Body text HelveticaNeue Light 24px, 35 chars/line.
+// 22 chars/line. Body text HelveticaNeue Light 28px, 35 chars/line.
 function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, brand } = input
   const watermark = escapeXml(brand.organizationName)
@@ -153,8 +153,8 @@ function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
   const headlineLineH  = 62
   const headlineMaxC   = 22
   const headlineMaxL   = 3
-  const bodyFontSz     = 24
-  const bodyLineH      = 34
+  const bodyFontSz     = 28
+  const bodyLineH      = 40
   const bodyMaxChars   = 35
   const bodyMaxLines   = 6
   const paragraphGap   = 14

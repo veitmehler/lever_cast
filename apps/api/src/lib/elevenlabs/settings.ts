@@ -7,6 +7,7 @@ export interface VoiceSettings {
   voiceoverEnabled: boolean
   stability: number
   similarity: number
+  speed: number
   apiKey: string | null
   hasApiKey: boolean
 }
@@ -29,6 +30,7 @@ export async function getVoiceSettings(userId: string): Promise<VoiceSettings> {
     voiceoverEnabled: settings?.voiceoverEnabled ?? false,
     stability: settings?.voiceoverStability ?? 0.5,
     similarity: settings?.voiceoverSimilarity ?? 0.75,
+    speed: settings?.voiceoverSpeed ?? 1.0,
     apiKey,
     hasApiKey: !!apiKey,
   }
@@ -42,6 +44,7 @@ export async function updateVoiceSettings(
     voiceoverEnabled?: boolean
     voiceoverStability?: number
     voiceoverSimilarity?: number
+    voiceoverSpeed?: number
   },
 ): Promise<VoiceSettings> {
   await prisma.settings.upsert({

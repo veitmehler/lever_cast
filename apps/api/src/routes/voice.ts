@@ -30,6 +30,7 @@ export async function voiceRoutes(app: FastifyInstance) {
       voiceoverEnabled: settings.voiceoverEnabled,
       stability: settings.stability,
       similarity: settings.similarity,
+      speed: settings.speed,
       hasApiKey: settings.hasApiKey,
     }
   })
@@ -49,6 +50,7 @@ export async function voiceRoutes(app: FastifyInstance) {
       voiceoverEnabled?: boolean
       voiceoverStability?: number
       voiceoverSimilarity?: number
+      voiceoverSpeed?: number
     }
 
     let verificationWarning: string | undefined
@@ -87,6 +89,7 @@ export async function voiceRoutes(app: FastifyInstance) {
       voiceoverEnabled: body.voiceoverEnabled,
       voiceoverStability: body.voiceoverStability,
       voiceoverSimilarity: body.voiceoverSimilarity,
+      voiceoverSpeed: body.voiceoverSpeed,
     })
 
     return {
@@ -95,6 +98,7 @@ export async function voiceRoutes(app: FastifyInstance) {
       voiceoverEnabled: updated.voiceoverEnabled,
       stability: updated.stability,
       similarity: updated.similarity,
+      speed: updated.speed,
       hasApiKey: updated.hasApiKey,
       maskedApiKey: updated.apiKey ? maskApiKey(updated.apiKey) : '',
       ...(verificationWarning ? { verificationWarning } : {}),

@@ -235,6 +235,7 @@ model Settings {
   voiceoverEnabled              Boolean  @default(false)
   voiceoverStability            Float    @default(0.5)
   voiceoverSimilarity           Float    @default(0.75)
+  voiceoverSpeed                Float    @default(1.0)
   socialTimezone                String?  @default("America/New_York")
   socialAutomationEnabled       Boolean  @default(true)
   lastLogin                     DateTime @default(now())

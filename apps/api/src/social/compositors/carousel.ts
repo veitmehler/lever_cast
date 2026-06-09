@@ -98,7 +98,10 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const bodyFontSz     = 28
   const bodyLineH      = 40
   const bodyMaxChars   = 29
-  const bodyMaxLines   = 7
+  // Allow the body to fill the available vertical space rather than truncating
+  // at 7 lines — narration reads the full text, so the slide must show it too.
+  // The currentY overflow guard below still prevents drawing past the frame.
+  const bodyMaxLines   = 18
   const paragraphGap   = 18
   const headBodyGap    = 26
 

@@ -41,6 +41,7 @@ export async function buildQuoteVideo(opts: QuoteVideoOptions): Promise<{
           modelId: voice.modelId,
           stability: voice.stability,
           similarityBoost: voice.similarity,
+          speed: voice.speed,
         })
         audioPath = path.join(tmpDir, 'voiceover.mp3')
         await fs.writeFile(audioPath, audio)

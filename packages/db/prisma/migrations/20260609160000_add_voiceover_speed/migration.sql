@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "settings" ADD COLUMN "voiceoverSpeed" DOUBLE PRECISION NOT NULL DEFAULT 1.0;

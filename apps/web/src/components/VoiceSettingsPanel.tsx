@@ -11,6 +11,7 @@ interface VoiceSettings {
   voiceoverEnabled: boolean
   stability: number
   similarity: number
+  speed: number
   hasApiKey: boolean
   maskedApiKey?: string
 }
@@ -87,6 +88,7 @@ export function VoiceSettingsPanel() {
           voiceoverEnabled: patch.voiceoverEnabled,
           voiceoverStability: patch.stability,
           voiceoverSimilarity: patch.similarity,
+          voiceoverSpeed: patch.speed,
         }),
       })
       if (!res.ok) {
@@ -228,6 +230,21 @@ export function VoiceSettingsPanel() {
                 onChange={(e) => setSettings((s) => s ? { ...s, similarity: parseFloat(e.target.value) } : s)}
                 className="w-full"
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Speed ({(settings.speed ?? 1).toFixed(2)}×)</label>
+              <input
+                type="range"
+                min={0.7}
+                max={1.2}
+                step={0.05}
+                value={settings.speed ?? 1}
+                onChange={(e) => setSettings((s) => s ? { ...s, speed: parseFloat(e.target.value) } : s)}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                0.7 = slower, 1.0 = normal, 1.2 = faster. ElevenLabs supports 0.7–1.2.
+              </p>
             </div>
           </div>
 

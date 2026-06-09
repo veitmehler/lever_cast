@@ -85,6 +85,7 @@ export async function synthesizeSpeech(opts: {
   modelId?: string
   stability?: number
   similarityBoost?: number
+  speed?: number
 }): Promise<Buffer> {
   const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}`, {
     method: 'POST',
@@ -99,6 +100,7 @@ export async function synthesizeSpeech(opts: {
       voice_settings: {
         stability: opts.stability ?? 0.5,
         similarity_boost: opts.similarityBoost ?? 0.75,
+        speed: opts.speed ?? 1.0,
       },
     }),
   })
@@ -135,6 +137,7 @@ export async function synthesizeSpeechWithTimestamps(opts: {
   modelId?: string
   stability?: number
   similarityBoost?: number
+  speed?: number
 }): Promise<SpeechWithTimestamps> {
   const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}/with-timestamps`, {
     method: 'POST',
@@ -148,6 +151,7 @@ export async function synthesizeSpeechWithTimestamps(opts: {
       voice_settings: {
         stability: opts.stability ?? 0.5,
         similarity_boost: opts.similarityBoost ?? 0.75,
+        speed: opts.speed ?? 1.0,
       },
     }),
   })

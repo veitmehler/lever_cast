@@ -211,13 +211,19 @@ export async function mergeAudioVideoWithDelay(
   outputPath: string,
   delayMs: number,
 ): Promise<void> {
+  const delay = Math.max(0, Math.round(delayMs))
+  // Use filter_complex with an explicit input reference [1:a] + all=1 so the
+  // delay reliably applies to every channel regardless of mono/stereo source,
+  // then map the video and delayed-audio streams explicitly. The previous
+  // `-filter:a` shorthand without `-map` could leave audio undelayed.
   await runFfmpeg([
     '-i', videoPath,
     '-i', audioPath,
+    '-filter_complex', `[1:a]adelay=${delay}:all=1[a]`,
+    '-map', '0:v:0',
+    '-map', '[a]',
     '-c:v', 'copy',
     '-c:a', 'aac',
-    // adelay applies per-channel; stereo = "delayMs|delayMs"
-    '-filter:a', `adelay=${Math.round(delayMs)}|${Math.round(delayMs)}`,
     '-shortest',
     outputPath,
   ])

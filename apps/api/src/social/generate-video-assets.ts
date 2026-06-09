@@ -316,6 +316,7 @@ export async function generateHookVideoAsset(opts: {
           modelId: voice.modelId,
           stability: voice.stability,
           similarityBoost: voice.similarity,
+          speed: voice.speed,
         })
         const audioFilePath = path.join(tmpDir, 'narration.mp3')
         await fs.writeFile(audioFilePath, audio)

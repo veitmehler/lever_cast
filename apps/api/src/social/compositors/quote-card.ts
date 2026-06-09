@@ -39,7 +39,6 @@ const BADGE_SIZE = 58 // px
 // bundled TTF name tables (see apps/api/fonts/patch-font-names.py). librsvg
 // resolves fonts via fontconfig only — @font-face embedding is unsupported —
 // so we select the exact face by family name instead of font-weight matching.
-const FONT_NAME_REGULAR = 'HelveticaNeue Regular'
 const FONT_NAME_LIGHT = 'HelveticaNeue Light'
 const FONT_NAME_BOLD = 'HelveticaNeue Bold'
 
@@ -82,7 +81,7 @@ function buildQuoteCardSvg(
   const logoTop    = blockTop
   const textStartY = blockTop + LOGO_SIZE + HEADER_TEXT_GAP + fontSize
 
-  const nameFont = escapeXml(FONT_NAME_REGULAR)
+  const nameFont = escapeXml(FONT_NAME_LIGHT)
   const bodyFont = escapeXml(FONT_NAME_LIGHT)
   const nameText = escapeXml(input.brand.socialAccountName)
 
@@ -102,7 +101,7 @@ function buildQuoteCardSvg(
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <!-- White background -->
   <rect width="${width}" height="${height}" fill="#FFFFFF"/>
-  <!-- Account name: HelveticaNeue Regular (unique family name) -->
+  <!-- Account name: HelveticaNeue Light (same weight as quote body) -->
   <text x="${nameX}" y="${nameY}" font-family="${nameFont}" font-size="${NAME_FONT_SIZE}" fill="#1A1A1A">${nameText}</text>
   ${verifiedBadge}
   <!-- Quote body: HelveticaNeue Light (unique family name) -->

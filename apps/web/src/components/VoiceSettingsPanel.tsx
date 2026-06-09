@@ -50,7 +50,7 @@ export function VoiceSettingsPanel() {
     loadSettings()
   }, [loadSettings])
 
-  const loadVoices = async () => {
+  const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true)
     try {
       const res = await fetch('/api/voice/voices')
@@ -65,7 +65,14 @@ export function VoiceSettingsPanel() {
     } finally {
       setIsLoadingVoices(false)
     }
-  }
+  }, [])
+
+  // Populate voice options on load so a saved voiceId renders in the dropdown.
+  useEffect(() => {
+    if (settings?.hasApiKey) {
+      void loadVoices()
+    }
+  }, [settings?.hasApiKey, loadVoices])
 
   const saveSettings = async (patch: Partial<VoiceSettings> & { elevenLabsApiKey?: string }) => {
     setIsSaving(true)

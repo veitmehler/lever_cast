@@ -100,6 +100,7 @@ const ALL_VARIABLES: { name: string; description: string; steps?: number[] }[] =
   { name: 'special_instructions', description: '[Carousel] Brand image style instructions',               steps: [202] },
   { name: 'organizationName',   description: '[Carousel] Brand / organization name',                      steps: [202] },
   { name: 'industry',           description: '[Carousel] Industry from brand settings',                   steps: [202] },
+  { name: 'writingStyle',       description: '[Carousel] Brand writing style / voice (from Settings)',    steps: [202] },
   // Platform caption (step 203)
   { name: 'platform',           description: '[Caption] Target platform (linkedin, instagram, etc.)',     steps: [203] },
   { name: 'slotKey',            description: '[Caption] Post slot key (F1, F4, etc.)',                    steps: [203] },

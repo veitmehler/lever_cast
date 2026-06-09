@@ -1,6 +1,7 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import {
+  addSilentAudio,
   concatVideos,
   defaultFontPath,
   overlayBulletsOnVideo,
@@ -59,7 +60,18 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     audioPath: opts.voiceAudioPath,
   })
 
-  await concatVideos([hookTitled, bodyPath], opts.outputPath)
+  // When the body carries a voiceover the concat demuxer determines its output
+  // stream layout from the first segment (the silent Seedance intro).  If the
+  // intro has no audio stream the body's AAC track is silently dropped.
+  // Fix: mux a silent AAC track into the intro so both segments are stream-compatible.
+  const introForConcat = opts.voiceAudioPath
+    ? path.join(opts.tmpDir, 'hook-titled-audio.mp4')
+    : hookTitled
+  if (opts.voiceAudioPath) {
+    await addSilentAudio(hookTitled, introForConcat)
+  }
+
+  await concatVideos([introForConcat, bodyPath], opts.outputPath)
   return { probe: await probeVideo(opts.outputPath), hookRawPath: hookRaw }
 }
 

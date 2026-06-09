@@ -201,6 +201,24 @@ export async function mergeAudioVideo(
 }
 
 /**
+ * Mux a silent stereo AAC track into a video that has no audio stream.
+ * Used to make the F6 intro clip stream-compatible with the body clip (which
+ * carries a voiceover) before the two are joined by the concat demuxer.
+ * The concat demuxer derives its output streams from the first segment, so
+ * without this the body's audio track is silently dropped.
+ */
+export async function addSilentAudio(inputPath: string, outputPath: string): Promise<void> {
+  await runFfmpeg([
+    '-i', inputPath,
+    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    '-shortest',
+    outputPath,
+  ])
+}
+
+/**
  * Write a drawtext string to a temp file and return its path, so the text can be
  * referenced via `drawtext=textfile=<path>` instead of `text=<inline>`.
  *

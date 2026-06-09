@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "BrandSettings" ADD COLUMN "socialCallToAction" TEXT;
+ALTER TABLE "brand_settings" ADD COLUMN "socialCallToAction" TEXT;

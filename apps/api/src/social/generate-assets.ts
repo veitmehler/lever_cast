@@ -26,6 +26,8 @@ export interface GeneratedCarousel {
   postType: 'carousel'
   slides: Array<{ imageUrl: string; mediaId: string; headline: string }>
   imageUrls: string[]
+  /** Raw (pre-overlay) background image URLs, one per slide — used by S4/S6 pitch slides. */
+  backgroundImageUrls: string[]
 }
 
 export interface GeneratedPitchStory {
@@ -118,10 +120,24 @@ export async function generateCarouselAssets(opts: {
   })
 
   const slides: GeneratedCarousel['slides'] = []
+  const backgroundImageUrls: string[] = []
 
   for (let i = 0; i < slidePlans.length; i++) {
     const plan = slidePlans[i]
     const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
+
+    // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
+    const bgRegistered = await registerSocialMedia({
+      userId: opts.userId,
+      buffer: bg,
+      s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${i + 1}-${genId}.png`,
+      title: `Carousel background ${i + 1}`,
+      altText: `Background for slide ${i + 1}`,
+      source: 'carousel_slide',
+      jobId,
+    })
+    backgroundImageUrls.push(bgRegistered.url)
+
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,
       slideIndex: i,
@@ -151,6 +167,7 @@ export async function generateCarouselAssets(opts: {
     postType: 'carousel',
     slides,
     imageUrls: slides.map((s) => s.imageUrl),
+    backgroundImageUrls,
   }
 }
 

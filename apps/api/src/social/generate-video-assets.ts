@@ -15,7 +15,7 @@ import { buildVideoReel, buildHookVideo } from './video/hook-video'
 import { buildQuoteVideo, buildLoopedStoryReel } from './video/quote-video'
 import { buildSlideshowVideo } from './video/slideshow-video'
 import { generateSeedanceClip, downloadSeedanceClip } from './video/seedance'
-import { registerSocialVideo } from './media-register'
+import { registerSocialMedia, registerSocialVideo } from './media-register'
 import {
   generateCarouselAssets,
   generateQuoteCardAsset,
@@ -24,6 +24,8 @@ import {
 import { extractReelBullets } from './generators/reel-bullets'
 import { generateVideoReelPrompt } from './generators/video-reel-prompt'
 import { generateQuoteVideoNarration } from './generators/quote-video-narration'
+import { generatePitchSlideText } from './generators/pitch-slide-text'
+import { buildPitchSlidePng } from './compositors/carousel'
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
 import { synthesizeSpeech } from '../lib/elevenlabs/client'
@@ -50,6 +52,8 @@ export interface GeneratedHookVideo {
   title: string
   /** Carousel image URLs generated for this hook video (index 0 = hook slide, 1+ = content). */
   carouselImageUrls: string[]
+  /** Raw (pre-overlay) background image URLs — parallel array to carouselImageUrls. */
+  carouselBackgroundImageUrls: string[]
 }
 
 export interface GeneratedQuoteVideo {
@@ -338,7 +342,13 @@ export async function generateHookVideoAsset(opts: {
       jobId,
     })
 
-    return { postType: 'hook_video', ...uploaded, title, carouselImageUrls: carousel.imageUrls }
+    return {
+      postType: 'hook_video',
+      ...uploaded,
+      title,
+      carouselImageUrls: carousel.imageUrls,
+      carouselBackgroundImageUrls: carousel.backgroundImageUrls,
+    }
   })
 }
 
@@ -402,31 +412,62 @@ export async function generateQuoteVideoAsset(opts: {
 }
 
 /**
- * S4: 9:16 story video built from F4's first two carousel images (hook + content).
- * Both slides are already rendered with overlays baked in; we just time them and
- * letterbox them into a 1080×1920 story format.
+ * S4: 9:16 story video.
+ * Slide 1 = F4 hook carousel image (pre-baked title overlay), letterboxed to story.
+ * Slide 2 = F4 raw background (content slide 1) center-cropped to 9:16 with a
+ *   full-frame dark overlay + uniquely LLM-generated pitch text (centered, white).
  */
 export async function generateStoryCarouselVideo(opts: {
   userId: string
-  /** imageUrls[0] = hook (title) slide, imageUrls[1] = first content slide. */
+  /** imageUrls[0] = pre-baked F4 hook slide. */
   imageUrls: string[]
+  /** backgroundImageUrls[1] = raw background for F4 content slide 1. */
+  backgroundImageUrls: string[]
+  /** S4's own article section text — used to generate the pitch copy. */
+  content: string
+  topic: string
   jobId?: string
 }): Promise<{ postType: 'pitch_carousel'; videoUrl: string; mediaId: string }> {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
 
-  // Use first two images; fall back gracefully if only one is available
-  const slideImages = opts.imageUrls.slice(0, 2)
-  if (slideImages.length === 0) throw new Error('generateStoryCarouselVideo: no imageUrls provided')
+  const hookImageUrl  = opts.imageUrls[0]
+  const rawBgUrl      = opts.backgroundImageUrls[1] ?? opts.backgroundImageUrls[0]
+  if (!hookImageUrl) throw new Error('generateStoryCarouselVideo: no imageUrls provided')
+  if (!rawBgUrl)     throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
+
+  // Generate unique pitch text for this S4 run
+  const pitchText = await generatePitchSlideText({
+    topic: opts.topic,
+    content: opts.content,
+  })
+
+  // Download raw background and composite the pitch slide PNG
+  const bgResp   = await fetch(rawBgUrl)
+  const bgBuffer = Buffer.from(await bgResp.arrayBuffer())
+  const pitchPng = await buildPitchSlidePng(bgBuffer, pitchText)
 
   // Random 4–7 s per slide
   const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
+
+  // Register pitch PNG to S3 so buildSlideshowVideo can download it by URL
+  const pitchRegistered = await registerSocialMedia({
+    userId: opts.userId,
+    buffer: pitchPng,
+    s3Key: `social/${opts.userId}/${jobId}/story-pitch-${genId}.png`,
+    title: 'Story pitch slide',
+    altText: pitchText,
+    source: 'carousel_slide',
+    jobId,
+    width: 1080,
+    height: 1920,
+  })
 
   return withTempDir('story-carousel-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'story-carousel.mp4')
 
     const probe = await buildSlideshowVideo({
-      imageUrls: slideImages,
+      imageUrls: [hookImageUrl, pitchRegistered.url],
       outputPath,
       variant: 'story',
       secondsPerSlide,
@@ -448,22 +489,23 @@ export async function generateStoryCarouselVideo(opts: {
 
 /**
  * S6: 9:16 story video with a fresh Fal.ai T2V intro clip (title fade-in) followed
- * by one content slide from F6.
+ * by a pitch slide built from F6's raw content background.
  *
  * Flow:
  *  1. Generate Seedance T2V at 9:16 (720×1280)
  *  2. Overlay title with fade-in via overlayTitleOnVideoFadeIn
  *  3. Rescale to 1080×1920 to match the content slideshow
- *  4. Build a single-image slideshow (story, 1080×1920) from contentImageUrl
- *  5. Concat intro + content slide
+ *  4. Download F6 raw background, 9:16 crop-scale, overlay dark + LLM pitch text
+ *  5. Concat intro clip + pitch slide
  */
 export async function generateStoryHookVideo(opts: {
   userId: string
   title: string
-  /** Used to generate the Seedance video prompt via the step-206 LLM. */
+  /** Article section text — used both for Seedance prompt and pitch copy. */
   content: string
-  /** F6's carousel imageUrls[1] — first content slide after the hook. */
-  contentImageUrl: string
+  topic: string
+  /** F6's backgroundImageUrls[1] — raw background (no text) from F6 content slide 1. */
+  backgroundImageUrl: string
   jobId?: string
 }): Promise<{ postType: 'pitch_hook'; videoUrl: string; mediaId: string }> {
   const genId = generationId()
@@ -471,14 +513,36 @@ export async function generateStoryHookVideo(opts: {
 
   const brand = await loadSocialBrandTheme(opts.userId)
 
-  const hookVideoPrompt = await generateVideoReelPrompt({
-    topic: opts.title,
-    details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
-    specialInstructions: brand.videoSpecialInstructions,
-    videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+  // Run the Seedance video prompt and the pitch text LLM in parallel
+  const [hookVideoPrompt, pitchText] = await Promise.all([
+    generateVideoReelPrompt({
+      topic: opts.title,
+      details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
+      specialInstructions: brand.videoSpecialInstructions,
+      videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+    }),
+    generatePitchSlideText({ topic: opts.topic, content: opts.content }),
+  ])
+
+  // Download raw background and composite the 9:16 pitch slide PNG
+  const bgResp   = await fetch(opts.backgroundImageUrl)
+  const bgBuffer = Buffer.from(await bgResp.arrayBuffer())
+  const pitchPng = await buildPitchSlidePng(bgBuffer, pitchText)
+
+  // Register pitch PNG to S3 so buildSlideshowVideo can download it by URL
+  const pitchRegistered = await registerSocialMedia({
+    userId: opts.userId,
+    buffer: pitchPng,
+    s3Key: `social/${opts.userId}/${jobId}/story-pitch-${genId}.png`,
+    title: 'Story pitch slide',
+    altText: pitchText,
+    source: 'carousel_slide',
+    jobId,
+    width: 1080,
+    height: 1920,
   })
 
-  // Random 4–7 s for the content slide
+  // Random 4–7 s for the pitch slide
   const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
 
   return withTempDir('story-hook-', async (tmpDir) => {
@@ -504,15 +568,15 @@ export async function generateStoryHookVideo(opts: {
     // Step 3 — Upscale to 1080×1920 so concat matches the slideshow dimensions
     await rescaleVideo(hookTitled, hookScaled, 1080, 1920)
 
-    // Step 4 — Single content slide (letterboxed 1080×1920)
+    // Step 4 — Pitch slide as a timed clip (already 1080×1920)
     await buildSlideshowVideo({
-      imageUrls: [opts.contentImageUrl],
+      imageUrls: [pitchRegistered.url],
       outputPath: bodyPath,
       variant: 'story',
       secondsPerSlide,
     })
 
-    // Step 5 — Concat intro clip + content slide
+    // Step 5 — Concat intro clip + pitch slide
     await concatVideos([hookScaled, bodyPath], outputPath)
     const probe = await probeVideo(outputPath)
 

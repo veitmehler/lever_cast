@@ -290,3 +290,80 @@ export async function renderCarouselSlide(
 export function carouselSlideDimensions(): { width: number; height: number } {
   return { width: SLIDE_SIZE, height: SLIDE_SIZE }
 }
+
+const STORY_W = 1080
+const STORY_H = 1920
+// Font for the pitch slide body text
+const FONT_REGULAR = 'HelveticaNeue Regular'
+
+/**
+ * Composite a 9:16 story pitch slide: center-crop the source background to
+ * 1080×1920, apply a full-frame dark overlay, then render centered white text.
+ *
+ * The pitchText is short (2–5 lines). Each \n in pitchText becomes a new
+ * paragraph with extra gap between them.
+ */
+export async function buildPitchSlidePng(
+  backgroundBuffer: Buffer,
+  pitchText: string,
+): Promise<Buffer> {
+  const bg = await sharp(backgroundBuffer)
+    .resize(STORY_W, STORY_H, { fit: 'cover', position: 'centre' })
+    .png()
+    .toBuffer()
+
+  const fontSize  = 42
+  const lineH     = 60
+  const paraGap   = 20
+  const maxChars  = 22
+  const maxLines  = 5
+  const centerX   = STORY_W / 2
+
+  // Build tspans — each newline-separated paragraph is word-wrapped
+  const paragraphs = pitchText.split('\n').map((p) => p.trim()).filter(Boolean)
+  let currentY = 900 // start near vertical centre of a 1920-tall canvas
+  const tspans: string[] = []
+
+  for (const para of paragraphs) {
+    const lines = wrapText(para, maxChars, maxLines)
+    for (const line of lines) {
+      tspans.push(`<tspan x="${centerX}" y="${currentY}">${escapeXml(line)}</tspan>`)
+      currentY += lineH
+    }
+    currentY += paraGap
+  }
+
+  const textHeight = currentY - 900
+  const svgStartY  = Math.max(60, (STORY_H - textHeight) / 2)
+
+  // Re-render tspans with corrected start position
+  currentY = svgStartY
+  const finalTspans: string[] = []
+  for (const para of paragraphs) {
+    const lines = wrapText(para, maxChars, maxLines)
+    for (const line of lines) {
+      finalTspans.push(`<tspan x="${centerX}" y="${currentY + fontSize}">${escapeXml(line)}</tspan>`)
+      currentY += lineH
+    }
+    currentY += paraGap
+  }
+
+  const overlaySvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${STORY_W}" height="${STORY_H}">
+  <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.72)"/>
+  <text
+    font-family="${FONT_REGULAR}"
+    font-size="${fontSize}"
+    fill="#FFFFFF"
+    text-anchor="middle"
+    dominant-baseline="auto"
+  >${finalTspans.join('')}</text>
+</svg>`
+
+  const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()
+
+  return sharp(bg)
+    .composite([{ input: overlayPng, top: 0, left: 0 }])
+    .png()
+    .toBuffer()
+}

@@ -121,7 +121,7 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   },
   {
     label: 'Social Media Posts',
-    steps: [201, 202, 203, 204, 205, 206, 207],
+    steps: [201, 202, 203, 204, 205, 206, 207, 208],
   },
 ]
 

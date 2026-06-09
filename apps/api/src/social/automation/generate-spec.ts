@@ -23,6 +23,8 @@ export interface SpecAssets {
   /** Pre-overlay raw Seedance background video URL — stored so S2 can reuse F2's background. */
   rawVideoUrl?: string
   title?: string
+  /** Raw (pre-overlay) carousel background image URLs — stored so S4/S6 can build pitch slides. */
+  backgroundImageUrls?: string[]
 }
 
 export async function generateSpecAssets(opts: {
@@ -66,6 +68,7 @@ export async function generateSpecAssets(opts: {
         mediaUrls: carousel.imageUrls,
         imageUrl: carousel.imageUrls[0],
         title: carousel.slides[0]?.headline ?? articleCtx.h2Title,
+        backgroundImageUrls: carousel.backgroundImageUrls,
       }
     }
 
@@ -104,12 +107,13 @@ export async function generateSpecAssets(opts: {
         slideCount,
         jobId: assetJobId,
       })
-      // Store carousel images in mediaUrls so the pitch_hook (S6) slot can reuse them.
+      // Store carousel images and raw backgrounds so S6 can build its pitch slide.
       return {
         postType: 'hook_video',
         videoUrl: hook.videoUrl,
         title: hook.title,
         mediaUrls: hook.carouselImageUrls,
+        backgroundImageUrls: hook.carouselBackgroundImageUrls,
       }
     }
 
@@ -124,28 +128,33 @@ export async function generateSpecAssets(opts: {
     }
 
     case 'pitch_carousel': {
-      // S4 — 9:16 story video using F4's first two pre-rendered carousel slides.
+      // S4 — 9:16 story video: F4 hook image (slide 1) + pitch slide from F4 raw background.
       const f4 = priorAssets.get('F4')
       if (!f4?.mediaUrls?.length) throw new Error('F4 carousel images are required before S4')
+      if (!f4?.backgroundImageUrls?.length) throw new Error('F4 background images are required before S4')
       const s4 = await generateStoryCarouselVideo({
         userId,
         imageUrls: f4.mediaUrls,
+        backgroundImageUrls: f4.backgroundImageUrls,
+        content: content.text,
+        topic: content.title ?? articleCtx.h2Title,
         jobId: assetJobId,
       })
       return { postType: 'pitch_carousel', videoUrl: s4.videoUrl }
     }
 
     case 'pitch_hook': {
-      // S6 — 9:16 story video: fresh Fal.ai T2V clip (F6 title) + F6 content image #1.
+      // S6 — 9:16 story video: fresh Fal.ai T2V clip (F6 title) + pitch slide from F6 raw background.
       const f6 = priorAssets.get('F6')
       const title = f6?.title ?? content.title ?? articleCtx.h2Title
-      const contentImageUrl = f6?.mediaUrls?.[1] ?? f6?.mediaUrls?.[0]
-      if (!contentImageUrl) throw new Error('F6 carousel images are required before S6')
+      const backgroundImageUrl = f6?.backgroundImageUrls?.[1] ?? f6?.backgroundImageUrls?.[0]
+      if (!backgroundImageUrl) throw new Error('F6 background images are required before S6')
       const s6 = await generateStoryHookVideo({
         userId,
         title,
         content: content.text,
-        contentImageUrl,
+        topic: content.title ?? articleCtx.h2Title,
+        backgroundImageUrl,
         jobId: assetJobId,
       })
       return { postType: 'pitch_hook', videoUrl: s6.videoUrl, title }

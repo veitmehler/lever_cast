@@ -25,6 +25,8 @@ export interface GeneratedQuoteCard {
 export interface GeneratedCarousel {
   postType: 'carousel'
   slides: Array<{ imageUrl: string; mediaId: string; headline: string }>
+  /** Full slide plans retained so callers can extract per-slide text for voiceover sync. */
+  slidePlans: CarouselSlidePlan[]
   imageUrls: string[]
   /** Raw (pre-overlay) background image URLs, one per slide — used by S4/S6 pitch slides. */
   backgroundImageUrls: string[]
@@ -168,6 +170,7 @@ export async function generateCarouselAssets(opts: {
   return {
     postType: 'carousel',
     slides,
+    slidePlans,
     imageUrls: slides.map((s) => s.imageUrl),
     backgroundImageUrls,
   }

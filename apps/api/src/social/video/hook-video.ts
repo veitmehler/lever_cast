@@ -1,9 +1,9 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import {
-  addSilentAudio,
   concatVideos,
   defaultFontPath,
+  mergeAudioVideoWithDelay,
   overlayBulletsOnVideo,
   overlayTitleAndBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
@@ -21,11 +21,15 @@ export interface HookVideoOptions {
   outputPath: string
   tmpDir: string
   hookDuration?: '5'
-  /** Seconds each content slide is held. If voiceAudioPath is set this should
-   *  be derived from the audio duration. Defaults to 4. */
+  /** Uniform seconds-per-slide fallback when voiceover is disabled. Defaults to 4. */
   secondsPerSlide?: number
-  /** Path to an ElevenLabs MP3 narration file. When provided it is merged into
-   *  the slideshow body (not the Seedance intro clip). */
+  /** Per-slide durations derived from ElevenLabs timestamp alignment. When provided
+   *  each slide holds its own duration and slideDurations.length must equal
+   *  slideshowImageUrls.length. */
+  slideDurations?: number[]
+  /** Path to an ElevenLabs MP3 narration file. When provided it is delay-merged
+   *  onto the final video AFTER the intro so narration starts with the first
+   *  content slide, not from t=0. */
   voiceAudioPath?: string
 }
 
@@ -35,7 +39,15 @@ export interface HookVideoResult {
   hookRawPath: string
 }
 
-/** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover. */
+/** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover.
+ *
+ * Audio strategy (when voiceAudioPath is provided):
+ *  1. Build a silent video-only intro (hookTitled).
+ *  2. Build a silent video-only slideshow body (no audio embedded at body level).
+ *  3. Concat intro + body as video-only.
+ *  4. Delay-merge narration onto the full video with adelay = intro duration in ms,
+ *     so speech starts precisely when the first content slide appears.
+ */
 export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoResult> {
   const hookUrl = await generateSeedanceClip({
     prompt: opts.hookPrompt,
@@ -48,30 +60,39 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
   const hookRaw    = path.join(opts.tmpDir, 'hook-raw.mp4')
   const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
   await downloadSeedanceClip(hookUrl, hookRaw)
-  // Always overlay the title using the fade-in variant (starts at t=1s, 0.5s fade)
   await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
+
+  // Probe intro duration so we know how long to delay the narration.
+  const introDuration = opts.voiceAudioPath
+    ? (await probeVideo(hookTitled)).duration
+    : 0
 
   const bodyPath = path.join(opts.tmpDir, 'hook-body.mp4')
   await buildSlideshowVideo({
     imageUrls: opts.slideshowImageUrls,
     outputPath: bodyPath,
     variant: 'feed',
+    slideDurations: opts.slideDurations,
     secondsPerSlide: opts.secondsPerSlide ?? 4,
-    audioPath: opts.voiceAudioPath,
+    // No audio here — merged after concat so timing is relative to the full video.
   })
 
-  // When the body carries a voiceover the concat demuxer determines its output
-  // stream layout from the first segment (the silent Seedance intro).  If the
-  // intro has no audio stream the body's AAC track is silently dropped.
-  // Fix: mux a silent AAC track into the intro so both segments are stream-compatible.
-  const introForConcat = opts.voiceAudioPath
-    ? path.join(opts.tmpDir, 'hook-titled-audio.mp4')
-    : hookTitled
+  // Concat video-only (no audio stream on either segment).
+  const silentOutputPath = opts.voiceAudioPath
+    ? path.join(opts.tmpDir, 'hook-silent.mp4')
+    : opts.outputPath
+  await concatVideos([hookTitled, bodyPath], silentOutputPath)
+
+  // Delay-merge narration so it starts at the first content slide.
   if (opts.voiceAudioPath) {
-    await addSilentAudio(hookTitled, introForConcat)
+    await mergeAudioVideoWithDelay(
+      silentOutputPath,
+      opts.voiceAudioPath,
+      opts.outputPath,
+      introDuration * 1000,
+    )
   }
 
-  await concatVideos([introForConcat, bodyPath], opts.outputPath)
   return { probe: await probeVideo(opts.outputPath), hookRawPath: hookRaw }
 }
 

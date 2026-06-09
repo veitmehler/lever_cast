@@ -11,6 +11,7 @@ import {
   rescaleVideo,
   probeVideo,
   concatVideos,
+  mergeAudioVideoWithDelay,
   runFfmpeg,
   defaultFontPath,
 } from './video/ffmpeg'
@@ -25,12 +26,11 @@ import {
 } from './generate-assets'
 import { extractReelBullets } from './generators/reel-bullets'
 import { generateVideoReelPrompt } from './generators/video-reel-prompt'
-import { generateQuoteVideoNarration } from './generators/quote-video-narration'
 import { generatePitchSlideText } from './generators/pitch-slide-text'
 import { buildPitchSlidePng, cropBufferToStoryAspect } from './compositors/carousel'
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
-import { synthesizeSpeech } from '../lib/elevenlabs/client'
+import { synthesizeSpeechWithTimestamps, computeSlideDurations } from '../lib/elevenlabs/client'
 import { getVoiceSettings } from '../lib/elevenlabs/settings'
 
 function generationId(): string {
@@ -272,51 +272,54 @@ export async function generateHookVideoAsset(opts: {
   // needed in the slideshow and would create a duplicate title frame.
   const contentSlideUrls = carousel.imageUrls.slice(1)
 
+  // Build spoken text for each content slide from its headline + body paragraphs.
+  // Slide 0 (hook) is omitted — title is spoken on the Seedance intro instead.
+  const contentSlideTexts = carousel.slidePlans.slice(1).map((plan) => {
+    const parts: string[] = []
+    if (plan.headlineText?.trim()) parts.push(plan.headlineText.trim())
+    if (plan.bodyText?.trim()) {
+      const para = plan.bodyText.trim().replace(/\n+/g, ' ')
+      parts.push(para)
+    }
+    return parts.join('. ')
+  })
+
   const topic = title
   const details = opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500)
 
-  // Generate Seedance video prompt and voiceover narration in parallel
-  const [hookVideoPrompt, narrationText] = await Promise.all([
-    generateVideoReelPrompt({
-      topic,
-      details,
-      specialInstructions: brand.videoSpecialInstructions,
-      videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
-    }),
-    generateQuoteVideoNarration(opts.userId, opts.content).catch(() => ''),
-  ])
+  // Generate Seedance video prompt (narration is now derived from slide plans)
+  const hookVideoPrompt = await generateVideoReelPrompt({
+    topic,
+    details,
+    specialInstructions: brand.videoSpecialInstructions,
+    videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+  })
 
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')
 
-    // Voiceover: synthesize if enabled, then derive slide duration from audio length
+    // Voiceover: synthesize with timestamps so each slide duration maps to speech.
+    // Audio is NOT merged into the slideshow body — instead it is delay-merged
+    // onto the final concatenated video so it starts after the Seedance intro.
     let voiceAudioPath: string | undefined
-    let secondsPerSlide = 4
+    let slideDurations: number[] | undefined
+    const secondsPerSlide = 4 // fallback when voiceover is disabled
 
-    const canUseVoice =
-      narrationText &&
-      voice.voiceoverEnabled &&
-      voice.apiKey &&
-      voice.voiceId
+    const slideTexts = contentSlideTexts.filter((t) => t.trim().length > 0)
 
-    if (canUseVoice) {
+    if (slideTexts.length > 0 && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
       try {
-        const mp3Buffer = await synthesizeSpeech({
-          apiKey: voice.apiKey!,
-          voiceId: voice.voiceId!,
-          text: narrationText,
+        const { audio, alignment } = await synthesizeSpeechWithTimestamps({
+          apiKey: voice.apiKey,
+          voiceId: voice.voiceId,
+          text: slideTexts.join(' '),
           modelId: voice.modelId,
           stability: voice.stability,
           similarityBoost: voice.similarity,
         })
         const audioFilePath = path.join(tmpDir, 'narration.mp3')
-        await fs.writeFile(audioFilePath, mp3Buffer)
-        // Measure the actual audio duration so slides fit the narration exactly
-        const audioProbe = await probeVideo(audioFilePath)
-        const audioDuration = audioProbe.duration
-        if (audioDuration > 0 && contentSlideUrls.length > 0) {
-          secondsPerSlide = audioDuration / contentSlideUrls.length
-        }
+        await fs.writeFile(audioFilePath, audio)
+        slideDurations = computeSlideDurations(slideTexts, alignment)
         voiceAudioPath = audioFilePath
       } catch {
         // Non-fatal — fall back to silent slideshow with default timing
@@ -333,6 +336,7 @@ export async function generateHookVideoAsset(opts: {
       outputPath,
       tmpDir,
       secondsPerSlide,
+      slideDurations,
       voiceAudioPath,
     })
 
@@ -383,15 +387,8 @@ export async function generateQuoteVideoAsset(opts: {
 
   return withTempDir('quote-video-', async (tmpDir) => {
     const quoteUrls: string[] = []
-    let narration = ''
-
-    if (opts.useNarrationPrompt) {
-      try {
-        narration = await generateQuoteVideoNarration(opts.userId, opts.content)
-      } catch {
-        narration = ''
-      }
-    }
+    // Collect per-slide spoken text for timestamp-based slide sync.
+    const slideTexts: string[] = []
 
     for (let i = 0; i < quoteCount; i++) {
       const card = await generateQuoteCardAsset({
@@ -401,17 +398,16 @@ export async function generateQuoteVideoAsset(opts: {
         jobId,
       })
       quoteUrls.push(card.imageUrl)
-      if (!narration) {
-        narration += `${card.quoteText}. `
-      }
+      // Use the actual quote text so ElevenLabs timing maps exactly to each slide.
+      slideTexts.push(card.quoteText.trim())
     }
 
     const outputPath = path.join(tmpDir, 'quote-video.mp4')
     const { probe, voiceoverUsed } = await buildQuoteVideo({
       userId: opts.userId,
       quoteImageUrls: quoteUrls,
+      slideTexts,
       outputPath,
-      narrationText: narration.trim(),
       secondsPerSlide: 4,
     })
 

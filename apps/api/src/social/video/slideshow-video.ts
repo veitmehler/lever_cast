@@ -20,6 +20,8 @@ export interface SlideshowOptions {
   outputPath: string
   variant?: SlideshowVariant
   secondsPerSlide?: number
+  /** Per-slide durations in seconds. When provided, overrides secondsPerSlide for each slide. */
+  slideDurations?: number[]
   audioPath?: string
   kenBurns?: boolean
 }
@@ -35,7 +37,7 @@ function scaleFilter(variant: SlideshowVariant, kenBurns: boolean, duration: num
 /** Build an MP4 slideshow from ordered image URLs. */
 export async function buildSlideshowVideo(opts: SlideshowOptions): Promise<VideoProbe> {
   const variant = opts.variant ?? 'feed'
-  const secondsPerSlide = opts.secondsPerSlide ?? 3
+  const defaultSecondsPerSlide = opts.secondsPerSlide ?? 3
   const kenBurns = opts.kenBurns ?? false
   const tmpDir = path.dirname(opts.outputPath)
   const localImages: string[] = []
@@ -51,12 +53,13 @@ export async function buildSlideshowVideo(opts: SlideshowOptions): Promise<Video
   const segmentPaths: string[] = []
   for (let i = 0; i < localImages.length; i++) {
     const segPath = path.join(tmpDir, `seg-${i}.mp4`)
-    const vf = scaleFilter(variant, kenBurns, secondsPerSlide)
+    const dur = opts.slideDurations?.[i] ?? defaultSecondsPerSlide
+    const vf = scaleFilter(variant, kenBurns, dur)
     await runFfmpeg([
       '-loop',
       '1',
       '-t',
-      String(secondsPerSlide),
+      String(dur),
       '-i',
       localImages[i],
       '-vf',

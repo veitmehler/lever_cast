@@ -201,6 +201,29 @@ export async function mergeAudioVideo(
 }
 
 /**
+ * Merge audio into a video with an explicit delay (milliseconds) before the
+ * audio starts. Used for F6 where narration should begin only after the silent
+ * Seedance intro, not from t=0 of the concatenated file.
+ */
+export async function mergeAudioVideoWithDelay(
+  videoPath: string,
+  audioPath: string,
+  outputPath: string,
+  delayMs: number,
+): Promise<void> {
+  await runFfmpeg([
+    '-i', videoPath,
+    '-i', audioPath,
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    // adelay applies per-channel; stereo = "delayMs|delayMs"
+    '-filter:a', `adelay=${Math.round(delayMs)}|${Math.round(delayMs)}`,
+    '-shortest',
+    outputPath,
+  ])
+}
+
+/**
  * Mux a silent stereo AAC track into a video that has no audio stream.
  * Used to make the F6 intro clip stream-compatible with the body clip (which
  * carries a voiceover) before the two are joined by the concat demuxer.

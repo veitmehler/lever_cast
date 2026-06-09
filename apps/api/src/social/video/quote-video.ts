@@ -2,46 +2,60 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { assertStoryVideoConstraints, loopVideo, withTempDir } from './ffmpeg'
 import { buildSlideshowVideo } from './slideshow-video'
-import { synthesizeSpeech } from '../../lib/elevenlabs/client'
+import {
+  synthesizeSpeechWithTimestamps,
+  computeSlideDurations,
+} from '../../lib/elevenlabs/client'
 import { getVoiceSettings } from '../../lib/elevenlabs/settings'
 
 export interface QuoteVideoOptions {
   userId: string
   quoteImageUrls: string[]
+  /** Per-slide spoken text used to sync slide durations to speech timing. */
+  slideTexts: string[]
   outputPath: string
-  narrationText?: string
+  /** Fallback seconds-per-slide used when voiceover is disabled. Defaults to 4. */
   secondsPerSlide?: number
 }
 
-/** S3: quote cards → timed slideshow video, optional ElevenLabs VO. */
+/** S3: quote cards → timed slideshow video, slide durations synced to ElevenLabs VO. */
 export async function buildQuoteVideo(opts: QuoteVideoOptions): Promise<{
   probe: Awaited<ReturnType<typeof buildSlideshowVideo>>
   voiceoverUsed: boolean
 }> {
   return withTempDir('quote-video-', async (tmpDir) => {
-    const silentPath = path.join(tmpDir, 'quote-silent.mp4')
     let audioPath: string | undefined
+    let slideDurations: number[] | undefined
     let voiceoverUsed = false
 
     const voice = await getVoiceSettings(opts.userId)
-    if (opts.narrationText && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
-      const mp3 = await synthesizeSpeech({
-        apiKey: voice.apiKey,
-        voiceId: voice.voiceId,
-        text: opts.narrationText,
-        modelId: voice.modelId,
-        stability: voice.stability,
-        similarityBoost: voice.similarity,
-      })
-      audioPath = path.join(tmpDir, 'voiceover.mp3')
-      await fs.writeFile(audioPath, mp3)
-      voiceoverUsed = true
+    const slideTexts = opts.slideTexts.filter((t) => t.trim().length > 0)
+
+    if (slideTexts.length > 0 && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
+      try {
+        const fullText = slideTexts.join(' ')
+        const { audio, alignment } = await synthesizeSpeechWithTimestamps({
+          apiKey: voice.apiKey,
+          voiceId: voice.voiceId,
+          text: fullText,
+          modelId: voice.modelId,
+          stability: voice.stability,
+          similarityBoost: voice.similarity,
+        })
+        audioPath = path.join(tmpDir, 'voiceover.mp3')
+        await fs.writeFile(audioPath, audio)
+        slideDurations = computeSlideDurations(slideTexts, alignment)
+        voiceoverUsed = true
+      } catch {
+        // Non-fatal — fall back to silent slideshow with default timing
+      }
     }
 
     const probe = await buildSlideshowVideo({
       imageUrls: opts.quoteImageUrls,
       outputPath: opts.outputPath,
       variant: 'story',
+      slideDurations,
       secondsPerSlide: opts.secondsPerSlide ?? 4,
       audioPath,
     })

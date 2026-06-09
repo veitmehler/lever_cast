@@ -186,42 +186,15 @@ export async function mergeAudioVideo(
   audioPath: string,
   outputPath: string,
 ): Promise<void> {
-  await runFfmpeg([
-    '-i',
-    videoPath,
-    '-i',
-    audioPath,
-    '-c:v',
-    'copy',
-    '-c:a',
-    'aac',
-    '-shortest',
-    outputPath,
-  ])
-}
-
-/**
- * Merge audio into a video with an explicit delay (milliseconds) before the
- * audio starts. Used for F6 where narration should begin only after the silent
- * Seedance intro, not from t=0 of the concatenated file.
- */
-export async function mergeAudioVideoWithDelay(
-  videoPath: string,
-  audioPath: string,
-  outputPath: string,
-  delayMs: number,
-): Promise<void> {
-  const delay = Math.max(0, Math.round(delayMs))
-  // Use filter_complex with an explicit input reference [1:a] + all=1 so the
-  // delay reliably applies to every channel regardless of mono/stereo source,
-  // then map the video and delayed-audio streams explicitly. The previous
-  // `-filter:a` shorthand without `-map` could leave audio undelayed.
+  // Explicitly map the video from input 0 and the audio from input 1. Without
+  // explicit maps ffmpeg auto-selects one audio stream across all inputs, which
+  // can pick a stray/silent track on the video container instead of the
+  // narration we want to mux in.
   await runFfmpeg([
     '-i', videoPath,
     '-i', audioPath,
-    '-filter_complex', `[1:a]adelay=${delay}:all=1[a]`,
     '-map', '0:v:0',
-    '-map', '[a]',
+    '-map', '1:a:0',
     '-c:v', 'copy',
     '-c:a', 'aac',
     '-shortest',
@@ -229,20 +202,55 @@ export async function mergeAudioVideoWithDelay(
   ])
 }
 
+/** Generate a silent stereo AAC clip of the given duration (seconds). */
+export async function makeSilenceAudio(outputPath: string, durationSec: number): Promise<void> {
+  await runFfmpeg([
+    '-f', 'lavfi',
+    '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-t', String(durationSec),
+    '-c:a', 'aac',
+    outputPath,
+  ])
+}
+
 /**
- * Mux a silent stereo AAC track into a video that has no audio stream.
- * Used to make the F6 intro clip stream-compatible with the body clip (which
- * carries a voiceover) before the two are joined by the concat demuxer.
- * The concat demuxer derives its output streams from the first segment, so
- * without this the body's audio track is silently dropped.
+ * Re-encode an audio file to exactly `durationSec` seconds, padding the tail
+ * with silence when the source is shorter. Used to make each slide's narration
+ * clip a fixed length so the concatenated track aligns with slide boundaries.
  */
-export async function addSilentAudio(inputPath: string, outputPath: string): Promise<void> {
+export async function padAudioToDuration(
+  inputPath: string,
+  outputPath: string,
+  durationSec: number,
+): Promise<void> {
   await runFfmpeg([
     '-i', inputPath,
-    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-    '-c:v', 'copy',
+    '-af', 'apad',
+    '-t', String(durationSec),
+    '-ar', '44100',
+    '-ac', '2',
     '-c:a', 'aac',
-    '-shortest',
+    outputPath,
+  ])
+}
+
+/** Concatenate audio files into a single contiguous AAC track (re-encoded). */
+export async function concatAudioFiles(paths: string[], outputPath: string): Promise<void> {
+  if (paths.length === 0) throw new Error('No audio files to concatenate')
+  if (paths.length === 1) {
+    await fs.copyFile(paths[0], outputPath)
+    return
+  }
+  const inputs = paths.flatMap((p) => ['-i', p])
+  const filter =
+    paths.map((_, i) => `[${i}:a]`).join('') + `concat=n=${paths.length}:v=0:a=1[a]`
+  await runFfmpeg([
+    ...inputs,
+    '-filter_complex', filter,
+    '-map', '[a]',
+    '-ar', '44100',
+    '-ac', '2',
+    '-c:a', 'aac',
     outputPath,
   ])
 }

@@ -11,7 +11,6 @@ import {
   rescaleVideo,
   probeVideo,
   concatVideos,
-  mergeAudioVideoWithDelay,
   runFfmpeg,
   defaultFontPath,
 } from './video/ffmpeg'
@@ -30,7 +29,7 @@ import { generatePitchSlideText } from './generators/pitch-slide-text'
 import { buildPitchSlidePng, cropBufferToStoryAspect } from './compositors/carousel'
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
-import { synthesizeSpeechWithTimestamps, computeSlideDurations } from '../lib/elevenlabs/client'
+import { buildPerSlideNarration } from './video/narration'
 import { getVoiceSettings } from '../lib/elevenlabs/settings'
 
 function generationId(): string {
@@ -298,30 +297,30 @@ export async function generateHookVideoAsset(opts: {
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')
 
-    // Voiceover: synthesize with timestamps so each slide duration maps to speech.
-    // Audio is NOT merged into the slideshow body — instead it is delay-merged
-    // onto the final concatenated video so it starts after the Seedance intro.
+    // Voiceover: synthesize one narration clip per content slide so each slide
+    // is held for exactly the length of its own speech, and the contiguous body
+    // audio is muxed after the intro by buildHookVideo.
     let voiceAudioPath: string | undefined
     let slideDurations: number[] | undefined
     const secondsPerSlide = 4 // fallback when voiceover is disabled
 
-    const slideTexts = contentSlideTexts.filter((t) => t.trim().length > 0)
+    const hasText = contentSlideTexts.some((t) => t.trim().length > 0)
 
-    if (slideTexts.length > 0 && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
+    if (hasText && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
       try {
-        const { audio, alignment } = await synthesizeSpeechWithTimestamps({
+        const narration = await buildPerSlideNarration({
           apiKey: voice.apiKey,
           voiceId: voice.voiceId,
-          text: slideTexts.join(' '),
           modelId: voice.modelId,
           stability: voice.stability,
-          similarityBoost: voice.similarity,
+          similarity: voice.similarity,
           speed: voice.speed,
+          // Index-aligned with contentSlideUrls so durations map to slides.
+          slideTexts: contentSlideTexts,
+          tmpDir,
         })
-        const audioFilePath = path.join(tmpDir, 'narration.mp3')
-        await fs.writeFile(audioFilePath, audio)
-        slideDurations = computeSlideDurations(slideTexts, alignment)
-        voiceAudioPath = audioFilePath
+        voiceAudioPath = narration.audioPath
+        slideDurations = narration.slideDurations
       } catch {
         // Non-fatal — fall back to silent slideshow with default timing
       }

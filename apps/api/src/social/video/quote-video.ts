@@ -1,11 +1,7 @@
 import path from 'node:path'
-import fs from 'node:fs/promises'
 import { assertStoryVideoConstraints, loopVideo, withTempDir } from './ffmpeg'
 import { buildSlideshowVideo } from './slideshow-video'
-import {
-  synthesizeSpeechWithTimestamps,
-  computeSlideDurations,
-} from '../../lib/elevenlabs/client'
+import { buildPerSlideNarration } from './narration'
 import { getVoiceSettings } from '../../lib/elevenlabs/settings'
 
 export interface QuoteVideoOptions {
@@ -29,23 +25,24 @@ export async function buildQuoteVideo(opts: QuoteVideoOptions): Promise<{
     let voiceoverUsed = false
 
     const voice = await getVoiceSettings(opts.userId)
-    const slideTexts = opts.slideTexts.filter((t) => t.trim().length > 0)
+    const hasText = opts.slideTexts.some((t) => t.trim().length > 0)
 
-    if (slideTexts.length > 0 && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
+    if (hasText && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
       try {
-        const fullText = slideTexts.join(' ')
-        const { audio, alignment } = await synthesizeSpeechWithTimestamps({
+        // Synthesize one clip per quote so each slide is shown for exactly the
+        // length of its own narration (index-aligned with quoteImageUrls).
+        const narration = await buildPerSlideNarration({
           apiKey: voice.apiKey,
           voiceId: voice.voiceId,
-          text: fullText,
           modelId: voice.modelId,
           stability: voice.stability,
-          similarityBoost: voice.similarity,
+          similarity: voice.similarity,
           speed: voice.speed,
+          slideTexts: opts.slideTexts,
+          tmpDir,
         })
-        audioPath = path.join(tmpDir, 'voiceover.mp3')
-        await fs.writeFile(audioPath, audio)
-        slideDurations = computeSlideDurations(slideTexts, alignment)
+        audioPath = narration.audioPath
+        slideDurations = narration.slideDurations
         voiceoverUsed = true
       } catch {
         // Non-fatal — fall back to silent slideshow with default timing

@@ -321,41 +321,23 @@ export async function buildPitchSlidePng(
     .png()
     .toBuffer()
 
-  const fontSize  = 42
-  const lineH     = 60
-  const paraGap   = 20
-  const maxChars  = 36
-  const maxLines  = 5
+  const fontSize  = 48
+  const lineH     = 66
+  const maxChars  = 32
+  const maxLines  = 6
   const centerX   = STORY_W / 2
 
-  // Build tspans — each newline-separated paragraph is word-wrapped
-  const paragraphs = pitchText.split('\n').map((p) => p.trim()).filter(Boolean)
-  let currentY = 900 // start near vertical centre of a 1920-tall canvas
-  const tspans: string[] = []
+  // Collapse the LLM's line breaks into one block and wrap uniformly, so every
+  // line uses the full target width regardless of how the model broke its output.
+  // (wrapText already normalises all whitespace, including newlines, to spaces.)
+  const lines = wrapText(pitchText, maxChars, maxLines)
 
-  for (const para of paragraphs) {
-    const lines = wrapText(para, maxChars, maxLines)
-    for (const line of lines) {
-      tspans.push(`<tspan x="${centerX}" y="${currentY}">${escapeXml(line)}</tspan>`)
-      currentY += lineH
-    }
-    currentY += paraGap
-  }
+  const textHeight = lines.length * lineH
+  const startY     = Math.max(60, (STORY_H - textHeight) / 2)
 
-  const textHeight = currentY - 900
-  const svgStartY  = Math.max(60, (STORY_H - textHeight) / 2)
-
-  // Re-render tspans with corrected start position
-  currentY = svgStartY
-  const finalTspans: string[] = []
-  for (const para of paragraphs) {
-    const lines = wrapText(para, maxChars, maxLines)
-    for (const line of lines) {
-      finalTspans.push(`<tspan x="${centerX}" y="${currentY + fontSize}">${escapeXml(line)}</tspan>`)
-      currentY += lineH
-    }
-    currentY += paraGap
-  }
+  const tspans = lines
+    .map((line, i) => `<tspan x="${centerX}" y="${startY + fontSize + i * lineH}">${escapeXml(line)}</tspan>`)
+    .join('')
 
   const overlaySvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${STORY_W}" height="${STORY_H}">
@@ -366,7 +348,7 @@ export async function buildPitchSlidePng(
     fill="#FFFFFF"
     text-anchor="middle"
     dominant-baseline="auto"
-  >${finalTspans.join('')}</text>
+  >${tspans}</text>
 </svg>`
 
   const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()

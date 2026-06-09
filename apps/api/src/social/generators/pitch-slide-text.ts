@@ -3,23 +3,23 @@ import { cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 
 const DEF_SYS = `You write ultra-short slide copy for social media story posts.
-Your job: given an article topic and a brief content summary, write 2–4 short lines that tease what the post contains and invite the viewer to tap through to read the full carousel.
+Your job: given an article topic and a brief content summary, write 2–4 short sentences that tease what the post contains and invite the viewer to tap through to read the full carousel.
 
 RULES:
-1. 2–4 lines total. Each line fits in roughly 22 characters.
-2. No hashtags, no emojis, no punctuation-heavy lines.
+1. 2–4 short sentences total. Keep the whole pitch under ~180 characters.
+2. Use normal sentence punctuation (periods, commas). No hashtags, no emojis.
 3. Never start with "Did you know" or generic filler.
 4. Tone: direct, confident, punchy — matching the brand voice.
-5. Output ONLY the lines of text, separated by newlines. No quotes, no labels, no markdown.`
+5. Output ONLY the pitch text. No quotes, no labels, no markdown.`
 
-const DEF_USER = `Write a 2–4 line story pitch slide for this post.
+const DEF_USER = `Write a 2–4 sentence story pitch slide for this post.
 
 Topic: {{topic}}
 
 Content summary:
 {{content}}
 
-Return ONLY the pitch lines, one per line.`
+Return ONLY the pitch text.`
 
 export async function generatePitchSlideText(opts: {
   topic: string

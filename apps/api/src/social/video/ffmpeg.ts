@@ -271,9 +271,11 @@ export async function overlayTitleOnVideo(
   const darkBox = `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`
 
   const dir = path.dirname(outputPath)
+  // ffmpeg drawtext y is the TOP of the text; centre each line in its lineH slot.
+  const lineOffset = Math.round((lineH - fontSize) / 2)
   const textFilters = await Promise.all(
     lines.map(async (line, i) => {
-      const y = boxY + boxPadV + fontSize + i * lineH
+      const y = boxY + boxPadV + i * lineH + lineOffset
       const tf = await writeDrawtextFile(dir, line)
       return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
     }),
@@ -316,10 +318,12 @@ export async function overlayTitleOnVideoFadeIn(
 
   const dir = path.dirname(outputPath)
 
-  // Write each text line to a temp file (avoids all filtergraph escaping issues)
+  // Write each text line to a temp file (avoids all filtergraph escaping issues).
+  // ffmpeg drawtext y is the TOP of the text; centre each line in its lineH slot.
+  const lineOffset = Math.round((lineH - fontSize) / 2)
   const textFilters = await Promise.all(
     lines.map(async (line, i) => {
-      const y = boxY + boxPadV + fontSize + i * lineH
+      const y = boxY + boxPadV + i * lineH + lineOffset
       const tf = await writeDrawtextFile(dir, line)
       return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
     }),
@@ -383,9 +387,12 @@ export async function overlayTitleOnVideoStripFadeIn(
 
   const dir = path.dirname(outputPath)
 
+  // ffmpeg drawtext y is the TOP of the text. Centre each line inside its lineH
+  // slot with (lineH - fontSize)/2 so the block sits symmetrically in the strip.
+  const lineOffset = Math.round((lineH - fontSize) / 2)
   const textFilters = await Promise.all(
     lines.map(async (line, i) => {
-      const y = stripY + padV + fontSize + i * lineH
+      const y = stripY + padV + i * lineH + lineOffset
       const tf = await writeDrawtextFile(dir, line)
       return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
     }),

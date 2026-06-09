@@ -1578,15 +1578,15 @@ Return ONLY the video description, ready to use in the video model.`,
     defaultModel: 'claude-sonnet-4-5-20250929',
     maxTokens: 200,
     systemPrompt:
-      'You write ultra-short slide copy for social media story posts.\nYour job: given an article topic and a brief content summary, write 2–4 short lines that tease what the post contains and invite the viewer to tap through to read the full carousel.\n\nRULES:\n1. 2–4 lines total. Each line fits in roughly 22 characters.\n2. No hashtags, no emojis, no punctuation-heavy lines.\n3. Never start with "Did you know" or generic filler.\n4. Tone: direct, confident, punchy — matching the brand voice.\n5. Output ONLY the lines of text, separated by newlines. No quotes, no labels, no markdown.',
-    userPrompt: `Write a 2–4 line story pitch slide for this post.
+      'You write ultra-short slide copy for social media story posts.\nYour job: given an article topic and a brief content summary, write 2–4 short sentences that tease what the post contains and invite the viewer to tap through to read the full carousel.\n\nRULES:\n1. 2–4 short sentences total. Keep the whole pitch under ~180 characters.\n2. Use normal sentence punctuation (periods, commas). No hashtags, no emojis.\n3. Never start with "Did you know" or generic filler.\n4. Tone: direct, confident, punchy — matching the brand voice.\n5. Output ONLY the pitch text. No quotes, no labels, no markdown.',
+    userPrompt: `Write a 2–4 sentence story pitch slide for this post.
 
 Topic: {{topic}}
 
 Content summary:
 {{content}}
 
-Return ONLY the pitch lines, one per line.`,
+Return ONLY the pitch text.`,
     isActive: true,
   },
   {

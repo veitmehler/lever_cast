@@ -25,6 +25,8 @@ export interface SpecAssets {
   title?: string
   /** Raw (pre-overlay) carousel background image URLs — stored so S4/S6 can build pitch slides. */
   backgroundImageUrls?: string[]
+  /** F6's raw Seedance hook clip (1:1, no title) — stored so S6 can reuse it at 9:16. */
+  hookRawVideoUrl?: string
 }
 
 export async function generateSpecAssets(opts: {
@@ -107,13 +109,14 @@ export async function generateSpecAssets(opts: {
         slideCount,
         jobId: assetJobId,
       })
-      // Store carousel images and raw backgrounds so S6 can build its pitch slide.
+      // Store carousel images, raw backgrounds, and raw hook clip so S6 can reuse them.
       return {
         postType: 'hook_video',
         videoUrl: hook.videoUrl,
         title: hook.title,
         mediaUrls: hook.carouselImageUrls,
         backgroundImageUrls: hook.carouselBackgroundImageUrls,
+        hookRawVideoUrl: hook.hookRawVideoUrl,
       }
     }
 
@@ -144,16 +147,19 @@ export async function generateSpecAssets(opts: {
     }
 
     case 'pitch_hook': {
-      // S6 — 9:16 story video: fresh Fal.ai T2V clip (F6 title) + pitch slide from F6 raw background.
+      // S6 — 9:16 story video: F6's raw hook clip cropped to 9:16 + pitch slide from F6 raw background.
       const f6 = priorAssets.get('F6')
       const title = f6?.title ?? content.title ?? articleCtx.h2Title
       const backgroundImageUrl = f6?.backgroundImageUrls?.[1] ?? f6?.backgroundImageUrls?.[0]
+      const hookRawVideoUrl = f6?.hookRawVideoUrl
       if (!backgroundImageUrl) throw new Error('F6 background images are required before S6')
+      if (!hookRawVideoUrl) throw new Error('F6 raw hook video is required before S6')
       const s6 = await generateStoryHookVideo({
         userId,
         title,
         content: content.text,
         topic: content.title ?? articleCtx.h2Title,
+        hookRawVideoUrl,
         backgroundImageUrl,
         jobId: assetJobId,
       })

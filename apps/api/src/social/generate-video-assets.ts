@@ -6,6 +6,7 @@ import {
   overlayTitleAndBulletsOnVideo,
   overlayBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
+  cropCenterToStoryAspect,
   rescaleVideo,
   probeVideo,
   concatVideos,
@@ -14,7 +15,6 @@ import {
 import { buildVideoReel, buildHookVideo } from './video/hook-video'
 import { buildQuoteVideo, buildLoopedStoryReel } from './video/quote-video'
 import { buildSlideshowVideo } from './video/slideshow-video'
-import { generateSeedanceClip, downloadSeedanceClip } from './video/seedance'
 import { registerSocialMedia, registerSocialVideo } from './media-register'
 import {
   generateCarouselAssets,
@@ -54,6 +54,8 @@ export interface GeneratedHookVideo {
   carouselImageUrls: string[]
   /** Raw (pre-overlay) background image URLs — parallel array to carouselImageUrls. */
   carouselBackgroundImageUrls: string[]
+  /** Raw Seedance hook clip (1:1, no title, no slideshow body) — S6 reuses this instead of generating a new one. */
+  hookRawVideoUrl: string
 }
 
 export interface GeneratedQuoteVideo {
@@ -319,7 +321,7 @@ export async function generateHookVideoAsset(opts: {
       }
     }
 
-    const probe = await buildHookVideo({
+    const { probe, hookRawPath } = await buildHookVideo({
       title,
       hookPrompt: hookVideoPrompt,
       // Pure T2V — no image input so Seedance has a clean background without
@@ -332,15 +334,28 @@ export async function generateHookVideoAsset(opts: {
       voiceAudioPath,
     })
 
-    const uploaded = await uploadVideoFile({
-      userId: opts.userId,
-      filePath: outputPath,
-      s3Key: `social/${opts.userId}/${jobId}/hook-video-${genId}.mp4`,
-      title: `Hook video — ${title.slice(0, 40)}`,
-      width: probe.width,
-      height: probe.height,
-      jobId,
-    })
+    // Upload raw hook clip to S3 so S6 can reuse it (crop to 9:16) without
+    // paying for a new Fal.ai generation.
+    const [uploaded, rawHookUploaded] = await Promise.all([
+      uploadVideoFile({
+        userId: opts.userId,
+        filePath: outputPath,
+        s3Key: `social/${opts.userId}/${jobId}/hook-video-${genId}.mp4`,
+        title: `Hook video — ${title.slice(0, 40)}`,
+        width: probe.width,
+        height: probe.height,
+        jobId,
+      }),
+      uploadVideoFile({
+        userId: opts.userId,
+        filePath: hookRawPath,
+        s3Key: `social/${opts.userId}/${jobId}/hook-raw-${genId}.mp4`,
+        title: `Hook raw clip — ${title.slice(0, 40)}`,
+        width: probe.width,
+        height: probe.height,
+        jobId,
+      }),
+    ])
 
     return {
       postType: 'hook_video',
@@ -348,6 +363,7 @@ export async function generateHookVideoAsset(opts: {
       title,
       carouselImageUrls: carousel.imageUrls,
       carouselBackgroundImageUrls: carousel.backgroundImageUrls,
+      hookRawVideoUrl: rawHookUploaded.videoUrl,
     }
   })
 }
@@ -488,22 +504,24 @@ export async function generateStoryCarouselVideo(opts: {
 }
 
 /**
- * S6: 9:16 story video with a fresh Fal.ai T2V intro clip (title fade-in) followed
- * by a pitch slide built from F6's raw content background.
+ * S6: 9:16 story video that REUSES F6's raw Seedance hook clip (no new Fal.ai call)
+ * followed by a pitch slide built from F6's raw content background.
  *
  * Flow:
- *  1. Generate Seedance T2V at 9:16 (720×1280)
- *  2. Overlay title with fade-in via overlayTitleOnVideoFadeIn
- *  3. Rescale to 1080×1920 to match the content slideshow
- *  4. Download F6 raw background, 9:16 crop-scale, overlay dark + LLM pitch text
+ *  1. Download F6's stored raw hook clip (1:1, 720p, no title)
+ *  2. Center-crop to 9:16, then upscale to 1080×1920
+ *  3. Overlay title with fade-in (matching F6's own title treatment)
+ *  4. Download F6 raw background image, composite dark overlay + LLM pitch text (9:16)
  *  5. Concat intro clip + pitch slide
  */
 export async function generateStoryHookVideo(opts: {
   userId: string
   title: string
-  /** Article section text — used both for Seedance prompt and pitch copy. */
+  /** Article section text for the pitch copy. */
   content: string
   topic: string
+  /** F6's stored raw Seedance clip (1:1, no title overlay). */
+  hookRawVideoUrl: string
   /** F6's backgroundImageUrls[1] — raw background (no text) from F6 content slide 1. */
   backgroundImageUrl: string
   jobId?: string
@@ -511,18 +529,8 @@ export async function generateStoryHookVideo(opts: {
   const genId = generationId()
   const jobId = opts.jobId ?? genId
 
-  const brand = await loadSocialBrandTheme(opts.userId)
-
-  // Run the Seedance video prompt and the pitch text LLM in parallel
-  const [hookVideoPrompt, pitchText] = await Promise.all([
-    generateVideoReelPrompt({
-      topic: opts.title,
-      details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
-      specialInstructions: brand.videoSpecialInstructions,
-      videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
-    }),
-    generatePitchSlideText({ topic: opts.topic, content: opts.content }),
-  ])
+  // Generate pitch text while we prepare the video assets
+  const pitchText = await generatePitchSlideText({ topic: opts.topic, content: opts.content })
 
   // Download raw background and composite the 9:16 pitch slide PNG
   const bgResp   = await fetch(opts.backgroundImageUrl)
@@ -546,27 +554,22 @@ export async function generateStoryHookVideo(opts: {
   const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
 
   return withTempDir('story-hook-', async (tmpDir) => {
-    const hookRaw    = path.join(tmpDir, 'hook-raw.mp4')
-    const hookTitled = path.join(tmpDir, 'hook-titled.mp4')
-    const hookScaled = path.join(tmpDir, 'hook-scaled.mp4')
-    const bodyPath   = path.join(tmpDir, 'hook-body.mp4')
-    const outputPath = path.join(tmpDir, 'story-hook.mp4')
+    const hookDownloaded = path.join(tmpDir, 'hook-raw.mp4')
+    const hookCropped    = path.join(tmpDir, 'hook-cropped.mp4')
+    const hookScaled     = path.join(tmpDir, 'hook-scaled.mp4')
+    const hookTitled     = path.join(tmpDir, 'hook-titled.mp4')
+    const bodyPath       = path.join(tmpDir, 'hook-body.mp4')
+    const outputPath     = path.join(tmpDir, 'story-hook.mp4')
 
-    // Step 1 — Seedance T2V at 9:16 (720×1280)
-    const seedanceUrl = await generateSeedanceClip({
-      prompt: hookVideoPrompt,
-      duration: '5',
-      resolution: '720p',
-      aspectRatio: '9:16',
-      jobId,
-    })
-    await downloadSeedanceClip(seedanceUrl, hookRaw)
+    // Step 1 — Download F6's raw hook clip (reuse, no new Fal.ai cost)
+    await downloadToFile(opts.hookRawVideoUrl, hookDownloaded)
 
-    // Step 2 — Title fade-in overlay (result stays at 720×1280)
-    await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
+    // Step 2 — Center-crop 1:1 to 9:16 (540×960), then upscale to 1080×1920
+    await cropCenterToStoryAspect(hookDownloaded, hookCropped)
+    await rescaleVideo(hookCropped, hookScaled, 1080, 1920)
 
-    // Step 3 — Upscale to 1080×1920 so concat matches the slideshow dimensions
-    await rescaleVideo(hookTitled, hookScaled, 1080, 1920)
+    // Step 3 — Overlay title with fade-in (identical treatment to F6)
+    await overlayTitleOnVideoFadeIn(hookScaled, hookTitled, opts.title, defaultFontPath())
 
     // Step 4 — Pitch slide as a timed clip (already 1080×1920)
     await buildSlideshowVideo({
@@ -577,7 +580,7 @@ export async function generateStoryHookVideo(opts: {
     })
 
     // Step 5 — Concat intro clip + pitch slide
-    await concatVideos([hookScaled, bodyPath], outputPath)
+    await concatVideos([hookTitled, bodyPath], outputPath)
     const probe = await probeVideo(outputPath)
 
     const uploaded = await uploadVideoFile({

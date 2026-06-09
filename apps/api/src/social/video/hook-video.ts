@@ -28,8 +28,14 @@ export interface HookVideoOptions {
   voiceAudioPath?: string
 }
 
+export interface HookVideoResult {
+  probe: VideoProbe
+  /** Local path to the raw (pre-title, pre-concat) Seedance clip — caller should upload to S3. */
+  hookRawPath: string
+}
+
 /** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover. */
-export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe> {
+export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoResult> {
   const hookUrl = await generateSeedanceClip({
     prompt: opts.hookPrompt,
     imageUrl: opts.hookImageUrl,
@@ -54,7 +60,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<VideoProbe
   })
 
   await concatVideos([hookTitled, bodyPath], opts.outputPath)
-  return probeVideo(opts.outputPath)
+  return { probe: await probeVideo(opts.outputPath), hookRawPath: hookRaw }
 }
 
 export interface VideoReelOptions {

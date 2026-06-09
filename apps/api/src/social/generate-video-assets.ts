@@ -490,7 +490,7 @@ export async function generateStoryCarouselVideo(opts: {
   })
 
   const titleDur = 4 + Math.floor(Math.random() * 4)
-  const pitchDur = 4 + Math.floor(Math.random() * 4)
+  const pitchDur = 10 + Math.floor(Math.random() * 5)
 
   return withTempDir('story-carousel-', async (tmpDir) => {
     // --- Slide 1: title screen ---
@@ -585,8 +585,8 @@ export async function generateStoryHookVideo(opts: {
     height: 1920,
   })
 
-  // Random 4–7 s for the pitch slide
-  const secondsPerSlide = 4 + Math.floor(Math.random() * 4)
+  // Random 10–14 s for the pitch slide
+  const secondsPerSlide = 10 + Math.floor(Math.random() * 5)
 
   return withTempDir('story-hook-', async (tmpDir) => {
     const hookDownloaded = path.join(tmpDir, 'hook-raw.mp4')

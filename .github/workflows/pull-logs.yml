@@ -7,6 +7,10 @@ on:
         description: "Number of log lines to tail"
         required: false
         default: "300"
+      since:
+        description: "Show logs since this time (e.g. 2026-06-09T20:00:00Z, or 24h)"
+        required: false
+        default: ""
 
 jobs:
   pull-logs:
@@ -32,4 +36,10 @@ jobs:
 
       - name: Pull docker-compose logs (api container)
         run: |
-          ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --tail=${{ github.event.inputs.tail }} api 2>&1"
+          SINCE="${{ github.event.inputs.since }}"
+          TAIL="${{ github.event.inputs.tail }}"
+          if [ -n "$SINCE" ]; then
+            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --since='${SINCE}' api 2>&1"
+          else
+            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --tail=${TAIL} api 2>&1"
+          fi

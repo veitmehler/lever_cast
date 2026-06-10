@@ -112,3 +112,68 @@ export async function synthesizeSpeech(opts: {
 
   return Buffer.from(await res.arrayBuffer())
 }
+
+export interface CharacterAlignment {
+  characters: string[]
+  character_start_times_seconds: number[]
+  character_end_times_seconds: number[]
+}
+
+export interface TimestampedSpeechResult {
+  audio: Buffer
+  alignment: CharacterAlignment
+}
+
+interface AudioWithTimestampsResponse {
+  audio_base64?: string
+  alignment?: CharacterAlignment | null
+}
+
+export async function synthesizeSpeechWithTimestamps(opts: {
+  apiKey: string
+  voiceId: string
+  text: string
+  modelId?: string
+  stability?: number
+  similarityBoost?: number
+  speed?: number
+}): Promise<TimestampedSpeechResult> {
+  const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}/with-timestamps`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': opts.apiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      text: opts.text.slice(0, 5000),
+      model_id: opts.modelId ?? 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: opts.stability ?? 0.5,
+        similarity_boost: opts.similarityBoost ?? 0.75,
+        speed: opts.speed ?? 1.0,
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`ElevenLabs TTS with timestamps failed (${res.status}): ${body.slice(0, 200)}`)
+  }
+
+  const data = (await res.json()) as AudioWithTimestampsResponse
+  if (!data.audio_base64) {
+    throw new Error('ElevenLabs TTS with timestamps returned no audio')
+  }
+  if (
+    !data.alignment?.characters?.length ||
+    !data.alignment.character_end_times_seconds?.length
+  ) {
+    throw new Error('ElevenLabs TTS with timestamps returned no alignment data')
+  }
+
+  return {
+    audio: Buffer.from(data.audio_base64, 'base64'),
+    alignment: data.alignment,
+  }
+}

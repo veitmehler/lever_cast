@@ -1,11 +1,8 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import {
-  concatAudioFiles,
-  concatVideos,
+  concatVideosReencode,
   defaultFontPath,
-  makeSilenceAudio,
-  mergeAudioVideo,
   overlayBulletsOnVideo,
   overlayTitleAndBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
@@ -14,7 +11,7 @@ import {
   type VideoProbe,
 } from './ffmpeg'
 import { generateSeedanceClip, downloadSeedanceClip } from './seedance'
-import { buildSlideshowVideo } from './slideshow-video'
+import { buildSlideshowVideo, slideshowDimensions } from './slideshow-video'
 import { logger } from '../../lib/logger'
 
 export interface HookVideoOptions {
@@ -30,9 +27,8 @@ export interface HookVideoOptions {
   /** Per-slide durations (seconds) — each slide holds its own duration. When
    *  provided, slideDurations.length must equal slideshowImageUrls.length. */
   slideDurations?: number[]
-  /** Path to the contiguous body-narration track (length == sum of slide
-   *  durations). When provided it is placed AFTER a lead-in silence equal to the
-   *  intro length so narration starts exactly on the first content slide. */
+  /** Contiguous body-narration track (length == sum of slide durations). Muxed
+   *  directly onto the slideshow body so narration starts on the first content slide. */
   voiceAudioPath?: string
 }
 
@@ -42,17 +38,17 @@ export interface HookVideoResult {
   hookRawPath: string
 }
 
+const MAX_INTRO_SECS = 5
+const FEED_DIMS = slideshowDimensions('feed')
+
 /** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover.
  *
  * Audio strategy (when voiceAudioPath is provided):
- *  1. Build a silent intro (hookTitled) and a silent slideshow body whose slide
- *     durations match each slide's narration clip.
- *  2. Concat intro + body into a silent video (concat demuxer, as before).
- *  3. Derive the intro length from the rendered files (full − body) so it can't
- *     drift, build a lead-in silence of that length, and prepend it to the body
- *     narration to form a full-length audio track.
- *  4. Mux that audio onto the silent video. Narration therefore begins exactly
- *     when the first content slide appears — no probe-based delay required.
+ *  1. Build the slideshow body with per-slide durations matching each narration clip.
+ *  2. Mux the body narration onto that slideshow (same pattern as S3 quote video).
+ *  3. Re-encode-concat the silent intro + narrated body — no duration probing or
+ *     lead-in silence math. Narration therefore begins exactly when the first content
+ *     slide appears because it is physically bound to the body segment.
  */
 export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoResult> {
   logger.info(
@@ -74,8 +70,6 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
   await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
 
   // Seedance sometimes returns clips much longer than the requested duration.
-  // Cap the titled intro at 5 s so the narration lead-in silence stays short.
-  const MAX_INTRO_SECS = 5
   const introProbedDuration = (await probeVideo(hookTitled)).duration
   if (introProbedDuration > MAX_INTRO_SECS + 0.5) {
     const hookTitledTrimmed = path.join(opts.tmpDir, 'hook-titled-trimmed.mp4')
@@ -99,36 +93,22 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     variant: 'feed',
     slideDurations: opts.slideDurations,
     secondsPerSlide: opts.secondsPerSlide ?? 4,
-    // No audio here — muxed after concat so timing is relative to the full video.
+    audioPath: opts.voiceAudioPath,
   })
-  logger.info({ slideDurations: opts.slideDurations }, 'buildHookVideo: slideshow body built')
+  logger.info(
+    { slideDurations: opts.slideDurations, hasVoiceAudio: !!opts.voiceAudioPath },
+    'buildHookVideo: slideshow body built',
+  )
 
-  if (opts.voiceAudioPath) {
-    const silentFull = path.join(opts.tmpDir, 'hook-silent.mp4')
-    await concatVideos([hookTitled, bodyPath], silentFull)
-
-    // Intro length = full video − body video, measured from the rendered files
-    // so it is exact (no reliance on a single intro-clip probe).
-    const fullDuration = (await probeVideo(silentFull)).duration
-    const bodyDuration = (await probeVideo(bodyPath)).duration
-    const introDuration = Math.max(0, fullDuration - bodyDuration)
-    logger.info({ fullDuration, bodyDuration, introDuration }, 'buildHookVideo: durations probed')
-
-    let fullAudio = opts.voiceAudioPath
-    if (introDuration > 0.05) {
-      const leadSilence = path.join(opts.tmpDir, 'hook-lead-silence.m4a')
-      await makeSilenceAudio(leadSilence, introDuration)
-      fullAudio = path.join(opts.tmpDir, 'hook-full-audio.m4a')
-      await concatAudioFiles([leadSilence, opts.voiceAudioPath], fullAudio)
-      logger.info({ introDuration }, 'buildHookVideo: lead silence prepended')
-    }
-
-    await mergeAudioVideo(silentFull, fullAudio, opts.outputPath)
-    logger.info('buildHookVideo: audio merged')
-  } else {
-    logger.info('buildHookVideo: no voiceover — concatenating silent video')
-    await concatVideos([hookTitled, bodyPath], opts.outputPath)
-  }
+  await concatVideosReencode(
+    [hookTitled, bodyPath],
+    opts.outputPath,
+    { width: FEED_DIMS.width, height: FEED_DIMS.height, fps: 30 },
+  )
+  logger.info(
+    { hasVoiceAudio: !!opts.voiceAudioPath },
+    'buildHookVideo: intro + body concatenated',
+  )
 
   const probe = await probeVideo(opts.outputPath)
   logger.info({ duration: probe.duration, width: probe.width, height: probe.height }, 'buildHookVideo: complete')

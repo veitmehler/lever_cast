@@ -126,6 +126,99 @@ export async function concatVideos(segmentPaths: string[], outputPath: string): 
   await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath])
 }
 
+export async function hasAudioStream(filePath: string): Promise<boolean> {
+  const { stdout } = await execFileAsync(ffprobeBin(), [
+    '-v', 'error',
+    '-select_streams', 'a',
+    '-show_entries', 'stream=index',
+    '-of', 'csv=p=0',
+    filePath,
+  ])
+  return stdout.trim().length > 0
+}
+
+export interface ConcatVideosReencodeOptions {
+  width?: number
+  height?: number
+  fps?: number
+}
+
+/** Scale/pad segments to a common resolution, normalize audio, and concat with re-encode.
+ *  Segments without audio get a silent stereo track so intro+body can be joined reliably. */
+async function normalizeSegmentForConcat(
+  inputPath: string,
+  outputPath: string,
+  opts: { width: number; height: number; fps: number },
+): Promise<void> {
+  const { width, height, fps } = opts
+  const vf = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps}`
+  const af = 'aformat=sample_rates=44100:channel_layouts=stereo'
+  const encode = [
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+    '-c:a', 'aac', '-b:a', '192k',
+    outputPath,
+  ]
+
+  if (await hasAudioStream(inputPath)) {
+    await runFfmpeg([
+      '-i', inputPath,
+      '-filter_complex', `[0:v]${vf}[v];[0:a]${af}[a]`,
+      '-map', '[v]', '-map', '[a]',
+      ...encode,
+    ])
+    return
+  }
+
+  await runFfmpeg([
+    '-i', inputPath,
+    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-filter_complex', `[0:v]${vf}[v];[1:a]${af}[a]`,
+    '-map', '[v]', '-map', '[a]',
+    '-shortest',
+    ...encode,
+  ])
+}
+
+export async function concatVideosReencode(
+  segmentPaths: string[],
+  outputPath: string,
+  opts: ConcatVideosReencodeOptions = {},
+): Promise<void> {
+  const width = opts.width ?? 1080
+  const height = opts.height ?? 1080
+  const fps = opts.fps ?? 30
+  const normOpts = { width, height, fps }
+
+  if (segmentPaths.length === 0) throw new Error('No video segments to concatenate')
+
+  if (segmentPaths.length === 1) {
+    await normalizeSegmentForConcat(segmentPaths[0], outputPath, normOpts)
+    return
+  }
+
+  const tmpDir = path.dirname(outputPath)
+  const normalized: string[] = []
+  for (let i = 0; i < segmentPaths.length; i++) {
+    const normPath = path.join(tmpDir, `reencode-seg-${i}.mp4`)
+    await normalizeSegmentForConcat(segmentPaths[i], normPath, normOpts)
+    normalized.push(normPath)
+  }
+
+  const inputs = normalized.flatMap((p) => ['-i', p])
+  const filter =
+    normalized.map((_, i) => `[${i}:v][${i}:a]`).join('') +
+    `concat=n=${normalized.length}:v=1:a=1[v][a]`
+
+  await runFfmpeg([
+    ...inputs,
+    '-filter_complex', filter,
+    '-map', '[v]', '-map', '[a]',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+    '-c:a', 'aac', '-b:a', '192k',
+    outputPath,
+  ])
+}
+
 /**
  * Center-crop (then scale) to 540×960 so feed reels (e.g. 1:1 F2) satisfy story constraints.
  */

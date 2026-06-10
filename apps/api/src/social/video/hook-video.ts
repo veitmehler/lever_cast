@@ -10,6 +10,7 @@ import {
   overlayTitleAndBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
   probeVideo,
+  runFfmpeg,
   type VideoProbe,
 } from './ffmpeg'
 import { generateSeedanceClip, downloadSeedanceClip } from './seedance'
@@ -71,6 +72,24 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
   const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
   await downloadSeedanceClip(hookUrl, hookRaw)
   await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
+
+  // Seedance sometimes returns clips much longer than the requested duration.
+  // Cap the titled intro at 5 s so the narration lead-in silence stays short.
+  const MAX_INTRO_SECS = 5
+  const introProbedDuration = (await probeVideo(hookTitled)).duration
+  if (introProbedDuration > MAX_INTRO_SECS + 0.5) {
+    const hookTitledTrimmed = path.join(opts.tmpDir, 'hook-titled-trimmed.mp4')
+    await runFfmpeg([
+      '-i', hookTitled,
+      '-t', String(MAX_INTRO_SECS),
+      '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+      '-an',
+      hookTitledTrimmed,
+    ])
+    await fs.rename(hookTitledTrimmed, hookTitled)
+    logger.info({ originalDuration: introProbedDuration, trimmedTo: MAX_INTRO_SECS }, 'buildHookVideo: intro trimmed')
+  }
+
   logger.info('buildHookVideo: intro clip titled')
 
   const bodyPath = path.join(opts.tmpDir, 'hook-body.mp4')

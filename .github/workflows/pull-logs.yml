@@ -34,12 +34,12 @@ jobs:
           echo "  IdentitiesOnly yes" >> ~/.ssh/config
           echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
 
-      - name: Pull docker-compose logs (api container)
+      - name: Pull docker-compose logs (worker + api containers)
         run: |
           SINCE="${{ github.event.inputs.since }}"
           TAIL="${{ github.event.inputs.tail }}"
           if [ -n "$SINCE" ]; then
-            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --since='${SINCE}' api 2>&1"
+            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --since='${SINCE}' worker api 2>&1"
           else
-            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --tail=${TAIL} api 2>&1"
+            ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --tail=${TAIL} worker api 2>&1"
           fi

@@ -1,0 +1,35 @@
+name: Pull API Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      tail:
+        description: "Number of log lines to tail"
+        required: false
+        default: "300"
+
+jobs:
+  pull-logs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DROPLET_IP: ${{ secrets.DROPLET_PUBLIC_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "Host droplet" >> ~/.ssh/config
+          echo "  HostName $DROPLET_IP" >> ~/.ssh/config
+          echo "  User socioply" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          echo "  IdentitiesOnly yes" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
+
+      - name: Pull docker-compose logs (api container)
+        run: |
+          ssh droplet "cd /opt/socioply && docker compose logs --no-log-prefix --tail=${{ github.event.inputs.tail }} api 2>&1"

@@ -3,6 +3,7 @@ import { assertStoryVideoConstraints, loopVideo, withTempDir } from './ffmpeg'
 import { buildSlideshowVideo } from './slideshow-video'
 import { buildPerSlideNarration } from './narration'
 import { getVoiceSettings } from '../../lib/elevenlabs/settings'
+import { logger } from '../../lib/logger'
 
 export interface QuoteVideoOptions {
   userId: string
@@ -27,6 +28,17 @@ export async function buildQuoteVideo(opts: QuoteVideoOptions): Promise<{
     const voice = await getVoiceSettings(opts.userId)
     const hasText = opts.slideTexts.some((t) => t.trim().length > 0)
 
+    logger.info(
+      {
+        hasText,
+        voiceoverEnabled: voice.voiceoverEnabled,
+        hasApiKey: !!voice.apiKey,
+        hasVoiceId: !!voice.voiceId,
+        slideCount: opts.slideTexts.length,
+      },
+      'buildQuoteVideo: voiceover check',
+    )
+
     if (hasText && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
       try {
         // Synthesize one clip per quote so each slide is shown for exactly the
@@ -44,8 +56,9 @@ export async function buildQuoteVideo(opts: QuoteVideoOptions): Promise<{
         audioPath = narration.audioPath
         slideDurations = narration.slideDurations
         voiceoverUsed = true
-      } catch {
-        // Non-fatal — fall back to silent slideshow with default timing
+        logger.info({ slideDurations }, 'buildQuoteVideo: narration complete')
+      } catch (err) {
+        logger.error({ err }, 'buildQuoteVideo: narration failed — falling back to silent slideshow')
       }
     }
 

@@ -14,6 +14,7 @@ import {
 } from './ffmpeg'
 import { generateSeedanceClip, downloadSeedanceClip } from './seedance'
 import { buildSlideshowVideo } from './slideshow-video'
+import { logger } from '../../lib/logger'
 
 export interface HookVideoOptions {
   title: string
@@ -53,6 +54,10 @@ export interface HookVideoResult {
  *     when the first content slide appears — no probe-based delay required.
  */
 export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoResult> {
+  logger.info(
+    { slideCount: opts.slideshowImageUrls.length, hasVoiceAudio: !!opts.voiceAudioPath },
+    'buildHookVideo: start — generating Seedance clip',
+  )
   const hookUrl = await generateSeedanceClip({
     prompt: opts.hookPrompt,
     imageUrl: opts.hookImageUrl,
@@ -60,11 +65,13 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     resolution: '720p',
     aspectRatio: '1:1',
   })
+  logger.info({ hookUrl }, 'buildHookVideo: Seedance clip generated')
 
   const hookRaw    = path.join(opts.tmpDir, 'hook-raw.mp4')
   const hookTitled = path.join(opts.tmpDir, 'hook-titled.mp4')
   await downloadSeedanceClip(hookUrl, hookRaw)
   await overlayTitleOnVideoFadeIn(hookRaw, hookTitled, opts.title, defaultFontPath())
+  logger.info('buildHookVideo: intro clip titled')
 
   const bodyPath = path.join(opts.tmpDir, 'hook-body.mp4')
   await buildSlideshowVideo({
@@ -75,6 +82,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     secondsPerSlide: opts.secondsPerSlide ?? 4,
     // No audio here — muxed after concat so timing is relative to the full video.
   })
+  logger.info({ slideDurations: opts.slideDurations }, 'buildHookVideo: slideshow body built')
 
   if (opts.voiceAudioPath) {
     const silentFull = path.join(opts.tmpDir, 'hook-silent.mp4')
@@ -85,6 +93,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     const fullDuration = (await probeVideo(silentFull)).duration
     const bodyDuration = (await probeVideo(bodyPath)).duration
     const introDuration = Math.max(0, fullDuration - bodyDuration)
+    logger.info({ fullDuration, bodyDuration, introDuration }, 'buildHookVideo: durations probed')
 
     let fullAudio = opts.voiceAudioPath
     if (introDuration > 0.05) {
@@ -92,14 +101,19 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
       await makeSilenceAudio(leadSilence, introDuration)
       fullAudio = path.join(opts.tmpDir, 'hook-full-audio.m4a')
       await concatAudioFiles([leadSilence, opts.voiceAudioPath], fullAudio)
+      logger.info({ introDuration }, 'buildHookVideo: lead silence prepended')
     }
 
     await mergeAudioVideo(silentFull, fullAudio, opts.outputPath)
+    logger.info('buildHookVideo: audio merged')
   } else {
+    logger.info('buildHookVideo: no voiceover — concatenating silent video')
     await concatVideos([hookTitled, bodyPath], opts.outputPath)
   }
 
-  return { probe: await probeVideo(opts.outputPath), hookRawPath: hookRaw }
+  const probe = await probeVideo(opts.outputPath)
+  logger.info({ duration: probe.duration, width: probe.width, height: probe.height }, 'buildHookVideo: complete')
+  return { probe, hookRawPath: hookRaw }
 }
 
 export interface VideoReelOptions {

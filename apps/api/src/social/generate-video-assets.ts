@@ -31,6 +31,7 @@ import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
 import { buildPerSlideNarration } from './video/narration'
 import { getVoiceSettings } from '../lib/elevenlabs/settings'
+import { logger } from '../lib/logger'
 
 function generationId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -294,6 +295,8 @@ export async function generateHookVideoAsset(opts: {
     videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
   })
 
+  logger.info({ userId: opts.userId, jobId, slideCount, genId }, 'generateHookVideoAsset: start')
+
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')
 
@@ -306,8 +309,20 @@ export async function generateHookVideoAsset(opts: {
 
     const hasText = contentSlideTexts.some((t) => t.trim().length > 0)
 
+    logger.info(
+      {
+        hasText,
+        voiceoverEnabled: voice.voiceoverEnabled,
+        hasApiKey: !!voice.apiKey,
+        hasVoiceId: !!voice.voiceId,
+        slideCount: contentSlideTexts.length,
+      },
+      'generateHookVideoAsset: voiceover check',
+    )
+
     if (hasText && voice.voiceoverEnabled && voice.apiKey && voice.voiceId) {
       try {
+        logger.info({ slideCount: contentSlideTexts.length }, 'generateHookVideoAsset: narration start')
         const narration = await buildPerSlideNarration({
           apiKey: voice.apiKey,
           voiceId: voice.voiceId,
@@ -321,11 +336,19 @@ export async function generateHookVideoAsset(opts: {
         })
         voiceAudioPath = narration.audioPath
         slideDurations = narration.slideDurations
-      } catch {
-        // Non-fatal — fall back to silent slideshow with default timing
+        logger.info(
+          { slideDurations, audioPath: narration.audioPath },
+          'generateHookVideoAsset: narration complete',
+        )
+      } catch (err) {
+        logger.error({ err }, 'generateHookVideoAsset: narration failed — falling back to silent slideshow')
       }
     }
 
+    logger.info(
+      { hasVoiceAudio: !!voiceAudioPath, slideDurations },
+      'generateHookVideoAsset: calling buildHookVideo',
+    )
     const { probe, hookRawPath } = await buildHookVideo({
       title,
       hookPrompt: hookVideoPrompt,
@@ -339,6 +362,7 @@ export async function generateHookVideoAsset(opts: {
       slideDurations,
       voiceAudioPath,
     })
+    logger.info({ width: probe.width, height: probe.height }, 'generateHookVideoAsset: video built')
 
     // Upload raw hook clip to S3 so S6 can reuse it (crop to 9:16) without
     // paying for a new Fal.ai generation.

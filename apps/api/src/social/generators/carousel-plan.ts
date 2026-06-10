@@ -123,7 +123,7 @@ export async function planCarouselSlides(opts: {
     const retryRun = await adapter.call({
       systemPrompt: DEF_SYS,
       userPrompt: retryPrompt,
-      model: 'claude-sonnet-4-5-20250929',
+      model,  // same provider+model — only the prompt template is reset to defaults
       temperature: 0.5,
       maxTokens: 4096,
       jsonMode: true,

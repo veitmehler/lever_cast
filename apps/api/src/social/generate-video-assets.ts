@@ -254,6 +254,8 @@ export async function generateHookVideoAsset(opts: {
   const jobId = opts.jobId ?? genId
   const slideCount = Math.min(Math.max(6, opts.slideCount ?? 6), 12)
 
+  logger.info({ userId: opts.userId, jobId, slideCount, genId }, 'generateHookVideoAsset: start')
+
   const [carousel, brand, voice] = await Promise.all([
     generateCarouselAssets({
       userId: opts.userId,
@@ -294,8 +296,6 @@ export async function generateHookVideoAsset(opts: {
     specialInstructions: brand.videoSpecialInstructions,
     videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
   })
-
-  logger.info({ userId: opts.userId, jobId, slideCount, genId }, 'generateHookVideoAsset: start')
 
   return withTempDir('hook-video-', async (tmpDir) => {
     const outputPath = path.join(tmpDir, 'hook.mp4')

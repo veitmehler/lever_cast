@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+import { logger } from '../../lib/logger'
 import type { CarouselSlidePlan, CarouselSlideType } from '../compositors/carousel'
 
 const DEF_SYS =
@@ -21,6 +22,52 @@ Rules:
 - bodyText: 1-4 short paragraphs, separated by \\n; null for hook slides
 - imagePrompt: photorealistic scene, no text/words/logos/watermarks in image`
 
+function buildUserPrompt(template: string, opts: {
+  slideCount: number
+  topic: string
+  content: string
+  organizationName: string
+  industry?: string
+  writingStyle?: string
+  callToAction?: string
+  articleUrl?: string
+  specialInstructions?: string
+}): string {
+  return template
+    .replace(/\{\{slide_count\}\}/g, String(opts.slideCount))
+    .replace(/\{\{slideCount\}\}/g, String(opts.slideCount))
+    .replace(/\{\{topic\}\}/g, opts.topic.slice(0, 500))
+    .replace(/\{\{details\}\}/g, opts.content.slice(0, 12000))
+    .replace(/\{\{content\}\}/g, opts.content.slice(0, 12000))
+    .replace(/\{\{organizationName\}\}/g, opts.organizationName)
+    .replace(/\{\{industry\}\}/g, opts.industry ?? 'general business')
+    .replace(/\{\{writingStyle\}\}/g, opts.writingStyle || 'Not specified')
+    .replace(/\{\{writing_style\}\}/g, opts.writingStyle || 'Not specified')
+    .replace(/\{\{call_to_action\}\}/g, opts.callToAction || '')
+    .replace(/\{\{callToAction\}\}/g, opts.callToAction || '')
+    .replace(/\{\{article_url\}\}/g, opts.articleUrl ?? '')
+    .replace(/\{\{special_instructions\}\}/g, (opts.specialInstructions ?? '').slice(0, 800))
+}
+
+type SlideRaw = {
+  index?: number
+  type?: string
+  headlineText?: string | null
+  bodyText?: string | null
+  imagePrompt?: string
+  headline?: string
+  bullets?: string[]
+}
+
+function parseSlidesFromRaw(rawText: string): { slides?: SlideRaw[] } | null {
+  try {
+    const parsed = cleanAndParseJSON(cleanTextOutput(rawText))
+    return parsed.data as { slides?: SlideRaw[] }
+  } catch {
+    return null
+  }
+}
+
 export async function planCarouselSlides(opts: {
   content: string
   topic?: string
@@ -38,20 +85,19 @@ export async function planCarouselSlides(opts: {
 
   const topic = opts.topic?.trim() || opts.organizationName
 
-  const userPrompt = (t?.userPrompt ?? DEF_USER)
-    .replace(/\{\{slide_count\}\}/g, String(opts.slideCount))
-    .replace(/\{\{slideCount\}\}/g, String(opts.slideCount))
-    .replace(/\{\{topic\}\}/g, topic.slice(0, 500))
-    .replace(/\{\{details\}\}/g, opts.content.slice(0, 12000))
-    .replace(/\{\{content\}\}/g, opts.content.slice(0, 12000))
-    .replace(/\{\{organizationName\}\}/g, opts.organizationName)
-    .replace(/\{\{industry\}\}/g, opts.industry ?? 'general business')
-    .replace(/\{\{writingStyle\}\}/g, opts.writingStyle || 'Not specified')
-    .replace(/\{\{writing_style\}\}/g, opts.writingStyle || 'Not specified')
-    .replace(/\{\{call_to_action\}\}/g, opts.callToAction || '')
-    .replace(/\{\{callToAction\}\}/g, opts.callToAction || '')
-    .replace(/\{\{article_url\}\}/g, opts.articleUrl ?? '')
-    .replace(/\{\{special_instructions\}\}/g, (opts.specialInstructions ?? '').slice(0, 800))
+  const promptVars = {
+    slideCount: opts.slideCount,
+    topic,
+    content: opts.content,
+    organizationName: opts.organizationName,
+    industry: opts.industry,
+    writingStyle: opts.writingStyle,
+    callToAction: opts.callToAction,
+    articleUrl: opts.articleUrl,
+    specialInstructions: opts.specialInstructions,
+  }
+
+  const userPrompt = buildUserPrompt(t?.userPrompt ?? DEF_USER, promptVars)
 
   const adapter = getLLMAdapter(provider)
   const run = await adapter.call({
@@ -63,19 +109,39 @@ export async function planCarouselSlides(opts: {
     jsonMode: true,
   })
 
-  const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
-  const data = parsed.data as {
-    slides?: Array<{
-      index?: number
-      type?: string
-      headlineText?: string | null
-      bodyText?: string | null
-      imagePrompt?: string
-      // legacy fields — tolerate old prompt format on admin-edited templates
-      headline?: string
-      bullets?: string[]
-    }>
+  let data = parseSlidesFromRaw(run.content)
+
+  // If parsing failed or the DB template returned wrong format (e.g. {"caption":"..."})
+  // retry once using hardcoded defaults to recover from a corrupted DB template.
+  if (!data?.slides?.length) {
+    logger.warn(
+      { rawContent: run.content.slice(0, 400), usingDbTemplate: !!t },
+      'planCarouselSlides: parse failed or no slides — retrying with default prompt',
+    )
+
+    const retryPrompt = buildUserPrompt(DEF_USER, promptVars)
+    const retryRun = await adapter.call({
+      systemPrompt: DEF_SYS,
+      userPrompt: retryPrompt,
+      model: 'claude-sonnet-4-5-20250929',
+      temperature: 0.5,
+      maxTokens: 4096,
+      jsonMode: true,
+    })
+
+    data = parseSlidesFromRaw(retryRun.content)
+
+    if (!data?.slides?.length) {
+      logger.error(
+        { retryRawContent: retryRun.content.slice(0, 400) },
+        'planCarouselSlides: retry also failed to return slides',
+      )
+      throw new Error('LLM did not return carousel slides after retry')
+    }
+
+    logger.info({ slideCount: data.slides.length }, 'planCarouselSlides: retry succeeded')
   }
+
   const rawSlides = data.slides ?? []
 
   if (rawSlides.length === 0) throw new Error('LLM did not return carousel slides')

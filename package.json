@@ -8,9 +8,15 @@
     "build": "pnpm --filter @socioply/web build",
     "dev:api": "pnpm --filter @socioply/api dev",
     "build:api": "pnpm --filter @socioply/api build",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

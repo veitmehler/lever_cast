@@ -27,9 +27,10 @@ RUN cd apps/api && npx prisma generate && npx tsc
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime
 
-# Phase 9: postgresql-client for pg_dump (DB backup handler)
+# postgresql18-client for pg_dump (DB backup handler) — must match the managed
+# server major version (18.x); pg_dump refuses to dump a newer server. (B3)
 # Article pipeline: Chromium + Mermaid CLI
-RUN apk add --no-cache chromium nss freetype fontconfig harfbuzz ca-certificates ttf-freefont font-liberation postgresql16-client ffmpeg
+RUN apk add --no-cache chromium nss freetype fontconfig harfbuzz ca-certificates ttf-freefont font-liberation postgresql18-client ffmpeg
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     CHROME_BIN=/usr/bin/chromium-browser

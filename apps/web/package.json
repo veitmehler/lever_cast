@@ -19,6 +19,7 @@
     "@fal-ai/client": "^1.7.2",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
+    "isomorphic-dompurify": "^2.30.0",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-slot": "^1.2.3",
     "@supabase/auth-helpers-nextjs": "^0.10.0",

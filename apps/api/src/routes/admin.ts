@@ -1,6 +1,46 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import { timingSafeEqual } from 'node:crypto'
 import { prisma } from '../lib/prisma'
 import { getBoss, QUEUES } from '../queues/index'
+
+/**
+ * Defense-in-depth HTTP Basic Auth for the admin dashboard.
+ *
+ * The dashboard is browser-loaded HTML whose JSON endpoints are fetched without
+ * a Clerk Bearer token, so Basic Auth (which the browser replays automatically
+ * on same-origin requests) is the right fit rather than requireAdmin().
+ *
+ * Enforced only when ADMIN_BASIC_USER and ADMIN_BASIC_PASS are both set. If they
+ * are unset it logs a warning and allows the request — the admin plugin is off
+ * by default (ADMIN_ENABLED) and network-blocked by Caddy, so this is an extra
+ * layer, not the primary gate. Set the env vars to turn it on.
+ */
+async function adminBasicAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const user = process.env.ADMIN_BASIC_USER
+  const pass = process.env.ADMIN_BASIC_PASS
+
+  if (!user || !pass) {
+    request.log.warn(
+      '[admin] ADMIN_BASIC_USER/ADMIN_BASIC_PASS not set — admin dashboard is unauthenticated',
+    )
+    return
+  }
+
+  const header = request.headers['authorization'] ?? ''
+  const expected = 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64')
+
+  const provided = Buffer.from(header)
+  const expectedBuf = Buffer.from(expected)
+  const ok =
+    provided.length === expectedBuf.length && timingSafeEqual(provided, expectedBuf)
+
+  if (!ok) {
+    await reply
+      .header('WWW-Authenticate', 'Basic realm="Socioply Admin"')
+      .status(401)
+      .send('Authentication required')
+  }
+}
 
 const QUEUE_NAMES = Object.values(QUEUES)
 
@@ -70,6 +110,9 @@ const HTML = `<!DOCTYPE html>
 </html>`
 
 export async function adminRoutes(app: FastifyInstance) {
+  // Gate every admin route (HTML + JSON) behind Basic Auth.
+  app.addHook('onRequest', adminBasicAuth)
+
   app.get('/', async (_req, reply) => {
     reply.type('text/html').send(HTML)
   })

@@ -14,6 +14,13 @@ export async function requireAuth(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<string | undefined> {
+  // If the populateClerkId onRequest hook already verified the token, reuse the
+  // result instead of verifying a second time.
+  if (request.clerkId) {
+    Sentry.setUser({ id: request.clerkId })
+    return request.clerkId
+  }
+
   const authHeader = request.headers['authorization']
   if (!authHeader?.startsWith('Bearer ')) {
     reply.status(401).send({ error: 'Unauthorized' })

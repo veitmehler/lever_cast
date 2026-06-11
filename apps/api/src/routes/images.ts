@@ -10,6 +10,7 @@ import {
 } from '../lib/imageGeneration'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { requireAuth } from '../middleware/auth'
+import { sniffImageMime, extForImageMime } from '../lib/image-sniff'
 
 // ─── S3 helpers ──────────────────────────────────────────────────────────────
 
@@ -327,11 +328,16 @@ export async function imageRoutes(app: FastifyInstance) {
       const user = await prisma.user.findUnique({ where: { clerkId } })
       if (!user) return reply.status(404).send({ error: 'User not found' })
 
-      const match = imageDataUrl.match(/^data:image\/(\w+);base64,/)
-      const extension = fileName?.split('.').pop() || match?.[1] || 'jpg'
-      const contentType = match ? `image/${match[1]}` : 'image/jpeg'
       const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '')
       const buffer = Buffer.from(base64Data, 'base64')
+
+      // Trust the actual bytes, not the client-supplied data-URL prefix/filename.
+      const sniffed = sniffImageMime(buffer)
+      if (!sniffed) {
+        return reply.status(400).send({ error: 'Unsupported or invalid image data' })
+      }
+      const contentType = sniffed
+      const extension = extForImageMime(sniffed)
 
       const { url, path } = await uploadBufferToS3(buffer, user.id, contentType, extension)
 

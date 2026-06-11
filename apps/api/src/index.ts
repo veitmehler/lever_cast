@@ -24,6 +24,8 @@ import multipart from '@fastify/multipart'
 import { articleRoutes } from './routes/articles'
 import { wpConnectionRoutes } from './routes/wp-connections'
 import { adminApiRoutes } from './routes/admin-api/index'
+import { populateClerkId } from './middleware/clerk-context'
+import { handleError } from './lib/error-handler'
 
 async function main() {
   // Fastify 5 requires a plain config object for `logger`, not a pino instance.
@@ -43,6 +45,11 @@ async function main() {
     credentials: true,
   })
 
+  // ── Populate req.clerkId before rate limiting ──────────────────────────────
+  // Best-effort token decode so per-route rate limits key on the user, not the
+  // shared egress IP. Must run before the rate-limit plugin registers its hook.
+  app.addHook('onRequest', populateClerkId)
+
   // ── Global IP-level rate limit (unauthenticated flood protection) ──────────
   await app.register(rateLimit, {
     max: 1000,
@@ -55,14 +62,8 @@ async function main() {
     }),
   })
 
-  // ── Global Sentry error handler ────────────────────────────────────────────
-  app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
-    req.log.error({ err }, 'unhandled error')
-    Sentry.captureException(err)
-    reply.status(err.statusCode ?? 500).send({
-      error: err.message ?? 'Internal Server Error',
-    })
-  })
+  // ── Global error handler (generic 5xx messages, full server-side logging) ──
+  app.setErrorHandler(handleError)
 
   // ── Routes ─────────────────────────────────────────────────────────────────
   await app.register(healthRoutes)

@@ -2,7 +2,7 @@ import PgBoss from 'pg-boss'
 import { spawn } from 'node:child_process'
 import { Readable } from 'node:stream'
 import { Upload } from '@aws-sdk/lib-storage'
-import { S3Client } from '@aws-sdk/client-s3'
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { logger } from '../lib/logger'
 
 export interface DbBackupJobData {
@@ -50,7 +50,11 @@ export async function dbBackupHandler(jobs: PgBoss.Job<DbBackupJobData>[]) {
   const pgEnv = {
     ...process.env,
     PGPASSWORD: decodeURIComponent(url.password),
-    PGSSLMODE: url.searchParams.get('sslmode') ?? 'require',
+    // Hardcode a libpq-valid sslmode. DO managed Postgres needs TLS but presents a
+    // self-signed chain, which is exactly libpq's "require" (encrypt, don't verify).
+    // Do NOT read sslmode from the URL: it may be a node-postgres-specific value
+    // like "no-verify" or be malformed — both of which pg_dump rejects.
+    PGSSLMODE: 'require',
   }
   const pgArgs = [
     '--no-owner', '--no-acl', '--format=plain',
@@ -63,7 +67,20 @@ export async function dbBackupHandler(jobs: PgBoss.Job<DbBackupJobData>[]) {
   const dump = spawn('pg_dump', pgArgs, { env: pgEnv })
   const gzip = spawn('gzip', ['-9'])
   dump.stdout.pipe(gzip.stdin)
-  dump.stderr.on('data', (d: Buffer) => logger.warn({ stderr: d.toString() }, '[db-backup] pg_dump stderr'))
+
+  let dumpStderr = ''
+  dump.stderr.on('data', (d: Buffer) => {
+    dumpStderr += d.toString()
+  })
+
+  // Resolve only when pg_dump exits cleanly; reject (with its stderr) otherwise.
+  const dumpDone = new Promise<void>((resolve, reject) => {
+    dump.on('error', reject)
+    dump.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`pg_dump exited with code ${code}: ${dumpStderr.trim()}`))
+    })
+  })
 
   const upload = new Upload({
     client: s3,
@@ -75,6 +92,19 @@ export async function dbBackupHandler(jobs: PgBoss.Job<DbBackupJobData>[]) {
     },
   })
 
-  await upload.done()
+  // Wait for BOTH to fully settle so the delete below can't race the upload.
+  const [uploadResult, dumpResult] = await Promise.allSettled([upload.done(), dumpDone])
+
+  if (dumpResult.status === 'rejected') {
+    // pg_dump failed — remove whatever (partial/empty) object got uploaded so a
+    // broken dump can never masquerade as a valid backup.
+    await s3.send(new DeleteObjectCommand({ Bucket: backupBucket, Key: key })).catch(() => {})
+    logger.error({ key, err: dumpResult.reason }, '[db-backup] pg_dump failed — removed partial object')
+    throw dumpResult.reason
+  }
+  if (uploadResult.status === 'rejected') {
+    throw uploadResult.reason
+  }
+
   logger.info({ key }, '[db-backup] complete')
 }

@@ -144,6 +144,40 @@
 
 ---
 
+## Backlog — deferred hardening (not yet scheduled)
+
+Items discovered during implementation that are worth doing but sit outside the
+numbered phases. Recorded here so they aren't lost.
+
+### B1 — Close the public SSH surface (Tailscale-only deploy)
+
+**Finding:** `sudo ufw status` on the prod droplet (`socioply-api-01`) shows
+`22/tcp ALLOW Anywhere` — public SSH is open to the internet, exposing it to
+brute-force. The migration plan's D9 intent was SSH **closed publicly**, reachable
+only over Tailscale, but in practice the implemented `deploy-api.yml` connects over
+the public IP, so port 22 was left open. Tailscale is installed and used only for
+human/admin access today, not for the CI deploy.
+
+**Why:** an open port 22 is unnecessary attack surface; Tailscale SSH is already
+running, so the private path exists.
+
+**How to apply (both prod and the new staging droplet):**
+1. Add the `tailscale/github-action` step to `deploy-api.yml` and
+   `deploy-api-staging.yml` to join the runner to the tailnet.
+2. Change the SSH target from the public IP to the droplet's MagicDNS name
+   (`socioply-api-01` / `socioply-api-staging-01`); the `*_DROPLET_PUBLIC_IP`
+   secret becomes unnecessary.
+3. Once deploys succeed over Tailscale, `sudo ufw delete allow 22/tcp` on both
+   droplets.
+
+**Note:** this touches the production deploy workflow, so it must be validated on
+staging first (same staging-parity rule as Phase 2). The Vercel → DO API link is
+unaffected — that stays HTTPS + Clerk JWT, which is the correct model for a
+serverless frontend (Vercel egress IPs can't be put on a tailnet). Tailscale is
+only ever the SSH/admin layer, never the app-traffic layer.
+
+---
+
 ## Sequencing summary & rationale
 
 | Phase | Theme | Why here |

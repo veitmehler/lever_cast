@@ -3,6 +3,7 @@ import { cleanTextOutput } from '../output-cleaner'
 import { loadPromptTemplate } from './prompt-template'
 import { withGeoRetry } from './geo-retry'
 import { logger } from '../../lib/logger'
+import { assertSafeWpUrl } from '../../lib/ssrf'
 
 const DEF_SYS =
   'You are a content categorization expert. Given an article topic and a list of WordPress categories, select the single most appropriate category.'
@@ -24,6 +25,7 @@ export async function fetchWpCategories(
   authHeader: string,
 ): Promise<Array<{ id: number; name: string; slug: string }>> {
   const base = siteUrl.replace(/\/$/, '')
+  await assertSafeWpUrl(base)
   const catRes = await fetch(`${base}/wp-json/wp/v2/categories?per_page=100`, {
     headers: { Authorization: authHeader },
   })

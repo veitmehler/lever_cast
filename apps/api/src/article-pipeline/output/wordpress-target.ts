@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { decrypt } from '../../lib/encryption'
 import { logger } from '../../lib/logger'
+import { assertSafeWpUrl } from '../../lib/ssrf'
 import { selectWordPressCategory } from '../enrichment/wp-category-selector'
 import { selectWordPressTags } from '../enrichment/wp-tag-selector'
 import type { OutputPayload, OutputTarget, OutputAttemptResult } from './types'
@@ -187,6 +188,10 @@ export class WordPressTarget implements OutputTarget {
     const plainPassword = decrypt(conn.appPassword)
     const auth = basicAuthHeader(conn.username, plainPassword)
     const siteUrl = conn.siteUrl
+
+    // SSRF guard: refuse to publish to an internal/loopback/link-local target,
+    // even if the stored connection's host now resolves somewhere private.
+    await assertSafeWpUrl(siteUrl)
 
     // Resolve topic row for category/tag IDs — select at publish time if not already set
     const jobRow = await prisma.articleJob.findFirst({

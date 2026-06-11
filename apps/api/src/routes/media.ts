@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { uploadImageToStorage } from '../lib/storage'
+import { sniffImageMime } from '../lib/image-sniff'
 
 const MEDIA_SELECT = {
   id: true,
@@ -95,7 +96,14 @@ export async function mediaRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'File size must be less than 10MB' })
     }
 
-    const dataUrl = `data:${data.mimetype};base64,${buf.toString('base64')}`
+    // Authoritative check: validate the real bytes, not the client-declared
+    // multipart mimetype, and use the sniffed type for storage + DB.
+    const mimeType = sniffImageMime(buf)
+    if (!mimeType) {
+      return reply.status(400).send({ error: 'File must be a valid image' })
+    }
+
+    const dataUrl = `data:${mimeType};base64,${buf.toString('base64')}`
     const { url, path } = await uploadImageToStorage(dataUrl, user.id, data.filename)
 
     const media = await prisma.media.create({
@@ -104,7 +112,7 @@ export async function mediaRoutes(app: FastifyInstance) {
         s3Key: path,
         url,
         source: 'upload',
-        mimeType: data.mimetype,
+        mimeType,
         title: data.filename ?? 'Uploaded image',
       },
       select: MEDIA_SELECT,

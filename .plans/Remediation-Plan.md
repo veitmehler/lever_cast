@@ -144,6 +144,76 @@
 
 ---
 
+## Backlog — deferred hardening (not yet scheduled)
+
+Items discovered during implementation that are worth doing but sit outside the
+numbered phases. Recorded here so they aren't lost.
+
+### B1 — Close the public SSH surface (Tailscale-only deploy)
+
+**Finding:** `sudo ufw status` on the prod droplet (`socioply-api-01`) shows
+`22/tcp ALLOW Anywhere` — public SSH is open to the internet, exposing it to
+brute-force. The migration plan's D9 intent was SSH **closed publicly**, reachable
+only over Tailscale, but in practice the implemented `deploy-api.yml` connects over
+the public IP, so port 22 was left open. Tailscale is installed and used only for
+human/admin access today, not for the CI deploy.
+
+**Why:** an open port 22 is unnecessary attack surface; Tailscale SSH is already
+running, so the private path exists.
+
+**How to apply (both prod and the new staging droplet):**
+1. Add the `tailscale/github-action` step to `deploy-api.yml` and
+   `deploy-api-staging.yml` to join the runner to the tailnet.
+2. Change the SSH target from the public IP to the droplet's MagicDNS name
+   (`socioply-api-01` / `socioply-api-staging-01`); the `*_DROPLET_PUBLIC_IP`
+   secret becomes unnecessary.
+3. Once deploys succeed over Tailscale, `sudo ufw delete allow 22/tcp` on both
+   droplets.
+
+**Note:** this touches the production deploy workflow, so it must be validated on
+staging first (same staging-parity rule as Phase 2). The Vercel → DO API link is
+unaffected — that stays HTTPS + Clerk JWT, which is the correct model for a
+serverless frontend (Vercel egress IPs can't be put on a tailnet). Tailscale is
+only ever the SSH/admin layer, never the app-traffic layer.
+
+### B2 — Migrations can't be replayed on a fresh database
+
+**Finding:** standing up the empty `socioply_staging` database failed with
+`P3018 / relation "users" does not exist` while applying
+`20251105152615_add_templates_table`. That migration is timestamped **before**
+`20251105185333_init` (the one that creates `users`), so on a from-scratch DB it
+runs first and references a table that doesn't exist yet. Production never hit this
+because its DB was loaded from a dump (the Supabase→DO migration), not replayed from
+zero. Staging had to be provisioned by cloning prod's schema + `_prisma_migrations`
+history (`pg_dump --exclude-schema=pgboss | psql`) instead.
+
+**Why:** you currently cannot build a working database from migrations alone — this
+breaks disaster recovery, any new environment, and clean local setup.
+
+**How to apply:** fix during **Phase 4** (schema consolidation). Squash/baseline the
+migration history so the canonical `packages/db` schema applies cleanly to an empty
+database in the correct order. Verify by running `prisma migrate deploy` against a
+throwaway empty DB in CI.
+
+### B3 — Image Postgres client version lags the managed server (backups likely broken)
+
+**Finding:** the managed cluster is **Postgres 18.4**, but the API image installs
+**`postgresql16-client`** (Dockerfile). `pg_dump 16` refuses to dump an 18 server
+(`server version mismatch`). The prod DB-backup handler shells out to `pg_dump`, so
+**production backups are almost certainly failing.**
+
+**Why:** no working backups is a serious operational risk; also blocks any
+host/container-side `pg_dump`/`psql` against the cluster.
+
+**How to apply:**
+1. Bump the Dockerfile's `postgresql16-client` → `postgresql18-client` (Alpine
+   package) to match the server.
+2. Confirm the backup handler produces a valid dump after the bump.
+3. Check whether recent prod backups actually succeeded; if not, take a manual dump
+   once the client is fixed.
+
+---
+
 ## Sequencing summary & rationale
 
 | Phase | Theme | Why here |

@@ -1,0 +1,152 @@
+name: Deploy API (Staging)
+
+# Staging mirror of deploy-api.yml. Builds a SEPARATE image tag (:staging, never
+# :latest) and deploys to a SEPARATE droplet path (/opt/socioply-staging) using
+# STAGING_* secrets, so it can never touch production.
+#
+# Use this to validate connectivity-sensitive changes (Phase 2: Postgres-scoped
+# TLS, SSRF guard) against real infrastructure before merging to main.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to build & deploy to staging"
+        required: false
+        default: staging
+
+concurrency:
+  group: deploy-api-staging
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # On manual dispatch, build the ref the operator chose; otherwise the
+          # pushed staging branch.
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (staging tags only)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          # NOTE: :staging / :staging-<sha> — never :latest, so production
+          # (which pulls :latest) is unaffected.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/lever_cast-api:staging
+            ghcr.io/${{ github.repository_owner }}/lever_cast-api:staging-${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Verify staging deploy secrets are set
+        env:
+          DROPLET_IP: ${{ secrets.STAGING_DROPLET_PUBLIC_IP }}
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          HEALTH_URL: ${{ secrets.STAGING_HEALTH_URL }}
+        run: |
+          missing=0
+          [ -z "$DROPLET_IP" ] && { echo "::error::STAGING_DROPLET_PUBLIC_IP is empty or unset"; missing=1; }
+          [ -z "$DEPLOY_KEY" ] && { echo "::error::STAGING_DEPLOY_SSH_KEY is empty or unset"; missing=1; }
+          [ -z "$HEALTH_URL" ] && { echo "::error::STAGING_HEALTH_URL is empty or unset"; missing=1; }
+          [ "$missing" = "1" ] && exit 1
+          echo "Staging deploy secrets present."
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          DROPLET_IP: ${{ secrets.STAGING_DROPLET_PUBLIC_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          {
+            echo "Host staging-droplet"
+            echo "  HostName $DROPLET_IP"
+            echo "  User socioply"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } >> ~/.ssh/config
+
+      - name: Smoke-test SSH connection
+        run: ssh staging-droplet 'echo "SSH OK from $(hostname) as $(whoami)"'
+
+      - name: Deploy to staging droplet
+        env:
+          HEALTH_URL: ${{ secrets.STAGING_HEALTH_URL }}
+        run: |
+          ssh staging-droplet "HEALTH_URL='$HEALTH_URL' bash -s" << 'ENDSSH'
+            set -euo pipefail
+
+            echo "::group::1. Tag current :staging as :staging-previous (for rollback)"
+            docker tag ghcr.io/veitmehler/lever_cast-api:staging \
+                       ghcr.io/veitmehler/lever_cast-api:staging-previous 2>/dev/null \
+              && echo "Tagged" || echo "No existing :staging to tag (first staging deploy?)"
+            echo "::endgroup::"
+
+            echo "::group::2. Pull new image"
+            cd /opt/socioply-staging
+            docker compose pull
+            echo "::endgroup::"
+
+            echo "::group::3. Run Prisma migrations (staging DB)"
+            # NOTE: NODE_TLS_REJECT_UNAUTHORIZED=0 mirrors production for now. The
+            # Phase 2 H1 work will replace this with a Postgres-scoped CA so TLS
+            # verification stays on — validate that change here first.
+            docker compose run --rm -T --no-deps \
+              -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+              api \
+              npx prisma migrate deploy \
+              --schema=/app/packages/db/prisma/schema.prisma < /dev/null
+            echo "::endgroup::"
+
+            echo "::group::4. Restart containers"
+            docker compose up -d --remove-orphans
+            docker compose ps
+            echo "::endgroup::"
+
+            echo "::group::4b. Prune dangling images"
+            docker image prune -f
+            echo "::endgroup::"
+
+            echo "::group::5. Health check"
+            echo "Waiting 10s for staging API to come up..."
+            sleep 10
+            for i in 1 2 3 4 5; do
+              if curl -sf "$HEALTH_URL"; then
+                echo ""
+                echo "Staging health check PASSED on attempt $i"
+                exit 0
+              fi
+              echo "Attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "Staging health check FAILED — rolling back to :staging-previous"
+            DEPLOY_TAG=staging-previous docker compose up -d --remove-orphans
+            exit 1
+          ENDSSH

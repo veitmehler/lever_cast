@@ -1,0 +1,10 @@
+# Staging Caddyfile — TEMPLATE.
+#
+# Copy to /opt/socioply-staging/Caddyfile on the staging droplet. Replace the
+# domain with your staging hostname (must have a DNS A record → staging droplet
+# IP for Caddy to provision a TLS cert automatically).
+
+staging-api.socioply.com {
+  encode gzip
+  reverse_proxy api:3001
+}

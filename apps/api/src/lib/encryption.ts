@@ -74,66 +74,64 @@ export function encrypt(plaintext: string): string {
   return `${V2_PREFIX}.${iv.toString('base64')}.${tag.toString('base64')}.${ct.toString('base64')}`
 }
 
+/** Thrown when a stored value cannot be decrypted (non-v2, malformed, or wrong key). */
+export class DecryptionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'DecryptionError'
+  }
+}
+
 /**
- * Decrypt a string produced by encrypt() or by the legacy base64 scheme.
+ * Decrypt a v2 (AES-256-GCM) ciphertext produced by encrypt().
  *
- * Resolution order:
- *   1. v2 format → try ENCRYPTION_KEY, then ENCRYPTION_KEY_OLD.
- *   2. Legacy base64 → base64-decode; return if printable ASCII.
- *   3. Plaintext passthrough → return as-is if printable ASCII.
- *   4. Return '' and log a warning.
+ * Phase 3: strict. Empty/null input returns '' (callers may store optional
+ * credentials). Anything else MUST be authenticated v2 ciphertext — the legacy
+ * base64 and plaintext-passthrough fallbacks were removed once every stored row
+ * was confirmed v2. A value that isn't v2, is malformed, or can't be decrypted
+ * with any active key throws DecryptionError rather than silently returning ''
+ * (which previously masked tampering/corruption with an empty credential).
  */
 export function decrypt(stored: string): string {
   if (!stored) return ''
 
-  // v2 format: v2.<iv>.<tag>.<ct>
-  if (stored.startsWith(`${V2_PREFIX}.`)) {
-    const parts = stored.split('.')
-    if (parts.length !== 4) {
-      console.error('[encryption] Malformed v2 ciphertext')
-      return ''
-    }
-    const [, ivB64, tagB64, ctB64] = parts
-    const iv = Buffer.from(ivB64, 'base64')
-    const tag = Buffer.from(tagB64, 'base64')
-    const ct = Buffer.from(ctB64, 'base64')
-
-    const keysToTry: Buffer[] = [getPrimaryKey()]
-    const oldKey = getOldKey()
-    if (oldKey) keysToTry.push(oldKey)
-
-    for (const key of keysToTry) {
-      try {
-        const d = createDecipheriv(ALGO, key, iv)
-        d.setAuthTag(tag)
-        const plain = Buffer.concat([d.update(ct), d.final()]).toString('utf8')
-        return plain
-      } catch {
-        // Try next key
-      }
-    }
-
-    console.error('[encryption] Failed to decrypt v2 ciphertext with any active key')
-    return ''
+  if (!stored.startsWith(`${V2_PREFIX}.`)) {
+    throw new DecryptionError('Refusing to decrypt a non-v2 value')
   }
 
-  // Legacy: base64-encoded plaintext (old "encryption" scheme)
-  try {
-    const decoded = Buffer.from(stored, 'base64').toString('utf8')
-    if (decoded && /^[\x20-\x7E]+$/.test(decoded)) {
-      return decoded
+  const parts = stored.split('.')
+  if (parts.length !== 4) {
+    throw new DecryptionError('Malformed v2 ciphertext')
+  }
+  const [, ivB64, tagB64, ctB64] = parts
+  const iv = Buffer.from(ivB64, 'base64')
+  const tag = Buffer.from(tagB64, 'base64')
+  const ct = Buffer.from(ctB64, 'base64')
+
+  const keysToTry: Buffer[] = [getPrimaryKey()]
+  const oldKey = getOldKey()
+  if (oldKey) keysToTry.push(oldKey)
+
+  for (const key of keysToTry) {
+    try {
+      const d = createDecipheriv(ALGO, key, iv)
+      d.setAuthTag(tag)
+      return Buffer.concat([d.update(ct), d.final()]).toString('utf8')
+    } catch {
+      // Try next key
     }
-  } catch {
-    // Not valid base64
   }
 
-  // Plaintext passthrough (tokens stored before any encryption was applied)
-  if (/^[\x20-\x7E]+$/.test(stored)) {
-    return stored
-  }
+  throw new DecryptionError('Failed to decrypt v2 ciphertext with any active key')
+}
 
-  console.warn('[encryption] Could not decrypt value — returning empty string')
-  return ''
+/**
+ * Fail fast at startup if encryption isn't usable. In production this throws when
+ * ENCRYPTION_KEY is missing/invalid (getPrimaryKey enforces it), so the process
+ * never boots silently using the insecure dev fallback key.
+ */
+export function assertEncryptionConfigured(): void {
+  getPrimaryKey()
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'
-import { encrypt, decrypt, maskApiKey } from '../encryption'
+import { encrypt, decrypt, maskApiKey, DecryptionError } from '../encryption'
 
 // A deterministic 32-byte key (base64) so v2 ciphertext round-trips reproducibly.
 const KEY_A = Buffer.alloc(32, 0x07).toString('base64')
@@ -15,10 +15,10 @@ afterEach(() => {
   delete process.env.ENCRYPTION_KEY_OLD
 })
 
-// These tests pin the CURRENT behavior of the encryption module. Phase 3 will
-// intentionally tighten decrypt() (drop legacy/plaintext fallbacks, fail loud);
-// the legacy-acceptance assertions below are expected to be updated then.
-describe('encryption (characterization)', () => {
+// Phase 3: decrypt() is now strict — only authenticated v2 ciphertext is accepted;
+// legacy base64 and plaintext passthrough were removed, and undecryptable input
+// throws DecryptionError instead of silently returning ''.
+describe('encryption', () => {
   it('round-trips a v2 ciphertext', () => {
     const out = encrypt('hello-secret')
     expect(decrypt(out)).toBe('hello-secret')
@@ -36,17 +36,24 @@ describe('encryption (characterization)', () => {
     expect(decrypt('')).toBe('')
   })
 
-  it('decrypts legacy base64-encoded plaintext (back-compat path)', () => {
+  it('throws on a legacy base64 value (no longer accepted)', () => {
     const legacy = Buffer.from('legacy-token', 'utf8').toString('base64')
-    expect(decrypt(legacy)).toBe('legacy-token')
+    expect(() => decrypt(legacy)).toThrow(DecryptionError)
   })
 
-  it('passes through bare printable-ASCII plaintext (back-compat path)', () => {
-    expect(decrypt('plain-token-123')).toBe('plain-token-123')
+  it('throws on bare plaintext (no longer passed through)', () => {
+    expect(() => decrypt('plain-token-123')).toThrow(DecryptionError)
   })
 
-  it('returns empty string for malformed v2 ciphertext', () => {
-    expect(decrypt('v2.onlytwo.parts')).toBe('')
+  it('throws on malformed v2 ciphertext', () => {
+    expect(() => decrypt('v2.onlytwo.parts')).toThrow(DecryptionError)
+  })
+
+  it('throws when v2 ciphertext cannot be decrypted with any active key', () => {
+    const ct = encrypt('secret')
+    process.env.ENCRYPTION_KEY = Buffer.alloc(32, 0x99).toString('base64') // wrong key
+    delete process.env.ENCRYPTION_KEY_OLD
+    expect(() => decrypt(ct)).toThrow(DecryptionError)
   })
 
   it('decrypts with ENCRYPTION_KEY_OLD after a key rotation', () => {

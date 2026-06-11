@@ -22,8 +22,12 @@ import { wpConnectionRoutes } from './routes/wp-connections'
 import { adminApiRoutes } from './routes/admin-api/index'
 import { populateClerkId } from './middleware/clerk-context'
 import { handleError } from './lib/error-handler'
+import { assertEncryptionConfigured } from './lib/encryption'
 
 async function main() {
+  // Fail fast if encryption isn't configured (never boot prod on the dev key).
+  assertEncryptionConfigured()
+
   // Fastify 5 requires a plain config object for `logger`, not a pino instance.
   // We pass our shared logger as the child logger used by request handlers.
   const app = Fastify({

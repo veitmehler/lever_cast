@@ -5,6 +5,7 @@ initSentry('worker')
 import PgBoss from 'pg-boss'
 import { logger } from './lib/logger'
 import { getBoss, stopBoss, QUEUES } from './queues/index'
+import { assertEncryptionConfigured } from './lib/encryption'
 import {
   publishHandler,
   publishScheduledHandler,
@@ -43,6 +44,9 @@ function withSentry<T>(
 
 async function main() {
   logger.info('[worker] starting…')
+
+  // Fail fast if encryption isn't configured (never boot prod on the dev key).
+  assertEncryptionConfigured()
 
   const boss = await getBoss()
 

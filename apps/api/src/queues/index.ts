@@ -3,13 +3,44 @@ import { Sentry } from '../lib/sentry'
 
 let boss: PgBoss | null = null
 
+/**
+ * Force `sslmode=no-verify` on a Postgres connection string so node-postgres
+ * connects with TLS but without CA verification. node-postgres treats
+ * `sslmode=require` (the DO default) as verify-on, which rejects DO's self-signed
+ * chain; `no-verify` is its encrypt-but-don't-verify mode. Returns the string
+ * unchanged if it can't be parsed as a URL.
+ */
+export function withNoVerifySsl(connectionString: string): string {
+  try {
+    const url = new URL(connectionString)
+    url.searchParams.set('sslmode', 'no-verify')
+    return url.toString()
+  } catch {
+    return connectionString
+  }
+}
+
 export async function getBoss(): Promise<PgBoss> {
   if (boss) return boss
 
-  const connectionString = process.env.PGBOSS_DATABASE_URL || process.env.DIRECT_URL
-  if (!connectionString) {
+  const rawConnectionString = process.env.PGBOSS_DATABASE_URL || process.env.DIRECT_URL
+  if (!rawConnectionString) {
     throw new Error('PGBOSS_DATABASE_URL or DIRECT_URL must be set (pg-boss needs a direct connection, not PgBouncer)')
   }
+
+  // DO managed Postgres requires TLS but presents a cert chain whose root isn't in
+  // the system trust store. We connect over the private VPC endpoint, so the link
+  // is encrypted; we just don't CA-verify it. This must be scoped to the pg-boss
+  // (node-postgres) connection ONLY — never process-wide (H1 removed the global
+  // NODE_TLS_REJECT_UNAUTHORIZED override so outbound calls verify properly).
+  //
+  // node-postgres reads `sslmode` from the connection string and treats
+  // `sslmode=require` as "verify the cert" — which overrides a passed
+  // `ssl: { rejectUnauthorized: false }` object and rejects the self-signed chain.
+  // Forcing `sslmode=no-verify` (node-postgres's encrypt-but-don't-verify mode) is
+  // the reliable way to express this. (Prisma's engine interprets `require` as
+  // no-verify already, which is why migrations worked but pg-boss did not.)
+  const connectionString = withNoVerifySsl(rawConnectionString)
 
   boss = new PgBoss({
     connectionString,

@@ -1,7 +1,3 @@
-// DigitalOcean managed Postgres uses a self-signed CA certificate.
-// Connection is still TLS-encrypted; this only skips CA chain verification.
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 // Sentry must be initialised before any other imports that might throw
 import { initSentry, Sentry } from './lib/sentry'
 initSentry('api')

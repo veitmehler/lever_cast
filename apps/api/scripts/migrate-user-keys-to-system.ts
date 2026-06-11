@@ -5,9 +5,6 @@
  *   docker exec socioply-api npx tsx /app/apps/api/scripts/migrate-user-keys-to-system.ts
  */
 
-// DigitalOcean Managed Postgres uses a self-signed CA; skip verification
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { PrismaClient } from '@prisma/client'
 import {
   createCipheriv,

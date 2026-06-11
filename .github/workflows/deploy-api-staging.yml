@@ -115,11 +115,10 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::3. Run Prisma migrations (staging DB)"
-            # NOTE: NODE_TLS_REJECT_UNAUTHORIZED=0 mirrors production for now. The
-            # Phase 2 H1 work will replace this with a Postgres-scoped CA so TLS
-            # verification stays on — validate that change here first.
+            # H1: no NODE_TLS_REJECT_UNAUTHORIZED override. Prisma's engine does its
+            # own TLS via sslmode in DIRECT_URL (sslmode=require = encrypted, not
+            # CA-verified), so it connects without disabling Node's TLS globally.
             docker compose run --rm -T --no-deps \
-              -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
               npx prisma migrate deploy \
               --schema=/app/packages/db/prisma/schema.prisma < /dev/null

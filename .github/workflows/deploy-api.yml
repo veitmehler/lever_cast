@@ -102,8 +102,9 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::3. Run Prisma migrations"
+            # H1: no NODE_TLS_REJECT_UNAUTHORIZED override — Prisma's engine handles
+            # TLS via sslmode in DIRECT_URL. Validated on staging first.
             docker compose run --rm -T --no-deps \
-              -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
               npx prisma migrate deploy \
               --schema=/app/packages/db/prisma/schema.prisma < /dev/null
@@ -111,7 +112,6 @@ jobs:
 
             echo "::group::3b. Seed prompt templates"
             docker compose run --rm -T --no-deps \
-              -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
               api \
               /app/node_modules/.bin/tsx /app/packages/db/prisma/seed.ts < /dev/null
             echo "::endgroup::"

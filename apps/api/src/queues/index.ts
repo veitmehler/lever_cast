@@ -17,6 +17,11 @@ export async function getBoss(): Promise<PgBoss> {
     archiveCompletedAfterSeconds: 60 * 60 * 24 * 7,
     deleteAfterSeconds: 60 * 60 * 24 * 30,
     monitorStateIntervalSeconds: 2,
+    // DO managed Postgres requires TLS. We connect over the private VPC endpoint,
+    // so the link is encrypted but the cert is not CA-verified (the managed cert's
+    // SAN doesn't cover the private hostname). This is scoped to the pg-boss
+    // connection ONLY — never process-wide. The global NODE_TLS_REJECT_UNAUTHORIZED
+    // override was removed in H1 so outbound calls (Clerk/OpenAI/S3/WordPress) verify.
     ssl: { rejectUnauthorized: false },
   })
 

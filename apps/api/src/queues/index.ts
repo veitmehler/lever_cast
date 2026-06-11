@@ -42,9 +42,17 @@ export async function getBoss(): Promise<PgBoss> {
   // no-verify already, which is why migrations worked but pg-boss did not.)
   const connectionString = withNoVerifySsl(rawConnectionString)
 
+  // Cap the pg-boss connection pool. pg-boss defaults to 10 connections PER
+  // process; with api + worker across prod + staging all hitting one small
+  // managed cluster (~22 slots), that exhausts it ("remaining connection slots
+  // are reserved for roles with the SUPERUSER attribute"). 5 is ample for this
+  // low-volume queue; override per-environment via PGBOSS_MAX_CONNECTIONS (B4).
+  const max = Number(process.env.PGBOSS_MAX_CONNECTIONS ?? 5)
+
   boss = new PgBoss({
     connectionString,
     schema: 'pgboss',
+    max,
     archiveCompletedAfterSeconds: 60 * 60 * 24 * 7,
     deleteAfterSeconds: 60 * 60 * 24 * 30,
     monitorStateIntervalSeconds: 2,

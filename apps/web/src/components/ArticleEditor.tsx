@@ -16,6 +16,7 @@ import { ArticleDiagram } from '@/components/tiptap/ArticleDiagram'
 import { GeoSummary } from '@/components/tiptap/GeoSummary'
 import { IslandMarker } from '@/components/tiptap/IslandMarker'
 import { restorePreservedArticleBlocks, stripPreservedArticleBlocks, stripTocFromHtml } from '@/lib/article-html-islands'
+import { sanitizeArticleHtml } from '@/lib/sanitize-html'
 
 type TocEntry = { level: 2 | 3; text: string }
 
@@ -269,7 +270,7 @@ export function ArticleEditor({ jobId, initial, featuredImage, citations, discla
                       </summary>
                       <div
                         className="article-body px-4 py-4"
-                        dangerouslySetInnerHTML={{ __html: html }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(html) }}
                       />
                     </details>
                   ))}

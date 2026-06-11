@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
 import { encrypt, decrypt } from '../lib/encryption'
+import { assertSafeWpUrl } from '../lib/ssrf'
 
 // ── WP REST helpers ────────────────────────────────────────────────────────
 
@@ -60,6 +61,14 @@ async function verifyConnection(
   authors?: Array<{ id: number; name: string }>
 }> {
   const base = siteUrl.replace(/\/$/, '')
+
+  // SSRF guard: refuse to fetch internal/loopback/link-local targets.
+  try {
+    await assertSafeWpUrl(base)
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Blocked URL' }
+  }
+
   try {
     // Verify credentials
     const meRes = await fetch(`${base}/wp-json/wp/v2/users/me?context=edit`, {

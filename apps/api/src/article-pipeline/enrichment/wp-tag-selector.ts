@@ -3,6 +3,7 @@ import { cleanTextOutput } from '../output-cleaner'
 import { loadPromptTemplate } from './prompt-template'
 import { withGeoRetry } from './geo-retry'
 import { logger } from '../../lib/logger'
+import { assertSafeWpUrl } from '../../lib/ssrf'
 
 const DEF_SYS =
   'You are a content tagging expert. Given an article topic and a list of WordPress tags, select the most applicable tags.'
@@ -25,6 +26,7 @@ export async function fetchWpTags(
   authHeader: string,
 ): Promise<Array<{ id: number; name: string; slug: string }>> {
   const base = siteUrl.replace(/\/$/, '')
+  await assertSafeWpUrl(base)
   const res = await fetch(`${base}/wp-json/wp/v2/tags?per_page=100`, {
     headers: { Authorization: authHeader },
   })

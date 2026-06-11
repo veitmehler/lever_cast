@@ -212,6 +212,30 @@ host/container-side `pg_dump`/`psql` against the cluster.
 3. Check whether recent prod backups actually succeeded; if not, take a manual dump
    once the client is fixed.
 
+### B4 — Database connection budget too tight for prod + staging
+
+**Finding:** the managed cluster is a small `db-s-1vcpu-1gb` (~22 connection slots).
+With prod **and** staging both running — each with an app Prisma pool and a pg-boss
+worker (pg-boss defaults to a ~10-connection pool) — the cluster saturates and new
+connections fail with `FATAL: remaining connection slots are reserved for roles with
+the SUPERUSER attribute`. Observed during Phase 2 staging work; stopping the idle
+staging worker freed enough slots. Prod stayed up (no clients yet) but this would
+starve prod under real load.
+
+**Why:** two pg-boss workers + two app pools on a 22-slot cluster is over budget;
+prod connection failures are a real risk once traffic arrives.
+
+**How to apply (cheapest first):**
+1. Cap the pg-boss pool in `queues/index.ts` via the `max` option (e.g. `max: 4`) —
+   helps both prod and staging immediately.
+2. Give staging its own DO **connection pool** (PgBouncer) and point staging's
+   `DATABASE_URL` at it instead of the direct endpoint (staging currently uses the
+   direct endpoint for both URLs, which doesn't multiplex).
+3. If still tight, upsize the cluster or give staging its own small cluster.
+
+**Interim:** keep the staging worker stopped when not actively testing
+(`docker compose stop worker` in `/opt/socioply-staging`).
+
 ---
 
 ## Sequencing summary & rationale

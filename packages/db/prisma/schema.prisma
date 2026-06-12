@@ -673,6 +673,22 @@ model SystemApiKey {
   @@map("system_api_keys")
 }
 
+// Admin-managed background music library for social video posts.
+// Tracks are loudness-normalized (EBU R128) and transcoded to AAC on upload,
+// so mix-time levels are predictable for every track.
+model MusicTrack {
+  id        String   @id @default(cuid())
+  title     String
+  s3Key     String // system/music/<id>.m4a (normalized AAC)
+  url       String // CDN URL
+  duration  Float // seconds, probed after normalization
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("music_tracks")
+}
+
 // ─── Article Pipeline V2 Models ───────────────────────────────────────────────
 
 model OutlineFramework {

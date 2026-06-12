@@ -14,6 +14,7 @@ import {
   LayoutList,
   Braces,
   Share2,
+  Music,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +27,7 @@ const navItems = [
   { label: 'Costs', href: '/admin/costs', icon: DollarSign },
   { label: 'Articles', href: '/admin/articles', icon: FileText },
   { label: 'Social Runs', href: '/admin/social', icon: Share2 },
+  { label: 'Music', href: '/admin/music', icon: Music },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Errors', href: '/admin/errors', icon: AlertTriangle },
 ]

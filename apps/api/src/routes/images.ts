@@ -7,7 +7,7 @@ import {
   generateWithFalAI,
   generateWithOpenAIDALLE,
   generateWithReplicate,
-} from '../lib/imageGeneration'
+} from '@socioply/shared'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { requireAuth } from '../middleware/auth'
 import { sniffImageMime, extForImageMime } from '../lib/image-sniff'

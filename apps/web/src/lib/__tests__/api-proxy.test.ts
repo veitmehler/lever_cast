@@ -30,11 +30,12 @@ vi.mock('next/server', () => {
 
 import { proxyToApi } from '../api-proxy'
 
-type FakeReqOpts = { authHeader?: string | null; method?: string; body?: ArrayBuffer }
+type FakeReqOpts = { authHeader?: string | null; method?: string; body?: ArrayBuffer; search?: string }
 
-function fakeReq({ authHeader = null, method = 'POST', body }: FakeReqOpts) {
+function fakeReq({ authHeader = null, method = 'POST', body, search = '' }: FakeReqOpts) {
   return {
     method,
+    nextUrl: { search },
     headers: {
       get(key: string) {
         const k = key.toLowerCase()
@@ -85,6 +86,20 @@ describe('proxyToApi (characterization)', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok123')
     // No Clerk fallback should have run when a client token is present.
     expect(authMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards the request query string to the upstream URL', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeUpstream(200))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await proxyToApi(
+      fakeReq({ authHeader: 'Bearer tok123', method: 'GET', search: '?status=published&limit=20' }),
+      '/api/articles',
+      { method: 'GET' },
+    )
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.socioply.com/api/articles?status=published&limit=20')
   })
 
   it('returns 503 when the upstream fetch throws (network failure)', async () => {

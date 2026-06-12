@@ -55,7 +55,9 @@ export async function proxyToApi(
   const contentType = request.headers.get('content-type') ?? 'application/json'
   const isBodyless = ['GET', 'HEAD'].includes(method.toUpperCase())
 
-  const upstreamUrl = `${DO_API_BASE}${path}`
+  // Preserve the query string — server-side filters (e.g. /api/articles?status=)
+  // and pagination params are otherwise silently dropped.
+  const upstreamUrl = `${DO_API_BASE}${path}${request.nextUrl.search}`
 
   let body: ArrayBuffer | undefined
   if (!isBodyless) {

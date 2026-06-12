@@ -33,6 +33,7 @@ import { buildPitchSlidePng, cropBufferToStoryAspect } from './compositors/carou
 import { loadSocialBrandTheme } from './brand-theme'
 import { loadPromptTemplate } from '../article-pipeline/enrichment/prompt-template'
 import { buildPerSlideNarration } from './video/narration'
+import { addBackgroundMusic } from './video/music'
 import { getVoiceSettings } from '../lib/elevenlabs/settings'
 import { logger } from '../lib/logger'
 
@@ -150,12 +151,18 @@ export async function generateVideoReelAsset(opts: {
       falModel,
     })
 
+    // Music on the final reel only — the raw background must stay clean
+    // because S2 re-overlays and re-scores it independently.
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+    })
+
     // Upload the raw (pre-overlay) background so S2 can reuse it with fresh bullets.
     const rawPath = path.join(tmpDir, 'reel-raw.mp4')
     const [uploaded, rawUploaded] = await Promise.all([
       uploadVideoFile({
         userId: opts.userId,
-        filePath: outputPath,
+        filePath: musicPath,
         s3Key: `social/${opts.userId}/${jobId}/video-reel-${genId}.mp4`,
         title: 'Video reel',
         width: probe.width,
@@ -232,9 +239,13 @@ export async function generateStoriesReelAsset(opts: {
     const probe = await probeVideo(finalPath)
     assertStoryVideoConstraints(probe)
 
+    const musicPath = await addBackgroundMusic(finalPath, tmpDir, {
+      videoDuration: probe.duration,
+    })
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: finalPath,
+      filePath: musicPath,
       s3Key: `social/${opts.userId}/${jobId}/stories-reel-${genId}.mp4`,
       title: 'Stories reel',
       width: probe.width,
@@ -358,7 +369,7 @@ export async function generateHookVideoAsset(opts: {
       { hasVoiceAudio: !!voiceAudioPath, slideDurations },
       'generateHookVideoAsset: calling buildHookVideo',
     )
-    const { probe, hookRawPath } = await buildHookVideo({
+    const { probe, hookRawPath, introDuration } = await buildHookVideo({
       title,
       hookPrompt: hookVideoPrompt,
       // Pure T2V — no image input so Seedance has a clean background without
@@ -373,12 +384,19 @@ export async function generateHookVideoAsset(opts: {
     })
     logger.info({ width: probe.width, height: probe.height }, 'generateHookVideoAsset: video built')
 
+    // Music: full level over the title intro, ducked when narration starts.
+    // Silent (no-voiceover) videos get full-level music throughout.
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+      duckAtSec: voiceAudioPath ? introDuration : undefined,
+    })
+
     // Upload raw hook clip to S3 so S6 can reuse it (crop to 9:16) without
     // paying for a new Fal.ai generation.
     const [uploaded, rawHookUploaded] = await Promise.all([
       uploadVideoFile({
         userId: opts.userId,
-        filePath: outputPath,
+        filePath: musicPath,
         s3Key: `social/${opts.userId}/${jobId}/hook-video-${genId}.mp4`,
         title: `Hook video — ${title.slice(0, 40)}`,
         width: probe.width,
@@ -462,9 +480,15 @@ export async function generateQuoteVideoAsset(opts: {
       secondsPerSlide: 4,
     })
 
+    // No title slide — narrated quote videos run music ducked from the start.
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+      duckAtSec: voiceoverUsed ? 0 : undefined,
+    })
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: outputPath,
+      filePath: musicPath,
       s3Key: `social/${opts.userId}/${jobId}/quote-video-${genId}.mp4`,
       title: 'Quote video',
       width: probe.width,
@@ -567,9 +591,13 @@ export async function generateStoryCarouselVideo(opts: {
     await concatVideos([titleVideoOut, pitchVideoPath], outputPath)
     const probe = await probeVideo(outputPath)
 
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+    })
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: outputPath,
+      filePath: musicPath,
       s3Key: `social/${opts.userId}/${jobId}/story-carousel-${genId}.mp4`,
       title: 'Story carousel video',
       width: probe.width,
@@ -665,9 +693,13 @@ export async function generateStoryHookVideo(opts: {
     await concatVideos([hookTitled, bodyPath], outputPath)
     const probe = await probeVideo(outputPath)
 
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+    })
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: outputPath,
+      filePath: musicPath,
       s3Key: `social/${opts.userId}/${jobId}/story-hook-${genId}.mp4`,
       title: `Story hook — ${opts.title.slice(0, 40)}`,
       width: probe.width,
@@ -693,9 +725,13 @@ export async function generateLoopedReelAsset(opts: {
     const outputPath = path.join(tmpDir, 'loop-reel.mp4')
     const probe = await buildLoopedStoryReel(opts.sourceVideoUrl, outputPath, loopCount)
 
+    const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
+      videoDuration: probe.duration,
+    })
+
     const uploaded = await uploadVideoFile({
       userId: opts.userId,
-      filePath: outputPath,
+      filePath: musicPath,
       s3Key: `social/${opts.userId}/${jobId}/loop-reel-${genId}.mp4`,
       title: `Looped reel (${loopCount}×)`,
       width: probe.width,

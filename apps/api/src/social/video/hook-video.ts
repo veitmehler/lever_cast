@@ -36,6 +36,8 @@ export interface HookVideoResult {
   probe: VideoProbe
   /** Local path to the raw (pre-title, pre-concat) Seedance clip — caller should upload to S3. */
   hookRawPath: string
+  /** Effective intro length (after any in-graph trim) — narration/music duck offset. */
+  introDuration: number
 }
 
 const MAX_INTRO_SECS = 5
@@ -148,7 +150,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
 
   const probe = await probeVideo(opts.outputPath)
   logger.info({ duration: probe.duration, width: probe.width, height: probe.height }, 'buildHookVideo: complete')
-  return { probe, hookRawPath: hookRaw }
+  return { probe, hookRawPath: hookRaw, introDuration }
 }
 
 export interface VideoReelOptions {

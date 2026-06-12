@@ -121,7 +121,7 @@ export default function AdminMusicPage() {
           <h1 className="text-2xl font-bold text-foreground">Music Library</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Background tracks for social video posts. Every video picks a random active track,
-            trims it to length with an end fade-out, and ducks it −18 dB under narration.
+            trims it to length with an end fade-out, and ducks it −20 dB under narration.
             Uploads are loudness-normalized (EBU R128, −16 LUFS) automatically.
           </p>
         </div>

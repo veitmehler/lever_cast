@@ -20,7 +20,7 @@ export interface MusicMixOptions {
   videoDuration: number
   /** Narration onset in seconds; undefined = never duck (no spoken words). */
   duckAtSec?: number
-  /** Duck depth in dB below full level. Defaults to 18. */
+  /** Duck depth in dB below full level. Defaults to 20. */
   duckDb?: number
   /** Ramp length of the duck transition. Defaults to 0.5s. */
   duckRampSec?: number
@@ -32,10 +32,13 @@ export interface MusicMixOptions {
  * Build the music filter chain (loop → trim to video length → duck envelope →
  * end fade-out → uniform format). Pure string builder so it is unit-testable.
  *
- * The volume envelope is `1 → gain` ramped linearly over duckRampSec starting
- * at duckAtSec, where gain = 10^(−duckDb/20). Commas inside expressions are
- * escaped for the filtergraph parser (same convention as the blend ramp in
- * ffmpeg.ts).
+ * The volume envelope is `1 → gain` ramped linearly over duckRampSec and
+ * COMPLETING exactly at duckAtSec (the ramp starts duckRampSec earlier), so
+ * the music is already fully ducked when the first word lands. gain =
+ * 10^(−duckDb/20). When the ramp would start before t=0 (narration from the
+ * first frame), the music is held at the ducked level throughout instead.
+ * Commas inside expressions are escaped for the filtergraph parser (same
+ * convention as the blend ramp in ffmpeg.ts).
  */
 export function buildMusicFilterChain(opts: MusicMixOptions): string {
   const dur = opts.videoDuration
@@ -49,13 +52,18 @@ export function buildMusicFilterChain(opts: MusicMixOptions): string {
   ]
 
   if (opts.duckAtSec !== undefined) {
-    const duckDb = opts.duckDb ?? 18
+    const duckDb = opts.duckDb ?? 20
     const ramp = opts.duckRampSec ?? 0.5
     const gain = Math.pow(10, -duckDb / 20)
     const drop = (1 - gain).toFixed(4)
-    parts.push(
-      `volume='1-${drop}*clip((t-${opts.duckAtSec.toFixed(3)})/${ramp}\\,0\\,1)':eval=frame`,
-    )
+    const rampStart = opts.duckAtSec - ramp
+    if (rampStart <= 0) {
+      parts.push(`volume=${gain.toFixed(4)}`)
+    } else {
+      parts.push(
+        `volume='1-${drop}*clip((t-${rampStart.toFixed(3)})/${ramp}\\,0\\,1)':eval=frame`,
+      )
+    }
   }
 
   parts.push(

@@ -3,6 +3,8 @@ import path from 'node:path'
 import {
   withTempDir,
   downloadToFile,
+  loopVideo,
+  assertStoryVideoConstraints,
   overlayTitleAndBulletsOnVideo,
   overlayBulletsOnVideo,
   overlayTitleOnVideoFadeIn,
@@ -210,18 +212,24 @@ export async function generateStoriesReelAsset(opts: {
   })
 
   return withTempDir('stories-reel-', async (tmpDir) => {
-    const rawPath  = path.join(tmpDir, 'reel-raw.mp4')
-    const finalPath = path.join(tmpDir, 'reel-overlay.mp4')
+    const rawPath    = path.join(tmpDir, 'reel-raw.mp4')
+    const loopedPath = path.join(tmpDir, 'reel-looped.mp4')
+    const finalPath  = path.join(tmpDir, 'reel-overlay.mp4')
 
     await downloadToFile(opts.rawVideoUrl, rawPath)
 
+    // Loop the ~6s background 3× (stream copy — no re-encode) BEFORE the
+    // overlay so the bullets stay on screen for the full story read time.
+    await loopVideo(rawPath, loopedPath, 3)
+
     if (headline) {
-      await overlayTitleAndBulletsOnVideo(rawPath, finalPath, headline, bullets)
+      await overlayTitleAndBulletsOnVideo(loopedPath, finalPath, headline, bullets)
     } else {
-      await overlayBulletsOnVideo(rawPath, finalPath, bullets)
+      await overlayBulletsOnVideo(loopedPath, finalPath, bullets)
     }
 
     const probe = await probeVideo(finalPath)
+    assertStoryVideoConstraints(probe)
 
     const uploaded = await uploadVideoFile({
       userId: opts.userId,

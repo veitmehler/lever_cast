@@ -25,7 +25,7 @@ vi.mock('../../lib/prisma', () => ({
   },
 }))
 
-vi.mock('../../lib/storage', () => ({ uploadImageToStorage: vi.fn() }))
+vi.mock('@socioply/shared', () => ({ uploadImageToStorage: vi.fn() }))
 
 import { mediaRoutes } from '../media'
 

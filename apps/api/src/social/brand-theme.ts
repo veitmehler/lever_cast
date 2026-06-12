@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma'
-import { downloadImageFromStorage } from '../lib/storage'
+import { downloadImageFromStorage } from '@socioply/shared'
 import { themeFromBrand } from '../article-pipeline/enrichment/diagram-theme'
 
 export interface SocialBrandTheme {

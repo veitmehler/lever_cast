@@ -1,4 +1,4 @@
-import { uploadBufferWithKey } from '../../lib/storage'
+import { uploadBufferWithKey } from '@socioply/shared'
 import type { OutputPayload, OutputTarget, OutputAttemptResult } from './types'
 
 const CDN_BASE = (process.env.CDN_BASE ?? '').replace(/\/$/, '')

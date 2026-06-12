@@ -8,7 +8,7 @@ import {
   verifyElevenLabsKey,
 } from '../lib/elevenlabs/client'
 import { getVoiceSettings, updateVoiceSettings, getUserElevenLabsApiKey } from '../lib/elevenlabs/settings'
-import { uploadBufferWithKey, deleteS3Prefix } from '../lib/storage'
+import { uploadBufferWithKey, deleteS3Prefix } from '@socioply/shared'
 
 async function resolveUser(clerkId: string) {
   return prisma.user.findUnique({ where: { clerkId } })

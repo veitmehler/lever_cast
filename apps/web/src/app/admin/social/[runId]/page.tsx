@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'

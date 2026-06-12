@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 /** Returns all primary keywords already used in the user's site pages (for exclusion). */
 export async function getGlobalExcludedKeywords(userId: string): Promise<string> {

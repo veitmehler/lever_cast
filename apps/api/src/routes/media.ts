@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { uploadImageToStorage } from '@socioply/shared'
 import { sniffImageMime } from '../lib/image-sniff'

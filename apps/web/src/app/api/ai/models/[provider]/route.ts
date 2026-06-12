@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { decrypt } from '@socioply/shared'
 import OpenAI from 'openai'
 // Anthropic and GoogleGenerativeAI are reserved for future use

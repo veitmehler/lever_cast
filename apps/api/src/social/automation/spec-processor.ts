@@ -1,5 +1,5 @@
 import type { SocialAutomationRun, SocialPostSpec, SitePage } from '@prisma/client'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { sendFailureAlert } from '../../lib/alerts'
 import { deleteS3Keys } from '@socioply/shared'

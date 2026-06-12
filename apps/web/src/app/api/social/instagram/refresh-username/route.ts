@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
-import { refreshInstagramUsername } from '@/lib/instagramUsername'
+import { prisma } from '@socioply/shared'
+import { refreshInstagramUsername } from '@socioply/shared'
 
 /**
  * POST /api/social/instagram/refresh-username

@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { downloadImageFromStorage } from '@socioply/shared'
 import { themeFromBrand } from '../article-pipeline/enrichment/diagram-theme'
 

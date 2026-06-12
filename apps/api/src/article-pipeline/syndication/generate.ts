@@ -6,7 +6,7 @@
  * needed since the two LLM calls complete in ~10–20 s.
  */
 
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
 

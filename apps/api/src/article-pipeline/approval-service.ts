@@ -18,7 +18,7 @@
  */
 
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { StepRunner } from './step-runner'

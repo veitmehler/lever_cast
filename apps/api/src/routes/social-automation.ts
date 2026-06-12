@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { retryAutomationSpec } from '../social/automation/run'
 import { enqueueSocialDispatch, enqueueSocialRegenerate } from '../social/automation/enqueue-dispatch'

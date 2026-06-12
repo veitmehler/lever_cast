@@ -3,7 +3,7 @@
  * Handles retrieving and managing social media connections
  */
 
-import { decrypt } from '@socioply/shared'
+import { decrypt } from './encryption'
 import { prisma } from './prisma'
 
 export interface SocialConnection {

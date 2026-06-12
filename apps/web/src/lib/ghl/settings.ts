@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { decrypt, encrypt } from '@socioply/shared'
 import type { GhlAccountIds } from './types'
 

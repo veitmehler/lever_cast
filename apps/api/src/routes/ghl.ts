@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { decrypt, encrypt, maskApiKey } from '@socioply/shared'

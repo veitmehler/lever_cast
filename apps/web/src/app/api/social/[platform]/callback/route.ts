@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { encrypt, decrypt } from '@socioply/shared'
 import { verifyOAuthState } from '@/lib/oauth'
-import { fetchInstagramUsername as fetchInstagramUsernameUtil } from '@/lib/instagramUsername'
+import { fetchInstagramUsername as fetchInstagramUsernameUtil } from '@socioply/shared'
 
 // Valid platform names
 const VALID_PLATFORMS = ['linkedin', 'twitter', 'facebook', 'instagram', 'threads']

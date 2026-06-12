@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getGhlCredentials } from '../../lib/ghl/settings'
 import { GHL_PLATFORMS } from '../../lib/ghl/types'
 import { isGhlManagedPlatform } from '../dispatcher'

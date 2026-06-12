@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'

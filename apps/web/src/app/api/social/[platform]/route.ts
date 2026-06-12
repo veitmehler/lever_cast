@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { generateOAuthState } from '@/lib/oauth'
 import { createHash } from 'crypto'
 

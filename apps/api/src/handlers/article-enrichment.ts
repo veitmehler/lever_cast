@@ -2,7 +2,7 @@ import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { runArticleEnrichment } from '../article-pipeline/enrichment/index'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 export interface ArticleEnrichmentJobData {
   jobId: string

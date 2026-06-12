@@ -1,9 +1,9 @@
 import PgBoss from 'pg-boss'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
-import { getTwitterAnalytics } from '../lib/twitterApi'
-import { getLinkedInAnalytics } from '../lib/linkedinApi'
+import { getTwitterAnalytics } from '@socioply/shared'
+import { getLinkedInAnalytics } from '@socioply/shared'
 import { syncGhlPostFromApi } from '../social/ghl-analytics'
 
 export interface AnalyticsSyncJobData {

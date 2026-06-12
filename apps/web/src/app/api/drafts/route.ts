@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 
 // Helper function to get or create user
 async function getOrCreateUser(clerkId: string) {

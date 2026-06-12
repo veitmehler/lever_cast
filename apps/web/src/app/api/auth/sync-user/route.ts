@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 
 /**
  * Sync Clerk user to database

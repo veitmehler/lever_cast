@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { SPEC_PROCESS_ORDER } from './default-specs'
 import { ensureDefaultSocialPostSpecs } from './ensure-specs'

@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { formatScheduledDate } from './schedule'
 

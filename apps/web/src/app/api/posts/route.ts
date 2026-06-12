@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { dispatchPublish, isGhlManagedPlatform } from '@/lib/social/dispatcher'
 
 // Helper function to get or create user

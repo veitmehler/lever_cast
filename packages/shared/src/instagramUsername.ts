@@ -4,7 +4,7 @@
  */
 
 import { prisma } from './prisma'
-import { decrypt } from '@socioply/shared'
+import { decrypt } from './encryption'
 
 const INSTAGRAM_API_BASE = 'https://graph.facebook.com/v24.0'
 

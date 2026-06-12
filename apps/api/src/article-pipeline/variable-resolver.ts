@@ -1,5 +1,5 @@
 import type { BrandSettings, PlatformSettings, OutlineFramework } from '@prisma/client'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getGlobalExcludedKeywords } from './keyword-validator'
 
 // Maps generic {{<step_name>_output}} variable suffixes to step numbers

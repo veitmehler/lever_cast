@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { getSocialConnection } from '@/lib/socialConnections'
+import { getSocialConnection } from '@socioply/shared'
 
 type RouteContext = {
   params: Promise<{
@@ -49,7 +49,7 @@ export async function PATCH(
     const finalSelectedPageId = postTargetType === 'personal' ? null : (selectedPageId || null)
 
     // Get user from Clerk ID
-    const { prisma } = await import('@/lib/prisma')
+    const { prisma } = await import('@socioply/shared')
     const user = await prisma.user.findUnique({
       where: { clerkId },
     })

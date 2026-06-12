@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { KpiCard } from '@/components/admin/KpiCard'
 import Link from 'next/link'
 

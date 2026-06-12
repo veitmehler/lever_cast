@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { Prisma } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 
 async function getUserId(clerkId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({

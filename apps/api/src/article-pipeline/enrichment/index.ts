@@ -8,7 +8,7 @@
  * 5) Optional WP tags (up to 4) when topic has wordPressConnectionId
  */
 
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
 import { decrypt } from '@socioply/shared'

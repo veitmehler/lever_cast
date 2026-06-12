@@ -8,7 +8,7 @@
  * This allows managing keys via the admin panel after initial deploy.
  */
 
-import { prisma } from './prisma'
+import { prisma } from '@socioply/shared'
 import { decrypt, encrypt } from '@socioply/shared'
 
 const ENV_VAR_MAP: Record<string, string> = {

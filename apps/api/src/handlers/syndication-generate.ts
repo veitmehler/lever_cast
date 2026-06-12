@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { generateSyndicationArticles } from '../article-pipeline/syndication/generate'

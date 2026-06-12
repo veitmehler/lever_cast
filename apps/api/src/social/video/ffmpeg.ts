@@ -433,6 +433,66 @@ export async function overlayTitleOnVideo(
   await runFfmpeg(['-i', inputPath, '-vf', vf, '-c:a', 'copy', outputPath])
 }
 
+export interface TitleFadeFilters {
+  /** Comma-joined drawbox + drawtext chain rendering the title box. */
+  overlayChain: string
+  /** `blend` all_expr cross-fading from the clean base (A) to the overlaid copy (B). */
+  blendExpr: string
+}
+
+/**
+ * Build the title-box overlay chain + fade-in blend expression used by
+ * overlayTitleOnVideoFadeIn, laid out for the given frame dimensions.
+ * Exposed separately so single-pass pipelines (buildHookVideo) can embed the
+ * same design inside a larger filter graph without an intermediate encode.
+ *
+ * Blend ramp: 0 → base (clean), 1 → overlaid.
+ * clip((T - fadeStart) / fadeDuration, 0, 1) gives 0 before fade, 1 after.
+ * Commas inside the clip() call must be escaped as \\, inside the expression string.
+ */
+export async function buildTitleFadeFilters(
+  dir: string,
+  title: string,
+  width: number,
+  height: number,
+  fontPath: string = defaultFontPath(),
+  fadeStart = 1.0,
+  fadeDuration = 0.5,
+): Promise<TitleFadeFilters> {
+  const scale = height / 1080
+
+  const lines = wrapTitle(title, 22, 5)
+  const fontSize = Math.round(52 * scale)
+  const lineH    = Math.round(68 * scale)
+  const boxPadV  = Math.round(36 * scale)
+  const boxPadH  = Math.round(60 * scale)
+  const boxW     = width - 2 * boxPadH
+  const boxH     = lines.length * lineH + 2 * boxPadV
+  const boxX     = boxPadH
+  const boxY     = Math.round((height - boxH) / 2) - Math.round(40 * scale)
+
+  // Write each text line to a temp file (avoids all filtergraph escaping issues).
+  // ffmpeg drawtext y is the TOP of the text; centre each line in its lineH slot.
+  const lineOffset = Math.round((lineH - fontSize) / 2)
+  const textFilters = await Promise.all(
+    lines.map(async (line, i) => {
+      const y = boxY + boxPadV + i * lineH + lineOffset
+      const tf = await writeDrawtextFile(dir, line)
+      return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
+    }),
+  )
+
+  const overlayChain = [
+    `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`,
+    ...textFilters,
+  ].join(',')
+
+  const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
+  const blendExpr = `A*(1-${ramp})+B*${ramp}`
+
+  return { overlayChain, blendExpr }
+}
+
 /**
  * Same as overlayTitleOnVideo but the title box + text fade in smoothly.
  *
@@ -452,41 +512,11 @@ export async function overlayTitleOnVideoFadeIn(
   fadeDuration = 0.5,
 ): Promise<void> {
   const { width, height } = await probeVideo(inputPath)
-  const scale = height / 1080
-
-  const lines = wrapTitle(title, 22, 5)
-  const fontSize = Math.round(52 * scale)
-  const lineH    = Math.round(68 * scale)
-  const boxPadV  = Math.round(36 * scale)
-  const boxPadH  = Math.round(60 * scale)
-  const boxW     = width - 2 * boxPadH
-  const boxH     = lines.length * lineH + 2 * boxPadV
-  const boxX     = boxPadH
-  const boxY     = Math.round((height - boxH) / 2) - Math.round(40 * scale)
-
   const dir = path.dirname(outputPath)
 
-  // Write each text line to a temp file (avoids all filtergraph escaping issues).
-  // ffmpeg drawtext y is the TOP of the text; centre each line in its lineH slot.
-  const lineOffset = Math.round((lineH - fontSize) / 2)
-  const textFilters = await Promise.all(
-    lines.map(async (line, i) => {
-      const y = boxY + boxPadV + i * lineH + lineOffset
-      const tf = await writeDrawtextFile(dir, line)
-      return `drawtext=fontfile=${fontPath}:textfile=${tf}:expansion=none:fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${y}`
-    }),
+  const { overlayChain, blendExpr } = await buildTitleFadeFilters(
+    dir, title, width, height, fontPath, fadeStart, fadeDuration,
   )
-
-  const overlayChain = [
-    `drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.65:t=fill`,
-    ...textFilters,
-  ].join(',')
-
-  // Blend ramp: 0 → base (clean), 1 → overlaid.
-  // clip((T - fadeStart) / fadeDuration, 0, 1) gives 0 before fade, 1 after.
-  // Commas inside the clip() call must be escaped as \\, inside the expression string.
-  const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
-  const blendExpr = `A*(1-${ramp})+B*${ramp}`
 
   const filterComplex = [
     `[0:v]split[base][dup]`,

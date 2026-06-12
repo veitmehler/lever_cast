@@ -23,8 +23,9 @@ COPY packages/db ./packages/db
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
-# Build the shared package, then generate the Prisma client and build the API
-RUN pnpm --filter @socioply/shared build && cd apps/api && npx prisma generate && npx tsc
+# Generate the Prisma client first (shared imports @prisma/client, whose types
+# only exist after generate), then build the shared package, then the API.
+RUN cd apps/api && npx prisma generate && cd /app && pnpm --filter @socioply/shared build && cd apps/api && npx tsc
 
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime

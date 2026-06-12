@@ -22,7 +22,7 @@ import { wpConnectionRoutes } from './routes/wp-connections'
 import { adminApiRoutes } from './routes/admin-api/index'
 import { populateClerkId } from './middleware/clerk-context'
 import { handleError } from './lib/error-handler'
-import { assertEncryptionConfigured } from './lib/encryption'
+import { assertEncryptionConfigured } from '@socioply/shared'
 
 async function main() {
   // Fail fast if encryption isn't configured (never boot prod on the dev key).

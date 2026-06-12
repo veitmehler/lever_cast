@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
-import { encrypt, decrypt } from '../lib/encryption'
+import { encrypt, decrypt } from '@socioply/shared'
 import { assertSafeWpUrl } from '../lib/ssrf'
 
 // ── WP REST helpers ────────────────────────────────────────────────────────

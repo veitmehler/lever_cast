@@ -38,6 +38,10 @@ jobs:
           pnpm --filter @socioply/api exec prisma generate
           pnpm --filter @socioply/web exec prisma generate
 
+      # Build the shared package so both apps can typecheck against its .d.ts.
+      - name: Build shared package
+        run: pnpm --filter @socioply/shared build
+
       - name: Typecheck
         run: pnpm -r typecheck
 

@@ -4,7 +4,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { encrypt, decrypt } from './encryption'
+import { encrypt, decrypt } from '@socioply/shared'
 import { prisma } from './prisma'
 import { downloadImageFromStorage } from './storage'
 

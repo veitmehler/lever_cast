@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import { encrypt, decrypt } from '@/lib/encryption'
+import { encrypt, decrypt } from '@socioply/shared'
 import { verifyOAuthState } from '@/lib/oauth'
 import { fetchInstagramUsername as fetchInstagramUsernameUtil } from '@/lib/instagramUsername'
 

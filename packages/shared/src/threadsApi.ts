@@ -5,7 +5,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { decrypt } from '@socioply/shared'
+import { decrypt } from './encryption'
 
 // Threads API uses its own domain: graph.threads.net (not graph.facebook.com)
 const THREADS_API_BASE = 'https://graph.threads.net/v1.0'

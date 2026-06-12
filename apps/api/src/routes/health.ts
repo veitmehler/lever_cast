@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getBoss } from '../queues/index'
 
 // Use the same non-standard env var names as the rest of the app (ACCESS_KEY_ID

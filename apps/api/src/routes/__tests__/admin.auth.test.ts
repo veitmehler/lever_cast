@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 
 // Keep the heavy deps inert — these tests only exercise the Basic Auth hook on
 // the HTML route, which touches neither.
-vi.mock('../../lib/prisma', () => ({ prisma: {} }))
+vi.mock('@socioply/shared', () => ({ prisma: {} }))
 vi.mock('../../queues/index', () => ({ getBoss: vi.fn(), QUEUES: {} }))
 
 import { adminRoutes } from '../admin'

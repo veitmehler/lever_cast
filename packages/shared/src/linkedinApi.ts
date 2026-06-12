@@ -4,7 +4,7 @@
  */
 
 import { getSocialConnection } from './socialConnections'
-import { downloadImageFromStorage } from '@socioply/shared'
+import { downloadImageFromStorage } from './storage'
 import sizeOf from 'image-size'
 
 const LINKEDIN_API_BASE = 'https://api.linkedin.com/v2'

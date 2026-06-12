@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { uploadBufferWithKey } from '@socioply/shared'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 export type SocialMediaSource = 'quote_card' | 'carousel_slide' | 'pitch_story' | 'social_video'
 

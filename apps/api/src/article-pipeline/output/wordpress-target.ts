@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { decrypt } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { assertSafeWpUrl } from '../../lib/ssrf'

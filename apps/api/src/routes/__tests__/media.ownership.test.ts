@@ -13,7 +13,8 @@ const mediaFindMany = vi.fn()
 const mediaCount = vi.fn()
 const mediaFindFirst = vi.fn()
 const mediaUpdate = vi.fn()
-vi.mock('../../lib/prisma', () => ({
+vi.mock('@socioply/shared', () => ({
+  uploadImageToStorage: vi.fn(),
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     media: {
@@ -24,8 +25,6 @@ vi.mock('../../lib/prisma', () => ({
     },
   },
 }))
-
-vi.mock('@socioply/shared', () => ({ uploadImageToStorage: vi.fn() }))
 
 import { mediaRoutes } from '../media'
 

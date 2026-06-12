@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { requireAdmin } from '../../middleware/admin'
 
 interface UpdatePromptBody {

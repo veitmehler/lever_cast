@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 /** Random integer in [6, 12] inclusive. */
 export function randomSlideCount(): number {

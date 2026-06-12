@@ -5,7 +5,7 @@
 
 import sharp from 'sharp'
 import { uploadBufferWithKey } from '@socioply/shared'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 
 const MAX_RETRIES = 3

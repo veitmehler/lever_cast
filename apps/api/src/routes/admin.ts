@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { timingSafeEqual } from 'node:crypto'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 
 /**

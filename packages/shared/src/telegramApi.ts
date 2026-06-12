@@ -5,8 +5,8 @@
  */
 
 import { prisma } from './prisma'
-import { decrypt } from '@socioply/shared'
-import { downloadImageFromStorage } from '@socioply/shared'
+import { decrypt } from './encryption'
+import { downloadImageFromStorage } from './storage'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
 

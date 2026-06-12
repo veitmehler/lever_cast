@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { requireAdmin } from '../../middleware/admin'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 function parseAssetsSummary(assetsJson: unknown): string {
   if (!assetsJson || typeof assetsJson !== 'object') return '—'

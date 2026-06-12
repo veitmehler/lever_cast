@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 import { Prisma } from '@prisma/client'
-import { getTwitterAnalytics } from '@/lib/twitterApi'
-import { getLinkedInAnalytics } from '@/lib/linkedinApi'
+import { getTwitterAnalytics } from '@socioply/shared'
+import { getLinkedInAnalytics } from '@socioply/shared'
 
 /**
  * POST /api/posts/[id]/sync-analytics - Sync analytics for a single post

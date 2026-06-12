@@ -1,8 +1,8 @@
 import { createGhlPost } from '@/lib/ghl/client'
 import { getGhlCredentials } from '@/lib/ghl/settings'
 import { GHL_PLATFORMS, type GhlPlatform } from '@/lib/ghl/types'
-import { postToTwitter, postTwitterThread } from '@/lib/twitterApi'
-import { postToTelegram } from '@/lib/telegramApi'
+import { postToTwitter, postTwitterThread } from '@socioply/shared'
+import { postToTelegram } from '@socioply/shared'
 
 export type PublishOutcome =
   | {

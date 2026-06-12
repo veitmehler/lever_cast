@@ -6,7 +6,7 @@ const findUnique = vi.fn()
 const del = vi.fn()
 const deleteMany = vi.fn()
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@socioply/shared', () => ({
   prisma: {
     oAuthState: {
       create: (...a: unknown[]) => create(...a),

@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { DEFAULT_SOCIAL_POST_SPECS } from './default-specs'
 
 /** Seed the 12 default slot configs for a user (idempotent). */

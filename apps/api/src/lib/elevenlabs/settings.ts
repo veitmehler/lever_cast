@@ -1,4 +1,4 @@
-import { prisma } from '../prisma'
+import { prisma } from '@socioply/shared'
 import { decrypt } from '@socioply/shared'
 
 export interface VoiceSettings {

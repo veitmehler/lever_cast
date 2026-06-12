@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { Sentry } from '../lib/sentry'
 import { logger } from '../lib/logger'
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../../middleware/admin'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '@socioply/shared'
 
 export async function articlesAdminRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { page?: string; status?: string; userId?: string } }>(

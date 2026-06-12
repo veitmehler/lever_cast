@@ -1,4 +1,4 @@
-import { prisma } from './prisma'
+import { prisma } from '@socioply/shared'
 import { logger } from './logger'
 import { Prisma } from '@prisma/client'
 

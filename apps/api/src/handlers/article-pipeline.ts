@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
-import { prisma } from '../lib/prisma'
+import { prisma } from '@socioply/shared'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 
 export interface ArticlePipelineJobData {

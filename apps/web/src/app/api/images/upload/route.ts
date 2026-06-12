@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { uploadImageToStorage } from '@socioply/shared'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@socioply/shared'
 
 /**
  * POST /api/images/upload - Upload an image to Supabase Storage

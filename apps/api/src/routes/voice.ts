@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { requireAuth } from '../middleware/auth'
-import { encrypt, maskApiKey } from '../lib/encryption'
+import { encrypt, maskApiKey } from '@socioply/shared'
 import {
   cloneElevenLabsVoice,
   listElevenLabsVoices,

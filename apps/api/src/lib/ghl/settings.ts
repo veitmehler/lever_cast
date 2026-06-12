@@ -1,5 +1,5 @@
 import { prisma } from '../prisma'
-import { decrypt, encrypt } from '../encryption'
+import { decrypt, encrypt } from '@socioply/shared'
 import type { GhlAccountIds } from './types'
 
 export interface GhlCredentials {

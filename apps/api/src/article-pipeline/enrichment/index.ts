@@ -11,7 +11,7 @@
 import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
-import { decrypt } from '../../lib/encryption'
+import { decrypt } from '@socioply/shared'
 import { uploadBufferWithKey, deleteS3Prefix } from '../../lib/storage'
 import {
   extractH2Sections,

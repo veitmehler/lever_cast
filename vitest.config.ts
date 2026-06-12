@@ -4,6 +4,10 @@ import { defineConfig } from 'vitest/config'
 // Per-app configs live in apps/*/vitest.config.ts.
 export default defineConfig({
   test: {
-    projects: ['apps/api/vitest.config.ts', 'apps/web/vitest.config.ts'],
+    projects: [
+      'packages/shared/vitest.config.ts',
+      'apps/api/vitest.config.ts',
+      'apps/web/vitest.config.ts',
+    ],
   },
 })

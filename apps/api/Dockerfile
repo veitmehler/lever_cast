@@ -12,6 +12,7 @@ COPY .npmrc ./
 
 # Copy package manifests for all workspace packages needed
 COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 
 # Install all deps with flat node_modules (required for Docker COPY between stages)
@@ -19,10 +20,11 @@ RUN pnpm install --no-frozen-lockfile --shamefully-hoist
 
 # Copy source files
 COPY packages/db ./packages/db
+COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
-# Generate Prisma client and build TypeScript
-RUN cd apps/api && npx prisma generate && npx tsc
+# Build the shared package, then generate the Prisma client and build the API
+RUN pnpm --filter @socioply/shared build && cd apps/api && npx prisma generate && npx tsc
 
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime
@@ -52,6 +54,7 @@ WORKDIR /app
 COPY --from=build /app/apps/api/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/db ./packages/db
+COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/apps/api/puppeteer-config.json ./puppeteer-config.json
 COPY --from=build /app/apps/api/mermaid-config.json ./mermaid-config.json
 

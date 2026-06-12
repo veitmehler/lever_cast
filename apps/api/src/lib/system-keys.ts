@@ -9,7 +9,7 @@
  */
 
 import { prisma } from './prisma'
-import { decrypt, encrypt } from './encryption'
+import { decrypt, encrypt } from '@socioply/shared'
 
 const ENV_VAR_MAP: Record<string, string> = {
   gemini: 'GEMINI_API_KEY',

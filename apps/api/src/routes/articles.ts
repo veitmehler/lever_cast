@@ -13,7 +13,7 @@ import {
   buildTocHtml,
   findFirstH2Index,
 } from '../article-pipeline/enrichment/html-parser'
-import { readS3Object } from '../lib/storage'
+import { readS3Object } from '@socioply/shared'
 import { enqueueSyndication } from '../article-pipeline/syndication/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'
 import { enqueueSocialDispatch } from '../social/automation/enqueue-dispatch'

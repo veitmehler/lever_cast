@@ -12,7 +12,7 @@ import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
 import { decrypt } from '@socioply/shared'
-import { uploadBufferWithKey, deleteS3Prefix } from '../../lib/storage'
+import { uploadBufferWithKey, deleteS3Prefix } from '@socioply/shared'
 import {
   extractH2Sections,
   buildEnrichedHtml,

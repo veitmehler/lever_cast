@@ -2,7 +2,7 @@ import type { SocialAutomationRun, SocialPostSpec, SitePage } from '@prisma/clie
 import { prisma } from '../../lib/prisma'
 import { logger } from '../../lib/logger'
 import { sendFailureAlert } from '../../lib/alerts'
-import { deleteS3Keys } from '../../lib/storage'
+import { deleteS3Keys } from '@socioply/shared'
 import { SPEC_PROCESS_ORDER, type SpecSlotKey } from './default-specs'
 import { buildArticleContentContext, type ArticleContentContext } from './content'
 import { ensureFutureScheduleDate, slotToUtc } from './schedule'

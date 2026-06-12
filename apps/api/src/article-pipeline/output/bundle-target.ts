@@ -1,6 +1,6 @@
 import archiver from 'archiver'
 import { Readable } from 'node:stream'
-import { uploadBufferWithKey } from '../../lib/storage'
+import { uploadBufferWithKey } from '@socioply/shared'
 import { buildHtmlBody } from './html-target'
 import type { OutputPayload, OutputTarget, OutputAttemptResult } from './types'
 

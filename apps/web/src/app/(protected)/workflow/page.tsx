@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { NewArticleForm } from '@/components/article/NewArticleForm'
+import { TOTAL_PIPELINE_STEPS } from '@/features/workflow/constants'
 import { useAuthedFetch } from '@/lib/use-authed-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending:     { label: 'Pending',        color: 'bg-muted text-muted-foreground' },
   in_progress: { label: 'Running',        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
   completed:   { label: 'Needs Approval', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
-  approved:    { label: 'Approved',       color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+  approved:    { label: 'Processing',     color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
   enriched:    { label: 'Ready to Publish', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
   published:   { label: 'Published',        color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' },
   failed:      { label: 'Failed',         color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
@@ -41,7 +42,7 @@ const FILTERS = [
   { value: 'all',         label: 'All' },
   { value: 'in_progress', label: 'Running' },
   { value: 'completed',   label: 'Needs Approval' },
-  { value: 'approved',    label: 'Approved' },
+  { value: 'approved',    label: 'Processing' },
   { value: 'enriched',    label: 'Ready to Publish' },
   { value: 'published', label: 'Published' },
   { value: 'failed',      label: 'Failed' },
@@ -49,21 +50,27 @@ const FILTERS = [
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
+// Statuses where the pipeline is actively working (badge shows a spinner)
+const ACTIVE_BADGE_STATUSES = new Set(['pending', 'in_progress', 'approved'])
+
+function StatusBadge({ status, busy }: { status: string; busy?: boolean }) {
   const { label, color } = STATUS_LABELS[status] ?? { label: status, color: 'bg-gray-100 text-gray-700' }
+  const isActive = busy === true ? true : ACTIVE_BADGE_STATUSES.has(status)
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+      {isActive && <Loader2 className="h-3 w-3 animate-spin" />}
       {label}
     </span>
   )
 }
 
 function ProgressBar({ currentStep }: { currentStep: number }) {
-  const pct = Math.min(100, Math.round((currentStep / 12) * 100))
+  const step = Math.min(currentStep, TOTAL_PIPELINE_STEPS)
+  const pct = Math.min(100, Math.round((step / TOTAL_PIPELINE_STEPS) * 100))
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-muted-foreground">Step {currentStep}/12</span>
+        <span className="text-xs text-muted-foreground">Step {step}/{TOTAL_PIPELINE_STEPS}</span>
         <span className="text-xs text-muted-foreground">{pct}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
@@ -216,13 +223,18 @@ export default function WorkflowPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {jobs.map((job) => (
+            {jobs.map((job) => {
+              // Phase B (approval chain) persists DB status 'completed' while
+              // currentStep runs 13+ — display it as Processing, matching the
+              // detail page's phaseBApprovalRunning logic.
+              const phaseBRunning = job.status === 'completed' && job.currentStep >= 13
+              return (
               <Link key={job.id} href={`/workflow/${job.id}`} className="block">
                 <div className="bg-card rounded-lg border border-border p-5 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <StatusBadge status={job.status} />
+                        <StatusBadge status={phaseBRunning ? 'approved' : job.status} busy={phaseBRunning} />
                         {job._count.errorLogs > 0 && (
                           <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">
                             {job._count.errorLogs} error{job._count.errorLogs !== 1 ? 's' : ''}
@@ -240,7 +252,7 @@ export default function WorkflowPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0">
-                      {['in_progress', 'pending'].includes(job.status) && (
+                      {(['in_progress', 'pending', 'approved'].includes(job.status) || phaseBRunning) && (
                         <div className="w-32">
                           <ProgressBar currentStep={job.currentStep} />
                         </div>
@@ -250,7 +262,8 @@ export default function WorkflowPage() {
                   </div>
                 </div>
               </Link>
-            ))}
+              )
+            })}
           </div>
         )}
 

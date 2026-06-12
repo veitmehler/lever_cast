@@ -23,7 +23,7 @@ function formatDuration(seconds: number): string {
 export default function AdminMusicPage() {
   const [tracks, setTracks] = useState<MusicTrack[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -44,24 +44,39 @@ export default function AdminMusicPage() {
     loadTracks()
   }, [loadTracks])
 
+  // Multiple files are uploaded one at a time — each POST carries one file,
+  // so the server normalizes them strictly sequentially. A failed file is
+  // reported and skipped; the rest continue.
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
     e.target.value = ''
 
-    setIsUploading(true)
+    setUploadProgress({ done: 0, total: files.length })
+    let succeeded = 0
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/admin/music', { method: 'POST', body: formData })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`)
-      toast.success(`"${data.title}" uploaded and normalized (${formatDuration(data.duration)})`)
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress({ done: i, total: files.length })
+        try {
+          const formData = new FormData()
+          formData.append('file', files[i])
+          const res = await fetch('/api/admin/music', { method: 'POST', body: formData })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`)
+          succeeded++
+          toast.success(`"${data.title}" uploaded and normalized (${formatDuration(data.duration)})`)
+        } catch (err) {
+          toast.error(
+            `${files[i].name}: ${err instanceof Error ? err.message : 'Upload failed'}`,
+          )
+        }
+      }
+      if (files.length > 1) {
+        toast.info(`${succeeded} of ${files.length} tracks uploaded`)
+      }
       await loadTracks()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
-      setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -114,15 +129,21 @@ export default function AdminMusicPage() {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav"
             className="hidden"
             onChange={handleUpload}
           />
-          <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-            {isUploading ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Normalizing…</>
+          <Button onClick={() => fileInputRef.current?.click()} disabled={uploadProgress !== null}>
+            {uploadProgress ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {uploadProgress.total > 1
+                  ? `Normalizing ${uploadProgress.done + 1}/${uploadProgress.total}…`
+                  : 'Normalizing…'}
+              </>
             ) : (
-              <><Upload className="w-4 h-4 mr-2" />Upload track</>
+              <><Upload className="w-4 h-4 mr-2" />Upload tracks</>
             )}
           </Button>
         </div>

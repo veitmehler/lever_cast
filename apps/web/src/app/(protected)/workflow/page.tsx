@@ -24,6 +24,8 @@ type ArticleJob = {
   startedAt: string | null
   topic: { topic: string; mode: string }
   _count: { pipelineSteps: number; errorLogs: number }
+  /** Active social-set generation (pending/processing), at most one entry */
+  socialAutomationRuns?: { status: string; completedSpecs: number; totalSpecs: number }[]
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -228,6 +230,7 @@ export default function WorkflowPage() {
               // currentStep runs 13+ — display it as Processing, matching the
               // detail page's phaseBApprovalRunning logic.
               const phaseBRunning = job.status === 'completed' && job.currentStep >= 13
+              const activeSocialRun = job.socialAutomationRuns?.[0]
               return (
               <Link key={job.id} href={`/workflow/${job.id}`} className="block">
                 <div className="bg-card rounded-lg border border-border p-5 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer">
@@ -235,6 +238,12 @@ export default function WorkflowPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <StatusBadge status={phaseBRunning ? 'approved' : job.status} busy={phaseBRunning} />
+                        {activeSocialRun && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Creating social posts {activeSocialRun.completedSpecs}/{activeSocialRun.totalSpecs}
+                          </span>
+                        )}
                         {job._count.errorLogs > 0 && (
                           <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">
                             {job._count.errorLogs} error{job._count.errorLogs !== 1 ? 's' : ''}

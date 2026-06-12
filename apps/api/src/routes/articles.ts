@@ -63,14 +63,34 @@ export async function articleRoutes(app: FastifyInstance) {
       offset?: string
     }
 
+    // Phase B (approval chain) keeps DB status 'completed' while currentStep
+    // runs 13+. The UI badges those as "Processing", so the status filter must
+    // agree: surface them under 'approved' and exclude them from 'completed'.
+    const statusFilter =
+      status === 'approved'
+        ? { OR: [{ status: 'approved' }, { status: 'completed', currentStep: { gte: 13 } }] }
+        : status === 'completed'
+          ? { status: 'completed', currentStep: { lt: 13 } }
+          : status
+            ? { status }
+            : {}
+
     const jobs = await prisma.articleJob.findMany({
       where: {
         userId: user.id,
-        ...(status ? { status } : {}),
+        ...statusFilter,
       },
       include: {
         topic: { select: { topic: true, mode: true } },
         _count: { select: { pipelineSteps: true, errorLogs: true } },
+        // Active social-set generation, if any — lets the listing show a
+        // "Creating social posts" indicator with live spec progress.
+        socialAutomationRuns: {
+          where: { status: { in: ['pending', 'processing'] } },
+          select: { status: true, completedSpecs: true, totalSpecs: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit, 10),

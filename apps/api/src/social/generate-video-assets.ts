@@ -26,6 +26,7 @@ import {
   type GeneratedCarousel,
 } from './generate-assets'
 import { extractReelBullets } from './generators/reel-bullets'
+import { selectQuotesForCards } from './generators/quote-selection'
 import { generateVideoReelPrompt } from './generators/video-reel-prompt'
 import { generatePitchSlideText } from './generators/pitch-slide-text'
 import { buildPitchSlidePng, cropBufferToStoryAspect } from './compositors/carousel'
@@ -422,11 +423,29 @@ export async function generateQuoteVideoAsset(opts: {
     // Collect per-slide spoken text for timestamp-based slide sync.
     const slideTexts: string[] = []
 
+    // Extract all quotes in ONE call so the slides cover different ideas —
+    // independent per-card extraction on the same content returns the same
+    // insight reworded N times.
+    let batchQuotes: Awaited<ReturnType<typeof selectQuotesForCards>> = []
+    try {
+      const brand = await loadSocialBrandTheme(opts.userId)
+      batchQuotes = await selectQuotesForCards({
+        content: opts.content,
+        organizationName: brand.organizationName,
+        count: quoteCount,
+      })
+    } catch (err) {
+      logger.warn({ err }, 'generateQuoteVideoAsset: batch quote selection failed — falling back to per-card extraction')
+    }
+
     for (let i = 0; i < quoteCount; i++) {
       const card = await generateQuoteCardAsset({
         userId: opts.userId,
         content: opts.content,
         variant: 'story',
+        // Distinct pre-extracted quote when available; per-card extraction otherwise.
+        quoteText: batchQuotes[i]?.quote,
+        attribution: batchQuotes[i]?.attribution,
         jobId,
       })
       quoteUrls.push(card.imageUrl)

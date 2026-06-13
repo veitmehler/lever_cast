@@ -543,6 +543,41 @@ export function useIdeaCapture({
     }
   }
 
+  // Single entry point for the primary "Generate Posts" button: produce the
+  // per-platform text (so the preview cards appear) AND, for non-"standard"
+  // post types, the matching media asset. Text is generated first so the reset
+  // inside the parent's generate handler clears any stale media before the
+  // asset populates it.
+  const handleGeneratePost = async () => {
+    if (!content.trim()) return
+    if (selectedPlatforms.size === 0) {
+      alert('Please select at least one platform')
+      return
+    }
+
+    handleGenerate()
+
+    switch (postType) {
+      case 'quote':
+        await handleGenerateQuoteCard()
+        break
+      case 'carousel':
+        await handleGenerateCarousel()
+        break
+      case 'video_reel':
+        await handleGenerateVideoReel()
+        break
+      case 'hook_video':
+        await handleGenerateHookVideo()
+        break
+      case 'quote_video':
+        await handleGenerateQuoteVideo()
+        break
+      default:
+        break
+    }
+  }
+
   const charCount = content.length
   const maxChars = 2000
   const charPercentage = (charCount / maxChars) * 100
@@ -596,6 +631,7 @@ export function useIdeaCapture({
     handleImageGenerated,
     toggleRecording,
     handleGenerate,
+    handleGeneratePost,
     handleGenerateQuoteCard,
     handleGenerateCarousel,
     handleGenerateVideoReel,

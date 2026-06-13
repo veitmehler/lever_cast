@@ -334,7 +334,8 @@ export function ImageGenerationModal({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          postContent: postContent, // Send original post content, not the edited prompt
+          prompt: prompt.trim(), // Send the user's actual prompt — used verbatim by the server
+          postContent: postContent, // Kept as a fallback when no prompt is provided
           styleInstructions: styleInstructions.trim() || undefined,
           provider,
           model,

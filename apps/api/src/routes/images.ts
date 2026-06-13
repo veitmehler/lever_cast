@@ -140,7 +140,7 @@ export async function imageRoutes(app: FastifyInstance) {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
 
-    const { postContent, styleInstructions, provider, model, aspectRatio, draftId } =
+    const { postContent, styleInstructions, provider, model, aspectRatio, draftId, prompt: userPrompt } =
       request.body as {
         postContent?: string
         styleInstructions?: string
@@ -148,6 +148,7 @@ export async function imageRoutes(app: FastifyInstance) {
         model?: string
         aspectRatio?: string
         draftId?: string
+        prompt?: string
       }
 
     if (!postContent || typeof postContent !== 'string') {
@@ -172,23 +173,40 @@ export async function imageRoutes(app: FastifyInstance) {
 
       const selectedModel: string = model || getDefaultModel(provider)
 
-      // Pick a system LLM for prompt generation
-      const llmResolved = await resolveSystemLLMProvider()
-
-      // Generate image prompt via LLM
+      // Build the prompt sent to the image model. If the caller supplied an
+      // explicit prompt, use it VERBATIM (only appending the optional style
+      // instructions) — "what you type is what's sent". Otherwise fall back to
+      // synthesizing one from the post content via an LLM.
       let prompt: string
-      if (llmResolved) {
-        try {
-          prompt = await generateImagePromptWithLLM(
-            postContent, styleInstructions, provider, selectedModel,
-            llmResolved.provider, llmResolved.model, llmResolved.apiKey,
-          )
-        } catch {
+      let promptSource: 'user' | 'llm'
+      if (userPrompt && userPrompt.trim()) {
+        promptSource = 'user'
+        const style = styleInstructions?.trim()
+        prompt = style ? `${userPrompt.trim()}. ${style}` : userPrompt.trim()
+      } else {
+        promptSource = 'llm'
+        // Pick a system LLM for prompt generation
+        const llmResolved = await resolveSystemLLMProvider()
+
+        // Generate image prompt via LLM
+        if (llmResolved) {
+          try {
+            prompt = await generateImagePromptWithLLM(
+              postContent, styleInstructions, provider, selectedModel,
+              llmResolved.provider, llmResolved.model, llmResolved.apiKey,
+            )
+          } catch {
+            prompt = generateSimpleImagePrompt(postContent, styleInstructions)
+          }
+        } else {
           prompt = generateSimpleImagePrompt(postContent, styleInstructions)
         }
-      } else {
-        prompt = generateSimpleImagePrompt(postContent, styleInstructions)
       }
+
+      request.log.info(
+        { provider, model: selectedModel, promptSource, promptLength: prompt.length, prompt },
+        'image generation prompt',
+      )
 
       // Generate the image
       let imageBuffer: Buffer
@@ -234,7 +252,7 @@ export async function imageRoutes(app: FastifyInstance) {
         } catch { /* non-fatal */ }
       }
 
-      return reply.send({ success: true, url, path, prompt })
+      return reply.send({ success: true, url, path, prompt, promptSource })
     } catch (err) {
       request.log.error({ err }, 'Error in /images/generate')
       return reply.status(500).send({

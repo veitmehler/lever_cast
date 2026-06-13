@@ -67,14 +67,25 @@ export async function GET() {
       },
     })
 
-    // Return masked keys
-    const maskedKeys = apiKeys.map((key) => ({
-      id: key.id,
-      provider: key.provider,
-      maskedKey: maskApiKey(decrypt(key.encryptedKey)),
-      createdAt: key.createdAt,
-      updatedAt: key.updatedAt,
-    }))
+    // Return masked keys. A single key that can't be decrypted (e.g. encrypted
+    // with a different ENCRYPTION_KEY) must not 500 the whole list — surface it
+    // with a marker so the user can still see and re-enter or delete it.
+    const maskedKeys = apiKeys.map((key) => {
+      let maskedKey: string
+      try {
+        maskedKey = maskApiKey(decrypt(key.encryptedKey))
+      } catch (error) {
+        console.error(`[api-keys] failed to decrypt stored ${key.provider} key:`, error)
+        maskedKey = '(unable to decrypt)'
+      }
+      return {
+        id: key.id,
+        provider: key.provider,
+        maskedKey,
+        createdAt: key.createdAt,
+        updatedAt: key.updatedAt,
+      }
+    })
 
     return NextResponse.json(maskedKeys)
   } catch (error) {

@@ -46,22 +46,27 @@ async function getOrCreateUser(clerkId: string) {
   return user
 }
 
-// Get user's API keys
-async function getUserApiKeys(userId: string) {
-  const apiKeys = await prisma.apiKey.findMany({
-    where: { userId },
-    select: {
-      provider: true,
-      encryptedKey: true,
-    },
-  })
+// Image-generation providers don't need a per-user key here: their model lists
+// are static/curated and generation uses a system key (FAL_KEY etc.). Only the
+// dynamic LLM providers need the user's key to list models.
+const IMAGE_PROVIDERS = new Set(['fal', 'openai-dalle', 'replicate'])
 
-  const decryptedKeys: Record<string, string> = {}
-  apiKeys.forEach(key => {
-    decryptedKeys[key.provider] = decrypt(key.encryptedKey)
+// Decrypt only the requested provider's stored key. A missing or undecryptable
+// key (e.g. encrypted with a different ENCRYPTION_KEY) must not 500 the whole
+// listing — it's treated as "no key", so image providers still return their
+// static list and LLM providers fall through to the no-key path.
+async function getUserApiKey(userId: string, provider: string): Promise<string | undefined> {
+  const row = await prisma.apiKey.findFirst({
+    where: { userId, provider },
+    select: { encryptedKey: true },
   })
-
-  return decryptedKeys
+  if (!row) return undefined
+  try {
+    return decrypt(row.encryptedKey)
+  } catch (error) {
+    console.error(`[ai/models] failed to decrypt stored ${provider} key:`, error)
+    return undefined
+  }
 }
 
 // GET /api/ai/models/[provider] - Get available models for a provider
@@ -79,11 +84,13 @@ export async function GET(
 
     const { provider } = await params
     const user = await getOrCreateUser(clerkId)
-    const apiKeys = await getUserApiKeys(user.id)
 
-    const apiKey = apiKeys[provider]
+    // Skip the key lookup entirely for image providers (they don't need it).
+    const apiKey = IMAGE_PROVIDERS.has(provider)
+      ? undefined
+      : await getUserApiKey(user.id, provider)
 
-    if (!apiKey) {
+    if (!apiKey && !IMAGE_PROVIDERS.has(provider)) {
       return NextResponse.json(
         { error: `No API key found for ${provider}` },
         { status: 404 }
@@ -95,7 +102,8 @@ export async function GET(
     try {
       switch (provider) {
         case 'openai': {
-          const openai = new OpenAI({ apiKey })
+          // Non-image providers are guaranteed a defined key past the 404 gate above.
+          const openai = new OpenAI({ apiKey: apiKey! })
           const response = await openai.models.list()
           models = response.data
             .filter(model => 
@@ -121,7 +129,7 @@ export async function GET(
           try {
             const response = await fetch('https://api.anthropic.com/v1/models', {
               headers: {
-                'x-api-key': apiKey,
+                'x-api-key': apiKey!,
                 'anthropic-version': '2023-06-01',
               },
             })

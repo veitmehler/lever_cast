@@ -22,6 +22,7 @@ import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-o
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
 import { socialDispatchHandler, SocialDispatchJobData } from './handlers/social-dispatch'
+import { socialVideoGenerateHandler, SocialVideoGenerateJobData } from './handlers/social-video-generate'
 import { socialAutomationSafetyHandler } from './handlers/social-automation-safety'
 import { syndicationGenerateHandler, SyndicationGenerateJobData } from './handlers/syndication-generate'
 import { syndicationSafetyHandler } from './handlers/syndication-safety'
@@ -159,6 +160,14 @@ async function main() {
     QUEUES.SOCIAL_DISPATCH,
     { batchSize: 1 },
     withSentry('social-dispatch', socialDispatchHandler),
+  )
+
+  // One-off dashboard video generation (video reel / hook / quote video). Heavy
+  // and slow, so one at a time.
+  await boss.work<SocialVideoGenerateJobData>(
+    QUEUES.SOCIAL_VIDEO_GENERATE,
+    { batchSize: 1 },
+    withSentry('social-video-generate', socialVideoGenerateHandler),
   )
 
   await boss.work(

@@ -90,7 +90,12 @@ export default function DashboardPage() {
       // Pass platform as-is (can be array, 'all', or single platform)
       const result = await generateContent(content, platform, templateId, twitterFormat)
       setGeneratedContent(result)
-      toast.success('Posts generated successfully!')
+      // For media post types (quote/carousel/video) the asset is generated after
+      // the text and shows its own "… generated!" toast on completion — so the
+      // success bubble waits for the media. Only the plain text post toasts here.
+      if (postType === 'standard') {
+        toast.success('Posts generated successfully!')
+      }
     } catch (error) {
       console.error('Error generating content:', error)
       

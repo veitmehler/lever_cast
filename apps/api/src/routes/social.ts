@@ -6,12 +6,8 @@ import {
   generatePitchStoryAssets,
   generateQuoteCardAsset,
 } from '../social/generate-assets'
-import {
-  generateHookVideoAsset,
-  generateLoopedReelAsset,
-  generateQuoteVideoAsset,
-  generateVideoReelAsset,
-} from '../social/generate-video-assets'
+import { generateLoopedReelAsset } from '../social/generate-video-assets'
+import { enqueueVideoGeneration } from '../social/enqueue-video'
 import { maxSlidesForPlatforms } from '../social/platform-limits'
 
 async function resolveUser(clerkId: string) {
@@ -164,16 +160,16 @@ export async function socialRoutes(app: FastifyInstance) {
     }
 
     try {
-      const result = await generateVideoReelAsset({
+      const { jobId } = await enqueueVideoGeneration({
         userId: user.id,
+        postType: 'video_reel',
         content: body.content.trim(),
-        jobId: body.jobId,
       })
-      return reply.send({ success: true, ...result })
+      return reply.status(202).send({ success: true, jobId, status: 'pending' })
     } catch (err) {
-      request.log.error({ err }, 'Error in /social/generate/video-reel')
+      request.log.error({ err }, 'Error enqueuing video reel')
       return reply.status(500).send({
-        error: 'Failed to generate video reel',
+        error: 'Failed to start video reel generation',
         details: err instanceof Error ? err.message : String(err),
       })
     }
@@ -193,17 +189,17 @@ export async function socialRoutes(app: FastifyInstance) {
     }
 
     try {
-      const result = await generateHookVideoAsset({
+      const { jobId } = await enqueueVideoGeneration({
         userId: user.id,
+        postType: 'hook_video',
         content: body.content.trim(),
         title: body.title,
-        jobId: body.jobId,
       })
-      return reply.send({ success: true, ...result })
+      return reply.status(202).send({ success: true, jobId, status: 'pending' })
     } catch (err) {
-      request.log.error({ err }, 'Error in /social/generate/hook-video')
+      request.log.error({ err }, 'Error enqueuing hook video')
       return reply.status(500).send({
-        error: 'Failed to generate hook video',
+        error: 'Failed to start hook video generation',
         details: err instanceof Error ? err.message : String(err),
       })
     }
@@ -217,26 +213,48 @@ export async function socialRoutes(app: FastifyInstance) {
     const user = await resolveUser(clerkId)
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const body = request.body as { content?: string; quoteCount?: number; jobId?: string }
+    const body = request.body as { content?: string; jobId?: string }
     if (!body.content?.trim()) {
       return reply.status(400).send({ error: 'Missing required field: content' })
     }
 
     try {
-      const result = await generateQuoteVideoAsset({
+      const { jobId } = await enqueueVideoGeneration({
         userId: user.id,
+        postType: 'quote_video',
         content: body.content.trim(),
-        quoteCount: body.quoteCount,
-        jobId: body.jobId,
       })
-      return reply.send({ success: true, ...result })
+      return reply.status(202).send({ success: true, jobId, status: 'pending' })
     } catch (err) {
-      request.log.error({ err }, 'Error in /social/generate/quote-video')
+      request.log.error({ err }, 'Error enqueuing quote video')
       return reply.status(500).send({
-        error: 'Failed to generate quote video',
+        error: 'Failed to start quote video generation',
         details: err instanceof Error ? err.message : String(err),
       })
     }
+  })
+
+  // GET /api/social/generate/video-status/:jobId — poll a dashboard video job
+  app.get('/social/generate/video-status/:jobId', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { jobId } = request.params as { jobId: string }
+    const row = await prisma.videoGenerationJob.findUnique({ where: { id: jobId } })
+    if (!row || row.userId !== user.id) {
+      return reply.status(404).send({ error: 'Video job not found' })
+    }
+
+    return reply.send({
+      jobId: row.id,
+      status: row.status,
+      postType: row.postType,
+      videoUrl: row.videoUrl,
+      error: row.error,
+    })
   })
 
   // POST /api/social/generate/loop-video

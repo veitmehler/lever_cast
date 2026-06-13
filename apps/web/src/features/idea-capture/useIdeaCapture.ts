@@ -463,85 +463,69 @@ export function useIdeaCapture({
     }
   }
 
-  const handleGenerateVideoReel = async () => {
+  // Video assets (reel / hook / quote video) take several minutes to build, so
+  // the server enqueues a job and returns immediately; we poll for the result.
+  // Waiting on a single HTTP request would exceed the proxy/serverless timeout
+  // (the server would finish but the browser request would have already failed).
+  const generateVideoAsset = async (
+    endpoint: string,
+    postType: 'video_reel' | 'hook_video' | 'quote_video',
+    successMessage: string,
+  ) => {
     if (!content.trim()) {
       toast.error('Enter your content first')
       return
     }
     setIsGeneratingAssets(true)
     try {
-      const response = await fetch('/api/social/generate/video-reel', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim() }),
       })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.details || errorData.error || 'Failed to generate video reel')
+        throw new Error(errorData.details || errorData.error || 'Failed to start video generation')
       }
-      const result = await response.json()
-      onMediaAssetsReady?.({ postType: 'video_reel', videoUrl: result.videoUrl })
-      toast.success('Video reel generated!')
+      const { jobId } = await response.json()
+      if (!jobId) throw new Error('Video generation did not start')
+
+      // Poll the job until it completes or fails (ceiling well above the ~6 min
+      // worst case so a slow generation isn't reported as a failure).
+      const deadline = Date.now() + 15 * 60 * 1000
+      let videoUrl: string | undefined
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 4000))
+        const statusRes = await fetch(`/api/social/generate/video-status/${jobId}`)
+        if (!statusRes.ok) continue
+        const job = await statusRes.json()
+        if (job.status === 'completed') {
+          videoUrl = job.videoUrl
+          break
+        }
+        if (job.status === 'failed') {
+          throw new Error(job.error || 'Video generation failed')
+        }
+      }
+      if (!videoUrl) throw new Error('Video generation timed out — please try again')
+
+      onMediaAssetsReady?.({ postType, videoUrl })
+      toast.success(successMessage)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to generate video reel')
+      toast.error(error instanceof Error ? error.message : 'Failed to generate video')
     } finally {
       setIsGeneratingAssets(false)
     }
   }
 
-  const handleGenerateHookVideo = async () => {
-    if (!content.trim()) {
-      toast.error('Enter your content first')
-      return
-    }
-    setIsGeneratingAssets(true)
-    try {
-      const response = await fetch('/api/social/generate/hook-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim() }),
-      })
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.details || errorData.error || 'Failed to generate hook video')
-      }
-      const result = await response.json()
-      onMediaAssetsReady?.({ postType: 'hook_video', videoUrl: result.videoUrl })
-      toast.success('Hook video generated!')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to generate hook video')
-    } finally {
-      setIsGeneratingAssets(false)
-    }
-  }
+  const handleGenerateVideoReel = () =>
+    generateVideoAsset('/api/social/generate/video-reel', 'video_reel', 'Video reel generated!')
 
-  const handleGenerateQuoteVideo = async () => {
-    if (!content.trim()) {
-      toast.error('Enter your content first')
-      return
-    }
-    setIsGeneratingAssets(true)
-    try {
-      const response = await fetch('/api/social/generate/quote-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim() }),
-      })
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.details || errorData.error || 'Failed to generate quote video')
-      }
-      const result = await response.json()
-      onMediaAssetsReady?.({ postType: 'quote_video', videoUrl: result.videoUrl })
-      toast.success(
-        result.voiceoverUsed ? 'Quote video generated with voiceover!' : 'Quote video generated!',
-      )
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to generate quote video')
-    } finally {
-      setIsGeneratingAssets(false)
-    }
-  }
+  const handleGenerateHookVideo = () =>
+    generateVideoAsset('/api/social/generate/hook-video', 'hook_video', 'Hook video generated!')
+
+  const handleGenerateQuoteVideo = () =>
+    generateVideoAsset('/api/social/generate/quote-video', 'quote_video', 'Quote video generated!')
 
   // Single entry point for the primary "Generate Posts" button: produce the
   // per-platform text (so the preview cards appear) AND, for non-"standard"

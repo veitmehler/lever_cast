@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import {
   BookMarked, ChevronDown, ChevronUp, ClipboardCopy, Download, ExternalLink,
-  Globe, Loader2, Package, Share2,
+  Globe, Loader2, Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { WorkflowView } from './useWorkflowJob'
@@ -11,8 +10,6 @@ import type { WorkflowView } from './useWorkflowJob'
 // Export panel (only after Publish)
 export function ExportPanel({ workflow }: { workflow: WorkflowView }) {
   const {
-    jobId,
-    sitePage,
     displayStatus,
     hasWpConnection,
     handleExport,
@@ -72,14 +69,6 @@ export function ExportPanel({ workflow }: { workflow: WorkflowView }) {
           </>
         )}
 
-        {sitePage?.excerpt && (
-          <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>
-            <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30">
-              <Share2 className="h-4 w-4 mr-1.5" />
-              Generate Social Posts
-            </Button>
-          </Link>
-        )}
         {!syndicationGenerated && (
           <Button
             size="sm"

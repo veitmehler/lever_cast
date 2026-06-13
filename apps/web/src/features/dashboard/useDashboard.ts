@@ -12,7 +12,6 @@ export function useDashboard() {
   const router = useRouter()
   const { user } = useUser()
   const [activeTab, setActiveTab] = useState<DashboardTab>('workflow')
-  const [articleOnly, setArticleOnly] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
@@ -944,7 +943,6 @@ export function useDashboard() {
   return {
     router,
     activeTab, setActiveTab,
-    articleOnly, setArticleOnly,
     isGenerating, setIsGenerating,
     prefillIdea,
     generatedContent, setGeneratedContent,

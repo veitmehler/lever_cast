@@ -6,8 +6,6 @@ import type { DashboardView } from '../useDashboard'
 export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
   const {
     activeTab,
-    articleOnly,
-    setArticleOnly,
     router,
     prefillIdea,
     postType,
@@ -27,17 +25,9 @@ export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
       {/* ── Start Workflow: article (+ optional social) ─────────────────── */}
       {activeTab === 'workflow' && (
         <div className="mb-8 bg-card rounded-2xl border border-border p-6">
-          <label className="mb-4 flex items-center gap-2 cursor-pointer text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={articleOnly}
-              onChange={(e) => setArticleOnly(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span>Article only — skip social posts</span>
-          </label>
           <NewArticleForm
-            mode={articleOnly ? 'article_only' : 'article_first'}
+            mode="article_first"
+            allowSocialToggle
             variant="inline"
             onCreated={(jobId) => router.push(`/workflow/${jobId}`)}
           />

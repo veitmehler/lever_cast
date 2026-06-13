@@ -30,6 +30,13 @@ export interface NewArticleFormProps {
    * 'inline' — no outer card wrapper; used inside an existing card (dashboard).
    */
   variant?: 'panel' | 'inline'
+  /**
+   * When true, an "Article only — skip social posts" checkbox appears in the
+   * advanced options (initial state derived from `mode`), letting the user
+   * switch between article_first / article_only. Off by default so other
+   * callers keep their fixed `mode`.
+   */
+  allowSocialToggle?: boolean
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -39,7 +46,7 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: NewArticleFormProps) {
+export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', allowSocialToggle = false }: NewArticleFormProps) {
   const [topic, setTopic]                     = useState('')
   const [isSubmitting, setIsSubmitting]       = useState(false)
   const [frameworks, setFrameworks]           = useState<OutlineFrameworkOption[]>([])
@@ -49,17 +56,23 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
   const [specialInstructions, setSpecialInst] = useState('')
   const [realCaseStudies, setRealCaseStudies] = useState('')
   const [publishingDate, setPublishingDate]   = useState('')
+  // Only meaningful when allowSocialToggle is set; otherwise effectiveMode === mode.
+  const [articleOnly, setArticleOnly]         = useState(mode === 'article_only')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => { setPublishingDate(todayDateString()) }, [])
 
+  const effectiveMode: ArticleMode = allowSocialToggle
+    ? (articleOnly ? 'article_only' : 'article_first')
+    : mode
+
   const heading =
-    mode === 'article_first'
+    effectiveMode === 'article_first'
       ? 'Create an Article (+ social posts when ready)'
       : 'New Article'
 
   const subheading =
-    mode === 'article_first'
+    effectiveMode === 'article_first'
       ? 'A full article will be generated first. Once approved, you can generate social posts from it.'
       : 'Enter a topic and the AI pipeline will generate a full article (steps 1–12, ~10 min).'
 
@@ -84,7 +97,7 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: trimmed,
-          mode,
+          mode: effectiveMode,
           publishingDate:             publishingDate || todayDateString(),
           outlineFrameworkNumber:     selectedFramework ?? null,
           outlineSpecialInstructions: specialInstructions.trim() || null,
@@ -192,6 +205,18 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel' }: 
 
         {showAdvanced && (
           <div className="mt-3 space-y-3 rounded-lg border border-border bg-muted/40 p-4">
+            {allowSocialToggle && (
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  checked={articleOnly}
+                  onChange={(e) => setArticleOnly(e.target.checked)}
+                  className="w-4 h-4"
+                  disabled={isSubmitting}
+                />
+                <span>Article only — skip social posts</span>
+              </label>
+            )}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
                 Special Instructions

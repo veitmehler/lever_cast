@@ -83,7 +83,12 @@ export async function GET(
 
     const apiKey = apiKeys[provider]
 
-    if (!apiKey) {
+    // Image-generation providers don't need a per-user key here: their model
+    // lists are static/curated and generation uses a system key (FAL_KEY etc.).
+    // Only the dynamic LLM providers need the user's key to list models.
+    const IMAGE_PROVIDERS = new Set(['fal', 'openai-dalle', 'replicate'])
+
+    if (!apiKey && !IMAGE_PROVIDERS.has(provider)) {
       return NextResponse.json(
         { error: `No API key found for ${provider}` },
         { status: 404 }

@@ -20,8 +20,15 @@ const MEDIA_SELECT = {
   createdAt: true,
 } as const
 
-function buildSourceFilter(source?: string): { in: string[] } | string | undefined {
-  if (!source || source === 'all') return undefined
+// Sources that are NOT browsable library images: social post slides carry
+// rendered text (carousel/quote/pitch), social_video is a video, and diagrams
+// carry text. The library only surfaces text-free images. These assets are
+// still stored and referenced by the posts/articles that own them — they're
+// just hidden from the library list/picker.
+const NON_LIBRARY_SOURCES = ['carousel_slide', 'quote_card', 'pitch_story', 'social_video', 'diagram']
+
+function buildSourceFilter(source?: string): { in: string[] } | { notIn: string[] } | string | undefined {
+  if (!source || source === 'all') return { notIn: NON_LIBRARY_SOURCES }
   if (source === 'ai') return { in: ['ai_featured', 'ai_social'] }
   return source
 }

@@ -196,7 +196,7 @@ export function useIdeaCapture({
               errorMessage = 'Microphone permission denied. Please allow microphone access and try again.'
               break
             case 'network':
-              errorMessage = 'Network error. Please check your connection.'
+              errorMessage = 'Voice dictation needs a Chromium browser (Chrome or Edge) with internet access to Google’s speech service. It may be blocked by Brave, Arc, a VPN, or an ad blocker.'
               break
             case 'aborted':
               // User stopped recording, not an error

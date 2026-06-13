@@ -28,7 +28,6 @@ const TABS = [
   { id: 'all', label: 'All' },
   { id: 'upload', label: 'Uploads' },
   { id: 'ai', label: 'AI Images' },
-  { id: 'diagram', label: 'Diagrams' },
 ] as const
 
 const SOURCE_LABELS: Record<MediaItem['source'], string> = {

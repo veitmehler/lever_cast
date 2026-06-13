@@ -5,13 +5,17 @@ import { Copy, RotateCw, Send, Check, AlertCircle, Calendar } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ScheduleModal } from './ScheduleModal'
+import { CarouselGallery } from './CarouselGallery'
 import Image from 'next/image'
+import type { CarouselSlidePlan } from '@/lib/social/types'
 
 interface PlatformPreviewProps {
   platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
   content: string | string[] // Support both single post and thread
   image?: string
   images?: string[]
+  slidePlans?: CarouselSlidePlan[]
+  onRegenerateSlide?: (slideIndex: number, editedPlan: CarouselSlidePlan) => Promise<void>
   video?: string
   onRegenerate: () => void | Promise<void>
   onPublish: (content: string | string[]) => void
@@ -53,6 +57,8 @@ export function PlatformPreview({
   content,
   image,
   images,
+  slidePlans,
+  onRegenerateSlide,
   video,
   onRegenerate,
   onPublish,
@@ -243,18 +249,11 @@ export function PlatformPreview({
 
         {/* Attached Image(s) */}
         {images && images.length > 1 ? (
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {images.map((slideUrl, index) => (
-              <Image
-                key={`${slideUrl}-${index}`}
-                src={slideUrl}
-                alt={`Carousel slide ${index + 1}`}
-                width={400}
-                height={400}
-                className="rounded-lg aspect-square w-full object-cover border border-border"
-              />
-            ))}
-          </div>
+          <CarouselGallery
+            images={images}
+            slidePlans={slidePlans}
+            onRegenerateSlide={onRegenerateSlide}
+          />
         ) : image ? (
           <div className="mb-3">
             <Image 

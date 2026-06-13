@@ -24,6 +24,8 @@ export interface GeneratedQuoteCard {
 
 export interface GeneratedCarousel {
   postType: 'carousel'
+  /** Shared id for this carousel's media; reused when regenerating a single slide. */
+  jobId: string
   slides: Array<{ imageUrl: string; mediaId: string; headline: string }>
   /** Full slide plans retained so callers can extract per-slide text for voiceover sync. */
   slidePlans: CarouselSlidePlan[]
@@ -169,11 +171,54 @@ export async function generateCarouselAssets(opts: {
 
   return {
     postType: 'carousel',
+    jobId,
     slides,
     slidePlans,
     imageUrls: slides.map((s) => s.imageUrl),
     backgroundImageUrls,
   }
+}
+
+/**
+ * Re-render a single carousel slide from a (possibly user-edited) plan. Mirrors
+ * one iteration of generateCarouselAssets' loop: generate a fresh background
+ * from the slide's imagePrompt, composite the text overlay, and register it.
+ * Fast (one image) so it runs synchronously in the request, unlike full videos.
+ */
+export async function regenerateCarouselSlide(opts: {
+  userId: string
+  slidePlan: CarouselSlidePlan
+  slideIndex: number
+  totalSlides: number
+  jobId?: string
+}): Promise<{ imageUrl: string; mediaId: string }> {
+  const brand = await loadSocialBrandTheme(opts.userId)
+  const logoBuffer = await loadLogoBuffer(brand.logoUrl)
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+  const plan = opts.slidePlan
+
+  const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
+
+  const buffer = await renderCarouselSlide(bg, {
+    slide: plan,
+    slideIndex: opts.slideIndex,
+    totalSlides: opts.totalSlides,
+    brand,
+    logoBuffer,
+  })
+
+  const registered = await registerSocialMedia({
+    userId: opts.userId,
+    buffer,
+    s3Key: `social/${opts.userId}/${jobId}/carousel-${opts.slideIndex + 1}-${genId}.png`,
+    title: `Carousel slide ${opts.slideIndex + 1} — ${(plan.headlineText ?? plan.bodyText ?? '').slice(0, 40)}`,
+    altText: plan.headlineText ?? plan.bodyText ?? `Slide ${opts.slideIndex + 1}`,
+    source: 'carousel_slide',
+    jobId,
+  })
+
+  return { imageUrl: registered.url, mediaId: registered.mediaId }
 }
 
 export async function generatePitchStoryAssets(opts: {

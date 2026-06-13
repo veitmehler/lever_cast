@@ -18,10 +18,19 @@ export interface GeneratedQuoteCardResponse {
   mediaId: string
 }
 
+export interface CarouselSlidePlan {
+  type: string
+  headlineText: string | null
+  bodyText: string | null
+  imagePrompt: string
+}
+
 export interface GeneratedCarouselResponse {
   success: boolean
   postType: 'carousel'
+  jobId: string
   slides: Array<{ imageUrl: string; mediaId: string; headline: string }>
+  slidePlans: CarouselSlidePlan[]
   imageUrls: string[]
   slideCount: number
   platformLimit: number

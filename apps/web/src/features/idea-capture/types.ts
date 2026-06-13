@@ -1,4 +1,4 @@
-import type { SocialPostType } from '@/lib/social/types'
+import type { CarouselSlidePlan, SocialPostType } from '@/lib/social/types'
 
 // TypeScript definitions for Web Speech API
 export interface SpeechRecognition extends EventTarget {
@@ -84,6 +84,8 @@ export interface IdeaCaptureProps {
     mediaUrls?: string[]
     videoUrl?: string
     quoteText?: string
+    slidePlans?: CarouselSlidePlan[]
+    carouselJobId?: string
   }) => void
   postType?: SocialPostType
   onPostTypeChange?: (postType: SocialPostType) => void

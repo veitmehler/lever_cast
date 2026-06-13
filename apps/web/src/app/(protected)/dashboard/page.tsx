@@ -12,7 +12,7 @@ import { Loader2, Save, Send, Calendar, Newspaper, MessageSquare, FileEdit } fro
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { NewArticleForm } from '@/components/article/NewArticleForm'
-import type { SocialPostType } from '@/lib/social/types'
+import type { SocialPostType, CarouselSlidePlan } from '@/lib/social/types'
 import { buildPublishMedia } from '@/lib/social/types'
 
 type PlatformKey = 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads'
@@ -40,6 +40,8 @@ export default function DashboardPage() {
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [videoUrl, setVideoUrl] = useState<string | undefined>(undefined)
   const [postType, setPostType] = useState<SocialPostType>('standard')
+  const [carouselSlidePlans, setCarouselSlidePlans] = useState<CarouselSlidePlan[]>([])
+  const [carouselJobId, setCarouselJobId] = useState<string | undefined>(undefined)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [apiKeyErrorReason, setApiKeyErrorReason] = useState<'no_key' | 'api_error'>('no_key')
@@ -239,6 +241,28 @@ export default function DashboardPage() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Re-render a single carousel slide from a (possibly edited) plan and swap the
+  // image in place. Shared across all platform preview cards via mediaUrls.
+  const handleRegenerateSlide = async (slideIndex: number, editedPlan: CarouselSlidePlan) => {
+    const response = await fetch('/api/social/generate/carousel/regenerate-slide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobId: carouselJobId,
+        slideIndex,
+        totalSlides: mediaUrls.length,
+        slidePlan: editedPlan,
+      }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.details || err.error || 'Failed to regenerate slide')
+    }
+    const { imageUrl } = await response.json()
+    setMediaUrls((prev) => prev.map((url, i) => (i === slideIndex ? imageUrl : url)))
+    setCarouselSlidePlans((prev) => prev.map((plan, i) => (i === slideIndex ? editedPlan : plan)))
   }
 
   const handleContentChange = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', newContent: string | string[]) => {
@@ -993,6 +1017,8 @@ export default function DashboardPage() {
             if (assets.imageUrl) setAttachedImage(assets.imageUrl)
             if (assets.mediaUrls) setMediaUrls(assets.mediaUrls)
             if (assets.videoUrl) setVideoUrl(assets.videoUrl)
+            setCarouselSlidePlans(assets.slidePlans ?? [])
+            setCarouselJobId(assets.carouselJobId)
           }}
           onGenerate={handleGenerate} 
           onImageAttached={async (imageUrl: string) => {
@@ -1098,6 +1124,8 @@ export default function DashboardPage() {
                 content={generatedContent.linkedin}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
@@ -1114,6 +1142,8 @@ export default function DashboardPage() {
                 content={generatedContent.facebook}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
@@ -1130,6 +1160,8 @@ export default function DashboardPage() {
                 content={generatedContent.instagram}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
@@ -1146,6 +1178,8 @@ export default function DashboardPage() {
                 content={generatedContent.telegram}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
@@ -1162,6 +1196,8 @@ export default function DashboardPage() {
                 content={generatedContent.threads}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}
@@ -1178,6 +1214,8 @@ export default function DashboardPage() {
                 content={generatedContent.twitter}
                 image={attachedImage}
                 images={postType === 'carousel' ? mediaUrls : undefined}
+                slidePlans={postType === 'carousel' ? carouselSlidePlans : undefined}
+                onRegenerateSlide={postType === 'carousel' ? handleRegenerateSlide : undefined}
                 video={videoUrl}
                 userName={userName}
                 userInitials={userInitials}

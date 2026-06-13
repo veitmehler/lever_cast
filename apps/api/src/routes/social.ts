@@ -5,7 +5,9 @@ import {
   generateCarouselAssets,
   generatePitchStoryAssets,
   generateQuoteCardAsset,
+  regenerateCarouselSlide,
 } from '../social/generate-assets'
+import type { CarouselSlidePlan } from '../social/compositors/carousel'
 import { generateLoopedReelAsset } from '../social/generate-video-assets'
 import { enqueueVideoGeneration } from '../social/enqueue-video'
 import { maxSlidesForPlatforms } from '../social/platform-limits'
@@ -103,6 +105,46 @@ export async function socialRoutes(app: FastifyInstance) {
       request.log.error({ err }, 'Error in /social/generate/carousel')
       return reply.status(500).send({
         error: 'Failed to generate carousel',
+        details: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
+
+  // POST /api/social/generate/carousel/regenerate-slide — re-render one slide
+  app.post('/social/generate/carousel/regenerate-slide', { config: { rateLimit: videoRateLimit } }, async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await resolveUser(clerkId)
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const body = request.body as {
+      jobId?: string
+      slideIndex?: number
+      totalSlides?: number
+      slidePlan?: CarouselSlidePlan
+    }
+    if (
+      !body.slidePlan ||
+      typeof body.slideIndex !== 'number' ||
+      typeof body.totalSlides !== 'number'
+    ) {
+      return reply.status(400).send({ error: 'Missing slidePlan, slideIndex, or totalSlides' })
+    }
+
+    try {
+      const result = await regenerateCarouselSlide({
+        userId: user.id,
+        slidePlan: body.slidePlan,
+        slideIndex: body.slideIndex,
+        totalSlides: body.totalSlides,
+        jobId: body.jobId,
+      })
+      return reply.send({ success: true, ...result })
+    } catch (err) {
+      request.log.error({ err }, 'Error in /social/generate/carousel/regenerate-slide')
+      return reply.status(500).send({
+        error: 'Failed to regenerate carousel slide',
         details: err instanceof Error ? err.message : String(err),
       })
     }

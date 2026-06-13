@@ -453,6 +453,8 @@ export function useIdeaCapture({
         postType: 'carousel',
         imageUrl: firstUrl,
         mediaUrls: result.imageUrls,
+        slidePlans: result.slidePlans,
+        carouselJobId: result.jobId,
       })
       toast.success(`Carousel generated (${result.slideCount} slides)`)
     } catch (error) {

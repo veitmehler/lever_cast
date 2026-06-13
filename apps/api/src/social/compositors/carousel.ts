@@ -220,6 +220,23 @@ async function downloadImage(url: string): Promise<Buffer> {
 }
 
 /** Generate a fal.ai background image for one carousel slide. */
+const FALLBACK_BG_PROMPT =
+  'soft-focus abstract professional background, neutral muted tones, gentle gradient, no text, no people'
+
+/**
+ * fal returns an all-black frame when its safety checker flags a prompt or when
+ * the prompt is empty. Detect that so we can fall back instead of shipping a
+ * black slide.
+ */
+async function isNearlyBlack(buffer: Buffer): Promise<boolean> {
+  try {
+    const { channels } = await sharp(buffer).stats()
+    return channels.slice(0, 3).every((c) => c.mean < 6)
+  } catch {
+    return false
+  }
+}
+
 export async function generateCarouselBackground(
   imagePrompt: string,
   jobId: string,
@@ -229,12 +246,17 @@ export async function generateCarouselBackground(
 
   fal.config({ credentials: apiKey })
 
-  const prompt = imagePrompt.slice(0, 2000)
+  // An empty prompt makes flux emit a black frame — always send something.
+  const prompt = (imagePrompt || '').trim().slice(0, 2000) || FALLBACK_BG_PROMPT
+
   const result = await fal.subscribe('fal-ai/flux/schnell', {
     input: {
       prompt,
       image_size: 'square_hd',
       num_inference_steps: 4,
+      // These are benign on-brand marketing backgrounds; the safety checker
+      // false-positives on ordinary scene prompts and returns a black image.
+      enable_safety_checker: false,
     },
     pollInterval: 2000,
     logs: false,
@@ -248,7 +270,21 @@ export async function generateCarouselBackground(
     return downloadImage(fallbackUrl)
   }
 
-  return downloadImage(url)
+  const buffer = await downloadImage(url)
+
+  // Defensive: if flux still returns a black frame, retry once via flux-pro.
+  if (await isNearlyBlack(buffer)) {
+    logger.warn({ jobId }, '[carousel] fal returned a black image, falling back to flux-pro')
+    try {
+      const fallbackUrl = await generateFeaturedImage(prompt, jobId)
+      return await downloadImage(fallbackUrl)
+    } catch (err) {
+      logger.error({ jobId, err }, '[carousel] flux-pro fallback also failed; using black frame')
+      return buffer
+    }
+  }
+
+  return buffer
 }
 
 /**

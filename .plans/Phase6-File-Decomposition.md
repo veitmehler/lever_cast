@@ -5,19 +5,39 @@
 > session, **one screen per PR**, with manual smoke-testing after each. The plan's
 > own guidance: do this last so it doesn't collide with the security/structural work.
 
-## Status (updated 2026-06-12)
+## Status (updated 2026-06-13)
 
 | File | Lines | Status |
 |---|---|---|
 | `apps/web/src/app/(protected)/settings/page.tsx` | ~~2515~~ → ~58 | ✅ **Done** — PR #23, merged to prod 2026-06-12 |
-| `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | 2083 | next up |
-| `apps/web/src/components/IdeaCapture.tsx` | 1298 | pending |
-| `apps/web/src/app/(protected)/dashboard/page.tsx` | 1249 | pending |
+| `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | ~~2083~~ → ~140 | ✅ **Done** — PR #27, merged to prod 2026-06-13 |
+| `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #TBD (re-export → `features/idea-capture/`) |
+| `apps/web/src/app/(protected)/dashboard/page.tsx` | 1249 | **← NEXT (Step 4)** |
 | `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | pending |
 | `apps/web/src/app/api/social/[platform]/callback/route.ts` | 1059 | pending |
 
 (Also large, secondary candidates: `apps/api/src/article-pipeline/enrichment/index.ts`
 ~966, `apps/api/src/routes/articles.ts` ~872.)
+
+**Follow-on PRs that rode on the workflow decomposition (#27)** — these were
+bug-fix/feature PRs the user surfaced while smoke-testing, NOT part of the
+decomposition itself, but they touched the same screens and are now on prod:
+- **PR #28** — `api-proxy.ts` was silently dropping ALL query strings
+  (`request.nextUrl.search` now forwarded — status-tab filtering & pagination
+  were broken on every proxied GET); workflow list `ProgressBar` denominator
+  12 → `TOTAL_PIPELINE_STEPS` (25); list shows "Processing" badge + bar during
+  Phase B (`completed` & step ≥ 13) and enrichment (`approved`).
+- **PR #29** — list endpoint `status=approved` also matches Phase B; virtual
+  `status=social_active` + a "Social Posts" tab (after Published) listing
+  articles with an in-flight social set (pending/processing/ready/scheduling);
+  3-state row chip; `updateGenerationProgress()` advances run `completedSpecs`
+  after EACH spec (was only finalized at the end → counter sat at 0/12).
+- **PR #30** — F6/video-post GHL dispatch fix (`buildGhlMediaArray`): a video
+  post sends ONLY the video, never the carousel slides it carries for S6 reuse.
+
+These prove the pattern: do the verbatim decomposition first, ship it, then any
+behavior bugs the user notices become small separate PRs — don't fold fixes into
+the "strictly behavior-preserving" decomposition PR.
 
 ## The pattern that worked for settings (PR #23) — reuse it
 
@@ -94,9 +114,36 @@
   expect step-list rendering, approval actions, enrichment status, social panel
   integration. Watch for interval/effect cleanup when extracting the polling
   into a hook — keep one polling hook, preserve its dependency shape.
-- `IdeaCapture.tsx` (1298): a component, not a page — extraction target is
-  `features/idea-capture/` with the component staying as the public export so
-  import sites don't change.
+- `IdeaCapture.tsx` (1298) — **NEXT (Step 3). Surveyed 2026-06-13:**
+  - **It's a component, not a page.** Named export `export function IdeaCapture(props)`
+    (NOT default). **Single consumer:** `app/(protected)/dashboard/page.tsx`
+    imports `{ IdeaCapture } from '@/components/IdeaCapture'`. To avoid touching
+    the import site, keep `components/IdeaCapture.tsx` as a one-line re-export
+    (`export { IdeaCapture } from '@/features/idea-capture'`) — same trick as
+    keeping the public surface stable. (Repointing the one dashboard import is
+    also fine; re-export is lower-risk.)
+  - **Props-driven, not fetch-on-mount like settings** — the parent passes
+    callbacks (`onGenerate`, `onImageAttached`, `onMediaAssetsReady`,
+    `onPostTypeChange`) and seed values (`postType`, `carouselImages`,
+    `initialIdea`). The domain hook (`useIdeaCapture`) must take the props in and
+    thread the callbacks through; it is NOT a self-contained data owner.
+  - ~21 hook calls. State clusters: idea text + voice dictation (Web Speech API,
+    `recognitionRef`), image attach/upload + the two pickers
+    (`ImageGenerationModal`, `ImageLibraryPicker` — already separate components,
+    imported), platform selection (`selectedPlatforms` is a `Set`, plus
+    `availablePlatforms` fetched from `/api/social/connections` + telegram key),
+    twitter single/thread, templates (fetched), post-type + quote/carousel asset
+    generation (`SocialPostTypeSelector`, `onMediaAssetsReady`).
+  - **Web Speech API types** (the `SpeechRecognition*` interfaces declared at
+    the top of the file) → move to `features/idea-capture/types.ts`. They're
+    browser globals with no lib.dom typing; keep them verbatim.
+  - **Browser-API caution:** the speech-recognition effect attaches to a `ref`
+    and cleans up on unmount — preserve its effect identity/cleanup exactly when
+    pulling it into the hook (same lesson as the workflow SSE/poll effects).
+  - Validation: web-only, no API/worker change → `deploy-api` skips, no staging
+    DB concern. Manual smoke on localhost:3000: dictation toggle, image
+    gen/library attach, platform multi-select, template pick, and each social
+    post-type (carousel/quote/video) asset generation through to `onGenerate`.
 - `posts/[id]/page.tsx` (1229): editor-heavy (TipTap) — keep editor setup in one
   hook; editor instances must not be re-created by the split (referential
   stability of extensions/config).

@@ -50,11 +50,14 @@ export async function buildPostsForSpec(opts: {
       articleCtx,
       logCtx: platformCtx,
     })
-    const mediaUrls = assets.mediaUrls?.length
+    const videoUrl = assets.videoUrl
+    // Video posts carry ONLY the video. Some specs (hook_video) keep their
+    // source carousel slides in assets.mediaUrls for cross-spec reuse —
+    // copying those onto the post makes GHL reject it as multi-media.
+    const mediaUrls = !videoUrl && assets.mediaUrls?.length
       ? trimSlidesForPlatform(assets.mediaUrls, platform)
       : undefined
-    const imageUrl = mediaUrls?.[0] ?? assets.imageUrl
-    const videoUrl = assets.videoUrl
+    const imageUrl = videoUrl ? undefined : mediaUrls?.[0] ?? assets.imageUrl
 
     if (!videoUrl && !imageUrl && !mediaUrls?.length) {
       skipped++

@@ -8,6 +8,7 @@ import type { WorkflowView } from './useWorkflowJob'
 // Social automation (12-post daily set)
 export function SocialMediaSetSection({ workflow }: { workflow: WorkflowView }) {
   const {
+    job,
     jobId,
     sitePage,
     displayStatus,
@@ -19,7 +20,8 @@ export function SocialMediaSetSection({ workflow }: { workflow: WorkflowView }) 
     retryingSpec,
   } = workflow
 
-  if (!sitePage || displayStatus !== 'published') return null
+  // "Article only" jobs skip social entirely.
+  if (!sitePage || displayStatus !== 'published' || job.topic.mode === 'article_only') return null
 
   return (
     <div className="bg-card rounded-xl border border-border mb-6 overflow-hidden">

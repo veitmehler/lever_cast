@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ChangeEvent } from 'react'
 import type { GeneratedCarouselResponse, GeneratedQuoteCardResponse } from '@/lib/social/types'
+import { GHL_PLATFORMS } from '@/lib/ghl/types'
 import { toast } from 'sonner'
 import type { IdeaCaptureProps, SpeechRecognition, SpeechRecognitionErrorEvent, SpeechRecognitionEvent, Template } from './types'
 
@@ -31,17 +32,40 @@ export function useIdeaCapture({
   const [isGeneratingAssets, setIsGeneratingAssets] = useState(false)
   const [quoteVariant, setQuoteVariant] = useState<'feed' | 'story'>('feed')
 
-  // Fetch available platforms (social connections + Telegram API key)
+  // Fetch available platforms. A platform is offered using the SAME system that
+  // actually publishes it (see dispatchPublish): LinkedIn/Facebook/Instagram/
+  // Threads publish via Omniply (GHL), so they're available when an Omniply
+  // account is mapped — NOT from a legacy direct-OAuth row, which would publish
+  // via Omniply anyway and fail without ghl_settings. Twitter uses direct OAuth;
+  // Telegram uses its API key.
   const fetchAvailablePlatforms = async () => {
     try {
       const platforms = new Set<string>(['all']) // Always show "Select All"
+      const ghlPlatforms = GHL_PLATFORMS as readonly string[]
 
-      // Fetch social connections
+      // Omniply (GHL)-managed platforms: available when an account is mapped
+      try {
+        const ghlResponse = await fetch('/api/ghl/settings')
+        if (ghlResponse.ok) {
+          const ghl = await ghlResponse.json()
+          const accountIds = (ghl?.accountIds ?? {}) as Record<string, string | undefined>
+          for (const platform of ghlPlatforms) {
+            if (accountIds[platform]) {
+              platforms.add(platform)
+            }
+          }
+        }
+      } catch (ghlError) {
+        console.error('Error fetching Omniply settings:', ghlError)
+      }
+
+      // Direct-OAuth platforms (e.g. Twitter): active social connections only.
+      // Skip GHL-managed platforms here — those are gated by Omniply above.
       const connectionsResponse = await fetch('/api/social/connections')
       if (connectionsResponse.ok) {
         const connections = await connectionsResponse.json()
         connections.forEach((conn: { platform: string; isActive: boolean }) => {
-          if (conn.isActive) {
+          if (conn.isActive && !ghlPlatforms.includes(conn.platform)) {
             platforms.add(conn.platform)
           }
         })
@@ -336,19 +360,14 @@ export function useIdeaCapture({
       // Pass undefined if "none" is selected, otherwise pass the template ID
       const templateId = selectedTemplate === 'none' ? undefined : selectedTemplate
 
-      // Convert Set to array for passing to onGenerate
-      // If all available platforms are selected, pass 'all', otherwise pass array
-      const allAvailable: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-      if (availablePlatforms.has('linkedin')) allAvailable.push('linkedin')
-      if (availablePlatforms.has('twitter')) allAvailable.push('twitter')
-      if (availablePlatforms.has('facebook')) allAvailable.push('facebook')
-      if (availablePlatforms.has('instagram')) allAvailable.push('instagram')
-      if (availablePlatforms.has('telegram')) allAvailable.push('telegram')
-      if (availablePlatforms.has('threads')) allAvailable.push('threads')
-
-      const allSelected = allAvailable.length > 0 && allAvailable.every(p => selectedPlatforms.has(p))
-      const platformParam: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] =
-        allSelected ? 'all' : Array.from(selectedPlatforms)
+      // Always pass the explicit list of selected platforms. (Previously this
+      // collapsed to 'all' when every available platform was selected, but the
+      // server then re-derived 'all' from direct-OAuth `social_connections`
+      // only and fell back to a hardcoded ['linkedin','twitter'] — ignoring
+      // Omniply-connected platforms. Sending the exact selection generates
+      // precisely the chosen platforms.)
+      const platformParam: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] =
+        Array.from(selectedPlatforms)
 
       // Pass twitterFormat when Twitter is selected
       const twitterFormatParam = selectedPlatforms.has('twitter')
@@ -524,6 +543,41 @@ export function useIdeaCapture({
     }
   }
 
+  // Single entry point for the primary "Generate Posts" button: produce the
+  // per-platform text (so the preview cards appear) AND, for non-"standard"
+  // post types, the matching media asset. Text is generated first so the reset
+  // inside the parent's generate handler clears any stale media before the
+  // asset populates it.
+  const handleGeneratePost = async () => {
+    if (!content.trim()) return
+    if (selectedPlatforms.size === 0) {
+      alert('Please select at least one platform')
+      return
+    }
+
+    handleGenerate()
+
+    switch (postType) {
+      case 'quote':
+        await handleGenerateQuoteCard()
+        break
+      case 'carousel':
+        await handleGenerateCarousel()
+        break
+      case 'video_reel':
+        await handleGenerateVideoReel()
+        break
+      case 'hook_video':
+        await handleGenerateHookVideo()
+        break
+      case 'quote_video':
+        await handleGenerateQuoteVideo()
+        break
+      default:
+        break
+    }
+  }
+
   const charCount = content.length
   const maxChars = 2000
   const charPercentage = (charCount / maxChars) * 100
@@ -577,6 +631,7 @@ export function useIdeaCapture({
     handleImageGenerated,
     toggleRecording,
     handleGenerate,
+    handleGeneratePost,
     handleGenerateQuoteCard,
     handleGenerateCarousel,
     handleGenerateVideoReel,

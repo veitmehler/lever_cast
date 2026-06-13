@@ -1,4 +1,4 @@
-import { Mic, Image as ImageIcon, Sparkles, Images } from 'lucide-react'
+import { Mic, Image as ImageIcon, Sparkles, Images, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ImageGenerationModal } from '@/components/ImageGenerationModal'
 import { ImageLibraryPicker } from '@/components/ImageLibraryPicker'
@@ -13,7 +13,8 @@ export function ActionBar({ capture }: { capture: IdeaCaptureView }) {
     handleImageSelect,
     setIsLibraryPickerOpen,
     setIsImageGenerationModalOpen,
-    handleGenerate,
+    handleGeneratePost,
+    isGeneratingAssets,
     content,
     isLibraryPickerOpen,
     setSelectedImage,
@@ -77,11 +78,15 @@ export function ActionBar({ capture }: { capture: IdeaCaptureView }) {
         <div className="flex-1" />
 
         <Button
-          onClick={handleGenerate}
-          disabled={!content.trim() || isRecording}
+          onClick={handleGeneratePost}
+          disabled={!content.trim() || isRecording || isGeneratingAssets}
           className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
-          <Sparkles className="w-4 h-4 mr-2" />
+          {isGeneratingAssets ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4 mr-2" />
+          )}
           Generate Posts
         </Button>
       </div>

@@ -7,7 +7,7 @@ const POST_TYPES: { id: SocialPostType; label: string; description: string }[] =
   { id: 'standard', label: 'Text + Image', description: 'Classic post with optional single image' },
   { id: 'quote', label: 'Quote Card', description: 'Branded quote image (1:1 or story)' },
   { id: 'carousel', label: 'Image Carousel', description: 'Multi-slide branded carousel' },
-  { id: 'video_reel', label: 'Video Reel', description: 'Seedance clip + bullet overlays' },
+  { id: 'video_reel', label: 'Video Reel', description: 'Background Video with Bullet Points overlayed' },
   { id: 'hook_video', label: 'Hook Video', description: 'Short hook + carousel slideshow' },
   { id: 'quote_video', label: 'Quote Video', description: 'Story quote slideshow + optional VO' },
 ]

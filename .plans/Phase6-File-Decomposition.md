@@ -11,13 +11,24 @@
 |---|---|---|
 | `apps/web/src/app/(protected)/settings/page.tsx` | ~~2515~~ → ~58 | ✅ **Done** — PR #23, merged to prod 2026-06-12 |
 | `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | ~~2083~~ → ~140 | ✅ **Done** — PR #27, merged to prod 2026-06-13 |
-| `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #TBD (re-export → `features/idea-capture/`) |
-| `apps/web/src/app/(protected)/dashboard/page.tsx` | 1249 | **← NEXT (Step 4)** |
-| `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | pending |
+| `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #31, merged to prod 2026-06-13 (re-export → `features/idea-capture/`) |
+| `apps/web/src/app/(protected)/dashboard/page.tsx` | ~~1292~~ → 37 | ✅ **Done** — PR #38 (`useDashboard` hook + 4 sections in `features/dashboard/`), web-only |
+| `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | **← NEXT** |
 | `apps/web/src/app/api/social/[platform]/callback/route.ts` | 1059 | pending |
 
 (Also large, secondary candidates: `apps/api/src/article-pipeline/enrichment/index.ts`
 ~966, `apps/api/src/routes/articles.ts` ~872.)
+
+**Dashboard note (2026-06-13):** the first decomposition attempt (PR #33) was
+**closed**, not merged — while it sat in review, the monolithic `dashboard/page.tsx`
+gained substantial behavior on main via feature PRs that touched it: **#34**
+(platform picker reads Omniply/GHL connections + generates for the exact selected
+platforms), **#35→#37** (async video generation: reel/hook/quote moved to the
+worker behind a polled `video_generation_jobs` job, fixing proxy/serverless
+timeouts), **#36** (carousel slide gallery + per-slide regeneration + a fal
+black-background fix). Merging #33 would have reverted those, so it was redone
+from scratch against current main as **PR #38** (verbatim move; identifier +
+string-literal diff vs the old file is empty).
 
 **Follow-on PRs that rode on the workflow decomposition (#27)** — these were
 bug-fix/feature PRs the user surfaced while smoke-testing, NOT part of the

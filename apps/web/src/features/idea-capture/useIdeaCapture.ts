@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ChangeEvent } from 'react'
 import type { GeneratedCarouselResponse, GeneratedQuoteCardResponse } from '@/lib/social/types'
+import { GHL_PLATFORMS } from '@/lib/ghl/types'
 import { toast } from 'sonner'
 import type { IdeaCaptureProps, SpeechRecognition, SpeechRecognitionErrorEvent, SpeechRecognitionEvent, Template } from './types'
 
@@ -31,17 +32,40 @@ export function useIdeaCapture({
   const [isGeneratingAssets, setIsGeneratingAssets] = useState(false)
   const [quoteVariant, setQuoteVariant] = useState<'feed' | 'story'>('feed')
 
-  // Fetch available platforms (social connections + Telegram API key)
+  // Fetch available platforms. A platform is offered using the SAME system that
+  // actually publishes it (see dispatchPublish): LinkedIn/Facebook/Instagram/
+  // Threads publish via Omniply (GHL), so they're available when an Omniply
+  // account is mapped — NOT from a legacy direct-OAuth row, which would publish
+  // via Omniply anyway and fail without ghl_settings. Twitter uses direct OAuth;
+  // Telegram uses its API key.
   const fetchAvailablePlatforms = async () => {
     try {
       const platforms = new Set<string>(['all']) // Always show "Select All"
+      const ghlPlatforms = GHL_PLATFORMS as readonly string[]
 
-      // Fetch social connections
+      // Omniply (GHL)-managed platforms: available when an account is mapped
+      try {
+        const ghlResponse = await fetch('/api/ghl/settings')
+        if (ghlResponse.ok) {
+          const ghl = await ghlResponse.json()
+          const accountIds = (ghl?.accountIds ?? {}) as Record<string, string | undefined>
+          for (const platform of ghlPlatforms) {
+            if (accountIds[platform]) {
+              platforms.add(platform)
+            }
+          }
+        }
+      } catch (ghlError) {
+        console.error('Error fetching Omniply settings:', ghlError)
+      }
+
+      // Direct-OAuth platforms (e.g. Twitter): active social connections only.
+      // Skip GHL-managed platforms here — those are gated by Omniply above.
       const connectionsResponse = await fetch('/api/social/connections')
       if (connectionsResponse.ok) {
         const connections = await connectionsResponse.json()
         connections.forEach((conn: { platform: string; isActive: boolean }) => {
-          if (conn.isActive) {
+          if (conn.isActive && !ghlPlatforms.includes(conn.platform)) {
             platforms.add(conn.platform)
           }
         })

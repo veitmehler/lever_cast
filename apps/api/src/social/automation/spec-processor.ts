@@ -221,6 +221,27 @@ export function slotsToProcess(onlySlot?: string): SpecSlotKey[] {
   return [...SPEC_PROCESS_ORDER]
 }
 
+/**
+ * Refresh the run's completed/failed counters from the spec-result rows
+ * without touching status/currentSpec — called after each spec so the
+ * "X/12" progress shown in the UI advances during generation instead of
+ * jumping 0 → 12 at the end.
+ */
+export async function updateGenerationProgress(runId: string): Promise<void> {
+  const counts = await prisma.socialAutomationSpecResult.groupBy({
+    by: ['status'],
+    where: { runId },
+    _count: true,
+  })
+  await prisma.socialAutomationRun.update({
+    where: { id: runId },
+    data: {
+      completedSpecs: counts.find((c) => c.status === 'completed')?._count ?? 0,
+      failedSpecs: counts.find((c) => c.status === 'failed')?._count ?? 0,
+    },
+  })
+}
+
 export async function finalizeGenerationCounts(runId: string): Promise<void> {
   const counts = await prisma.socialAutomationSpecResult.groupBy({
     by: ['status'],

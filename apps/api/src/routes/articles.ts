@@ -48,6 +48,10 @@ function regenerateToc(html: string): string {
   return withIds.slice(0, firstH2) + tocHtml + '\n' + withIds.slice(firstH2)
 }
 
+// Social-run states that count as "in flight" for the listing's Social Posts
+// tab — everything from enqueue until the set is fully scheduled or failed.
+const SOCIAL_ACTIVE_RUN_STATUSES = ['pending', 'processing', 'ready', 'scheduling']
+
 export async function articleRoutes(app: FastifyInstance) {
   // ── GET /api/articles — list jobs for current user ────────────────────────
   app.get('/articles', async (request, reply) => {
@@ -63,14 +67,38 @@ export async function articleRoutes(app: FastifyInstance) {
       offset?: string
     }
 
+    // Phase B (approval chain) keeps DB status 'completed' while currentStep
+    // runs 13+. The UI badges those as "Processing", so the status filter must
+    // agree: surface them under 'approved' and exclude them from 'completed'.
+    // 'social_active' is a virtual status: articles whose social-media set is
+    // still in flight (generating, awaiting review, or scheduling).
+    const statusFilter =
+      status === 'approved'
+        ? { OR: [{ status: 'approved' }, { status: 'completed', currentStep: { gte: 13 } }] }
+        : status === 'completed'
+          ? { status: 'completed', currentStep: { lt: 13 } }
+          : status === 'social_active'
+            ? { socialAutomationRuns: { some: { status: { in: SOCIAL_ACTIVE_RUN_STATUSES } } } }
+            : status
+              ? { status }
+              : {}
+
     const jobs = await prisma.articleJob.findMany({
       where: {
         userId: user.id,
-        ...(status ? { status } : {}),
+        ...statusFilter,
       },
       include: {
         topic: { select: { topic: true, mode: true } },
         _count: { select: { pipelineSteps: true, errorLogs: true } },
+        // In-flight social set, if any — lets the listing show a live
+        // creation/review/scheduling indicator per article.
+        socialAutomationRuns: {
+          where: { status: { in: SOCIAL_ACTIVE_RUN_STATUSES } },
+          select: { status: true, completedSpecs: true, totalSpecs: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit, 10),

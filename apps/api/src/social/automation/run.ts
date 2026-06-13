@@ -9,6 +9,7 @@ import {
   loadPriorAssets,
   processAutomationSpec,
   slotsToProcess,
+  updateGenerationProgress,
 } from './spec-processor'
 import { ensureRunSlideCount } from './slide-count'
 
@@ -121,6 +122,8 @@ export async function runSocialAutomation(
     })
 
     if (result.assets) priorAssets.set(slotKey, result.assets)
+
+    await updateGenerationProgress(runId)
   }
 
   await finalizeGenerationCounts(runId)

@@ -12,7 +12,7 @@
 | `apps/web/src/app/(protected)/settings/page.tsx` | ~~2515~~ → ~58 | ✅ **Done** — PR #23, merged to prod 2026-06-12 |
 | `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | ~~2083~~ → ~140 | ✅ **Done** — PR #27, merged to prod 2026-06-13 |
 | `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #31, merged to prod 2026-06-13 (re-export → `features/idea-capture/`) |
-| `apps/web/src/app/(protected)/dashboard/page.tsx` | ~~1249~~ → 38 | 🔄 **In review** — decomposition into `features/dashboard/` (`useDashboard` hook + 4 sections), web-only |
+| `apps/web/src/app/(protected)/dashboard/page.tsx` | ~~1249~~ → 38 | 🔄 **In review — PR #33** — decomposition into `features/dashboard/` (`useDashboard` hook + 4 sections), web-only |
 | `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | pending |
 | `apps/web/src/app/api/social/[platform]/callback/route.ts` | 1059 | pending |
 

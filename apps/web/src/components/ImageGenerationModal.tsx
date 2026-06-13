@@ -27,6 +27,7 @@ export function ImageGenerationModal({
   const [model, setModel] = useState('')
   const [aspectRatio, setAspectRatio] = useState('1:1')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationElapsed, setGenerationElapsed] = useState(0)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null)
   const [availableModels, setAvailableModels] = useState<Array<{ value: string; label: string }>>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
@@ -121,6 +122,29 @@ export function ImageGenerationModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableModels, provider, defaultImageModel])
+
+  // Track elapsed time while generating so a slow Fal cold start (the model
+  // spinning up from idle, which can take a couple of minutes) reads as
+  // progress instead of a hang.
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationElapsed(0)
+      return
+    }
+    const started = Date.now()
+    setGenerationElapsed(0)
+    const id = setInterval(() => {
+      setGenerationElapsed(Math.floor((Date.now() - started) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [isGenerating])
+
+  const generationStatusMessage =
+    generationElapsed < 15
+      ? 'Generating your image…'
+      : generationElapsed < 45
+        ? 'Still rendering — this usually takes a few seconds…'
+        : 'The model is warming up (cold start). The first image after the model has been idle can take a couple of minutes — hang tight, it’s still running.'
 
   const loadSettings = async () => {
     try {
@@ -642,6 +666,17 @@ export function ImageGenerationModal({
                   className="w-full h-auto max-h-96 object-contain"
                 />
               </div>
+            </div>
+          )}
+
+          {/* Generation progress (keeps a slow Fal cold start from looking like a hang) */}
+          {isGenerating && (
+            <div className="rounded-lg border border-border bg-secondary/30 p-3 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                {generationStatusMessage}
+                <span className="ml-1 tabular-nums text-xs">({generationElapsed}s)</span>
+              </p>
             </div>
           )}
 

@@ -61,6 +61,29 @@ function inferMimeTypeFromUrl(url: string, kind: 'image' | 'video'): string {
   }
 }
 
+/**
+ * Build the GHL media array for a post. A video post must carry ONLY the
+ * video: the platforms behind GHL (Instagram/Facebook reels, LinkedIn)
+ * reject video + images as "multi media format". Some posts (e.g.
+ * hook_video) carry their source carousel slides in mediaUrls for
+ * cross-spec reuse — those must never be sent alongside the video.
+ */
+export function buildGhlMediaArray(
+  options: Pick<DispatchPublishOptions, 'imageUrl' | 'mediaUrls' | 'videoUrl'>,
+): Array<{ url: string; type?: string }> {
+  const media: Array<{ url: string; type?: string }> = []
+  if (options.videoUrl) {
+    media.push({ url: options.videoUrl, type: inferMimeTypeFromUrl(options.videoUrl, 'video') })
+  } else if (options.mediaUrls?.length) {
+    for (const url of options.mediaUrls) {
+      media.push({ url, type: inferMimeTypeFromUrl(url, 'image') })
+    }
+  } else if (options.imageUrl) {
+    media.push({ url: options.imageUrl, type: inferMimeTypeFromUrl(options.imageUrl, 'image') })
+  }
+  return media
+}
+
 async function publishViaGhl(
   userId: string,
   platform: GhlPlatform,
@@ -95,18 +118,7 @@ async function publishViaGhl(
       : Array.isArray(content)
         ? content[0]
         : content
-  const media: Array<{ url: string; type?: string }> = []
-
-  if (options.mediaUrls?.length) {
-    for (const url of options.mediaUrls) {
-      media.push({ url, type: inferMimeTypeFromUrl(url, 'image') })
-    }
-  } else if (options.imageUrl) {
-    media.push({ url: options.imageUrl, type: inferMimeTypeFromUrl(options.imageUrl, 'image') })
-  }
-  if (options.videoUrl) {
-    media.push({ url: options.videoUrl, type: inferMimeTypeFromUrl(options.videoUrl, 'video') })
-  }
+  const media = buildGhlMediaArray(options)
 
   if (platform === 'instagram' && media.length === 0) {
     logger.warn(baseLog, '[dispatcher] Instagram requires media')

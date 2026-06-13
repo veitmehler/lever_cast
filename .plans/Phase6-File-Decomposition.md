@@ -11,8 +11,8 @@
 |---|---|---|
 | `apps/web/src/app/(protected)/settings/page.tsx` | ~~2515~~ → ~58 | ✅ **Done** — PR #23, merged to prod 2026-06-12 |
 | `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | ~~2083~~ → ~140 | ✅ **Done** — PR #27, merged to prod 2026-06-13 |
-| `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #TBD (re-export → `features/idea-capture/`) |
-| `apps/web/src/app/(protected)/dashboard/page.tsx` | 1249 | **← NEXT (Step 4)** |
+| `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #31, merged to prod 2026-06-13 (re-export → `features/idea-capture/`) |
+| `apps/web/src/app/(protected)/dashboard/page.tsx` | ~~1249~~ → 38 | 🔄 **In review** — decomposition into `features/dashboard/` (`useDashboard` hook + 4 sections), web-only |
 | `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | pending |
 | `apps/web/src/app/api/social/[platform]/callback/route.ts` | 1059 | pending |
 
@@ -38,6 +38,33 @@ decomposition itself, but they touched the same screens and are now on prod:
 These prove the pattern: do the verbatim decomposition first, ship it, then any
 behavior bugs the user notices become small separate PRs — don't fold fixes into
 the "strictly behavior-preserving" decomposition PR.
+
+**Follow-on PR that rode on the IdeaCapture decomposition (#31)** — bundle of 6
+smoke-surfaced fixes, all on prod 2026-06-13:
+- **PR #32** — (1) voice dictation `network` message now names the real cause
+  (Chromium + Google speech backend; Brave disables it). (2) Image library
+  excludes text-bearing social assets: `media` list endpoint default/`all` view
+  `notIn` `carousel_slide`/`quote_card`/`pitch_story`/`social_video`/`diagram`,
+  and the Image Library page's "Diagrams" tab removed. (3) Image-model dropdown
+  was always empty — `/api/ai/models/[provider]` returned 404 when the user had
+  no *personal* key, but image gen uses a *system* key and fal's list is static;
+  image providers now skip the per-user-key requirement. (4) That route also
+  eagerly decrypted ALL user keys and 500'd if any failed — now decrypts only
+  the requested provider's key, in try/catch. (5) **Image prompt bug**: the
+  modal required a prompt but discarded it (sent `postContent`, server re-LLM'd
+  it). Now the modal sends the user's `prompt` and the server uses it VERBATIM
+  (+ optional style), logging/returning `promptSource`. (6) `/api/api-keys`
+  graceful-degrade (one undecryptable key no longer 500s the whole list →
+  `(unable to decrypt)` marker). Plus a client-only cold-start progress UX in
+  the image modal (escalating message + elapsed seconds; a Fal cold start can
+  take ~3 min and looked like a hang).
+
+**Local-dev gotcha discovered during #32 smoke:** the local `apps/web/.env`
+(symlink → root `.env`) had an **empty `ENCRYPTION_KEY`**, so local Next routes
+couldn't decrypt any staging-stored per-user key → 500s on `/api/api-keys`,
+LLM model lists, etc. Fixed by setting the staging `ENCRYPTION_KEY` in the local
+`.env` (gitignored; necessary since local dev points at the staging DB). System
+keys (fal-ai etc.) were never affected — those decrypt on staging-**api**.
 
 ## The pattern that worked for settings (PR #23) — reuse it
 
@@ -110,40 +137,39 @@ the "strictly behavior-preserving" decomposition PR.
 
 ## Per-file notes for the remaining screens
 
-- `workflow/[jobId]/page.tsx` (2083): polls `/api/articles/:id` every ~3s;
-  expect step-list rendering, approval actions, enrichment status, social panel
-  integration. Watch for interval/effect cleanup when extracting the polling
-  into a hook — keep one polling hook, preserve its dependency shape.
-- `IdeaCapture.tsx` (1298) — **NEXT (Step 3). Surveyed 2026-06-13:**
-  - **It's a component, not a page.** Named export `export function IdeaCapture(props)`
-    (NOT default). **Single consumer:** `app/(protected)/dashboard/page.tsx`
-    imports `{ IdeaCapture } from '@/components/IdeaCapture'`. To avoid touching
-    the import site, keep `components/IdeaCapture.tsx` as a one-line re-export
-    (`export { IdeaCapture } from '@/features/idea-capture'`) — same trick as
-    keeping the public surface stable. (Repointing the one dashboard import is
-    also fine; re-export is lower-risk.)
-  - **Props-driven, not fetch-on-mount like settings** — the parent passes
-    callbacks (`onGenerate`, `onImageAttached`, `onMediaAssetsReady`,
-    `onPostTypeChange`) and seed values (`postType`, `carouselImages`,
-    `initialIdea`). The domain hook (`useIdeaCapture`) must take the props in and
-    thread the callbacks through; it is NOT a self-contained data owner.
-  - ~21 hook calls. State clusters: idea text + voice dictation (Web Speech API,
-    `recognitionRef`), image attach/upload + the two pickers
-    (`ImageGenerationModal`, `ImageLibraryPicker` — already separate components,
-    imported), platform selection (`selectedPlatforms` is a `Set`, plus
-    `availablePlatforms` fetched from `/api/social/connections` + telegram key),
-    twitter single/thread, templates (fetched), post-type + quote/carousel asset
-    generation (`SocialPostTypeSelector`, `onMediaAssetsReady`).
-  - **Web Speech API types** (the `SpeechRecognition*` interfaces declared at
-    the top of the file) → move to `features/idea-capture/types.ts`. They're
-    browser globals with no lib.dom typing; keep them verbatim.
-  - **Browser-API caution:** the speech-recognition effect attaches to a `ref`
-    and cleans up on unmount — preserve its effect identity/cleanup exactly when
-    pulling it into the hook (same lesson as the workflow SSE/poll effects).
-  - Validation: web-only, no API/worker change → `deploy-api` skips, no staging
-    DB concern. Manual smoke on localhost:3000: dictation toggle, image
-    gen/library attach, platform multi-select, template pick, and each social
-    post-type (carousel/quote/video) asset generation through to `onGenerate`.
+- `workflow/[jobId]/page.tsx` (2083) — ✅ done, PR #27.
+- `IdeaCapture.tsx` (1298) — ✅ done, PR #31 (+ #32 follow-ons). Pattern used:
+  props-driven `useIdeaCapture` hook threading parent callbacks/seed-props,
+  `types.ts` for the `SpeechRecognition*` browser globals, 4 section components,
+  1-line re-export to keep the dashboard import stable.
+- `dashboard/page.tsx` (1249) — **NEXT (Step 4). Surveyed 2026-06-13:**
+  - `export default function DashboardPage()`, `'use client'`. It is the **parent
+    that renders `IdeaCapture`** (line ~975) and `NewArticleForm` (~964),
+    switched by `dashMode` (`DashboardMode` = `social_only` | `article`). So this
+    is the screen that OWNS the props it passes down to the just-decomposed
+    IdeaCapture (`onGenerate`, `onImageAttached`, `onMediaAssetsReady`,
+    `onPostTypeChange`, `postType`, `carouselImages`, `initialIdea`/`rawIdea`).
+  - **Handler-heavy, NOT effect/polling-heavy** — ~10 `useState`, **no
+    `useEffect`** (closer to settings risk than workflow). The bulk is ~8 large
+    async handlers driving the post lifecycle: `handleGenerate` (idea →
+    `/api/posts` + `/api/drafts`), `handleSaveDraft`, `handleRegenerate`,
+    `handleContentChange`, `handleSchedule`, `handlePublish`,
+    `handleBulkPublishAll`, `handleBulkScheduleAll`, plus `getMediaForPlatform`.
+  - State that threads widely: `generatedContent` (drives the per-platform
+    previews), `actualSelectedPlatforms`, `postType` + `carouselImages` (passed
+    into IdeaCapture), `rawIdea`, `dashMode`, plus modal toggles
+    (`showApiKeyModal`, `showBulkScheduleModal`, `isBulkPublishing/Scheduling`).
+  - Suggested split: a `useDashboard` (or `usePostGeneration`) domain hook owning
+    that state + the 8 handlers (return as one `dashboard` object), and section
+    components for: the mode toggle, the input switch (IdeaCapture vs
+    `NewArticleForm`), the **6 `PlatformPreview` cards** (one per platform — prime
+    candidate for a `.map`), the action bar (save/schedule/publish/bulk), and the
+    `ScheduleModal` / `ApiKeyRequiredModal` / bulk-schedule modal. No effect-order
+    concern since there are no effects.
+  - Validation: web-only (drafts/posts routes already exist) → `deploy-api`
+    skips. Manual smoke on localhost:3000: generate from an idea, edit a
+    platform's content, regenerate one, schedule one, publish one, and bulk
+    publish/schedule; also flip `dashMode` to the article form.
 - `posts/[id]/page.tsx` (1229): editor-heavy (TipTap) — keep editor setup in one
   hook; editor instances must not be re-created by the split (referential
   stability of extensions/config).

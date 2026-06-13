@@ -1,5 +1,4 @@
 import { SocialPostTypeSelector } from '@/components/SocialPostTypeSelector'
-import { maxSlidesForPlatforms } from '@/lib/social/types'
 import type { IdeaCaptureView } from '../useIdeaCapture'
 
 export function PostTypeAssets({ capture }: { capture: IdeaCaptureView }) {
@@ -10,7 +9,6 @@ export function PostTypeAssets({ capture }: { capture: IdeaCaptureView }) {
     isRecording,
     quoteVariant,
     setQuoteVariant,
-    selectedPlatformList,
   } = capture
 
   return (
@@ -45,25 +43,6 @@ export function PostTypeAssets({ capture }: { capture: IdeaCaptureView }) {
               <span className="text-sm">9:16 Story</span>
             </label>
           </div>
-        </div>
-      )}
-
-      {postType === 'carousel' && (
-        <div className="mt-4">
-          <p className="text-xs text-muted-foreground mb-2">
-            Slide count adapts to selected platforms (Twitter max {maxSlidesForPlatforms(['twitter'])}, LinkedIn max {maxSlidesForPlatforms(['linkedin'])}).
-            {selectedPlatformList.length > 0 && (
-              <> Current limit: {maxSlidesForPlatforms(selectedPlatformList)} slides.</>
-            )}
-          </p>
-        </div>
-      )}
-
-      {(postType === 'video_reel' || postType === 'hook_video' || postType === 'quote_video') && (
-        <div className="mt-4">
-          <p className="text-xs text-muted-foreground mb-2">
-            Video generation uses FFmpeg + fal Seedance (720p). Quote videos use your ElevenLabs voice when enabled in Settings.
-          </p>
         </div>
       )}
     </>

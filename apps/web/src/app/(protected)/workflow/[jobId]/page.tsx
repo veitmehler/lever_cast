@@ -117,11 +117,13 @@ export default function WorkflowJobPage() {
 
         <FinalReviewPanel workflow={view} />
 
-        <SocialMediaSetSection workflow={view} />
-
         <ExportPanel workflow={view} />
 
+        {/* Platform Articles (LinkedIn/Medium) above the Social media set —
+            matches the actual production order. */}
         <SyndicationPanels workflow={view} />
+
+        <SocialMediaSetSection workflow={view} />
 
         <ErrorLogsPanel workflow={view} />
 

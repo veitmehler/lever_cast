@@ -1,7 +1,6 @@
 'use client'
 
-import { CalendarClock, Loader2, Share2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CalendarClock } from 'lucide-react'
 import { SocialPreviewPanel } from '@/features/social/SocialPreviewPanel'
 import type { WorkflowView } from './useWorkflowJob'
 
@@ -12,8 +11,6 @@ export function SocialMediaSetSection({ workflow }: { workflow: WorkflowView }) 
     jobId,
     sitePage,
     displayStatus,
-    handleGenerateSocialSet,
-    isGeneratingSocial,
     socialRuns,
     fetchSocialRuns,
     handleRetrySpec,
@@ -30,32 +27,9 @@ export function SocialMediaSetSection({ workflow }: { workflow: WorkflowView }) 
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-card-foreground">Social media set</h2>
           <p className="text-xs text-muted-foreground">
-            Generate 12 branded posts (6 feed + 6 story), preview captions and media here, then approve to schedule via Omniply.
+            12 branded posts (6 feed + 6 story) are generated automatically on publish — preview captions and media here, then approve to schedule via Omniply.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="default"
-          onClick={() => void handleGenerateSocialSet()}
-          disabled={
-            isGeneratingSocial ||
-            socialRuns.some(
-              (r) =>
-                r.status === 'pending' ||
-                r.status === 'processing' ||
-                r.status === 'scheduling' ||
-                r.status === 'ready',
-            )
-          }
-          className="gap-1.5"
-        >
-          {isGeneratingSocial ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Share2 className="h-4 w-4" />
-          )}
-          Generate social set
-        </Button>
       </div>
       {socialRuns.length > 0 && (
         <SocialPreviewPanel

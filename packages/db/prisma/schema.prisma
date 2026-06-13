@@ -364,6 +364,27 @@ model Media {
   @@map("media")
 }
 
+// One-off async video generation job for the dashboard composer (video reel,
+// hook video, quote video). These run for several minutes — far longer than a
+// serverless/proxy request will stay open — so the route enqueues a job and the
+// worker processes it; the client polls this row for the result.
+model VideoGenerationJob {
+  id        String   @id @default(cuid())
+  userId    String
+  postType  String // video_reel | hook_video | quote_video
+  status    String   @default("pending") // pending | processing | completed | failed
+  content   String // raw idea / source text the asset is generated from
+  title     String?
+  videoUrl  String?
+  mediaId   String?
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("video_generation_jobs")
+}
+
 model WordPressConnection {
   id              String   @id @default(cuid())
   userId          String

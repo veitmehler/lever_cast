@@ -360,19 +360,14 @@ export function useIdeaCapture({
       // Pass undefined if "none" is selected, otherwise pass the template ID
       const templateId = selectedTemplate === 'none' ? undefined : selectedTemplate
 
-      // Convert Set to array for passing to onGenerate
-      // If all available platforms are selected, pass 'all', otherwise pass array
-      const allAvailable: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-      if (availablePlatforms.has('linkedin')) allAvailable.push('linkedin')
-      if (availablePlatforms.has('twitter')) allAvailable.push('twitter')
-      if (availablePlatforms.has('facebook')) allAvailable.push('facebook')
-      if (availablePlatforms.has('instagram')) allAvailable.push('instagram')
-      if (availablePlatforms.has('telegram')) allAvailable.push('telegram')
-      if (availablePlatforms.has('threads')) allAvailable.push('threads')
-
-      const allSelected = allAvailable.length > 0 && allAvailable.every(p => selectedPlatforms.has(p))
-      const platformParam: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads' | 'all' | ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] =
-        allSelected ? 'all' : Array.from(selectedPlatforms)
+      // Always pass the explicit list of selected platforms. (Previously this
+      // collapsed to 'all' when every available platform was selected, but the
+      // server then re-derived 'all' from direct-OAuth `social_connections`
+      // only and fell back to a hardcoded ['linkedin','twitter'] — ignoring
+      // Omniply-connected platforms. Sending the exact selection generates
+      // precisely the chosen platforms.)
+      const platformParam: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] =
+        Array.from(selectedPlatforms)
 
       // Pass twitterFormat when Twitter is selected
       const twitterFormatParam = selectedPlatforms.has('twitter')

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { generateContent, GeneratedContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
 import { buildPublishMedia } from '@/lib/social/types'
+import { buildDraftContentUpdate } from '@/features/social/draftContent'
 import type { SocialPostType, CarouselSlidePlan } from '@/lib/social/types'
 import type { PlatformKey, DashboardTab } from './types'
 import { PLATFORM_ORDER } from './constants'
@@ -264,23 +265,7 @@ export function useDashboard() {
     // If draft is already saved, update it in the database
     if (currentDraftId) {
       try {
-        const updateData: Record<string, string> = {}
-        if (platform === 'linkedin') {
-          updateData.linkedinContent = newContent as string
-        } else if (platform === 'facebook') {
-          updateData.facebookContent = newContent as string
-        } else if (platform === 'instagram') {
-          updateData.instagramContent = newContent as string
-        } else if (platform === 'telegram') {
-          updateData.telegramContent = newContent as string
-        } else if (platform === 'threads') {
-          updateData.threadsContent = newContent as string
-        } else {
-          // Stringify if array, otherwise use as string
-          updateData.twitterContent = Array.isArray(newContent) 
-            ? JSON.stringify(newContent) 
-            : newContent
-        }
+        const updateData = buildDraftContentUpdate(platform, newContent)
 
         const response = await fetch(`/api/drafts/${currentDraftId}`, {
           method: 'PATCH',

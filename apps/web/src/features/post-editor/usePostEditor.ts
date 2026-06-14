@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { generateContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
+import { buildDraftContentUpdate, parseDraftTwitterContent } from '@/features/social/draftContent'
 import type { Draft } from './types'
 
 export function usePostEditor(id: string) {
@@ -43,16 +44,7 @@ export function usePostEditor(id: string) {
         const data = await response.json()
 
         // Parse twitterContent if it's a JSON string
-        if (data.twitterContent && typeof data.twitterContent === 'string') {
-          try {
-            const parsed = JSON.parse(data.twitterContent)
-            if (Array.isArray(parsed)) {
-              data.twitterContent = parsed
-            }
-          } catch {
-            // Keep as string if not valid JSON
-          }
-        }
+        parseDraftTwitterContent(data)
 
         setPost(data)
       } catch (error) {
@@ -105,23 +97,7 @@ export function usePostEditor(id: string) {
 
     // Save to database
     try {
-      const updateData: Record<string, string> = {}
-      if (platform === 'linkedin') {
-        updateData.linkedinContent = newContent as string
-      } else if (platform === 'facebook') {
-        updateData.facebookContent = newContent as string
-      } else if (platform === 'instagram') {
-        updateData.instagramContent = newContent as string
-      } else if (platform === 'telegram') {
-        updateData.telegramContent = newContent as string
-      } else if (platform === 'threads') {
-        updateData.threadsContent = newContent as string
-      } else {
-        // Stringify if array, otherwise use as string
-        updateData.twitterContent = Array.isArray(newContent)
-          ? JSON.stringify(newContent)
-          : newContent
-      }
+      const updateData = buildDraftContentUpdate(platform, newContent)
 
       const response = await fetch(`/api/drafts/${id}`, {
         method: 'PATCH',
@@ -229,16 +205,7 @@ export function usePostEditor(id: string) {
         const updatedDraft = await draftResponse.json()
 
         // Parse twitterContent if it's a JSON string
-        if (updatedDraft.twitterContent && typeof updatedDraft.twitterContent === 'string') {
-          try {
-            const parsed = JSON.parse(updatedDraft.twitterContent)
-            if (Array.isArray(parsed)) {
-              updatedDraft.twitterContent = parsed
-            }
-          } catch {
-            // Keep as string if not valid JSON
-          }
-        }
+        parseDraftTwitterContent(updatedDraft)
 
         setPost(updatedDraft)
       }
@@ -621,23 +588,7 @@ export function usePostEditor(id: string) {
       }
 
       // Update the draft with new content
-      const updateData: Record<string, string> = {}
-      if (platform === 'linkedin') {
-        updateData.linkedinContent = newContent as string
-      } else if (platform === 'facebook') {
-        updateData.facebookContent = newContent as string
-      } else if (platform === 'instagram') {
-        updateData.instagramContent = newContent as string
-      } else if (platform === 'telegram') {
-        updateData.telegramContent = newContent as string
-      } else if (platform === 'threads') {
-        updateData.threadsContent = newContent as string
-      } else {
-        // Stringify if array, otherwise use as string
-        updateData.twitterContent = Array.isArray(newContent)
-          ? JSON.stringify(newContent)
-          : (newContent as string)
-      }
+      const updateData = buildDraftContentUpdate(platform, newContent)
 
       const response = await fetch(`/api/drafts/${id}`, {
         method: 'PATCH',

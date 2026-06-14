@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { generateContent, GeneratedContent } from '@/lib/mockAI'
@@ -70,6 +70,7 @@ export function useDashboard() {
     setSelectedTemplateId(templateId)
     setGeneratedContent(null)
     setCurrentDraftId(null)
+    draftCreateRef.current = null // new generation → new draft
     setAttachedImage(image)
     if (!image) {
       setMediaUrls([])
@@ -305,63 +306,85 @@ export function useDashboard() {
     }
   }
 
+  // Create the post draft exactly once, even when several per-platform publish/
+  // schedule calls run concurrently (bulk actions). Without this lock each
+  // concurrent call sees currentDraftId === null and creates its own draft —
+  // producing one duplicate draft per platform.
+  const draftCreateRef = useRef<Promise<string | null> | null>(null)
+  const ensureDraftId = async (): Promise<string | null> => {
+    if (currentDraftId) return currentDraftId
+    if (!rawIdea) return null
+    if (draftCreateRef.current) return draftCreateRef.current
+
+    draftCreateRef.current = (async () => {
+      const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
+
+      // Determine platforms from generatedContent if actualSelectedPlatforms is not set
+      const platformsToSave = (() => {
+        if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
+          return JSON.stringify(actualSelectedPlatforms)
+        } else if (actualSelectedPlatforms === 'all') {
+          return 'all'
+        } else if (generatedContent) {
+          const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
+          if (generatedContent.linkedin) platforms.push('linkedin')
+          if (generatedContent.twitter) platforms.push('twitter')
+          if (generatedContent.facebook) platforms.push('facebook')
+          if (generatedContent.instagram) platforms.push('instagram')
+          if (generatedContent.telegram) platforms.push('telegram')
+          if (generatedContent.threads) platforms.push('threads')
+          return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
+        }
+        return 'all' // Fallback
+      })()
+
+      const draftResponse = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          contentRaw: rawIdea,
+          linkedinContent: generatedContent?.linkedin || null,
+          twitterContent: Array.isArray(generatedContent?.twitter)
+            ? JSON.stringify(generatedContent.twitter)
+            : (generatedContent?.twitter || null),
+          facebookContent: generatedContent?.facebook || null,
+          instagramContent: generatedContent?.instagram || null,
+          telegramContent: generatedContent?.telegram || null,
+          threadsContent: generatedContent?.threads || null,
+          platforms: platformsToSave,
+          status: 'draft',
+          attachedImage: attachedImage || null,
+        }),
+      })
+
+      if (!draftResponse.ok) {
+        const errorData = await draftResponse.json().catch(() => ({ error: 'Unknown error' }))
+        const errorMessage = errorData.details
+          ? `${errorData.error || 'Failed to save draft'}: ${errorData.details}`
+          : errorData.error || 'Unknown error'
+        throw new Error(`Failed to save draft: ${errorMessage}`)
+      }
+
+      const draft = await draftResponse.json()
+      setCurrentDraftId(draft.id)
+      return draft.id as string
+    })()
+
+    try {
+      return await draftCreateRef.current
+    } catch (err) {
+      draftCreateRef.current = null // clear the lock so a later attempt can retry
+      throw err
+    }
+  }
+
   const handleSchedule = async (platform: 'linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads', content: string | string[], scheduledAt: Date) => {
     try {
       // First, save draft if not already saved
       let draftId = currentDraftId
       if (!draftId && rawIdea) {
-        const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
-        
-        // Determine platforms from generatedContent if actualSelectedPlatforms is not set
-        const platformsToSave = (() => {
-          if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
-            return JSON.stringify(actualSelectedPlatforms)
-          } else if (actualSelectedPlatforms === 'all') {
-            return 'all'
-          } else if (generatedContent) {
-            // Derive from generatedContent
-            const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-            if (generatedContent.linkedin) platforms.push('linkedin')
-            if (generatedContent.twitter) platforms.push('twitter')
-            if (generatedContent.facebook) platforms.push('facebook')
-            if (generatedContent.instagram) platforms.push('instagram')
-            if (generatedContent.telegram) platforms.push('telegram')
-            if (generatedContent.threads) platforms.push('threads')
-            return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
-          }
-          return 'all' // Fallback
-        })()
-        
-        const draftResponse = await fetch('/api/drafts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title,
-            contentRaw: rawIdea,
-            linkedinContent: generatedContent?.linkedin || null,
-            twitterContent: Array.isArray(generatedContent?.twitter) 
-              ? JSON.stringify(generatedContent.twitter) 
-              : (generatedContent?.twitter || null),
-            facebookContent: generatedContent?.facebook || null,
-            instagramContent: generatedContent?.instagram || null,
-            telegramContent: generatedContent?.telegram || null,
-            threadsContent: generatedContent?.threads || null,
-            platforms: platformsToSave,
-            status: 'draft',
-            attachedImage: attachedImage || null,
-          }),
-        })
-
-        if (!draftResponse.ok) {
-          const errorData = await draftResponse.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || 'Failed to save draft')
-        }
-
-        const draft = await draftResponse.json()
-        draftId = draft.id
-        setCurrentDraftId(draft.id)
+        draftId = await ensureDraftId()
       } else if (draftId) {
         // Ensure edited content is saved before scheduling
         const updateData: Record<string, string> = {}
@@ -496,62 +519,7 @@ export function useDashboard() {
       // First, save draft if not already saved (use current edited content)
       let draftId = currentDraftId
       if (!draftId && rawIdea) {
-        const title = rawIdea.slice(0, 50) + (rawIdea.length > 50 ? '...' : '')
-        
-        // Determine platforms from generatedContent if actualSelectedPlatforms is not set
-        const platformsToSave = (() => {
-          if (Array.isArray(actualSelectedPlatforms) && actualSelectedPlatforms.length > 0) {
-            return JSON.stringify(actualSelectedPlatforms)
-          } else if (actualSelectedPlatforms === 'all') {
-            return 'all'
-          } else if (generatedContent) {
-            // Derive from generatedContent
-            const platforms: ('linkedin' | 'twitter' | 'facebook' | 'instagram' | 'telegram' | 'threads')[] = []
-            if (generatedContent.linkedin) platforms.push('linkedin')
-            if (generatedContent.twitter) platforms.push('twitter')
-            if (generatedContent.facebook) platforms.push('facebook')
-            if (generatedContent.instagram) platforms.push('instagram')
-            if (generatedContent.telegram) platforms.push('telegram')
-            if (generatedContent.threads) platforms.push('threads')
-            return platforms.length === 6 ? 'all' : JSON.stringify(platforms)
-          }
-          return 'all' // Fallback
-        })()
-        
-        const draftResponse = await fetch('/api/drafts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title,
-            contentRaw: rawIdea,
-            linkedinContent: generatedContent?.linkedin || null,
-            twitterContent: Array.isArray(generatedContent?.twitter) 
-              ? JSON.stringify(generatedContent.twitter) 
-              : (generatedContent?.twitter || null),
-            facebookContent: generatedContent?.facebook || null,
-            instagramContent: generatedContent?.instagram || null,
-            telegramContent: generatedContent?.telegram || null,
-            threadsContent: generatedContent?.threads || null,
-            platforms: platformsToSave,
-            status: 'draft',
-            attachedImage: attachedImage || null,
-          }),
-        })
-
-        if (!draftResponse.ok) {
-          const errorData = await draftResponse.json().catch(() => ({ error: 'Unknown error' }))
-          console.error('Failed to save draft:', errorData)
-          const errorMessage = errorData.details
-            ? `${errorData.error || 'Failed to save draft'}: ${errorData.details}`
-            : errorData.error || 'Unknown error'
-          throw new Error(`Failed to save draft: ${errorMessage}`)
-        }
-
-        const draft = await draftResponse.json()
-        draftId = draft.id
-        setCurrentDraftId(draft.id)
+        draftId = await ensureDraftId()
       } else if (draftId) {
         // If draft exists, ensure edited content is saved before publishing
         const updateData: Record<string, string> = {}

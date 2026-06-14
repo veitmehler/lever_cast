@@ -6,6 +6,7 @@ import type { WorkflowView } from './useWorkflowJob'
 
 export function PublishConfirmModal({ workflow }: { workflow: WorkflowView }) {
   const {
+    job,
     showPublishConfirm, setShowPublishConfirm,
     isPublishing,
     hasWpConnection,
@@ -14,6 +15,8 @@ export function PublishConfirmModal({ workflow }: { workflow: WorkflowView }) {
   } = workflow
 
   if (!showPublishConfirm) return null
+
+  const articleOnly = job.topic.mode === 'article_only'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
@@ -25,11 +28,15 @@ export function PublishConfirmModal({ workflow }: { workflow: WorkflowView }) {
         <ul className="text-sm space-y-1.5 pl-4 list-disc text-foreground">
           <li>LinkedIn Article</li>
           <li>Medium Article</li>
-          <li>12-post social preview set (Facebook, Instagram, LinkedIn, Threads, Twitter, Telegram)</li>
+          {!articleOnly && (
+            <li>12-post social preview set (Facebook, Instagram, LinkedIn, Threads, Twitter, Telegram)</li>
+          )}
         </ul>
-        <p className="text-xs text-muted-foreground">
-          Social posts are generated for preview on this page first. After you review, click Approve &amp; schedule to send them to Omniply.
-        </p>
+        {!articleOnly && (
+          <p className="text-xs text-muted-foreground">
+            Social posts are generated for preview on this page first. After you review, click Approve &amp; schedule to send them to Omniply.
+          </p>
+        )}
         <div className="flex gap-3 pt-2 justify-end">
           <Button
             variant="outline"
@@ -51,7 +58,7 @@ export function PublishConfirmModal({ workflow }: { workflow: WorkflowView }) {
             }}
           >
             {isPublishing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
-            Publish &amp; Generate Previews
+            {articleOnly ? 'Publish article' : 'Publish & Generate Previews'}
           </Button>
         </div>
       </div>

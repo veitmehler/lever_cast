@@ -5,13 +5,13 @@ import { generateContent, GeneratedContent } from '@/lib/mockAI'
 import { toast } from 'sonner'
 import { buildPublishMedia } from '@/lib/social/types'
 import type { SocialPostType, CarouselSlidePlan } from '@/lib/social/types'
-import type { PlatformKey, DashboardMode } from './types'
+import type { PlatformKey, DashboardTab } from './types'
 import { PLATFORM_ORDER } from './constants'
 
 export function useDashboard() {
   const router = useRouter()
   const { user } = useUser()
-  const [dashMode, setDashMode] = useState<DashboardMode>('social_only')
+  const [activeTab, setActiveTab] = useState<DashboardTab>('workflow')
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
@@ -942,7 +942,7 @@ export function useDashboard() {
 
   return {
     router,
-    dashMode, setDashMode,
+    activeTab, setActiveTab,
     isGenerating, setIsGenerating,
     prefillIdea,
     generatedContent, setGeneratedContent,

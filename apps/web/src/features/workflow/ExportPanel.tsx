@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import {
-  BookMarked, ChevronDown, ChevronUp, ClipboardCopy, Download, ExternalLink,
-  Globe, Loader2, Package, Share2,
+  ChevronDown, ChevronUp, ClipboardCopy, Download, ExternalLink,
+  Globe, Loader2, Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { WorkflowView } from './useWorkflowJob'
@@ -11,16 +10,11 @@ import type { WorkflowView } from './useWorkflowJob'
 // Export panel (only after Publish)
 export function ExportPanel({ workflow }: { workflow: WorkflowView }) {
   const {
-    jobId,
-    sitePage,
     displayStatus,
     hasWpConnection,
     handleExport,
     exportingTarget,
     handleCopySubstack,
-    syndicationGenerated,
-    handleGenerateSyndication,
-    syndicationLoading,
     attempts,
     showAttempts, setShowAttempts,
   } = workflow
@@ -70,29 +64,6 @@ export function ExportPanel({ workflow }: { workflow: WorkflowView }) {
               Copy for Substack
             </Button>
           </>
-        )}
-
-        {sitePage?.excerpt && (
-          <Link href={`/dashboard?idea=${encodeURIComponent(sitePage.excerpt)}&articleJobId=${jobId}`}>
-            <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30">
-              <Share2 className="h-4 w-4 mr-1.5" />
-              Generate Social Posts
-            </Button>
-          </Link>
-        )}
-        {!syndicationGenerated && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
-            onClick={() => void handleGenerateSyndication()}
-            disabled={syndicationLoading}
-          >
-            {syndicationLoading
-              ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              : <BookMarked className="h-4 w-4 mr-1.5" />}
-            {syndicationLoading ? 'Generating articles…' : 'Generate LinkedIn & Medium Articles'}
-          </Button>
         )}
       </div>
 

@@ -454,7 +454,7 @@ export async function articleRoutes(app: FastifyInstance) {
     const job = await prisma.articleJob.findFirst({
       where: { id: jobId, userId: user.id },
       include: {
-        topic: { select: { publishingDate: true, scheduledDate: true } },
+        topic: { select: { publishingDate: true, scheduledDate: true, mode: true } },
         sitePage: { select: { id: true } },
       },
     })
@@ -480,7 +480,10 @@ export async function articleRoutes(app: FastifyInstance) {
         logger.error({ jobId, err }, '[publish] failed to enqueue syndication'),
       )
 
-      if (settings?.socialAutomationEnabled !== false) {
+      // Skip the 12-post social set for "Article only" jobs (topic mode), in
+      // addition to the global socialAutomationEnabled setting. Syndication
+      // (LinkedIn/Medium article) still runs — that's article distribution.
+      if (settings?.socialAutomationEnabled !== false && job.topic.mode !== 'article_only') {
         enqueueSocialAutomation({
           userId: user.id,
           jobId,

@@ -51,7 +51,7 @@ export function SchemaPanel({ workflow }: { workflow: WorkflowView }) {
                 : <><ClipboardCopy className="h-3.5 w-3.5" /> Copy JSON-LD</>}
             </Button>
           )}
-          {displayStatus === 'enriched' && (
+          {(displayStatus === 'enriched' || sitePage?.enrichmentStatus === 'failed') && (
             <Button
               size="sm"
               variant="outline"
@@ -67,7 +67,7 @@ export function SchemaPanel({ workflow }: { workflow: WorkflowView }) {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Rerun processing
+              {sitePage?.enrichmentStatus === 'failed' ? 'Retry enrichment' : 'Rerun processing'}
             </Button>
           )}
         </div>

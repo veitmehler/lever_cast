@@ -61,6 +61,11 @@ export async function handleTwitterCallback(args: {
   })
 
   if (!profileResponse.ok) {
+    const errorText = await profileResponse.text()
+    console.error('[Twitter OAuth] Failed to fetch user profile:', {
+      status: profileResponse.status,
+      error: errorText,
+    })
     return { kind: 'redirect', response: redirectWithCleanup('/settings?error=profile_fetch_failed') }
   }
 

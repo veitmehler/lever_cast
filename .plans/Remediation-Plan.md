@@ -16,9 +16,12 @@
 
 ## Current status (updated 2026-06-15)
 
-**Phases 0–6 COMPLETE and on prod. Phase 7 PAUSED** (unit-testable surface
-essentially exhausted — 16 PRs, ~80→~383 tests; remainder is orchestration best
-done as integration tests). Detailed running log lives in the
+**This remediation plan is COMPLETE.** Phases 0–6 done & on prod; all 8 security
+findings closed; backlog **B1–B4 all done**. **Phase 7 PAUSED by decision** (unit
+surface exhausted — 16 PRs, ~80→~383 tests; only an *optional* integration-test
+harness remains). The sole non-engineering loose end is a one-time authed check of the
+hosted staging env (user-side). Out of scope: the separate `Phase9-Hardening-
+Observability.md` (not scheduled). Detailed running log lives in the
 `remediation-effort-status` memory; the Phase 6 PR-by-PR table is in
 `Phase6-File-Decomposition.md`; the Phase 7 PR list + paused items are in
 `Phase7-Test-Expansion.md`.
@@ -40,21 +43,19 @@ done as integration tests). Detailed running log lives in the
   #38/#42/#43/#44) + A5 hygiene (#46) + Twitter logging (#45) + social dedup (#47).
   All 8 original security findings (H1/H2/M1/M2/M3/L2/L3/L4) closed.
 
-**Remaining to close out this plan** (Phase 7 unit work is paused, see below):
-- **B4 — final dashboard knob only:** size the prod `socioply-pool` (DO Connection
-  Pools) to ~9–10. The connection-budget work is otherwise done (see "Done" below);
-  DO allows only **one** pool per cluster and it already fronts prod, so staging can't
-  get its own — handled via per-env caps instead.
-- **Phase 7 integration-test harness** (optional remainder) — disposable Postgres +
-  separate CI job for the orchestrators deferred in `Phase7-Test-Expansion.md`.
-- **Hosted staging environment** (replaces the old "Vercel preview Clerk key scoping"
-  papercut) — a long-lived **`staging` branch** is bound to a Vercel custom domain
-  (`staging.socioply.com`) with branch-scoped env: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-  + `CLERK_SECRET_KEY` = the **test** Clerk instance, `DO_API_BASE` = `staging-api`
-  (which verifies the test JWT; prod-api uses `sk_live` and would 401). Keeps the
-  random `*.vercel.app` previews untouched. Clerk uses the dev instance to start
-  (not domain-locked; dev banner + ~100-user cap acceptable). Keep `staging` in sync
-  with `main`; a `staging` push never triggers `deploy-api` (main-only).
+**This plan is effectively COMPLETE (2026-06-15).** All numbered phases (0–6) and
+every backlog item (B1–B4) are done/resolved. Nothing engineering-blocking remains —
+what's left is optional or user-side:
+- **Phase 7 unit coverage — paused by decision** (surface exhausted, ~80→~383 tests).
+  The only remainder is the **optional** integration-test harness (disposable Postgres
+  + separate CI job) for the orchestrators in `Phase7-Test-Expansion.md`.
+- **Hosted staging env — done.** `staging` branch → Vercel `staging.socioply.com` with
+  branch-scoped test-Clerk keys + `DO_API_BASE=staging-api`; DNS live; Vercel Deployment
+  Protection **intentionally ON** (team-private — reach it via Vercel login). Open
+  thread = a one-time authed check by the user (test sign-in + staging-api wiring).
+  Not a blocker. (Replaced the old "Vercel preview Clerk scoping" papercut.)
+- **Phase 9** (`Phase9-Hardening-Observability.md`) — the user's separate plan, out of
+  scope here, not scheduled.
 
 **Audited & resolved 2026-06-15 (were listed as papercuts, verified non-issues):**
 - "eager-decrypt-500 on `/api/settings` + `/api/social/connections`" — **non-issue**:
@@ -75,9 +76,12 @@ budget** ✅ — step 1 pg-boss cap, plus tiered per-env allocation (2026-06-15)
 `connection_limit=2`; staging `connection_limit=2` + `PGBOSS_MAX_CONNECTIONS=2` (worker
 stopped when idle); prod `PGBOSS_MAX_CONNECTIONS=8` (applied + verified on the droplet).
 pg-boss takes **direct** slots (can't use the transaction-mode pool); prod app queries
-go through the single `socioply-pool`. Budget (cluster 25): prod ≈ pgboss 8 + app-pool
-~9 = 17, staging ≤6, dev 2 — fits with the superuser reserve. Cluster upsize deferred
-until clients justify it. The user's separate `Phase9-Hardening-Observability.md` is out of
+go through the `socioply-pool` (PgBouncer), **resized 22→12** (DO dashboard, 2026-06-15).
+Budget (cluster 25): prod ≈ pgboss 8 + app-pool ≤12, staging ≤6, dev 2 — caps are lazy,
+so realistic usage is well under the limit. (Note: DO allows multiple pools per cluster,
+bounded by connection availability — not "one pool"; a 2nd pool for staging/dev was
+considered and declined: it only helps Prisma conns, not pg-boss, for ~2 connections of
+savings.) Cluster upsize deferred until clients justify it. The user's separate `Phase9-Hardening-Observability.md` is out of
 scope for this plan (not scheduled). Optional secondary God-files
 (`article-pipeline/enrichment/index.ts` ~966, `routes/articles.ts` ~903) were never in
 the core decomposition list.
@@ -332,20 +336,23 @@ starve prod under real load.
 **Why:** two pg-boss workers + two app pools on a 22-slot cluster is over budget;
 prod connection failures are a real risk once traffic arrives.
 
-**Resolution (2026-06-15) — tiered per-env caps, since DO allows only ONE pool/cluster
-and it already fronts prod (so step 2 below is impossible as written):**
+**Resolution (2026-06-15) ✅ DONE — tiered per-env caps + right-sized prod pool:**
 1. ✅ pg-boss pool capped via `max` / `PGBOSS_MAX_CONNECTIONS` in `queues/index.ts`
    (pg-boss uses the **direct** endpoint — it can't go through a transaction-mode pool).
-2. ~~Give staging its own DO pool~~ — **not possible**: one pool per cluster, already on
-   prod (`socioply-pool`, `:25061`). Staging stays on direct connections, tightly capped.
-3. **Applied caps:** dev web `connection_limit=2`; staging `connection_limit=2` +
+2. **Applied caps:** dev web `connection_limit=2`; staging `connection_limit=2` +
    `PGBOSS_MAX_CONNECTIONS=2` (worker stopped when idle); prod `PGBOSS_MAX_CONNECTIONS=8`
    (applied + verified on the droplet, `pgboss idle=8`).
-4. **Budget (cluster 25, ~22 usable):** prod ≈ pgboss 8 + app-pool ~9 = 17; staging ≤6
-   (≈2 idle); dev 2 → fits with the superuser reserve. pg-boss=15 was rejected (ignores
-   the additive ~9-slot app pool → 28 > 25).
-5. **Remaining knob:** size the prod `socioply-pool` to ~9–10 in the DO dashboard.
-6. Upsize the cluster (or give staging its own) once clients justify the cost.
+3. **Prod `socioply-pool` resized 22→12** (DO dashboard). At 22 the web pool could
+   monopolize the cluster and starve pg-boss (direct) + staging + dev; 12 leaves room.
+4. **Budget (cluster 25, ~22 usable):** prod ≈ pgboss 8 + app-pool ≤12, staging ≤6
+   (≈2 idle), dev 2 — caps are lazy, realistic usage well under the limit. pg-boss=15
+   was rejected (ignores the additive app-pool slots → would exceed the cluster).
+5. **CORRECTION:** DO does *not* limit a cluster to one pool — the bound is connection
+   availability. A 2nd pool for staging/dev was considered and **declined**: it only
+   helps Prisma/app conns (pg-boss stays direct), staging/dev already use tiny direct
+   caps (~2 connections to save), and it adds PgBouncer friction. Worth it only for
+   prod-architecture parity, not connection savings.
+6. Upsize the cluster once clients justify the cost (the real scaling lever).
 
 **Interim still in force:** keep the staging worker stopped when not actively testing
 (`docker compose stop worker` in `/opt/socioply-staging`).

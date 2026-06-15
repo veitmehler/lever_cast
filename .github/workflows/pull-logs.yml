@@ -17,18 +17,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # B1: reach the droplet over Tailscale (public port 22 is closed).
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Configure SSH
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DROPLET_IP: ${{ secrets.DROPLET_PUBLIC_IP }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          # MagicDNS name, not the public IP.
+          TS_HOST=socioply-api-01
+          ssh-keyscan -H "$TS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           echo "Host droplet" >> ~/.ssh/config
-          echo "  HostName $DROPLET_IP" >> ~/.ssh/config
+          echo "  HostName $TS_HOST" >> ~/.ssh/config
           echo "  User socioply" >> ~/.ssh/config
           echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
           echo "  IdentitiesOnly yes" >> ~/.ssh/config

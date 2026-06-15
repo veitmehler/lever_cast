@@ -48,8 +48,14 @@ done as integration tests). Detailed running log lives in the
   get its own — handled via per-env caps instead.
 - **Phase 7 integration-test harness** (optional remainder) — disposable Postgres +
   separate CI job for the orchestrators deferred in `Phase7-Test-Expansion.md`.
-- **Vercel preview Clerk key scoping** (dashboard) — scope `pk_test`/`sk_test` to the
-  Preview env so preview URLs are usable for authed smoke testing.
+- **Hosted staging environment** (replaces the old "Vercel preview Clerk key scoping"
+  papercut) — a long-lived **`staging` branch** is bound to a Vercel custom domain
+  (`staging.socioply.com`) with branch-scoped env: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+  + `CLERK_SECRET_KEY` = the **test** Clerk instance, `DO_API_BASE` = `staging-api`
+  (which verifies the test JWT; prod-api uses `sk_live` and would 401). Keeps the
+  random `*.vercel.app` previews untouched. Clerk uses the dev instance to start
+  (not domain-locked; dev banner + ~100-user cap acceptable). Keep `staging` in sync
+  with `main`; a `staging` push never triggers `deploy-api` (main-only).
 
 **Audited & resolved 2026-06-15 (were listed as papercuts, verified non-issues):**
 - "eager-decrypt-500 on `/api/settings` + `/api/social/connections`" — **non-issue**:

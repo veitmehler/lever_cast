@@ -63,30 +63,43 @@ jobs:
     steps:
       - name: Verify staging deploy secrets are set
         env:
-          DROPLET_IP: ${{ secrets.STAGING_DROPLET_PUBLIC_IP }}
           DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
           HEALTH_URL: ${{ secrets.STAGING_HEALTH_URL }}
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
         run: |
           missing=0
-          [ -z "$DROPLET_IP" ] && { echo "::error::STAGING_DROPLET_PUBLIC_IP is empty or unset"; missing=1; }
+          [ -z "$TS_OAUTH_CLIENT_ID" ] && { echo "::error::TS_OAUTH_CLIENT_ID is empty or unset"; missing=1; }
+          [ -z "$TS_OAUTH_SECRET" ] && { echo "::error::TS_OAUTH_SECRET is empty or unset"; missing=1; }
           [ -z "$DEPLOY_KEY" ] && { echo "::error::STAGING_DEPLOY_SSH_KEY is empty or unset"; missing=1; }
           [ -z "$HEALTH_URL" ] && { echo "::error::STAGING_HEALTH_URL is empty or unset"; missing=1; }
           [ "$missing" = "1" ] && exit 1
           echo "Staging deploy secrets present."
 
+      # B1: join the runner to the tailnet so it reaches the droplet over
+      # Tailscale instead of the public IP. Once this path is proven, public
+      # port 22 on the droplet is closed via ufw. Ephemeral, tagged CI node.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Configure SSH
         env:
           DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
-          DROPLET_IP: ${{ secrets.STAGING_DROPLET_PUBLIC_IP }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null
+          # Reach the droplet by its Tailscale MagicDNS name, not the public IP.
+          TS_HOST=socioply-api-staging-01
+          ssh-keyscan -H "$TS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           {
             echo "Host staging-droplet"
-            echo "  HostName $DROPLET_IP"
+            echo "  HostName $TS_HOST"
             echo "  User socioply"
             echo "  IdentityFile ~/.ssh/deploy_key"
             echo "  IdentitiesOnly yes"

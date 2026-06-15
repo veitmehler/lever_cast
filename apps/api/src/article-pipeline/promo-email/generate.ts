@@ -28,6 +28,11 @@ function stripHtmlTags(html: string): string {
     .trim()
 }
 
+/** Derive GHL preheader/preview text from the HTML body (first ~100 chars, single line). */
+export function htmlToPreviewText(html: string): string {
+  return stripHtmlTags(html).replace(/\s+/g, ' ').trim().slice(0, 100)
+}
+
 export interface PromoEmailResult {
   subject: string
   bodyHtml: string

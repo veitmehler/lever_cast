@@ -2,9 +2,14 @@ import PgBoss from 'pg-boss'
 import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
-import { generatePromoEmail } from '../article-pipeline/promo-email/generate'
+import { generatePromoEmail, htmlToPreviewText } from '../article-pipeline/promo-email/generate'
 import { getPromoEmailConfig } from '../lib/ghl/settings'
-import { createGhlEmailCampaign, scheduleGhlEmailCampaign } from '../lib/ghl/client'
+import {
+  createGhlEmailCampaign,
+  scheduleGhlEmailCampaign,
+  formatLocalSendAt,
+  type GhlEmailMeta,
+} from '../lib/ghl/client'
 import { GHL_MIN_SCHEDULE_LEAD_MS } from '../social/automation/schedule'
 
 export interface PromoEmailGenerateJobData {
@@ -99,21 +104,44 @@ export async function promoEmailGenerateHandler(
         continue
       }
 
+      // GHL requires a verified sender for email campaigns.
+      if (!config.fromEmail) {
+        throw new Error('Promotional email needs a "From email" — set it in Omniply settings')
+      }
+
       const email = await generatePromoEmail(jobId, userId)
+
+      const meta: GhlEmailMeta = {
+        subject: email.subject,
+        fromName: config.fromName ?? config.fromEmail,
+        fromEmail: config.fromEmail,
+        previewText: htmlToPreviewText(email.bodyHtml),
+      }
 
       const campaign = await createGhlEmailCampaign({
         apiKey: config.apiKey,
         locationId: config.locationId,
         name: `Article promo — ${email.subject}`.slice(0, 120),
-        subject: email.subject,
+        meta,
         bodyHtml: email.bodyHtml,
-        tagId: config.tagId,
-        fromName: config.fromName ?? undefined,
-        fromEmail: config.fromEmail ?? undefined,
+        timeZone: config.timezone,
+        userId: config.ghlUserId,
       })
 
-      const sendAt = computeSendAt(new Date(publishingDate), config.sendTime, config.timezone)
-      await scheduleGhlEmailCampaign(config.apiKey, config.locationId, campaign.campaignId, sendAt.toISOString())
+      // computeSendAt returns the correct UTC instant; GHL wants it as a local
+      // wall-clock string paired with timeZone.
+      const sendAtUtc = computeSendAt(new Date(publishingDate), config.sendTime, config.timezone)
+      const sendAtLocal = formatLocalSendAt(sendAtUtc, config.timezone)
+      await scheduleGhlEmailCampaign({
+        apiKey: config.apiKey,
+        locationId: config.locationId,
+        campaignId: campaign.campaignId,
+        meta,
+        tagIds: [config.tagId],
+        timeZone: config.timezone,
+        userId: config.ghlUserId,
+        sendAt: sendAtLocal,
+      })
 
       await prisma.articleEmailCampaign.update({
         where: { jobId },
@@ -122,13 +150,13 @@ export async function promoEmailGenerateHandler(
           ghlCampaignId: campaign.campaignId,
           tagId: config.tagId,
           tagName: config.tagName,
-          scheduledFor: sendAt,
+          scheduledFor: sendAtUtc,
           errorMessage: null,
         },
       })
 
       logger.info(
-        { jobId, campaignId: campaign.campaignId, sendAt: sendAt.toISOString() },
+        { jobId, campaignId: campaign.campaignId, sendAt: sendAtLocal, timeZone: config.timezone },
         '[promo-email-generate] campaign scheduled',
       )
     } catch (err) {

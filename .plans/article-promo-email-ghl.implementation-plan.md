@@ -309,16 +309,19 @@ Follow existing patterns (`apps/api/src/routes/__tests__/ghl.routes.test.ts`, `a
 
 ## 9b. Implementation status (2026-06-15)
 
-**Built on branch `feat/article-promo-email-ghl`.** All phases implemented; typecheck + lint clean; 396 tests pass (13 new). DB migrate:deploy + prompt seed + `promoEmailEnabled` opt-in remain for rollout.
+**Built on branch `feat/article-promo-email-ghl`.** All phases implemented; typecheck + lint clean; 399 tests pass (16 new). DB migrate:deploy + prompt seed + `promoEmailEnabled` opt-in remain for rollout.
 
 Phase 0 findings (recorded):
 - **Tags** — confirmed via official OpenAPI repo: `GET /locations/{locationId}/tags` → `{ tags: [{ id, name, locationId }] }`. Implemented as `listGhlTags`.
-- **Email campaign V2** — the create/schedule endpoints are documented on the marketplace but are NOT in the public OpenAPI repo and the doc pages are JS-rendered. Client methods (`createGhlEmailCampaign` / `scheduleGhlEmailCampaign`) are built against the documented V2 paths (`POST /emails/public/v2/locations/{locationId}/campaigns[/{id}/schedule]`) with resilient id extraction, isolated in `apps/api/src/lib/ghl/client.ts`. **Exact field names (`html`/`tagIds`/`scheduleTimestamp`, sender identity) still need confirming against a live call before enabling in prod.**
-- **Pre-existing bug discovered:** `slotToUtc` in `social/automation/schedule.ts` diverges (returned 2026-06-17 for 9am ET on 2026-06-20) — its iterative day/month terms overshoot once the guess crosses midnight. Out of scope to fix; promo-email scheduling uses a correct inline offset-method conversion (`computeSendAt`) instead. **Worth a separate ticket** — social automation send-times may be affected.
+- **Email campaign V2 — CONFIRMED** against a working production integration (see [[GHL-Integration_Explanation.md]]). Client matches the real two-step flow:
+  - Create: `POST /emails/public/v2/locations/{locationId}/campaigns/email-campaign` with `{ name, subject, previewText, fromName, fromEmail, editorType: 'html', editorContent, timeZone, userId, emailMeta }`; id from `data.id`/`data.campaignId`. **Tag is NOT set here.**
+  - Schedule: `POST .../campaigns/{campaignId}/schedule` with `{ scheduleType: 'scheduled', timeZone, userId, emailMeta, recipients: { type: 'tag', tagIds }, scheduleConfig: { sendAt } }`.
+  - **`sendAt` is local wall-clock** (`YYYY-MM-DDTHH:mm:ss`, no `Z`) interpreted in `timeZone` — `formatLocalSendAt()` converts the UTC instant. `userId` = `GhlSettings.ghlUserId` (campaign owner, required). A verified `fromEmail` is required (enforced at settings-save and at send time).
+- **Pre-existing bug discovered + FIXED** (separate PR off `main`, `fix/slot-to-utc-tz-conversion`): `slotToUtc` in `social/automation/schedule.ts` diverged (returned 2026-06-17 for 9am ET on 2026-06-20) — iterative day/month terms overshot once the guess crossed midnight. Replaced with single-step offset correction + tests. Promo-email scheduling uses its own inline conversion (`computeSendAt` + `formatLocalSendAt`).
 
 ## 10. Open items to resolve
 
-1. **[Phase 0 — blocking]** Exact GHL Create/Schedule Email Campaign schema: audience-by-tag support, inline HTML vs template id, sender identity, schedule timestamp format, required scopes. (See §2.)
+1. **[RESOLVED]** GHL Create/Schedule Email Campaign schema — confirmed and implemented (see §9b). Inline HTML via `editorContent`; tag audience set at schedule via `recipients.tagIds`; `sendAt` is local wall-clock; `userId` + verified `fromEmail` required.
 2. **[Decision]** "Published after the configured send time" rule — recommend **send immediately**. Confirm.
 3. **[Data]** Canonical `{{article_url}}` source at publish time — `SitePage` slug + site base URL, WordPress permalink, or other? Needed for the email's link-back. If no reliable URL, decide fallback (omit link, or use a landing page).
 4. **[Decision]** GHL prerequisites the user must complete in their account once: verified sending domain / from-address, Private Integration key scopes. Document in settings UI as a checklist.

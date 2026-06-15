@@ -42,6 +42,8 @@ export function encryptGhlApiKey(apiKey: string): string {
 export interface PromoEmailConfig {
   apiKey: string
   locationId: string
+  /** GHL user id that owns created campaigns — required by the email API. */
+  ghlUserId: string
   tagId: string
   tagName: string | null
   sendTime: string // "HH:mm"
@@ -52,12 +54,18 @@ export interface PromoEmailConfig {
 
 /**
  * Returns the promotional-email config only when the feature is fully usable:
- * enabled, a decryptable API key, a locationId, and a target tag. Otherwise null
- * so callers can cheaply skip.
+ * enabled, a decryptable API key, a locationId, a GHL user id (campaign owner),
+ * and a target tag. Otherwise null so callers can cheaply skip.
  */
 export async function getPromoEmailConfig(userId: string): Promise<PromoEmailConfig | null> {
   const row = await prisma.ghlSettings.findUnique({ where: { userId } })
-  if (!row?.promoEmailEnabled || !row.ghlApiKey || !row.ghlLocationId || !row.promoEmailTagId) {
+  if (
+    !row?.promoEmailEnabled ||
+    !row.ghlApiKey ||
+    !row.ghlLocationId ||
+    !row.ghlUserId ||
+    !row.promoEmailTagId
+  ) {
     return null
   }
   const apiKey = decrypt(row.ghlApiKey)
@@ -66,6 +74,7 @@ export async function getPromoEmailConfig(userId: string): Promise<PromoEmailCon
   return {
     apiKey,
     locationId: row.ghlLocationId,
+    ghlUserId: row.ghlUserId,
     tagId: row.promoEmailTagId,
     tagName: row.promoEmailTagName,
     sendTime: row.promoEmailSendTime ?? '09:00',

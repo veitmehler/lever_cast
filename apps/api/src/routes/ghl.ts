@@ -105,6 +105,9 @@ export async function ghlRoutes(app: FastifyInstance) {
       if (p.enabled && !(p.tagId ?? existing?.promoEmailTagId)) {
         return reply.status(400).send({ error: 'Select a tag before enabling promotional emails' })
       }
+      if (p.enabled && !(p.fromEmail ?? existing?.promoEmailFromEmail)) {
+        return reply.status(400).send({ error: 'Set a "From email" before enabling promotional emails' })
+      }
       if (p.enabled !== undefined) promoUpdate.promoEmailEnabled = p.enabled
       if (p.tagId !== undefined) promoUpdate.promoEmailTagId = p.tagId || null
       if (p.tagName !== undefined) promoUpdate.promoEmailTagName = p.tagName || null

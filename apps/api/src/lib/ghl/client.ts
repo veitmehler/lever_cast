@@ -278,31 +278,36 @@ export async function listGhlTags(apiKey: string, locationId: string): Promise<G
 
 // ── Email campaigns (promotional email per published article) ────────────────
 //
-// NOTE: GHL's V2 email-marketing endpoints (create/schedule campaign) are
-// documented on the marketplace but are NOT present in the public OpenAPI repo,
-// and the doc pages are JS-rendered. The request/response shapes below follow
-// the documented V2 paths and the conventions of the rest of the LeadConnector
-// API; the exact field names should be confirmed against a live call before
-// enabling in production. All such uncertainty is isolated to this section.
+// Two-step Email Campaigns V2 flow (confirmed against a working production
+// integration): (1) create a draft campaign with inline HTML, (2) schedule it
+// with the tag audience + send time. GHL performs delivery.
 //
-// Documented paths (services.leadconnectorhq.com):
-//   POST /emails/public/v2/locations/{locationId}/campaigns
+// Paths (services.leadconnectorhq.com):
+//   POST /emails/public/v2/locations/{locationId}/campaigns/email-campaign
 //   POST /emails/public/v2/locations/{locationId}/campaigns/{campaignId}/schedule
 
 const EMAIL_API_VERSION = '2021-07-28'
+
+/** Sender/meta block duplicated into both create and schedule bodies. */
+export interface GhlEmailMeta {
+  subject: string
+  fromName: string
+  fromEmail: string
+  previewText: string
+}
 
 export interface CreateGhlEmailCampaignInput {
   apiKey: string
   locationId: string
   /** Internal campaign name (not shown to recipients). */
   name: string
-  subject: string
+  meta: GhlEmailMeta
   /** Email-safe HTML body. */
   bodyHtml: string
-  /** Tag / smart-list id the campaign is sent to. */
-  tagId: string
-  fromName?: string
-  fromEmail?: string
+  /** IANA timezone the schedule time is interpreted in. */
+  timeZone: string
+  /** GHL user id that owns the campaign. */
+  userId: string
 }
 
 export interface CreateGhlEmailCampaignResult {
@@ -317,27 +322,35 @@ function extractCampaignId(payload: unknown): string | null {
     (root.campaign as Record<string, unknown> | undefined) ??
     (root.data as Record<string, unknown> | undefined) ??
     root
-  const id = nested?._id ?? nested?.id ?? nested?.campaignId ?? root.redirect
+  const id = nested?.id ?? nested?._id ?? nested?.campaignId ?? root.campaignId ?? root.id
   return typeof id === 'string' ? id : null
 }
 
 export async function createGhlEmailCampaign(
   input: CreateGhlEmailCampaignInput,
 ): Promise<CreateGhlEmailCampaignResult> {
-  const body: Record<string, unknown> = {
-    locationId: input.locationId,
+  const { meta } = input
+  const body = {
     name: input.name,
-    subject: input.subject,
-    html: input.bodyHtml,
-    // Audience: contacts carrying this tag (the "smart list").
-    tagIds: [input.tagId],
+    subject: meta.subject,
+    previewText: meta.previewText,
+    fromName: meta.fromName,
+    fromEmail: meta.fromEmail,
+    editorType: 'html',
+    editorContent: input.bodyHtml,
+    timeZone: input.timeZone,
+    userId: input.userId,
+    emailMeta: {
+      subject: meta.subject,
+      fromName: meta.fromName,
+      fromEmail: meta.fromEmail,
+      previewText: meta.previewText,
+    },
   }
-  if (input.fromName) body.fromName = input.fromName
-  if (input.fromEmail) body.fromEmail = input.fromEmail
 
   const data = await ghlRequest<Record<string, unknown>>(
     input.apiKey,
-    `/emails/public/v2/locations/${input.locationId}/campaigns`,
+    `/emails/public/v2/locations/${input.locationId}/campaigns/email-campaign`,
     { method: 'POST', body, version: EMAIL_API_VERSION },
   )
 
@@ -348,23 +361,69 @@ export async function createGhlEmailCampaign(
   return { campaignId }
 }
 
-/**
- * Schedule a previously-created campaign to send at `sendAt` (ISO 8601).
- * Pass an instant already in the past to send (approximately) immediately.
- */
+export interface ScheduleGhlEmailCampaignInput {
+  apiKey: string
+  locationId: string
+  campaignId: string
+  meta: GhlEmailMeta
+  /** Tag ids the campaign is sent to (the "smart list"). */
+  tagIds: string[]
+  timeZone: string
+  userId: string
+  /**
+   * Local wall-clock send time, "YYYY-MM-DDTHH:mm:ss" with NO timezone suffix.
+   * GHL interprets it in `timeZone` — passing a UTC `Z` string sends at the
+   * wrong time. Use formatLocalSendAt() to build this from a UTC Date.
+   */
+  sendAt: string
+}
+
+/** Schedule a previously-created campaign to send to `tagIds` at `sendAt`. */
 export async function scheduleGhlEmailCampaign(
-  apiKey: string,
-  locationId: string,
-  campaignId: string,
-  sendAt: string,
+  input: ScheduleGhlEmailCampaignInput,
 ): Promise<void> {
-  await ghlRequest<unknown>(
-    apiKey,
-    `/emails/public/v2/locations/${locationId}/campaigns/${campaignId}/schedule`,
-    {
-      method: 'POST',
-      body: { scheduleTimestamp: sendAt, sendAt },
-      version: EMAIL_API_VERSION,
+  const { meta } = input
+  const body = {
+    scheduleType: 'scheduled',
+    timeZone: input.timeZone,
+    userId: input.userId,
+    emailMeta: {
+      subject: meta.subject,
+      fromName: meta.fromName,
+      fromEmail: meta.fromEmail,
+      previewText: meta.previewText,
     },
+    recipients: {
+      type: 'tag',
+      tagIds: input.tagIds,
+    },
+    scheduleConfig: {
+      sendAt: input.sendAt,
+    },
+  }
+
+  await ghlRequest<unknown>(
+    input.apiKey,
+    `/emails/public/v2/locations/${input.locationId}/campaigns/${input.campaignId}/schedule`,
+    { method: 'POST', body, version: EMAIL_API_VERSION },
   )
+}
+
+/**
+ * Format a UTC instant as GHL's local wall-clock send string
+ * ("YYYY-MM-DDTHH:mm:ss", no suffix) in `timeZone`. GHL pairs this with the
+ * `timeZone` field, so it must be the local representation, not UTC.
+ */
+export function formatLocalSendAt(utcDate: Date, timeZone: string): string {
+  // 'sv-SE' natively formats as "YYYY-MM-DD HH:mm:ss"; swap the space for 'T'.
+  const local = new Intl.DateTimeFormat('sv-SE', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(utcDate)
+  return local.replace(' ', 'T')
 }

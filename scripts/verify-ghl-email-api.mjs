@@ -93,18 +93,28 @@ async function main() {
       console.error('\n--create requires --tag <tagId>')
       process.exit(1)
     }
-    console.log('\n3) POST /emails/public/v2/locations/{id}/campaigns  (create DRAFT — not sent)')
-    const body = {
-      locationId,
-      name: `API verify draft ${new Date().toISOString()}`,
-      subject: '[verify] please ignore',
-      html: '<p>verification draft — safe to delete</p>',
-      tagIds: [tagId],
+    const userId = process.env.GHL_USER_ID
+    const fromEmail = process.env.GHL_FROM_EMAIL
+    const fromName = process.env.GHL_FROM_NAME ?? 'Verification'
+    if (!userId || !fromEmail) {
+      console.error('\n--create needs GHL_USER_ID and GHL_FROM_EMAIL env vars too.')
+      process.exit(1)
     }
-    const created = await call('POST', `/emails/public/v2/locations/${locationId}/campaigns`, body)
+    console.log('\n3) POST .../campaigns/email-campaign  (create DRAFT — not sent)')
+    const meta = { subject: '[verify] please ignore', fromName, fromEmail, previewText: 'verification' }
+    const body = {
+      name: `API verify draft ${new Date().toISOString()}`,
+      ...meta,
+      editorType: 'html',
+      editorContent: '<p>verification draft — safe to delete</p>',
+      timeZone: 'America/New_York',
+      userId,
+      emailMeta: meta,
+    }
+    const created = await call('POST', `/emails/public/v2/locations/${locationId}/campaigns/email-campaign`, body)
     console.log(`   status ${created.status}`)
     console.log('   response:', JSON.stringify(created.data).slice(0, 800))
-    console.log('\n   NOTE: delete this draft in GHL if it was created.')
+    console.log('\n   NOTE: delete this draft in GHL if it was created. (Schedule step is NOT exercised here.)')
   } else {
     console.log('\n3) (skipped create — pass --create --tag <tagId> to confirm write fields)')
   }

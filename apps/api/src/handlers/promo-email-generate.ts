@@ -1,0 +1,156 @@
+import PgBoss from 'pg-boss'
+import { prisma } from '@socioply/shared'
+import { logger } from '../lib/logger'
+import { sendFailureAlert } from '../lib/alerts'
+import { generatePromoEmail } from '../article-pipeline/promo-email/generate'
+import { getPromoEmailConfig } from '../lib/ghl/settings'
+import { createGhlEmailCampaign, scheduleGhlEmailCampaign } from '../lib/ghl/client'
+import { GHL_MIN_SCHEDULE_LEAD_MS } from '../social/automation/schedule'
+
+export interface PromoEmailGenerateJobData {
+  jobId: string
+  userId: string
+  /** ISO string of the article publishing date. */
+  publishingDate: string
+}
+
+/** Calendar Y/M/D of `date` as seen in `timeZone`. */
+function calendarDateInZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
+  return { year: get('year'), month: get('month'), day: get('day') }
+}
+
+/**
+ * Convert a wall-clock time (year/month/day/hour/minute) in `timeZone` to a UTC
+ * Date. Uses the single-step offset-correction method: guess the instant as if
+ * the wall time were UTC, measure how that instant renders in the zone, and
+ * subtract the resulting offset. Correct except within the ~1h DST-transition
+ * window, which is acceptable for a promotional send time.
+ */
+function zonedWallTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  const guess = Date.UTC(year, month - 1, day, hour, minute, 0)
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(guess))
+  const get = (type: string) => parseInt(fmt.find((p) => p.type === type)?.value ?? '0', 10)
+  const asZoned = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  const offset = asZoned - guess // tz offset (ms) at the target instant
+  return new Date(guess - offset)
+}
+
+/**
+ * Compute the absolute UTC instant the campaign should send: the configured
+ * wall-clock `sendTime` (HH:mm) on the article's publishing date, in the user's
+ * timezone. If that instant is already past (e.g. the article published late in
+ * the day), send as soon as GHL allows (now + minimum lead time).
+ */
+export function computeSendAt(
+  publishingDate: Date,
+  sendTime: string,
+  timezone: string,
+  now: Date = new Date(),
+): Date {
+  const [hour, minute] = sendTime.split(':').map((n) => parseInt(n, 10))
+  const { year, month, day } = calendarDateInZone(publishingDate, timezone)
+  const target = zonedWallTimeToUtc(year, month, day, hour, minute, timezone)
+
+  const earliest = new Date(now.getTime() + GHL_MIN_SCHEDULE_LEAD_MS)
+  return target.getTime() < earliest.getTime() ? earliest : target
+}
+
+export async function promoEmailGenerateHandler(
+  jobs: PgBoss.Job<PromoEmailGenerateJobData>[],
+): Promise<void> {
+  for (const job of jobs) {
+    const { jobId, userId, publishingDate } = job.data
+    logger.info({ jobId, pgBossJobId: job.id }, '[promo-email-generate] starting')
+
+    await prisma.articleEmailCampaign.updateMany({
+      where: { jobId, status: 'pending' },
+      data: { status: 'processing' },
+    })
+
+    try {
+      // Resolve config first so we fail fast if the feature was disabled after enqueue.
+      const config = await getPromoEmailConfig(userId)
+      if (!config) {
+        logger.warn({ jobId }, '[promo-email-generate] promo email not configured/enabled — skipping')
+        await prisma.articleEmailCampaign.deleteMany({ where: { jobId, status: 'processing' } })
+        continue
+      }
+
+      const email = await generatePromoEmail(jobId, userId)
+
+      const campaign = await createGhlEmailCampaign({
+        apiKey: config.apiKey,
+        locationId: config.locationId,
+        name: `Article promo — ${email.subject}`.slice(0, 120),
+        subject: email.subject,
+        bodyHtml: email.bodyHtml,
+        tagId: config.tagId,
+        fromName: config.fromName ?? undefined,
+        fromEmail: config.fromEmail ?? undefined,
+      })
+
+      const sendAt = computeSendAt(new Date(publishingDate), config.sendTime, config.timezone)
+      await scheduleGhlEmailCampaign(config.apiKey, config.locationId, campaign.campaignId, sendAt.toISOString())
+
+      await prisma.articleEmailCampaign.update({
+        where: { jobId },
+        data: {
+          status: 'scheduled',
+          ghlCampaignId: campaign.campaignId,
+          tagId: config.tagId,
+          tagName: config.tagName,
+          scheduledFor: sendAt,
+          errorMessage: null,
+        },
+      })
+
+      logger.info(
+        { jobId, campaignId: campaign.campaignId, sendAt: sendAt.toISOString() },
+        '[promo-email-generate] campaign scheduled',
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error({ jobId, err }, '[promo-email-generate] failed')
+
+      await prisma.articleEmailCampaign
+        .updateMany({
+          where: { jobId, status: { in: ['processing', 'generated'] } },
+          data: { status: 'failed', errorMessage: message },
+        })
+        .catch(() => {})
+
+      await sendFailureAlert({
+        userId,
+        jobId,
+        errorType: 'promo_email_generate_failed',
+        message,
+        context: { jobId, pgBossJobId: job.id },
+      }).catch(() => {})
+
+      throw err
+    }
+  }
+}

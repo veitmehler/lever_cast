@@ -195,6 +195,14 @@ model GhlSettings {
   accountIds     Json? // { facebook?: string, instagram?: string, linkedin?: string }
   lastVerifiedAt DateTime?
   lastError      String?
+  // Promotional email automation (one campaign per published article, sent to a tag/smart list)
+  promoEmailEnabled   Boolean @default(false)
+  promoEmailTagId     String?
+  promoEmailTagName   String?
+  promoEmailSendTime  String? @default("09:00") // "HH:mm" 24h, in promoEmailTimezone
+  promoEmailTimezone  String? @default("America/New_York")
+  promoEmailFromName  String?
+  promoEmailFromEmail String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -464,6 +472,7 @@ model ArticleJob {
   llmUsage             LLMUsage[]
   syndicationArticles   SyndicationArticle[]
   socialAutomationRuns  SocialAutomationRun[]
+  articleEmailCampaign  ArticleEmailCampaign?
 
   @@index([userId])
   @@index([status])
@@ -491,6 +500,36 @@ model SyndicationArticle {
   @@unique([jobId, platform])
   @@index([userId])
   @@map("syndication_articles")
+}
+
+// Promotional email sent to a GHL smart list (tag) for each published article.
+// One row per article job. Generated from the article via PromptTemplate step 32,
+// then created + scheduled as a GHL Email Campaign on the publish date.
+model ArticleEmailCampaign {
+  id            String     @id @default(cuid())
+  jobId         String     @unique
+  job           ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId        String
+  subject       String
+  bodyHtml      String     @db.Text
+  status        String     @default("pending") // pending | generated | scheduled | sent | failed
+  ghlCampaignId String?
+  tagId         String? // tag/smart-list id snapshot used at send time
+  tagName       String?
+  scheduledFor  DateTime?
+  sentAt        DateTime?
+  errorMessage  String?    @db.Text
+  inputTokens   Int        @default(0)
+  outputTokens  Int        @default(0)
+  cost          Float      @default(0)
+  provider      String?
+  model         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("article_email_campaigns")
 }
 
 model PipelineStep {

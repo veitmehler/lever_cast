@@ -38,3 +38,39 @@ export async function getGhlAccountId(
 export function encryptGhlApiKey(apiKey: string): string {
   return encrypt(apiKey.trim())
 }
+
+export interface PromoEmailConfig {
+  apiKey: string
+  locationId: string
+  tagId: string
+  tagName: string | null
+  sendTime: string // "HH:mm"
+  timezone: string
+  fromName: string | null
+  fromEmail: string | null
+}
+
+/**
+ * Returns the promotional-email config only when the feature is fully usable:
+ * enabled, a decryptable API key, a locationId, and a target tag. Otherwise null
+ * so callers can cheaply skip.
+ */
+export async function getPromoEmailConfig(userId: string): Promise<PromoEmailConfig | null> {
+  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  if (!row?.promoEmailEnabled || !row.ghlApiKey || !row.ghlLocationId || !row.promoEmailTagId) {
+    return null
+  }
+  const apiKey = decrypt(row.ghlApiKey)
+  if (!apiKey) return null
+
+  return {
+    apiKey,
+    locationId: row.ghlLocationId,
+    tagId: row.promoEmailTagId,
+    tagName: row.promoEmailTagName,
+    sendTime: row.promoEmailSendTime ?? '09:00',
+    timezone: row.promoEmailTimezone ?? 'America/New_York',
+    fromName: row.promoEmailFromName,
+    fromEmail: row.promoEmailFromEmail,
+  }
+}

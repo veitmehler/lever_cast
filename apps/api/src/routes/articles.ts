@@ -15,6 +15,7 @@ import {
 } from '../article-pipeline/enrichment/html-parser'
 import { readS3Object } from '@socioply/shared'
 import { enqueueSyndication } from '../article-pipeline/syndication/enqueue'
+import { enqueuePromoEmail } from '../article-pipeline/promo-email/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'
 import { enqueueSocialDispatch } from '../social/automation/enqueue-dispatch'
 import { logger } from '../lib/logger'
@@ -480,6 +481,18 @@ export async function articleRoutes(app: FastifyInstance) {
         logger.error({ jobId, err }, '[publish] failed to enqueue syndication'),
       )
 
+      // Promotional email → GHL Email Campaign, scheduled for the publish day.
+      // Gated on the global per-user setting; full config is re-checked in the worker.
+      const ghl = await prisma.ghlSettings.findUnique({
+        where: { userId: user.id },
+        select: { promoEmailEnabled: true, promoEmailTagId: true },
+      })
+      if (ghl?.promoEmailEnabled && ghl.promoEmailTagId) {
+        enqueuePromoEmail({ jobId, userId: user.id, publishingDate }).catch((err) =>
+          logger.error({ jobId, err }, '[publish] failed to enqueue promo email'),
+        )
+      }
+
       // Skip the 12-post social set for "Article only" jobs (topic mode), in
       // addition to the global socialAutomationEnabled setting. Syndication
       // (LinkedIn/Medium article) still runs — that's article distribution.
@@ -766,6 +779,42 @@ export async function articleRoutes(app: FastifyInstance) {
       })
 
       return reply.send({ articles })
+    },
+  )
+
+  // ── GET /api/articles/:jobId/promo-email ──────────────────────────────────
+  app.get<{ Params: { jobId: string } }>(
+    '/articles/:jobId/promo-email',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+
+      const user = await prisma.user.findUnique({ where: { clerkId } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const { jobId } = request.params
+      const job = await prisma.articleJob.findFirst({
+        where: { id: jobId, userId: user.id },
+        select: { id: true },
+      })
+      if (!job) return reply.status(404).send({ error: 'Article job not found' })
+
+      const campaign = await prisma.articleEmailCampaign.findUnique({
+        where: { jobId },
+        select: {
+          subject:       true,
+          bodyHtml:      true,
+          status:        true,
+          ghlCampaignId: true,
+          tagName:       true,
+          scheduledFor:  true,
+          sentAt:        true,
+          errorMessage:  true,
+          createdAt:     true,
+        },
+      })
+
+      return reply.send({ campaign })
     },
   )
 

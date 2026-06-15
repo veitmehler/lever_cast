@@ -3,7 +3,7 @@ import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { decrypt, encrypt, maskApiKey } from '@socioply/shared'
-import { getGhlOAuthStartUrl, listGhlAccounts } from '../lib/ghl/client'
+import { getGhlOAuthStartUrl, listGhlAccounts, listGhlTags } from '../lib/ghl/client'
 import type { GhlAccountIds } from '../lib/ghl/types'
 import { GHL_PLATFORMS } from '../lib/ghl/types'
 
@@ -27,6 +27,15 @@ export async function ghlRoutes(app: FastifyInstance) {
         maskedApiKey: '',
         lastVerifiedAt: null,
         lastError: null,
+        promoEmail: {
+          enabled: false,
+          tagId: null,
+          tagName: null,
+          sendTime: '09:00',
+          timezone: 'America/New_York',
+          fromName: null,
+          fromEmail: null,
+        },
       }
     }
 
@@ -41,6 +50,15 @@ export async function ghlRoutes(app: FastifyInstance) {
       hasApiKey: !!row.ghlApiKey,
       lastVerifiedAt: row.lastVerifiedAt,
       lastError: row.lastError,
+      promoEmail: {
+        enabled: row.promoEmailEnabled,
+        tagId: row.promoEmailTagId,
+        tagName: row.promoEmailTagName,
+        sendTime: row.promoEmailSendTime ?? '09:00',
+        timezone: row.promoEmailTimezone ?? 'America/New_York',
+        fromName: row.promoEmailFromName,
+        fromEmail: row.promoEmailFromEmail,
+      },
     }
   })
 
@@ -57,9 +75,44 @@ export async function ghlRoutes(app: FastifyInstance) {
       ghlLocationId?: string
       ghlUserId?: string
       accountIds?: GhlAccountIds
+      promoEmail?: {
+        enabled?: boolean
+        tagId?: string | null
+        tagName?: string | null
+        sendTime?: string
+        timezone?: string
+        fromName?: string | null
+        fromEmail?: string | null
+      }
     }
 
     const existing = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+
+    // Validate + build promotional-email update (only when the client sends it).
+    const promoUpdate: Record<string, unknown> = {}
+    if (body.promoEmail !== undefined) {
+      const p = body.promoEmail
+      if (p.sendTime !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.sendTime)) {
+        return reply.status(400).send({ error: 'promoEmail.sendTime must be HH:mm (24h)' })
+      }
+      if (p.timezone !== undefined) {
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: p.timezone })
+        } catch {
+          return reply.status(400).send({ error: `Invalid timezone: ${p.timezone}` })
+        }
+      }
+      if (p.enabled && !(p.tagId ?? existing?.promoEmailTagId)) {
+        return reply.status(400).send({ error: 'Select a tag before enabling promotional emails' })
+      }
+      if (p.enabled !== undefined) promoUpdate.promoEmailEnabled = p.enabled
+      if (p.tagId !== undefined) promoUpdate.promoEmailTagId = p.tagId || null
+      if (p.tagName !== undefined) promoUpdate.promoEmailTagName = p.tagName || null
+      if (p.sendTime !== undefined) promoUpdate.promoEmailSendTime = p.sendTime
+      if (p.timezone !== undefined) promoUpdate.promoEmailTimezone = p.timezone
+      if (p.fromName !== undefined) promoUpdate.promoEmailFromName = p.fromName || null
+      if (p.fromEmail !== undefined) promoUpdate.promoEmailFromEmail = p.fromEmail || null
+    }
 
     const ghlLocationId = body.ghlLocationId?.trim() || existing?.ghlLocationId || null
     const ghlUserId = body.ghlUserId?.trim() || existing?.ghlUserId || null
@@ -87,12 +140,14 @@ export async function ghlRoutes(app: FastifyInstance) {
         ghlLocationId,
         ghlUserId,
         accountIds,
+        ...promoUpdate,
       },
       update: {
         ghlApiKey,
         ghlLocationId,
         ghlUserId,
         ...(body.accountIds !== undefined ? { accountIds } : {}),
+        ...promoUpdate,
       },
     })
 
@@ -102,6 +157,15 @@ export async function ghlRoutes(app: FastifyInstance) {
       ghlUserId: row.ghlUserId,
       accountIds: row.accountIds,
       maskedApiKey: maskApiKey(decrypt(ghlApiKey)),
+      promoEmail: {
+        enabled: row.promoEmailEnabled,
+        tagId: row.promoEmailTagId,
+        tagName: row.promoEmailTagName,
+        sendTime: row.promoEmailSendTime ?? '09:00',
+        timezone: row.promoEmailTimezone ?? 'America/New_York',
+        fromName: row.promoEmailFromName,
+        fromEmail: row.promoEmailFromEmail,
+      },
     }
   })
 
@@ -150,6 +214,34 @@ export async function ghlRoutes(app: FastifyInstance) {
         where: { userId: user.id },
         data: { lastError: message },
       }).catch(() => {})
+      return reply.status(400).send({ error: message })
+    }
+  })
+
+  // GET /api/ghl/tags — list location tags (for the promotional-email smart-list picker)
+  app.get('/ghl/tags', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const row = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+    if (!row?.ghlApiKey || !row.ghlLocationId) {
+      return reply.status(400).send({ error: 'Save your GHL API key and Location ID first' })
+    }
+
+    const apiKey = decrypt(row.ghlApiKey)
+    if (!apiKey) {
+      return reply.status(400).send({ error: 'Could not decrypt GHL API key' })
+    }
+
+    try {
+      const tags = await listGhlTags(apiKey, row.ghlLocationId)
+      return { tags }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error({ userId: user.id, locationId: row.ghlLocationId, err }, '[ghl] listGhlTags threw')
       return reply.status(400).send({ error: message })
     }
   })

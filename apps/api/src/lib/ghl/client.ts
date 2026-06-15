@@ -5,12 +5,15 @@ import {
   type GhlPostStatus,
   type GhlPostType,
   type GhlSocialAccount,
+  type GhlTag,
 } from './types'
 import { logger } from '../logger'
 
 export interface GhlRequestOptions {
   method?: string
   body?: unknown
+  /** Override the `Version` header (some endpoint families pin a different date). */
+  version?: string
 }
 
 async function ghlRequest<T>(
@@ -29,7 +32,7 @@ async function ghlRequest<T>(
       Authorization: `Bearer ${apiKey}`,
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Version: GHL_API_VERSION,
+      Version: options.version ?? GHL_API_VERSION,
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
@@ -254,4 +257,114 @@ export async function editGhlPost(input: EditGhlPostInput): Promise<Record<strin
 
 export function getGhlOAuthStartUrl(platform: string): string {
   return `${GHL_BASE_URL}/social-media-posting/oauth/${platform}/start`
+}
+
+// ── Tags (smart-list audience source) ────────────────────────────────────────
+
+/**
+ * List location tags — used to populate the promotional-email "smart list"
+ * picker. Endpoint is the documented Locations API:
+ *   GET /locations/{locationId}/tags  →  { tags: [{ id, name, locationId }] }
+ */
+export async function listGhlTags(apiKey: string, locationId: string): Promise<GhlTag[]> {
+  const data = await ghlRequest<{ tags?: GhlTag[] } | GhlTag[]>(
+    apiKey,
+    `/locations/${locationId}/tags`,
+  )
+  const tags = Array.isArray(data) ? data : (data.tags ?? [])
+  logger.info({ locationId, count: tags.length }, '[ghl] tags loaded')
+  return tags
+}
+
+// ── Email campaigns (promotional email per published article) ────────────────
+//
+// NOTE: GHL's V2 email-marketing endpoints (create/schedule campaign) are
+// documented on the marketplace but are NOT present in the public OpenAPI repo,
+// and the doc pages are JS-rendered. The request/response shapes below follow
+// the documented V2 paths and the conventions of the rest of the LeadConnector
+// API; the exact field names should be confirmed against a live call before
+// enabling in production. All such uncertainty is isolated to this section.
+//
+// Documented paths (services.leadconnectorhq.com):
+//   POST /emails/public/v2/locations/{locationId}/campaigns
+//   POST /emails/public/v2/locations/{locationId}/campaigns/{campaignId}/schedule
+
+const EMAIL_API_VERSION = '2021-07-28'
+
+export interface CreateGhlEmailCampaignInput {
+  apiKey: string
+  locationId: string
+  /** Internal campaign name (not shown to recipients). */
+  name: string
+  subject: string
+  /** Email-safe HTML body. */
+  bodyHtml: string
+  /** Tag / smart-list id the campaign is sent to. */
+  tagId: string
+  fromName?: string
+  fromEmail?: string
+}
+
+export interface CreateGhlEmailCampaignResult {
+  campaignId: string
+}
+
+/** Pull a campaign id out of whatever shape GHL returns. */
+function extractCampaignId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const root = payload as Record<string, unknown>
+  const nested =
+    (root.campaign as Record<string, unknown> | undefined) ??
+    (root.data as Record<string, unknown> | undefined) ??
+    root
+  const id = nested?._id ?? nested?.id ?? nested?.campaignId ?? root.redirect
+  return typeof id === 'string' ? id : null
+}
+
+export async function createGhlEmailCampaign(
+  input: CreateGhlEmailCampaignInput,
+): Promise<CreateGhlEmailCampaignResult> {
+  const body: Record<string, unknown> = {
+    locationId: input.locationId,
+    name: input.name,
+    subject: input.subject,
+    html: input.bodyHtml,
+    // Audience: contacts carrying this tag (the "smart list").
+    tagIds: [input.tagId],
+  }
+  if (input.fromName) body.fromName = input.fromName
+  if (input.fromEmail) body.fromEmail = input.fromEmail
+
+  const data = await ghlRequest<Record<string, unknown>>(
+    input.apiKey,
+    `/emails/public/v2/locations/${input.locationId}/campaigns`,
+    { method: 'POST', body, version: EMAIL_API_VERSION },
+  )
+
+  const campaignId = extractCampaignId(data)
+  if (!campaignId) {
+    throw new Error('GHL did not return an email campaign id')
+  }
+  return { campaignId }
+}
+
+/**
+ * Schedule a previously-created campaign to send at `sendAt` (ISO 8601).
+ * Pass an instant already in the past to send (approximately) immediately.
+ */
+export async function scheduleGhlEmailCampaign(
+  apiKey: string,
+  locationId: string,
+  campaignId: string,
+  sendAt: string,
+): Promise<void> {
+  await ghlRequest<unknown>(
+    apiKey,
+    `/emails/public/v2/locations/${locationId}/campaigns/${campaignId}/schedule`,
+    {
+      method: 'POST',
+      body: { scheduleTimestamp: sendAt, sendAt },
+      version: EMAIL_API_VERSION,
+    },
+  )
 }

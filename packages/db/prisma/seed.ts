@@ -513,6 +513,51 @@ Output the full article in Markdown. Start directly with the # title.`,
   },
 ]
 
+// ── Promotional email template (Step 32) ────────────────────────────────────
+// Generates a short promotional email from a published article. Sent as a GHL
+// Email Campaign to a tag/smart list. Output is strict JSON { subject, bodyHtml }.
+const PROMO_EMAIL_TEMPLATE = [
+  {
+    stepNumber: 32,
+    stepName: 'generate_promotional_email',
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 2000,
+    systemPrompt:
+      'You are an expert email marketer who writes short, high-converting promotional emails that drive clicks to a newly published article. ' +
+      'You write a compelling subject line and a concise, scannable HTML email body. ' +
+      'The body must be valid, email-safe HTML (use <p>, <strong>, <ul>/<li>, and <a href> only — no <html>, <head>, <body>, <style>, or <script> tags, no external CSS). ' +
+      'Always include exactly one clear call-to-action link to the article. ' +
+      'Output ONLY a single JSON object and nothing else, in the exact shape: ' +
+      '{"subject": "<subject line>", "bodyHtml": "<email body html>"}. ' +
+      'Do not wrap the JSON in markdown code fences. Do not add commentary.',
+    userPrompt: `Write a promotional email announcing this newly published article to our newsletter audience.
+
+ARTICLE TITLE: {{title}}
+
+PRIMARY KEYWORD: {{primary_keyword}}
+
+ARTICLE EXCERPT / SUMMARY: {{excerpt}}
+
+ARTICLE URL: {{article_url}}
+
+FULL ARTICLE BODY (for context — do NOT reproduce it):
+{{article_body}}
+
+---
+
+Requirements:
+- Subject line: 4–9 words, curiosity-driven, no clickbait, no emoji.
+- Body: 90–160 words of valid email-safe HTML.
+- Open with a hook tied to the reader's problem, give 2–3 concrete reasons to read the article, then a single call-to-action button/link pointing to {{article_url}} (use an <a href> with anchor text like "Read the full article").
+- Warm, professional, second-person ("you") tone. No "Dear reader". No signature block.
+- If {{article_url}} is empty, still write the email but make the CTA link text "Read the full article" with href="#".
+
+Output ONLY the JSON object: {"subject": "...", "bodyHtml": "..."}`,
+    isActive: true,
+  },
+]
+
 // ── Enrichment template (not a numbered pipeline step — uses stepNumber 20) ─────
 const ENRICHMENT_TEMPLATES = [
   {
@@ -1619,7 +1664,7 @@ Rules:
 async function main() {
   console.log('Seeding prompt templates...')
 
-  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES, ...SOCIAL_TEMPLATES]) {
+  for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES, ...PROMO_EMAIL_TEMPLATE, ...SOCIAL_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
       where: { stepNumber: template.stepNumber },
       create: template,

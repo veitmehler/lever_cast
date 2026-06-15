@@ -14,6 +14,56 @@
 
 ---
 
+## Current status (updated 2026-06-15)
+
+**Phases 0–6 COMPLETE and on prod. Phase 7 PAUSED** (unit-testable surface
+essentially exhausted — 16 PRs, ~80→~383 tests; remainder is orchestration best
+done as integration tests). Detailed running log lives in the
+`remediation-effort-status` memory; the Phase 6 PR-by-PR table is in
+`Phase6-File-Decomposition.md`; the Phase 7 PR list + paused items are in
+`Phase7-Test-Expansion.md`.
+
+- **Phase 0** ✅ — Vitest + CI (`.github/workflows/ci.yml` `verify` job:
+  prisma generate → build shared → `pnpm -r typecheck`/`lint`/`test`) + Phase-0
+  characterization tests.
+- **Phase 1** ✅ — M3 sanitize-html, M1 rate-limit key, L3 generic 500s, L4 upload
+  content-type sniff, L2 admin in-route auth.
+- **Phase 2** ✅ — H1 (TLS verify scoped to Postgres; prod DB via private VPC
+  endpoint) + H2 (WordPress SSRF guard).
+- **Phase 3** ✅ — M2 strict v2 encryption (migrate → verify → tighten).
+- **Phase 4** ✅ — A1 single canonical Prisma schema in `packages/db`. (Incl. **B2**
+  migration baseline so a fresh DB builds from migrations.)
+- **Phase 5** ✅ — A2 shared libs consolidated into `@socioply/shared` (encryption,
+  storage, imageGeneration, twitterApi, telegramApi, threadsApi, linkedinApi,
+  socialConnections, instagramUsername + the single globalThis Prisma client).
+- **Phase 6** ✅ — A3 all 7 God-files decomposed into `features/*` (PRs #23/#27/#31/
+  #38/#42/#43/#44) + A5 hygiene (#46) + Twitter logging (#45) + social dedup (#47).
+  All 8 original security findings (H1/H2/M1/M2/M3/L2/L3/L4) closed.
+
+**Remaining to close out this plan** (Phase 7 unit work is paused, see below):
+- **B1** — close public SSH / Tailscale-only deploy (NOT done).
+- **B4 step 2** — durable connection-pool fix: DO PgBouncer pool for `socioply_staging`
+  or cluster upsize (step 1, the pg-boss pool cap, is done).
+- **Phase 7 integration-test harness** (optional remainder) — disposable Postgres +
+  separate CI job for the orchestrators deferred in `Phase7-Test-Expansion.md`.
+- **Minor papercuts** (tracked in `remediation-effort-status` memory): eager-decrypt-
+  all-then-500 still unfixed on `/api/settings` + `/api/social/connections`; voice/GHL
+  settings don't surface failed saves loudly; Vercel preview Clerk key scoping
+  (preview URLs unusable for authed smoke).
+
+**Done:** **B2** (migration baseline) ✅, **B3** (pg client bump) ✅, **B4 step 1**
+(pg-boss pool cap) ✅. The user's separate `Phase9-Hardening-Observability.md` is out of
+scope for this plan (not scheduled). Optional secondary God-files
+(`article-pipeline/enrichment/index.ts` ~966, `routes/articles.ts` ~903) were never in
+the core decomposition list.
+
+⚠️ **Twitter end-to-end connect is unverified** (deferred): staging connect 403s at
+`/2/users/me` (`client-not-enrolled`) because the dev Twitter app isn't attached to a
+Twitter *Project* — an env/portal issue, not code. User is setting up a new Twitter
+app. PR #44's callback code is verified correct up to that external boundary.
+
+---
+
 ## Phase 0 — Foundation & safety net (no behavior change)
 
 **Goal:** Make it possible to change code with confidence. Nothing here alters runtime behavior.
@@ -131,14 +181,33 @@
 
 ---
 
-## Phase 7 — Broaden test coverage (A4, ongoing)
+## Phase 7 — Broaden test coverage (A4) ← **PAUSED 2026-06-15 (unit surface exhausted)**
 
 **Goal:** Build out from the Phase 0 characterization tests into real coverage now that the structure is clean.
 
-**Work:**
-- Prioritize: the publish pipeline (`handlers/publish.ts`), the article pipeline stages, social-platform adapters (using the now-shared libs), and the admin authorization paths.
-- Add a few integration tests against a disposable Postgres (Docker) for the queue/ownership flows.
-- Wire coverage reporting into CI as a visibility metric (not a hard gate initially).
+**Outcome:** 16 additive PRs (#48–#63), all merged to prod and verified, took the suite
+from ~80 → **~383 tests** (api 264 + web 15 + shared 104). Coverage now spans the entire
+shared platform-adapter layer, the publish pipeline, the article-pipeline pure transforms,
+and authz/validation for **every api route file except `social.ts`**. Full PR list + the
+deliberately-deferred orchestration items are in `Phase7-Test-Expansion.md`.
+
+**Why paused:** what's left is prisma/LLM/headless-browser **orchestration**
+(`buildOutputPayload`, `resolveVariables`, `runArticleEnrichment`, the bundle/wordpress
+publish targets, `social.ts` generation). As mock-heavy unit tests these mostly restate
+the implementation and stay brittle; the real risk (DB query/`include` correctness, and
+LLM/browser behavior) isn't exercised by stubs. They belong in **integration tests
+against a throwaway Postgres (separate CI job)** — recorded as the optional remainder
+above, not folded into the fast unit suite. No end users yet + manual staging smoke
+already gates this layer, so the marginal ROI is low.
+
+**Operational notes (still true, for whoever resumes):**
+- api `tsconfig` includes `src/**/*` (no `__tests__` exclude) → a type-error in a test
+  reddens CI typecheck AND the Docker build. Tests must typecheck.
+- Merging tests under **`apps/api/`** auto-redeploys **prod** (deploy-api.yml paths) →
+  run the `staging-deploy-inflight-check` before merge. `packages/shared`/`apps/web` are
+  deploy-free.
+- Integration tests: throwaway Docker Postgres / testcontainers, NEVER the shared DO
+  cluster (B4 budget). Separate CI job. Optional: `vitest --coverage` as visibility, not a gate.
 
 **Risk:** None — additive.
 

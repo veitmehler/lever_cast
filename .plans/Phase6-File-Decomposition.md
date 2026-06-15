@@ -13,8 +13,9 @@
 | `apps/web/src/app/(protected)/workflow/[jobId]/page.tsx` | ~~2083~~ → ~140 | ✅ **Done** — PR #27, merged to prod 2026-06-13 |
 | `apps/web/src/components/IdeaCapture.tsx` | ~~1298~~ → 1 | ✅ **Done** — PR #31, merged to prod 2026-06-13 (re-export → `features/idea-capture/`) |
 | `apps/web/src/app/(protected)/dashboard/page.tsx` | ~~1292~~ → 37 | ✅ **Done** — PR #38 (`useDashboard` hook + 4 sections in `features/dashboard/`), web-only |
-| `apps/web/src/app/(protected)/posts/[id]/page.tsx` | 1229 | **← NEXT** |
-| `apps/web/src/app/api/social/[platform]/callback/route.ts` | 1059 | pending |
+| `apps/web/src/app/(protected)/posts/[id]/page.tsx` | ~~1229~~ → 50 | ✅ **Done** — PR #42, merged to prod 2026-06-14 (`usePostEditor` hook + PostHeader/PlatformPreviewGrid sections in `features/post-editor/`), web-only |
+| `apps/web/src/app/(protected)/posts/page.tsx` (Drafts list) | ~~961~~ → 52 | ✅ **Done** — PR #43, merged to prod 2026-06-14 (`usePostsList` hook + BulkActionsBar/FilterTabs/DraftsGrid in `features/posts-list/`), web-only |
+| `apps/web/src/app/api/social/[platform]/callback/route.ts` | ~~1059~~ → 344 | ✅ **Done** — PR #44, merged to prod 2026-06-14 (per-platform handlers → `features/social-callbacks/`), web/Vercel route |
 
 (Also large, secondary candidates: `apps/api/src/article-pipeline/enrichment/index.ts`
 ~966, `apps/api/src/routes/articles.ts` ~872.)
@@ -182,7 +183,14 @@ the "strictly behavior-preserving" decomposition PR.
     DB concern. Manual smoke on localhost:3000: dictation toggle, image
     gen/library attach, platform multi-select, template pick, and each social
     post-type (carousel/quote/video) asset generation through to `onGenerate`.
-- `posts/[id]/page.tsx` (1229) — **← NEXT (Step 5). Surveyed 2026-06-14:**
+- `posts/[id]/page.tsx` (1229) — ✅ **DONE (Step 5). PR #42, prod 2026-06-14.**
+  Split into `features/post-editor/`: `usePostEditor(id)` (all state + single
+  draft-fetch effect + ~14 handlers/getters → `PostEditorView`),
+  `sections/PostHeader.tsx` (back link + header + original-idea/image block +
+  ImageGenerationModal as a fragment), `sections/PlatformPreviewGrid.tsx` (the
+  per-platform PlatformPreview + PostAnalytics grid), `types.ts` (Draft). Page →
+  50 lines. Verbatim (id/string-literal diff empty except `React.ChangeEvent`→
+  imported `ChangeEvent`); web-only; smoke-passed. Original survey below:
   - **NOT a TipTap editor** (the earlier note was wrong — TipTap lives in the
     *article* editor / workflow, not here). This is the **social-post
     per-platform editor**: it loads a saved Draft (`/api/drafts/[id]`) and renders
@@ -206,22 +214,67 @@ the "strictly behavior-preserving" decomposition PR.
     `deploy-api` skips.
   - Related: `posts/page.tsx` (the Drafts **list**, ~961 lines) is also oversized —
     decide whether to fold it into the same PR or a follow-up.
-- `social/[platform]/callback/route.ts` (1059): **server route** — decompose by
-  extracting per-platform handlers into modules (e.g.
-  `features/social-callbacks/` or `app/api/social/_handlers/<platform>.ts`).
-  Pure control-flow split; no DOM concerns, so this one is the safest and can
-  be validated by the existing OAuth flows on staging.
+- `posts/page.tsx` (961) — ✅ **DONE (Step 6). PR #43, prod 2026-06-14.** Drafts **list** for `/posts`.
+  Split into `features/posts-list/`: `usePostsList()` (9 state vars, both effects
+  in original order [mount-fetch, then clear-on-filter-change], derived
+  `filteredPosts`/`scheduledDrafts`, and the bulk handlers
+  delete/publish/schedule → `PostsListView`), `sections/BulkActionsBar.tsx`,
+  `sections/FilterTabs.tsx`, `sections/DraftsGrid.tsx` (loading + select-all +
+  the card-map grid [kept inline to preserve its selection closures] + empty
+  state). Page → 52 lines (static header + ScheduleModal kept inline). Verbatim:
+  id/literal diff empty except `React.MouseEvent`/`React.ChangeEvent`→imported
+  types and the modal's `selectedDrafts.size`→`posts.selectedDrafts.size`. The
+  unused `handleSelectDraft` (eslint-disabled, "kept for future") preserved in the
+  hook. Web-only → `deploy-api` skips. Smoke: tabs (All/Drafts/Scheduled/
+  Published) + counts, Drafts-tab select-all / shift-click range / bulk
+  delete+publish+schedule, card badges, card → detail nav.
+- `social/[platform]/callback/route.ts` (1059) — ✅ **DONE (Step 7). PR #44, prod 2026-06-14.**
+  Smoke note: Twitter connect on staging fails at `/2/users/me` with HTTP 403
+  `client-not-enrolled` — the **dev/staging Twitter app (id 31808072) isn't attached
+  to a Twitter Project**, so v2 API calls are forbidden. NOT a code regression
+  (state + token exchange both succeed; the call sequence/strings are byte-identical
+  to prod, where the Twitter app IS enrolled). Follow-up queued: add the swallowed
+  Twitter profile-fetch error log (the other platforms already log theirs).
+  Extracted per-platform OAuth code-exchange into `features/social-callbacks/`:
+  config.ts (VALID_PLATFORMS + env consts + threads redirect helper), types.ts
+  (TokenData, PrismaError, Instagram fetch-param types, + a `CallbackOutcome`
+  discriminated union `{kind:'redirect'} | {kind:'token'}`), getOrCreateUser.ts,
+  and linkedin/twitter/facebook/instagram/threads.ts handlers (each returns a
+  CallbackOutcome). route.ts (344) keeps auth/validate/state-verify, dispatches,
+  and keeps the shared persistence block (appType/find-or-create/IG bg username
+  fetch/logging) inline. **NOT a verbatim move** — it's a control-flow restructure
+  (early `return redirectWithCleanup(x)` → `{kind:'redirect',response:...}`,
+  fall-through → `{kind:'token',...}`); safety net = ALL OAuth string literals
+  byte-identical (verified: single/double/backtick OLD-not-in-NEW all empty) +
+  staging OAuth smoke. Only non-mechanical change: single-assign `let`→`const`
+  (prefer-const). Web/Vercel route (NOT droplet). Smoke: connect each configured
+  platform from Settings (→ `?connected=true`), reconnect updates existing,
+  LinkedIn personal vs company, an error/denied path → `/settings?error=...`.
 
-## Repo hygiene (low-risk, can be one small PR)
+## Repo hygiene (A5) — ✅ DONE (PR #46, prod 2026-06-14)
 
-- Move the ~12 uppercase root `*.md` setup/fix docs into `.documentation/`
-  (which already exists). Keep `README.md` at root.
-- Archive or delete the completed one-off `scripts/*.js|*.ts` migration scripts
-  (e.g. `add-*.js`, `fix-*.js`) — several still import the deleted
-  `@/lib/prisma` path and are already broken/excluded from typecheck. Keep
-  anything still referenced by a package script.
+- ✅ Moved 10 root `*.md` setup/fix docs into `.documentation/`; `README.md` kept at root.
+- ✅ Deleted 22 completed/broken one-off `scripts/*` (12 `.js` schema migrations + 10 `.ts`,
+  5 of which imported the deleted `@/lib/prisma`). Kept `migrate-encryption.ts`,
+  `migrate-images.ts` (runbook tools) and `sync-analytics.sh`.
 - ~~Prod `DIRECT_URL` malformed `sslmode=r>`~~ — already fixed 2026-06-12 during
   the droplet env-file cleanup.
+
+## Follow-ups — ✅ DONE
+
+- **PR #45** — Twitter profile-fetch error logging (the one platform that swallowed it).
+- **PR #47 (dedup)** — extracted the 2 genuinely-identical helpers into
+  `features/social/draftContent.ts` (`buildDraftContentUpdate`,
+  `parseDraftTwitterContent`). The dashboard/post-editor *stateful* handlers have
+  DIVERGED (dashboard: media/provider/ensureDraft; editor: isPublished-guard/loaded
+  draft) and were deliberately NOT merged — no longer true duplicates.
+
+## ✅ PHASE 6 COMPLETE (all 7 God-files + A5 + dedup, prod 2026-06-14)
+
+Optional, NOT in the core list: secondary large files
+`apps/api/src/article-pipeline/enrichment/index.ts` (~966) and
+`apps/api/src/routes/articles.ts` (~872). Twitter connect end-to-end smoke is
+deferred (user setting up a new Twitter app; the 403 is app-not-in-a-Project, not code).
 
 ## Risk
 

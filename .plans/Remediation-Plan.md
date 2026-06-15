@@ -41,7 +41,6 @@ done as integration tests). Detailed running log lives in the
   All 8 original security findings (H1/H2/M1/M2/M3/L2/L3/L4) closed.
 
 **Remaining to close out this plan** (Phase 7 unit work is paused, see below):
-- **B1** — close public SSH / Tailscale-only deploy (NOT done).
 - **B4 — final dashboard knob only:** size the prod `socioply-pool` (DO Connection
   Pools) to ~9–10. The connection-budget work is otherwise done (see "Done" below);
   DO allows only **one** pool per cluster and it already fronts prod, so staging can't
@@ -66,7 +65,12 @@ done as integration tests). Detailed running log lives in the
   `VoiceSettingsPanel.saveSettings` and `GhlSettingsPanel.handleSave` do
   `!res.ok → throw → toast.error`.
 
-**Done:** **B2** (migration baseline) ✅, **B3** (pg client bump) ✅, **B4 connection
+**Done:** **B1** (close public SSH / Tailscale-only deploy) ✅ — 2026-06-15: both
+`deploy-api.yml` + `deploy-api-staging.yml` deploy over Tailscale (`tailscale/
+github-action@v3` OAuth, `tag:ci` → MagicDNS), and `ufw delete allow 22/tcp` removed
+public SSH on both droplets (only `tailscale0` allow + default-deny remain). Validated
+on staging first, then prod; human SSH + CI deploys verified over the tailnet with 22
+closed. **B2** (migration baseline) ✅, **B3** (pg client bump) ✅, **B4 connection
 budget** ✅ — step 1 pg-boss cap, plus tiered per-env allocation (2026-06-15): dev web
 `connection_limit=2`; staging `connection_limit=2` + `PGBOSS_MAX_CONNECTIONS=2` (worker
 stopped when idle); prod `PGBOSS_MAX_CONNECTIONS=8` (applied + verified on the droplet).
@@ -239,7 +243,20 @@ already gates this layer, so the marginal ROI is low.
 Items discovered during implementation that are worth doing but sit outside the
 numbered phases. Recorded here so they aren't lost.
 
-### B1 — Close the public SSH surface (Tailscale-only deploy)
+### B1 — Close the public SSH surface (Tailscale-only deploy) ✅ DONE 2026-06-15
+
+**Resolution:** ground truth was better than the original finding — both droplets
+already ran Tailscale (daemon enabled, `RunSSH:true`), sshd was already key-only, and
+ufw already allowed `tailscale0` + default-denied; the only public hole was
+`22/tcp ALLOW Anywhere`. The real work was moving the CI deploys off the public IP.
+Done: user created a Tailscale OAuth client (Trust credentials → `auth_keys` + `tag:ci`)
+→ repo secrets `TS_OAUTH_CLIENT_ID`/`TS_OAUTH_SECRET`; ACL grants `tag:ci → tag:server`
+SSH and both droplets are tagged `tag:server`; `deploy-api.yml` +
+`deploy-api-staging.yml` now use `tailscale/github-action@v3` (OAuth) → SSH the MagicDNS
+names. Validated staging-first (dispatch + push), then prod (dispatch + push-to-main),
+then `ufw delete allow 22/tcp` on both. Human SSH + CI deploys verified over the tailnet
+with public 22 closed. The `*_DROPLET_PUBLIC_IP` secrets are now unused. Original finding
+below for context.
 
 **Finding:** `sudo ufw status` on the prod droplet (`socioply-api-01`) shows
 `22/tcp ALLOW Anywhere` — public SSH is open to the internet, exposing it to

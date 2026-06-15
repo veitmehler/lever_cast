@@ -42,17 +42,32 @@ done as integration tests). Detailed running log lives in the
 
 **Remaining to close out this plan** (Phase 7 unit work is paused, see below):
 - **B1** — close public SSH / Tailscale-only deploy (NOT done).
-- **B4 step 2** — durable connection-pool fix: DO PgBouncer pool for `socioply_staging`
-  or cluster upsize (step 1, the pg-boss pool cap, is done).
+- **B4 — final dashboard knob only:** size the prod `socioply-pool` (DO Connection
+  Pools) to ~9–10. The connection-budget work is otherwise done (see "Done" below);
+  DO allows only **one** pool per cluster and it already fronts prod, so staging can't
+  get its own — handled via per-env caps instead.
 - **Phase 7 integration-test harness** (optional remainder) — disposable Postgres +
   separate CI job for the orchestrators deferred in `Phase7-Test-Expansion.md`.
-- **Minor papercuts** (tracked in `remediation-effort-status` memory): eager-decrypt-
-  all-then-500 still unfixed on `/api/settings` + `/api/social/connections`; voice/GHL
-  settings don't surface failed saves loudly; Vercel preview Clerk key scoping
-  (preview URLs unusable for authed smoke).
+- **Vercel preview Clerk key scoping** (dashboard) — scope `pk_test`/`sk_test` to the
+  Preview env so preview URLs are usable for authed smoke testing.
 
-**Done:** **B2** (migration baseline) ✅, **B3** (pg client bump) ✅, **B4 step 1**
-(pg-boss pool cap) ✅. The user's separate `Phase9-Hardening-Observability.md` is out of
+**Audited & resolved 2026-06-15 (were listed as papercuts, verified non-issues):**
+- "eager-decrypt-500 on `/api/settings` + `/api/social/connections`" — **non-issue**:
+  neither route decrypts (settings = plaintext prefs; connections GET selects only
+  non-secret cols). The genuine decrypting list routes (`/api/api-keys`,
+  `/api/ai/models/[provider]`) are already per-key try/catch-safe.
+- "voice/GHL settings don't surface failed saves" — **already fixed**: both
+  `VoiceSettingsPanel.saveSettings` and `GhlSettingsPanel.handleSave` do
+  `!res.ok → throw → toast.error`.
+
+**Done:** **B2** (migration baseline) ✅, **B3** (pg client bump) ✅, **B4 connection
+budget** ✅ — step 1 pg-boss cap, plus tiered per-env allocation (2026-06-15): dev web
+`connection_limit=2`; staging `connection_limit=2` + `PGBOSS_MAX_CONNECTIONS=2` (worker
+stopped when idle); prod `PGBOSS_MAX_CONNECTIONS=8` (applied + verified on the droplet).
+pg-boss takes **direct** slots (can't use the transaction-mode pool); prod app queries
+go through the single `socioply-pool`. Budget (cluster 25): prod ≈ pgboss 8 + app-pool
+~9 = 17, staging ≤6, dev 2 — fits with the superuser reserve. Cluster upsize deferred
+until clients justify it. The user's separate `Phase9-Hardening-Observability.md` is out of
 scope for this plan (not scheduled). Optional secondary God-files
 (`article-pipeline/enrichment/index.ts` ~966, `routes/articles.ts` ~903) were never in
 the core decomposition list.
@@ -294,15 +309,22 @@ starve prod under real load.
 **Why:** two pg-boss workers + two app pools on a 22-slot cluster is over budget;
 prod connection failures are a real risk once traffic arrives.
 
-**How to apply (cheapest first):**
-1. Cap the pg-boss pool in `queues/index.ts` via the `max` option (e.g. `max: 4`) —
-   helps both prod and staging immediately.
-2. Give staging its own DO **connection pool** (PgBouncer) and point staging's
-   `DATABASE_URL` at it instead of the direct endpoint (staging currently uses the
-   direct endpoint for both URLs, which doesn't multiplex).
-3. If still tight, upsize the cluster or give staging its own small cluster.
+**Resolution (2026-06-15) — tiered per-env caps, since DO allows only ONE pool/cluster
+and it already fronts prod (so step 2 below is impossible as written):**
+1. ✅ pg-boss pool capped via `max` / `PGBOSS_MAX_CONNECTIONS` in `queues/index.ts`
+   (pg-boss uses the **direct** endpoint — it can't go through a transaction-mode pool).
+2. ~~Give staging its own DO pool~~ — **not possible**: one pool per cluster, already on
+   prod (`socioply-pool`, `:25061`). Staging stays on direct connections, tightly capped.
+3. **Applied caps:** dev web `connection_limit=2`; staging `connection_limit=2` +
+   `PGBOSS_MAX_CONNECTIONS=2` (worker stopped when idle); prod `PGBOSS_MAX_CONNECTIONS=8`
+   (applied + verified on the droplet, `pgboss idle=8`).
+4. **Budget (cluster 25, ~22 usable):** prod ≈ pgboss 8 + app-pool ~9 = 17; staging ≤6
+   (≈2 idle); dev 2 → fits with the superuser reserve. pg-boss=15 was rejected (ignores
+   the additive ~9-slot app pool → 28 > 25).
+5. **Remaining knob:** size the prod `socioply-pool` to ~9–10 in the DO dashboard.
+6. Upsize the cluster (or give staging its own) once clients justify the cost.
 
-**Interim:** keep the staging worker stopped when not actively testing
+**Interim still in force:** keep the staging worker stopped when not actively testing
 (`docker compose stop worker` in `/opt/socioply-staging`).
 
 ---

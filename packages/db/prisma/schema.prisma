@@ -24,25 +24,31 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  drafts                Draft[]
-  posts                 Post[]
-  apiKeys               ApiKey[]
-  settings              Settings?
-  brandSettings         BrandSettings?
-  templates             Template[]
-  socialConnections     SocialConnection[]
-  twitterApiRequests    TwitterApiRequest[]
-  topics                Topic[]
-  articleJobs           ArticleJob[]
-  llmUsage              LLMUsage[]
-  wordPressConnections  WordPressConnection[]
-  errorLogs             ErrorLog[]
-  media                 Media[]
-  sectionEnrichments    SectionEnrichment[]
-  ghlSettings           GhlSettings?
-  socialAutomationRuns  SocialAutomationRun[]
-  socialPostSpecs       SocialPostSpec[]
+  drafts               Draft[]
+  posts                Post[]
+  apiKeys              ApiKey[]
+  settings             Settings?
+  brandSettings        BrandSettings?
+  templates            Template[]
+  socialConnections    SocialConnection[]
+  twitterApiRequests   TwitterApiRequest[]
+  topics               Topic[]
+  articleJobs          ArticleJob[]
+  llmUsage             LLMUsage[]
+  wordPressConnections WordPressConnection[]
+  errorLogs            ErrorLog[]
+  media                Media[]
+  sectionEnrichments   SectionEnrichment[]
+  ghlSettings          GhlSettings?
+  socialAutomationRuns SocialAutomationRun[]
+  socialPostSpecs      SocialPostSpec[]
 
+  // Newsletter pipeline — the single calendar explicitly assigned to this customer
+  newsletterCalendarId String?
+  newsletterCalendar   NewsletterCalendar? @relation("UserNewsletterCalendar", fields: [newsletterCalendarId], references: [id], onDelete: SetNull)
+  newsletters          Newsletter[]
+
+  @@index([newsletterCalendarId])
   @@map("users")
 }
 
@@ -76,33 +82,33 @@ model Draft {
 }
 
 model Post {
-  id                    String    @id @default(cuid())
+  id                    String               @id @default(cuid())
   userId                String
   draftId               String? // Link back to the draft this was published from
   parentPostId          String? // For Twitter threads: link to the parent post (summary)
   threadOrder           Int? // For Twitter threads: 0 = summary, 1+ = replies (order within thread)
   platform              String // "linkedin" | "twitter" | "facebook" | "instagram" | "telegram" | "threads"
-  content               String    @db.Text // The actual content that was published
+  content               String               @db.Text // The actual content that was published
   publishedAt           DateTime? // When the post was actually published (nullable for scheduled posts)
   scheduledAt           DateTime? // When the post is scheduled to be published
   postUrl               String? // URL to the published post (if available from API)
   tweetId               String? // Twitter/X tweet ID (for replies and verification)
   imageUrl              String? // URL of image published with this post (Supabase Storage URL)
   postType              String? // quote | carousel | video_reel | hook_video | ...
-  mediaUrls             String[]  @default([]) // carousel / multi-image
+  mediaUrls             String[]             @default([]) // carousel / multi-image
   videoUrl              String?
-  postAsStory           Boolean   @default(false)
+  postAsStory           Boolean              @default(false)
   provider              String? // ghl | direct
   ghlPostId             String?
   automationRunId       String?
   automationRun         SocialAutomationRun? @relation(fields: [automationRunId], references: [id], onDelete: SetNull)
   slotKey               String? // F1..S6 for automation posts
-  status                String    @default("published") // ready | scheduled | published | failed | deleted
+  status                String               @default("published") // ready | scheduled | published | failed | deleted
   errorMsg              String? // If publishing failed, store error
   analyticsLastSyncedAt DateTime? // When analytics were last fetched
   analyticsData         Json? // Store analytics as JSON (platform-specific structure)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   // Relations
   user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -122,24 +128,24 @@ model Post {
 }
 
 model SocialAutomationRun {
-  id             String    @id @default(cuid())
+  id             String                       @id @default(cuid())
   userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobId          String?
-  job            ArticleJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  job            ArticleJob?                  @relation(fields: [jobId], references: [id], onDelete: SetNull)
   sitePageId     String?
-  sitePage       SitePage? @relation(fields: [sitePageId], references: [id], onDelete: SetNull)
+  sitePage       SitePage?                    @relation(fields: [sitePageId], references: [id], onDelete: SetNull)
   scheduledDate  String // YYYY-MM-DD in user's social timezone
-  status         String    @default("pending") // pending | processing | ready | scheduling | completed | failed | cancelled
-  totalSpecs     Int       @default(12)
-  completedSpecs Int       @default(0)
-  failedSpecs    Int       @default(0)
+  status         String                       @default("pending") // pending | processing | ready | scheduling | completed | failed | cancelled
+  totalSpecs     Int                          @default(12)
+  completedSpecs Int                          @default(0)
+  failedSpecs    Int                          @default(0)
   currentSpec    String?
-  error          String?   @db.Text
+  error          String?                      @db.Text
   groupId        String?
   slideCount     Int? // shared F4/F6 carousel + hook slide count (6–12), set once per run
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   posts          Post[]
   specResults    SocialAutomationSpecResult[]
 
@@ -186,25 +192,25 @@ model SocialPostSpec {
 }
 
 model GhlSettings {
-  id             String    @id @default(cuid())
-  userId         String    @unique
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ghlApiKey      String?   @db.Text // AES-256-GCM encrypted Private Integration key
-  ghlLocationId  String?
-  ghlUserId      String? // GHL team member who owns created posts
-  accountIds     Json? // { facebook?: string, instagram?: string, linkedin?: string }
-  lastVerifiedAt DateTime?
-  lastError      String?
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ghlApiKey           String?   @db.Text // AES-256-GCM encrypted Private Integration key
+  ghlLocationId       String?
+  ghlUserId           String? // GHL team member who owns created posts
+  accountIds          Json? // { facebook?: string, instagram?: string, linkedin?: string }
+  lastVerifiedAt      DateTime?
+  lastError           String?
   // Promotional email automation (one campaign per published article, sent to a tag/smart list)
-  promoEmailEnabled   Boolean @default(true)
+  promoEmailEnabled   Boolean   @default(true)
   promoEmailTagId     String?
   promoEmailTagName   String?
-  promoEmailSendTime  String? @default("09:00") // "HH:mm" 24h, in promoEmailTimezone
-  promoEmailTimezone  String? @default("America/New_York")
+  promoEmailSendTime  String?   @default("09:00") // "HH:mm" 24h, in promoEmailTimezone
+  promoEmailTimezone  String?   @default("America/New_York")
   promoEmailFromName  String?
   promoEmailFromEmail String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@map("ghl_settings")
 }
@@ -345,15 +351,15 @@ model OAuthState {
 // ─────────────────────────────────────────────
 
 model Media {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  s3Key     String
-  url       String
-  altText   String?
-  mimeType  String?
-  width     Int?
-  height    Int?
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  s3Key    String
+  url      String
+  altText  String?
+  mimeType String?
+  width    Int?
+  height   Int?
 
   source    String    @default("upload") // upload | ai_featured | ai_social | diagram
   title     String?
@@ -394,22 +400,22 @@ model VideoGenerationJob {
 }
 
 model WordPressConnection {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label           String
-  siteUrl         String
-  username        String
-  appPassword     String   @db.Text
-  defaultAuthorId Int?
-  defaultStatus   String   @default("draft")
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label             String
+  siteUrl           String
+  username          String
+  appPassword       String    @db.Text
+  defaultAuthorId   Int?
+  defaultStatus     String    @default("draft")
   defaultCategoryId Int?
-  lastVerifiedAt  DateTime?
-  lastError       String?
-  seoPlugin       String?   // yoast | rankmath | aioseo | seopress | theseoframework
-  topics          Topic[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lastVerifiedAt    DateTime?
+  lastError         String?
+  seoPlugin         String? // yoast | rankmath | aioseo | seopress | theseoframework
+  topics            Topic[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([userId, siteUrl])
   @@index([userId])
@@ -417,30 +423,30 @@ model WordPressConnection {
 }
 
 model Topic {
-  id                    String               @id @default(cuid())
-  userId                String
-  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topic                 String
-  scheduledDate         DateTime
-  excludedKeywords      String[]
-  status                String               @default("pending")
-  mode                  String               @default("social_only") // social_only | article_first | article_only
-  defaultOutputTargets  String[]
-  wordPressConnectionId String?
-  wordPressConnection   WordPressConnection? @relation(fields: [wordPressConnectionId], references: [id])
-  slug                  String?
-  category              String?
-  publishingDate        DateTime?
+  id                         String               @id @default(cuid())
+  userId                     String
+  user                       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic                      String
+  scheduledDate              DateTime
+  excludedKeywords           String[]
+  status                     String               @default("pending")
+  mode                       String               @default("social_only") // social_only | article_first | article_only
+  defaultOutputTargets       String[]
+  wordPressConnectionId      String?
+  wordPressConnection        WordPressConnection? @relation(fields: [wordPressConnectionId], references: [id])
+  slug                       String?
+  category                   String?
+  publishingDate             DateTime?
   outlineFrameworkNumber     Int?
-  outlineSpecialInstructions String?  @db.Text // per-article focus areas / special notes for the outline
-  realCaseStudies            String?  @db.Text // per-article real anecdotes or case studies (optional)
-  outlineFrameworkSource     String?           // diagnostic: 'user' | 'csv' | 'llm_assigned'
-  wpCategoryId               Int?              // AI-selected WP category when site linked
-  wpTagIds                   Int[]             @default([]) // AI-selected WP tag IDs when site linked
-  skipSocialMedia            Boolean           @default(false)
+  outlineSpecialInstructions String?              @db.Text // per-article focus areas / special notes for the outline
+  realCaseStudies            String?              @db.Text // per-article real anecdotes or case studies (optional)
+  outlineFrameworkSource     String? // diagnostic: 'user' | 'csv' | 'llm_assigned'
+  wpCategoryId               Int? // AI-selected WP category when site linked
+  wpTagIds                   Int[]                @default([]) // AI-selected WP tag IDs when site linked
+  skipSocialMedia            Boolean              @default(false)
   articleJobs                ArticleJob[]
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
 
   @@index([userId])
   @@index([scheduledDate])
@@ -450,29 +456,29 @@ model Topic {
 }
 
 model ArticleJob {
-  id              String   @id @default(cuid())
-  topicId         String
-  topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status          String   @default("pending") // pending | in_progress | completed | approved | enriched | published | exported | failed
-  currentStep     Int      @default(0)
-  enrichmentJobId String?
-  totalCost       Float    @default(0)
-  totalTokens     Int      @default(0)
-  createdAt       DateTime @default(now())
-  startedAt       DateTime?
-  completedAt     DateTime?
-  approvedAt      DateTime?
-  enrichedAt      DateTime?
+  id                   String                @id @default(cuid())
+  topicId              String
+  topic                Topic                 @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status               String                @default("pending") // pending | in_progress | completed | approved | enriched | published | exported | failed
+  currentStep          Int                   @default(0)
+  enrichmentJobId      String?
+  totalCost            Float                 @default(0)
+  totalTokens          Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+  approvedAt           DateTime?
+  enrichedAt           DateTime?
   pipelineSteps        PipelineStep[]
   sitePage             SitePage?
   errorLogs            ErrorLog[]
   outputAttempts       OutputAttempt[]
   llmUsage             LLMUsage[]
-  syndicationArticles   SyndicationArticle[]
-  socialAutomationRuns  SocialAutomationRun[]
-  articleEmailCampaign  ArticleEmailCampaign?
+  syndicationArticles  SyndicationArticle[]
+  socialAutomationRuns SocialAutomationRun[]
+  articleEmailCampaign ArticleEmailCampaign?
 
   @@index([userId])
   @@index([status])
@@ -484,7 +490,7 @@ model SyndicationArticle {
   jobId        String
   job          ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   userId       String
-  platform     String     // 'linkedin' | 'medium'
+  platform     String // 'linkedin' | 'medium'
   title        String
   content      String     @db.Text
   status       String     @default("pending") // pending | completed | failed
@@ -533,76 +539,79 @@ model ArticleEmailCampaign {
 }
 
 model PipelineStep {
-  id               String      @id @default(cuid())
+  id               String          @id @default(cuid())
   jobId            String
-  job              ArticleJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job              ArticleJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   stepNumber       Int
   stepName         String
-  status           String      @default("pending") // pending | running | completed | failed
+  status           String          @default("pending") // pending | running | completed | failed
   provider         String?
   model            String?
   promptTemplateId String?
   promptTemplate   PromptTemplate? @relation(fields: [promptTemplateId], references: [id])
-  inputTokens      Int         @default(0)
-  outputTokens     Int         @default(0)
-  totalTokens      Int         @default(0)
-  cost             Float       @default(0)
+  inputTokens      Int             @default(0)
+  outputTokens     Int             @default(0)
+  totalTokens      Int             @default(0)
+  cost             Float           @default(0)
   startedAt        DateTime?
   completedAt      DateTime?
   duration         Int?
-  output           String?     @db.Text
-  errorMessage     String?     @db.Text
-  retryCount       Int         @default(0)
+  output           String?         @db.Text
+  errorMessage     String?         @db.Text
+  retryCount       Int             @default(0)
 
   @@unique([jobId, stepNumber])
   @@map("pipeline_steps")
 }
 
 model PromptTemplate {
-  id              String   @id @default(cuid())
-  stepNumber      Int      @unique
+  id              String         @id @default(cuid())
+  stepNumber      Int            @unique
   stepName        String
-  systemPrompt    String?  @db.Text
-  userPrompt      String   @db.Text
+  systemPrompt    String?        @db.Text
+  userPrompt      String         @db.Text
   variables       Json?
-  defaultProvider String   @default("gemini")
-  defaultModel    String   @default("gemini-2.5-flash")
+  defaultProvider String         @default("gemini")
+  defaultModel    String         @default("gemini-2.5-flash")
   maxTokens       Int?
-  version         Int      @default(1)
-  isActive        Boolean  @default(true)
+  version         Int            @default(1)
+  isActive        Boolean        @default(true)
+  // Stable string key for non-pipeline prompts looked up by name (e.g. newsletter `nl_*`).
+  // Nullable so existing rows stay keyed by stepNumber.
+  key             String?        @unique
   pipelineSteps   PipelineStep[]
 
   @@map("prompt_templates")
 }
 
 model SitePage {
-  id               String    @id @default(cuid())
-  jobId            String?   @unique
-  job              ArticleJob? @relation(fields: [jobId], references: [id])
-  userId           String
-  slug             String
-  title            String
-  bodyHtml         String?   @db.Text
-  originalBodyHtml String?   @db.Text
-  featuredImageId  String?
-  featuredImage    Media?    @relation("SitePageFeaturedImage", fields: [featuredImageId], references: [id])
-  publishedAt      DateTime?
-  readingTime      Int?
-  seoTitle         String?
-  seoDescription   String?
-  citations        Json?
-  disclaimer       String?   @db.Text
-  excerpt          String?   @db.VarChar(160)
-  primaryKeyword   String?
-  schemaJson       String?   @db.Text            // JSON-LD from Step 16 (generate_schema_markup)
-  enrichmentStatus  String   @default("pending") // pending | in_progress | completed | failed
-  enrichmentError   String?
-  enrichedAt       DateTime?
-  keyTakeawaysHtml  String?  @db.Text
-  tocHtml           String?  @db.Text
-  diagrams         ArticleDiagram[]
-  sectionEnrichments     SectionEnrichment[]
-  socialAutomationRuns   SocialAutomationRun[]
+  id                   String                @id @default(cuid())
+  jobId                String?               @unique
+  job                  ArticleJob?           @relation(fields: [jobId], references: [id])
+  userId               String
+  slug                 String
+  title                String
+  bodyHtml             String?               @db.Text
+  originalBodyHtml     String?               @db.Text
+  featuredImageId      String?
+  featuredImage        Media?                @relation("SitePageFeaturedImage", fields: [featuredImageId], references: [id])
+  publishedAt          DateTime?
+  readingTime          Int?
+  seoTitle             String?
+  seoDescription       String?
+  citations            Json?
+  disclaimer           String?               @db.Text
+  excerpt              String?               @db.VarChar(160)
+  primaryKeyword       String?
+  schemaJson           String?               @db.Text // JSON-LD from Step 16 (generate_schema_markup)
+  enrichmentStatus     String                @default("pending") // pending | in_progress | completed | failed
+  enrichmentError      String?
+  enrichedAt           DateTime?
+  keyTakeawaysHtml     String?               @db.Text
+  tocHtml              String?               @db.Text
+  diagrams             ArticleDiagram[]
+  sectionEnrichments   SectionEnrichment[]
+  socialAutomationRuns SocialAutomationRun[]
 
   @@unique([userId, slug])
   @@index([primaryKeyword])
@@ -611,22 +620,22 @@ model SitePage {
 }
 
 model SectionEnrichment {
-  id              String   @id @default(cuid())
-  sitePageId      String
-  sitePage        SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  position        Int
-  originalH2      String
-  question        String?
-  summary         String?  @db.Text
-  questionSource  String?
-  llmProvider     String?
-  llmModel        String?
-  inputTokens     Int      @default(0)
-  outputTokens    Int      @default(0)
-  cost            Float    @default(0)
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  sitePageId     String
+  sitePage       SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position       Int
+  originalH2     String
+  question       String?
+  summary        String?  @db.Text
+  questionSource String?
+  llmProvider    String?
+  llmModel       String?
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  cost           Float    @default(0)
+  createdAt      DateTime @default(now())
 
   @@unique([sitePageId, position])
   @@index([userId, question])
@@ -635,15 +644,15 @@ model SectionEnrichment {
 }
 
 model ArticleDiagram {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   sitePageId     String
-  sitePage       SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  sitePage       SitePage  @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
   position       Int
   sectionAnchor  String
   sectionTitle   String
   caption        String?
-  mermaidSyntax  String   @db.Text
-  svgContent     String   @db.Text
+  mermaidSyntax  String    @db.Text
+  svgContent     String    @db.Text
   svgS3Key       String?
   pngS3Key       String?
   pngWidth       Int?
@@ -654,10 +663,10 @@ model ArticleDiagram {
   pngGeneratedAt DateTime?
   llmProvider    String
   llmModel       String
-  inputTokens    Int      @default(0)
-  outputTokens   Int      @default(0)
-  cost           Float    @default(0)
-  createdAt      DateTime @default(now())
+  inputTokens    Int       @default(0)
+  outputTokens   Int       @default(0)
+  cost           Float     @default(0)
+  createdAt      DateTime  @default(now())
 
   @@unique([sitePageId, position])
   @@index([sitePageId])
@@ -665,17 +674,17 @@ model ArticleDiagram {
 }
 
 model OutputAttempt {
-  id          String     @id @default(cuid())
-  jobId       String
-  job         ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  userId      String
-  target      String                // wordpress | html | bundle | preview
-  targetRefId String?
-  status      String     @default("pending") // pending | success | failed
-  startedAt   DateTime   @default(now())
-  completedAt DateTime?
-  durationMs  Int?
-  resultUrl   String?
+  id           String     @id @default(cuid())
+  jobId        String
+  job          ArticleJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId       String
+  target       String // wordpress | html | bundle | preview
+  targetRefId  String?
+  status       String     @default("pending") // pending | success | failed
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  resultUrl    String?
   errorMessage String?
   payloadHash  String?
 
@@ -715,7 +724,7 @@ model LLMUsage {
   inputTokens  Int
   outputTokens Int
   cost         Float
-  source       String      // article-pipeline | social-only | enrichment | image-gen
+  source       String // article-pipeline | social-only | enrichment | image-gen
   createdAt    DateTime    @default(now())
 
   @@index([userId, createdAt])
@@ -753,10 +762,10 @@ model MusicTrack {
 
 model OutlineFramework {
   id          String   @id @default(cuid())
-  number      Int      @unique                // 1..12 — matches CSV "Outline Framework" column
-  label       String                           // e.g., "Pillar / Educational Foundation"
-  description String?  @db.Text               // "when to use" — used by LLM auto-assignment
-  body        String   @db.Text               // full framework body injected into prompts
+  number      Int      @unique // 1..12 — matches CSV "Outline Framework" column
+  label       String // e.g., "Pillar / Educational Foundation"
+  description String?  @db.Text // "when to use" — used by LLM auto-assignment
+  body        String   @db.Text // full framework body injected into prompts
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -766,55 +775,56 @@ model OutlineFramework {
 
 model PlatformSettings {
   id               String   @id @default("singleton") // only one row
-  googleGuidelines String?  @db.Text                  // Google Helpful Content guidelines text
-  schemaTypeRules  Json?                               // [{ keyword, articleType, publisherType }]
+  googleGuidelines String?  @db.Text // Google Helpful Content guidelines text
+  schemaTypeRules  Json? // [{ keyword, articleType, publisherType }]
   updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")
 }
 
 model BrandSettings {
-  id                   String  @id @default(cuid())
-  userId               String  @unique
-  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Article brand context (used by prompt variable resolver)
-  geolocation          String? @db.Text
-  industry             String? @db.Text // e.g. Chiropractic, Accounting — primes LLM prompts
-  businessDescription  String? @db.Text // free-text: what the business does, who it serves
-  who                  String? @db.Text // target audience description
-  ourExperience        String? @db.Text // firm / author experience blurb
-  articleGoal          String? @db.Text // strategic goal of each article
-  specialInstructions  String? @db.Text // global special instructions injected into every article
-  defaultAuthorName      String?
-  defaultAuthorWebsite   String?
-  defaultAuthorLinkedIn  String? // personal LinkedIn URL for schema + author profile
-  defaultAuthorJobTitle  String? // e.g. "Chiropractor" — author.jobTitle in JSON-LD
-  defaultAuthorAlumniOf  String? // institution name — author.alumniOf in JSON-LD
-  schemaArticleType      String? // override auto-derived @type, e.g. "MedicalArticle"
+  geolocation           String? @db.Text
+  industry              String? @db.Text // e.g. Chiropractic, Accounting — primes LLM prompts
+  specialization        String? @db.Text // e.g. "family care", "sports" — drives newsletter calendar matching + voice
+  businessDescription   String? @db.Text // free-text: what the business does, who it serves
+  who                   String? @db.Text // target audience description
+  ourExperience         String? @db.Text // firm / author experience blurb
+  articleGoal           String? @db.Text // strategic goal of each article
+  specialInstructions   String? @db.Text // global special instructions injected into every article
+  defaultAuthorName     String?
+  defaultAuthorWebsite  String?
+  defaultAuthorLinkedIn String? // personal LinkedIn URL for schema + author profile
+  defaultAuthorJobTitle String? // e.g. "Chiropractor" — author.jobTitle in JSON-LD
+  defaultAuthorAlumniOf String? // institution name — author.alumniOf in JSON-LD
+  schemaArticleType     String? // override auto-derived @type, e.g. "MedicalArticle"
 
   // Organization / schema markup fields (used in Wave 4)
-  organizationName        String?
-  organizationWebsite     String?
-  organizationEmail       String?
-  organizationPhone       String?
+  organizationName         String?
+  organizationWebsite      String?
+  organizationEmail        String?
+  organizationPhone        String?
   // Structured address — sub-fields (new); combined string kept for backward compat
-  addressLine1        String?
-  addressLine2        String?
-  addressLocality     String? // city
-  addressRegion       String? // state / province
-  postalCode          String?
-  addressCountryName  String? // full country name, e.g. "Australia"
-  organizationAddress     String? @db.Text // computed combined string (legacy + fallback)
-  organizationCountryCode String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
+  addressLine1             String?
+  addressLine2             String?
+  addressLocality          String? // city
+  addressRegion            String? // state / province
+  postalCode               String?
+  addressCountryName       String? // full country name, e.g. "Australia"
+  organizationAddress      String? @db.Text // computed combined string (legacy + fallback)
+  organizationCountryCode  String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
   organizationLogoUrl      String? // CDN URL for the business logo (used in schema publisher.logo)
   socialLogoUrl            String? // optional override for social quote cards / compositors; falls back to organizationLogoUrl
   socialAccountName        String? // social handle / display name for quote cards (e.g. "hormozi"); falls back to organizationName
   instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards
-  videoSpecialInstructions String? @db.Text         // client-specific instructions injected into the Fal.ai video prompt (e.g. style, restrictions)
-  socialCallToAction       String? @db.Text         // what the social posts should promote / drive toward (injected as {{call_to_action}})
+  videoSpecialInstructions String? @db.Text // client-specific instructions injected into the Fal.ai video prompt (e.g. style, restrictions)
+  socialCallToAction       String? @db.Text // what the social posts should promote / drive toward (injected as {{call_to_action}})
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD
-  socialMediaLinks          Json?   // [{ platform: string, url: string }]
+  socialMediaLinks         Json? // [{ platform: string, url: string }]
 
   // Mermaid diagrams (article enrichment — theme injected into %%{init}%% )
   diagramPrimaryColor     String?
@@ -825,12 +835,106 @@ model BrandSettings {
   diagramFontFamily       String?
 
   // Article typography (standalone HTML export only — not WordPress)
-  articleFontFamily     String?
-  articleFontWeight     String?
-  articleFontSizeBase   String?
+  articleFontFamily   String?
+  articleFontWeight   String?
+  articleFontSizeBase String?
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  // Newsletter email template (end-user customizable; renderer supplies sensible defaults)
+  nlHeaderBgColor     String?
+  nlFooterBgColor     String?
+  nlFontFamily        String?
+  nlFontColor         String?
+  nlHeadingFontWeight String?
+  nlBodyFontWeight    String?
+  nlLinkColor         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("brand_settings")
+}
+
+// ─────────────────────────────────────────────
+// Newsletter Pipeline (magazine-style)
+// ─────────────────────────────────────────────
+
+// Admin-managed content calendar, scoped per industry + specialization.
+// Topics are uploaded via CSV; customers are explicitly assigned to a calendar.
+model NewsletterCalendar {
+  id             String            @id @default(cuid())
+  name           String
+  industry       String // matches BrandSettings.industry
+  specialization String? // e.g. "family care", "sports"
+  topics         NewsletterTopic[]
+  assignments    User[]            @relation("UserNewsletterCalendar")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@map("newsletter_calendars")
+}
+
+// One dated edition's source content (one CSV row). Optional columns drive
+// industry modules / secondary article purely by presence.
+model NewsletterTopic {
+  id               String             @id @default(cuid())
+  calendarId       String
+  calendar         NewsletterCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  date             DateTime
+  topic            String // feature article
+  bullet1          String
+  bullet2          String
+  bullet3          String
+  secondaryTopic   String? // → second full-length article
+  recipe           String? // module hints (populated column ⇒ generate)
+  kidsSnack        String?
+  techFreeActivity String?
+  videoUrl         String? // explicit video override
+  // shared research write-back (computed once, reused across customers in this calendar)
+  research         Json? // { video:{...}, recipe:{...}, teaserSources:[{bullet,url,extract}] }
+  researchStatus   String             @default("pending") // pending|complete|partial|failed
+  newsletters      Newsletter[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([calendarId, date])
+  @@index([calendarId])
+  @@map("newsletter_topics")
+}
+
+// Per-customer voiced newsletter for one topic. JSON per section so a
+// single-section regenerate writes one column.
+model Newsletter {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId          String
+  topic            NewsletterTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  status           String          @default("pending") // pending|researching|generating|ready_for_review|approved|scheduled|sent|failed
+  // voiced content — JSON per section
+  featureArticle   Json? // {title,teaser,tldr,body,imageUrl}
+  secondaryArticle Json?
+  teasers          Json? // [{title,body,cta,link} ×3]
+  quickHits        Json? // {tips:[..4], facts:[..4]}
+  fun              Json? // {triviaQuestion,triviaAnswer,joke}
+  modules          Json? // {recipe?,kidsSnack?,techFreeActivity?}
+  subjectLine      String?
+  previewText      String?
+  renderedHtml     String?         @db.Text
+  validation       Json? // completion score + issues
+  // delivery
+  ghlCampaignId    String?
+  scheduledFor     DateTime?
+  sentAt           DateTime?
+  approvedAt       DateTime?
+  // cost
+  cost             Float           @default(0)
+  inputTokens      Int             @default(0)
+  outputTokens     Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([userId, topicId])
+  @@index([userId, status])
+  @@index([topicId])
+  @@map("newsletters")
 }

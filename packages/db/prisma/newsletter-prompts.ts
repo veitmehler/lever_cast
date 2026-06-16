@@ -1,0 +1,657 @@
+/**
+ * Newsletter pipeline prompt templates (`nl_*`).
+ *
+ * These are DB-backed PromptTemplate rows looked up by the string `key` (not by
+ * stepNumber). Each still carries a unique `stepNumber` (300+) because the column
+ * is required + unique; generation/render code addresses them by `key`.
+ *
+ * Ported (and industry-neutralized) from the reference chiropractic newsletter
+ * workflow — see .plans/newsletter-creation-workflow.md. Chiropractic specifics
+ * are replaced with {{industry}} / {{specialization}} / {{targetAudience}} so the
+ * same prompts serve any productized vertical.
+ *
+ * Variable convention (literal {{var}} substitution, same as the article pipeline):
+ *   {{writingStyle}}    - BrandSettings/Settings writing style (per-customer voice)
+ *   {{targetAudience}}  - BrandSettings.who
+ *   {{industry}}        - BrandSettings.industry
+ *   {{specialization}}  - BrandSettings.specialization
+ *   plus per-step topic / bullet / article-context variables noted inline.
+ *
+ * Imported by prisma/seed.ts (prod auto-seeds) and scripts/seed-newsletter-prompts.ts
+ * (staging, which does not run the seed step). Keep this the single source of truth.
+ */
+
+export interface NewsletterPromptTemplate {
+  stepNumber: number
+  key: string
+  stepName: string
+  defaultProvider: string
+  defaultModel: string
+  maxTokens?: number
+  systemPrompt: string | null
+  userPrompt: string
+  isActive: boolean
+}
+
+const GEMINI_PRO = 'gemini-2.5-pro'
+const GEMINI_FLASH = 'gemini-2.5-flash'
+const CLAUDE = 'claude-sonnet-4-5-20250929'
+
+export const NEWSLETTER_TEMPLATES: NewsletterPromptTemplate[] = [
+  // ── Article chain (used for BOTH the feature and secondary article) ──────────
+  {
+    stepNumber: 300,
+    key: 'nl_article_outline',
+    stepName: 'newsletter_article_outline',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt:
+      'You are an expert content strategist who writes People-First, Helpful-Content-compliant outlines. ' +
+      'You research the topic with live web data and structure a tight, valuable report outline.',
+    userPrompt: `Create a detailed outline for a ~750-word educational report.
+
+TOPIC: {{topic}}
+KEY ANGLES:
+- {{bullet1}}
+- {{bullet2}}
+- {{bullet3}}
+
+INDUSTRY: {{industry}}
+SPECIALIZATION: {{specialization}}
+TARGET AUDIENCE: {{targetAudience}}
+
+Requirements:
+- People-First / Helpful-Content compliant; concrete, non-fluffy.
+- Logical H2 sections (and H3s where useful) that fully cover the topic for this audience.
+- Include an introduction angle and a practical takeaway/conclusion.
+- Optimise for search intent without keyword stuffing.
+
+Return ONLY the outline.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 301,
+    key: 'nl_article_intro',
+    stepName: 'newsletter_article_intro',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt:
+      'You write search-intent introductions that hook the reader immediately and match their voice.',
+    userPrompt: `Write a search-intent introduction for an article based on this outline.
+
+OUTLINE:
+{{articleOutline}}
+
+WRITING STYLE TO MATCH: {{writingStyle}}
+
+Requirements:
+- 2–4 sentences that hook the reader and frame why this matters to them now.
+- Plain text only — no bold, italics, headings, or quotation marks.
+- Do not summarize the whole article; just open it.
+
+Return ONLY the introduction text.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 302,
+    key: 'nl_article_faq',
+    stepName: 'newsletter_article_faq',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt: 'You find the real questions people ask about a topic ("People Also Ask").',
+    userPrompt: `Using live search, find the 4 most common "People Also Ask" questions for this topic.
+
+TOPIC: {{articleTopic}}
+OUTLINE CONTEXT:
+{{articleOutline}}
+
+Return ONLY a numbered list of exactly 4 questions, nothing else.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 303,
+    key: 'nl_article_faq_facts',
+    stepName: 'newsletter_article_faq_facts',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt: 'You are a research expert who finds accurate, verifiable facts with sources.',
+    userPrompt: `For each of the following questions, provide 2 verifiable facts or statistics with a credible source.
+
+QUESTIONS:
+{{articleFAQs}}
+
+Requirements:
+- 2 facts/stats per question, each with a source name/URL.
+- Accurate and current; no fabrication.
+
+Return the facts grouped under each question.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 304,
+    key: 'nl_article_facts',
+    stepName: 'newsletter_article_facts',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt: 'You are a research expert who finds accurate, verifiable facts with sources.',
+    userPrompt: `For each section of this outline, provide 2 verifiable facts or statistics with a credible source.
+
+OUTLINE:
+{{articleOutline}}
+
+Requirements:
+- 2 facts/stats per section, each with a source name/URL.
+- Accurate and current; no fabrication.
+
+Return the facts grouped under each section.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 305,
+    key: 'nl_article_writer_system',
+    stepName: 'newsletter_article_writer_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 4096,
+    systemPrompt: null,
+    userPrompt: `You are an expert human writer producing a newsletter feature article for a business in the {{industry}} industry (specialization: {{specialization}}), writing for this audience: {{targetAudience}}.
+
+Write like a real, knowledgeable human:
+- High perplexity and burstiness — vary sentence length and structure naturally.
+- Conversational, warm, second-person where natural. 5th–7th grade reading level.
+- Factual accuracy ONLY — use the provided facts/FAQ data; never invent statistics or claims.
+- No ALL-CAPS words in the body. Use single quotes, not double quotes, inside prose.
+- Avoid AI/marketing clichés (e.g. "in today's fast-paced world", "unlock the potential", "tapestry", "robust", "delve", "navigate the landscape", "game-changer", "elevate").
+- Never reference source/summary articles directly.
+
+Match this writing style: {{writingStyle}}
+
+Output STRICT JSON only (no markdown fences, no commentary), in EXACTLY this shape:
+{"article_title": "<=5 words, plain text", "article_teaser": "~50 words plain text", "article_tldr": "~12 words plain text", "article_body": "HTML using ONLY <h2>/<ul>/<ol>/<li>/<p> — no title, no <body>/<article>"}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 306,
+    key: 'nl_article_writer_user',
+    stepName: 'newsletter_article_writer_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 4096,
+    systemPrompt: null,
+    userPrompt: `Write a 500–750 word educational article.
+
+TOPIC (the angle): {{topic}}
+
+SEARCH-INTENT INTRO TO OPEN FROM:
+{{articleIntro}}
+
+OUTLINE:
+{{articleOutline}}
+
+FAQs TO WEAVE IN:
+{{articleFAQs}}
+
+FACTS / STATS (use these — do not invent others):
+{{articleFacts}}
+
+FAQ FACTS:
+{{faqFacts}}
+
+Requirements:
+- Open from the search-intent intro, then deliver on the outline.
+- Weave in the facts and FAQ answers naturally; cite source context where helpful.
+- Practical and specific for the audience; end with a clear takeaway.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 307,
+    key: 'nl_article_image_prompt',
+    stepName: 'newsletter_article_image_prompt',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 600,
+    systemPrompt:
+      'You write photo-realistic, text-free, people-free image generation prompts for Flux Pro.',
+    userPrompt: `Write a single image-generation prompt for the feature image of this article.
+
+ARTICLE INTRO / CONTEXT:
+{{articleIntro}}
+
+Requirements:
+- Photo-realistic, editorial-magazine style relevant to the topic and the {{industry}} industry.
+- NO text, NO logos, NO people/faces.
+- Be specific about subject, composition, lighting, colour palette, and mood.
+
+Return ONLY the image prompt text.`,
+    isActive: true,
+  },
+
+  // ── Teasers ("Around the web") ───────────────────────────────────────────────
+  {
+    stepNumber: 308,
+    key: 'nl_teaser_url_selector',
+    stepName: 'newsletter_teaser_url_selector',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt: 'You pick the single best, most-educational source URL for a given angle.',
+    userPrompt: `From the {{urlCount}} candidate URLs below, pick the SINGLE highest-quality, most educational and trustworthy page for this angle, for our audience ({{targetAudience}}).
+
+ANGLE: {{bulletPoint}}
+
+CANDIDATE URLS:
+{{urls}}
+
+Return ONLY the chosen URL — no explanation, nothing else.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 309,
+    key: 'nl_teaser_summarizer_system',
+    stepName: 'newsletter_teaser_summarizer_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `You are a veteran newsletter writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+Write at a 5th–7th grade reading level. Use single quotes (not double) inside prose. Match this voice: {{writingStyle}}.
+
+Output STRICT JSON only (no markdown fences, no commentary) in EXACTLY this shape:
+{"title": "<short teaser title>", "body": "HTML <p> only — three ~50-word paragraphs", "cta": "HTML <p> only — one punchy call-to-action paragraph"}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 310,
+    key: 'nl_teaser_summarizer_user',
+    stepName: 'newsletter_teaser_summarizer_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `Write a teaser that makes the reader want to click through to the source article.
+
+ANGLE: {{bulletPoint}}
+
+SOURCE ARTICLE CONTENT (summarize from this; focus on the substance):
+{{articleContent}}
+
+Requirements:
+- A 3-paragraph teaser (~50 words each) plus 1 punchy CTA paragraph.
+- Do NOT reproduce the source verbatim; tease the value.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+
+  // ── Quick hits (tips, facts) + fun (trivia, joke) ────────────────────────────
+  {
+    stepNumber: 311,
+    key: 'nl_tips_system',
+    stepName: 'newsletter_tips_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1500,
+    systemPrompt: null,
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+Visceral, real-life, simple language at a 5th–7th grade reading level. Vary grammar across items. Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
+
+Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
+{"tip_1": "...", "tip_2": "...", "tip_3": "...", "tip_4": "..."}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 312,
+    key: 'nl_tips_user',
+    stepName: 'newsletter_tips_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1500,
+    systemPrompt: null,
+    userPrompt: `Write exactly 4 punchy, practical tips related to this edition.
+
+TOPIC: {{topic}}
+ANGLES: {{bullet1}} | {{bullet2}} | {{bullet3}}
+
+Requirements:
+- Each tip <= 25 words, actionable, specific, no fluff.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 313,
+    key: 'nl_facts_system',
+    stepName: 'newsletter_facts_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1500,
+    systemPrompt: null,
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+Simple, vivid language at a 5th–7th grade reading level. Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
+
+Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
+{"fact_1": "...", "fact_2": "...", "fact_3": "...", "fact_4": "..."}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 314,
+    key: 'nl_facts_user',
+    stepName: 'newsletter_facts_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1500,
+    systemPrompt: null,
+    userPrompt: `Write exactly 4 "Did You Know" facts related to this edition.
+
+TOPIC: {{topic}}
+ANGLES: {{bullet1}} | {{bullet2}} | {{bullet3}}
+
+Requirements:
+- Each fact <= 50 words, accurate and genuinely interesting.
+- Do not mention the year in every fact.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 315,
+    key: 'nl_trivia_system',
+    stepName: 'newsletter_trivia_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1000,
+    systemPrompt: null,
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
+
+Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
+{"trivia_question": "...", "trivia_answer": "..."}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 316,
+    key: 'nl_trivia_user',
+    stepName: 'newsletter_trivia_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1000,
+    systemPrompt: null,
+    userPrompt: `Write one suspenseful trivia question and its answer, loosely tied to this edition.
+
+TOPIC: {{topic}}
+ANGLES: {{bullet1}} | {{bullet2}} | {{bullet3}}
+
+Requirements:
+- The question should build curiosity.
+- The answer must NOT mention "newsletter" or this edition.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 317,
+    key: 'nl_joke_system',
+    stepName: 'newsletter_joke_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1000,
+    systemPrompt: null,
+    userPrompt: `You are a genuinely funny comedy writer producing a "Joke of the Day" for a {{industry}} newsletter audience: {{targetAudience}}.
+Clean, clever, observational humour. Single quotes only. Match this voice: {{writingStyle}}.
+
+Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
+{"joke": "HTML — exactly two <p> paragraphs"}`,
+    isActive: true,
+  },
+  {
+    stepNumber: 318,
+    key: 'nl_joke_user',
+    stepName: 'newsletter_joke_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 1000,
+    systemPrompt: null,
+    userPrompt: `Write one genuinely funny, family-friendly "Joke of the Day", loosely related to this edition if you can do it naturally.
+
+TOPIC: {{topic}}
+
+Requirements:
+- Two short <p> paragraphs (setup + payoff). Actually funny, not corny.
+
+Output STRICT JSON only in the shape defined by the system instructions.`,
+    isActive: true,
+  },
+
+  // ── Video + email metadata ───────────────────────────────────────────────────
+  {
+    stepNumber: 319,
+    key: 'nl_youtube_query',
+    stepName: 'newsletter_youtube_query',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt: 'You craft the single best YouTube search query to find a high-quality, informative video.',
+    userPrompt: `To find the best, highest-quality, most informative video for the topic "{{topic}}" for an audience of {{targetAudience}} in the {{industry}} industry, what is the single best YouTube search query?
+
+ONLY return the search query — no explanation, no commentary, no quotes.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 320,
+    key: 'nl_subject_line',
+    stepName: 'newsletter_subject_line',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt: 'You write high-open-rate email subject lines.',
+    userPrompt: `Write ONE email subject line for a newsletter edition about: {{topic}}
+
+Audience: {{targetAudience}}
+
+Requirements:
+- 40–60 characters, keyword-rich, curiosity-driven.
+- No spam-trigger words, no emojis, no surrounding quotes.
+
+Return ONLY the subject line text.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 321,
+    key: 'nl_preview_text',
+    stepName: 'newsletter_preview_text',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt: 'You write email preview (preheader) text that complements the subject line.',
+    userPrompt: `Write the email preview (preheader) text for a newsletter edition about: {{topic}}
+
+SUBJECT LINE (do not repeat it): {{subjectLine}}
+Audience: {{targetAudience}}
+
+Requirements:
+- 80–100 characters, complements (does not repeat) the subject.
+- Ends with a benefit or soft CTA. No emojis, no surrounding quotes.
+
+Return ONLY the preview text.`,
+    isActive: true,
+  },
+
+  // ── Module: Recipe ───────────────────────────────────────────────────────────
+  {
+    stepNumber: 322,
+    key: 'nl_recipe_researcher',
+    stepName: 'newsletter_recipe_researcher',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt: 'You are a world-class chef who researches recipes using live web data.',
+    userPrompt: `Research the recipe idea: {{recipeHint}}
+
+Using live search, return 3 related, high-quality recipe ideas (as "## Recipe 1", "## Recipe 2", "## Recipe 3") that could be fused into one excellent, approachable recipe. Include key ingredients and technique notes for each.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 323,
+    key: 'nl_recipe_writer_system',
+    stepName: 'newsletter_recipe_writer_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2500,
+    systemPrompt: null,
+    userPrompt: `You are a professional recipe writer for a {{industry}} newsletter audience: {{targetAudience}}. Match this voice: {{writingStyle}}.
+
+Write ONE excellent, approachable recipe based on the research provided.
+RECIPE IDEA: {{recipeHint}}
+RESEARCH:
+{{recipeResearch}}
+
+Uniqueness — do NOT duplicate any of these previously-used recipe titles:
+{{previousRecipeTitles}}
+
+Output STRICT JSON only (no fences, no commentary) in EXACTLY this shape:
+{"recipe_intro": "HTML — <h2> title + 1 <p> intro", "recipe_ingredients": "HTML <ul><li> only", "recipe_instructions": "HTML <ol><li> only"}
+Use ONLY <h2>/<ul>/<ol>/<li>/<p> — no <body>/<article>.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 324,
+    key: 'nl_recipe_writer_user',
+    stepName: 'newsletter_recipe_writer_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2500,
+    systemPrompt: null,
+    userPrompt: `Write the recipe based on the context provided in the system instructions. Output STRICT JSON only in the shape defined there.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 325,
+    key: 'nl_recipe_image_prompt',
+    stepName: 'newsletter_recipe_image_prompt',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 500,
+    systemPrompt: 'You write photo-realistic, text-free, people-free food image prompts for Flux Pro.',
+    userPrompt: `Write a single image-generation prompt for a photo of this finished dish.
+
+RECIPE:
+{{recipeContent}}
+
+Requirements:
+- Photo-realistic, appetising food photography. NO text, NO logos, NO people.
+- Be specific about plating, lighting, and styling.
+
+Return ONLY the image prompt text.`,
+    isActive: true,
+  },
+
+  // ── Module: Kids snack ───────────────────────────────────────────────────────
+  {
+    stepNumber: 326,
+    key: 'nl_kids_snack_researcher',
+    stepName: 'newsletter_kids_snack_researcher',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt: 'You research fun, healthy, easy kids snack ideas using live web data.',
+    userPrompt: `Research the kids snack idea: {{snackHint}}
+
+Using live search, return ideas and key ingredients/technique notes for a fun, healthy, easy-to-make kids snack.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 327,
+    key: 'nl_kids_snack_writer_system',
+    stepName: 'newsletter_kids_snack_writer_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `You write fun, healthy kids snack recipes for a {{industry}} newsletter audience of parents: {{targetAudience}}. Match this voice: {{writingStyle}}.
+
+SNACK IDEA: {{snackHint}}
+RESEARCH:
+{{snackResearch}}
+
+Uniqueness — do NOT duplicate any of these previously-used snack titles:
+{{previousSnackTitles}}
+
+Output STRICT JSON only (no fences, no commentary) in EXACTLY this shape:
+{"kids_snack_intro": "HTML — <h2> title + 1 <p> intro", "kids_snack_ingredients": "HTML <ul><li> only", "kids_snack_instructions": "HTML <ol><li> only"}
+Use ONLY <h2>/<ul>/<ol>/<li>/<p>.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 328,
+    key: 'nl_kids_snack_writer_user',
+    stepName: 'newsletter_kids_snack_writer_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `Write the kids snack based on the context provided in the system instructions. Output STRICT JSON only in the shape defined there.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 329,
+    key: 'nl_kids_snack_image_prompt',
+    stepName: 'newsletter_kids_snack_image_prompt',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 500,
+    systemPrompt: 'You write photo-realistic, text-free, people-free food image prompts for Flux Pro.',
+    userPrompt: `Write a single image-generation prompt for a photo of this finished kids snack.
+
+SNACK:
+{{snackContent}}
+
+Requirements:
+- Photo-realistic, fun, appetising. NO text, NO logos, NO people.
+
+Return ONLY the image prompt text.`,
+    isActive: true,
+  },
+
+  // ── Module: Tech-free activity (no image) ────────────────────────────────────
+  {
+    stepNumber: 330,
+    key: 'nl_tech_free_researcher',
+    stepName: 'newsletter_tech_free_researcher',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_PRO,
+    systemPrompt: 'You research engaging, screen-free family activities using live web data.',
+    userPrompt: `Research the tech-free activity idea: {{activityHint}}
+
+Using live search, return ideas, required materials, and step notes for an engaging, screen-free activity families can do together.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 331,
+    key: 'nl_tech_free_writer_system',
+    stepName: 'newsletter_tech_free_writer_system',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `You write engaging, screen-free family activities for a {{industry}} newsletter audience: {{targetAudience}}. Match this voice: {{writingStyle}}.
+
+ACTIVITY IDEA: {{activityHint}}
+RESEARCH:
+{{research}}
+
+Uniqueness — do NOT duplicate any of these previously-used activity titles:
+{{previousActivityTitles}}
+
+Output STRICT JSON only (no fences, no commentary) in EXACTLY this shape:
+{"tech_free_activity_intro": "HTML — <h2> title + 1 <p> intro", "tech_free_activity_materials": "HTML <ul><li> only", "tech_free_activity_instructions": "HTML <ol><li> only"}
+Use ONLY <h2>/<ul>/<ol>/<li>/<p>.`,
+    isActive: true,
+  },
+  {
+    stepNumber: 332,
+    key: 'nl_tech_free_writer_user',
+    stepName: 'newsletter_tech_free_writer_user',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 2000,
+    systemPrompt: null,
+    userPrompt: `Write the tech-free activity based on the context provided in the system instructions. Output STRICT JSON only in the shape defined there.`,
+    isActive: true,
+  },
+]

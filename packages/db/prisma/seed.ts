@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { NEWSLETTER_TEMPLATES } from './newsletter-prompts'
 
 const prisma = new PrismaClient()
 
@@ -1677,6 +1678,19 @@ async function main() {
 
   const promptTotal = PROMPT_TEMPLATES.length + ENRICHMENT_TEMPLATES.length + GEO_ENRICHMENT_TEMPLATES.length
   console.log(`\nSeeded ${promptTotal} prompt templates.`)
+
+  // Newsletter prompts are keyed by the string `key` (not stepNumber).
+  console.log('\nSeeding newsletter prompt templates...')
+  for (const template of NEWSLETTER_TEMPLATES) {
+    await prisma.promptTemplate.upsert({
+      where: { key: template.key },
+      create: template,
+      // Never overwrite admin edits on re-seed.
+      update: {},
+    })
+    console.log(`  ✓ ${template.key}: ${template.stepName}`)
+  }
+  console.log(`Seeded ${NEWSLETTER_TEMPLATES.length} newsletter prompt templates.`)
 
   // Seed outline frameworks
   console.log('\nSeeding outline frameworks...')

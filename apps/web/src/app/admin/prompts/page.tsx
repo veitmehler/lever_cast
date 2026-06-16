@@ -73,6 +73,8 @@ const STEP_LABELS: Record<string, string> = {
   // Platform syndication
   generate_linkedin_article:      '1. LinkedIn Article',
   generate_medium_article:        '2. Medium Article',
+  // Promotional email
+  generate_promotional_email:     'Promotional Email',
   // Social media posts
   social_quote_selection:         '1. Quote selection',
   social_carousel_plan:           '2. Carousel plan',
@@ -119,6 +121,10 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   {
     label: 'Platform Syndication — LinkedIn & Medium',
     steps: [30, 31],
+  },
+  {
+    label: 'Promotional Email',
+    steps: [32],
   },
   {
     label: 'Social Media Posts',

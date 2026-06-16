@@ -80,6 +80,34 @@ export function parsePromoEmail(raw: string, fallbackSubject: string): { subject
 }
 
 export async function generatePromoEmail(jobId: string, userId: string): Promise<PromoEmailResult> {
+  // Idempotency: if a prior attempt already produced the email (e.g. a pg-boss
+  // retry after a schedule failure), reuse it instead of making another LLM
+  // call. The enqueue placeholder has empty subject/body, so a populated row
+  // means generation already succeeded.
+  const prior = await prisma.articleEmailCampaign.findUnique({
+    where: { jobId },
+    select: {
+      subject: true, bodyHtml: true,
+      inputTokens: true, outputTokens: true, cost: true, provider: true, model: true,
+    },
+  })
+  if (prior && prior.subject && prior.bodyHtml) {
+    logger.info({ jobId }, '[promo-email] reusing previously generated email (idempotent retry)')
+    await prisma.articleEmailCampaign.update({
+      where: { jobId },
+      data: { status: 'generated', errorMessage: null },
+    })
+    return {
+      subject: prior.subject,
+      bodyHtml: prior.bodyHtml,
+      inputTokens: prior.inputTokens,
+      outputTokens: prior.outputTokens,
+      cost: prior.cost,
+      provider: prior.provider ?? '',
+      model: prior.model ?? '',
+    }
+  }
+
   const [sitePage, brand, template] = await Promise.all([
     prisma.sitePage.findUnique({
       where: { jobId },

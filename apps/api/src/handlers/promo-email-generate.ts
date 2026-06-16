@@ -119,22 +119,35 @@ export async function promoEmailGenerateHandler(
         previewText: htmlToPreviewText(email.bodyHtml),
       }
 
-      const campaign = await createGhlEmailCampaign({
-        apiKey: config.apiKey,
-        locationId: config.locationId,
-        name: `Article promo — ${email.subject}`.slice(0, 120),
-        meta,
-        bodyHtml: email.bodyHtml,
-        timeZone: config.timezone,
-        userId: config.ghlUserId,
-      })
-
-      // Record the created campaign id immediately so a schedule failure leaves a
-      // traceable reference even if rollback also fails.
-      await prisma.articleEmailCampaign.update({
+      // Idempotency: reuse a campaign created by a prior attempt (e.g. a retry
+      // after a schedule failure whose rollback didn't delete it) instead of
+      // creating another one. Rollback nulls ghlCampaignId on successful delete,
+      // so a non-null value here means a real draft still exists in GHL.
+      const existing = await prisma.articleEmailCampaign.findUnique({
         where: { jobId },
-        data: { ghlCampaignId: campaign.campaignId },
+        select: { ghlCampaignId: true },
       })
+      let campaignId = existing?.ghlCampaignId ?? null
+      if (campaignId) {
+        logger.info({ jobId, campaignId }, '[promo-email-generate] reusing existing draft campaign (idempotent retry)')
+      } else {
+        const created = await createGhlEmailCampaign({
+          apiKey: config.apiKey,
+          locationId: config.locationId,
+          name: `Article promo — ${email.subject}`.slice(0, 120),
+          meta,
+          bodyHtml: email.bodyHtml,
+          timeZone: config.timezone,
+          userId: config.ghlUserId,
+        })
+        campaignId = created.campaignId
+        // Record the id immediately so a schedule failure leaves a traceable
+        // reference even if rollback also fails.
+        await prisma.articleEmailCampaign.update({
+          where: { jobId },
+          data: { ghlCampaignId: campaignId },
+        })
+      }
 
       // computeSendAt returns the correct UTC instant; GHL wants it as a local
       // wall-clock string paired with timeZone.
@@ -144,7 +157,7 @@ export async function promoEmailGenerateHandler(
         await scheduleGhlEmailCampaign({
           apiKey: config.apiKey,
           locationId: config.locationId,
-          campaignId: campaign.campaignId,
+          campaignId,
           meta,
           tagIds: [config.tagId],
           timeZone: config.timezone,
@@ -152,14 +165,14 @@ export async function promoEmailGenerateHandler(
           sendAt: sendAtLocal,
         })
       } catch (scheduleErr) {
-        // Roll back the just-created draft so failed publishes don't accumulate
-        // orphaned campaigns in GHL. Best-effort: keep the original error.
+        // Roll back the draft so failed publishes don't accumulate orphaned
+        // campaigns in GHL. Best-effort: keep the original error.
         try {
-          await deleteGhlEmailCampaign(config.apiKey, config.locationId, campaign.campaignId)
+          await deleteGhlEmailCampaign(config.apiKey, config.locationId, campaignId)
           await prisma.articleEmailCampaign.update({ where: { jobId }, data: { ghlCampaignId: null } })
-          logger.info({ jobId, campaignId: campaign.campaignId }, '[promo-email-generate] rolled back draft after schedule failure')
+          logger.info({ jobId, campaignId }, '[promo-email-generate] rolled back draft after schedule failure')
         } catch (rollbackErr) {
-          logger.warn({ jobId, campaignId: campaign.campaignId, rollbackErr }, '[promo-email-generate] failed to roll back draft campaign')
+          logger.warn({ jobId, campaignId, rollbackErr }, '[promo-email-generate] failed to roll back draft campaign')
         }
         throw scheduleErr
       }
@@ -168,7 +181,7 @@ export async function promoEmailGenerateHandler(
         where: { jobId },
         data: {
           status: 'scheduled',
-          ghlCampaignId: campaign.campaignId,
+          ghlCampaignId: campaignId,
           tagId: config.tagId,
           tagName: config.tagName,
           scheduledFor: sendAtUtc,
@@ -177,7 +190,7 @@ export async function promoEmailGenerateHandler(
       })
 
       logger.info(
-        { jobId, campaignId: campaign.campaignId, sendAt: sendAtLocal, timeZone: config.timezone },
+        { jobId, campaignId, sendAt: sendAtLocal, timeZone: config.timezone },
         '[promo-email-generate] campaign scheduled',
       )
     } catch (err) {

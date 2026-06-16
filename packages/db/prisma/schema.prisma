@@ -209,6 +209,13 @@ model GhlSettings {
   promoEmailTimezone  String?   @default("America/New_York")
   promoEmailFromName  String?
   promoEmailFromEmail String?
+  // Magazine newsletter delivery (one GHL email campaign per approved edition)
+  newsletterTagId     String?
+  newsletterTagName   String?
+  newsletterSendTime  String?   @default("09:00") // "HH:mm" 24h, in newsletterTimezone
+  newsletterTimezone  String?   @default("America/New_York")
+  newsletterFromName  String?
+  newsletterFromEmail String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 

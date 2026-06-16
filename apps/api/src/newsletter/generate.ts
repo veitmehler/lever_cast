@@ -23,6 +23,7 @@ import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
 import { generateArticle, type VoiceVars, type UsageRecorder } from './article'
 import type { TopicResearch, TeaserSource } from './research'
+import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
 
@@ -330,45 +331,168 @@ function validateNewsletter(parts: {
   }
 }
 
-// ── Entry point ─────────────────────────────────────────────────────────────
+async function generateSubject(topic: { topic: string }, voice: VoiceVars, usage: Usage): Promise<string | null> {
+  const s = await runNewsletterPrompt('nl_subject_line', {
+    topic: topic.topic,
+    targetAudience: voice.targetAudience,
+  })
+  await usage.record(s.response)
+  return cleanTextOutput(s.content) || null
+}
 
-/**
- * Generate (or re-generate) the voiced content for one (userId, topicId) and set
- * status=ready_for_review. The Newsletter row must already exist (enqueue creates
- * it). Assumes ensureTopicResearch has run (the handler calls it first).
- */
-export async function generateNewsletterForCustomer(userId: string, topicId: string): Promise<void> {
+async function generatePreview(
+  topic: { topic: string },
+  subjectLine: string | null,
+  voice: VoiceVars,
+  usage: Usage,
+): Promise<string | null> {
+  const p = await runNewsletterPrompt('nl_preview_text', {
+    topic: topic.topic,
+    subjectLine: subjectLine ?? '',
+    targetAudience: voice.targetAudience,
+  })
+  await usage.record(p.response)
+  return cleanTextOutput(p.content) || null
+}
+
+// ── Shared context ────────────────────────────────────────────────────────────
+
+interface GenContext {
+  newsletterId: string
+  userId: string
+  topic: Prisma.NewsletterTopicGetPayload<{ include: { calendar: true } }>
+  voice: VoiceVars
+  research: TopicResearch
+  usage: Usage
+  bullets: string[]
+  topicVars: Record<string, string>
+}
+
+async function loadGenContext(newsletterId: string): Promise<GenContext> {
   const newsletter = await prisma.newsletter.findUnique({
-    where: { userId_topicId: { userId, topicId } },
+    where: { id: newsletterId },
     include: { topic: { include: { calendar: true } } },
   })
-  if (!newsletter) throw new Error(`Newsletter (${userId}, ${topicId}) not found`)
-
+  if (!newsletter) throw new Error(`Newsletter ${newsletterId} not found`)
   const topic = newsletter.topic
   const calendar = topic.calendar
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: newsletter.userId },
     include: { brandSettings: true, settings: true },
   })
-
   const voice: VoiceVars = {
     writingStyle: user?.settings?.writingStyle ?? '',
     targetAudience: user?.brandSettings?.who ?? '',
     industry: user?.brandSettings?.industry ?? calendar.industry,
     specialization: user?.brandSettings?.specialization ?? calendar.specialization ?? '',
   }
-  const research = (topic.research as TopicResearch | null) ?? {}
-  const usage = new Usage(userId)
-  const bullets = [topic.bullet1, topic.bullet2, topic.bullet3]
-  const topicVars = {
-    topic: topic.topic,
-    bullet1: topic.bullet1,
-    bullet2: topic.bullet2,
-    bullet3: topic.bullet3,
+  return {
+    newsletterId,
+    userId: newsletter.userId,
+    topic,
+    voice,
+    research: (topic.research as TopicResearch | null) ?? {},
+    usage: new Usage(newsletter.userId),
+    bullets: [topic.bullet1, topic.bullet2, topic.bullet3],
+    topicVars: {
+      topic: topic.topic,
+      bullet1: topic.bullet1,
+      bullet2: topic.bullet2,
+      bullet3: topic.bullet3,
+    },
   }
+}
 
-  // Feature article — required (throw aborts the edition).
-  const featureArticle = await generateArticle(topic.topic, bullets, voice, `${topic.id}/${userId}-feature`, usage)
+// ── Render + validate persistence ──────────────────────────────────────────────
+
+function toRenderBrand(b: {
+  organizationName?: string | null
+  organizationLogoUrl?: string | null
+  organizationAddress?: string | null
+  nlHeaderBgColor?: string | null
+  nlFooterBgColor?: string | null
+  nlFontFamily?: string | null
+  nlFontColor?: string | null
+  nlHeadingFontWeight?: string | null
+  nlBodyFontWeight?: string | null
+  nlLinkColor?: string | null
+} | null): RenderBrand {
+  if (!b) return {}
+  return {
+    organizationName: b.organizationName,
+    organizationLogoUrl: b.organizationLogoUrl,
+    organizationAddress: b.organizationAddress,
+    nlHeaderBgColor: b.nlHeaderBgColor,
+    nlFooterBgColor: b.nlFooterBgColor,
+    nlFontFamily: b.nlFontFamily,
+    nlFontColor: b.nlFontColor,
+    nlHeadingFontWeight: b.nlHeadingFontWeight,
+    nlBodyFontWeight: b.nlBodyFontWeight,
+    nlLinkColor: b.nlLinkColor,
+  }
+}
+
+/**
+ * Recompute validation from the row's current columns, render the magazine HTML,
+ * and persist both. Idempotent — safe to call after a full generate or a
+ * single-section regenerate.
+ */
+export async function renderAndSave(newsletterId: string): Promise<string> {
+  const nl = await prisma.newsletter.findUnique({
+    where: { id: newsletterId },
+    include: { topic: true },
+  })
+  if (!nl) throw new Error(`Newsletter ${newsletterId} not found`)
+  const brandRow = await prisma.brandSettings.findUnique({ where: { userId: nl.userId } })
+  const research = (nl.topic.research as TopicResearch | null) ?? {}
+  const video = (research.video as RenderVideo | undefined) ?? null
+
+  const feature = nl.featureArticle as { body?: string; title?: string } | null
+  const qh = nl.quickHits as QuickHits | null
+  const fun = nl.fun as Fun | null
+  const validation = validateNewsletter({
+    featureArticle: feature ? { body: feature.body ?? '', title: feature.title ?? '' } : null,
+    teasers: nl.teasers as Teaser[] | null,
+    quickHits: qh,
+    fun,
+    subjectLine: nl.subjectLine,
+    previewText: nl.previewText,
+    research,
+    needsRecipe: !!nl.topic.recipe,
+  })
+
+  const html = renderNewsletterHtml(buildRenderInput(nl, video), toRenderBrand(brandRow))
+  await prisma.newsletter.update({
+    where: { id: newsletterId },
+    data: { renderedHtml: html, validation: J(validation) },
+  })
+  return html
+}
+
+// ── Entry point — full generation ──────────────────────────────────────────────
+
+/**
+ * Generate the voiced content for one (userId, topicId) and set
+ * status=ready_for_review. The Newsletter row must already exist (enqueue creates
+ * it). Assumes ensureTopicResearch has run (the handler calls it first).
+ */
+export async function generateNewsletterForCustomer(userId: string, topicId: string): Promise<void> {
+  const row = await prisma.newsletter.findUnique({
+    where: { userId_topicId: { userId, topicId } },
+    select: { id: true },
+  })
+  if (!row) throw new Error(`Newsletter (${userId}, ${topicId}) not found`)
+  const ctx = await loadGenContext(row.id)
+  const { topic, voice, research, usage, bullets, topicVars } = ctx
+
+  // Feature article — required (a throw aborts the edition).
+  const featureArticle = await generateArticle(
+    topic.topic,
+    bullets,
+    voice,
+    `${topic.id}/${userId}-feature`,
+    usage,
+  )
 
   // Secondary article — optional.
   let secondaryArticle = null
@@ -386,7 +510,7 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
     }
   }
 
-  // Teasers, quick-hits, fun, modules (all fault-tolerant).
+  // Teasers, quick-hits, fun, modules, metadata (all fault-tolerant).
   let teasers: Teaser[] | null = null
   try {
     teasers = await voiceTeasers(research.teaserSources ?? [], voice, usage)
@@ -398,44 +522,21 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
   const fun = await generateFun(topicVars, voice, usage)
   const modules = await generateModules(topic, research, voice, usage)
 
-  // Email metadata.
   let subjectLine: string | null = null
   let previewText: string | null = null
   try {
-    const s = await runNewsletterPrompt('nl_subject_line', {
-      topic: topic.topic,
-      targetAudience: voice.targetAudience,
-    })
-    await usage.record(s.response)
-    subjectLine = cleanTextOutput(s.content) || null
+    subjectLine = await generateSubject(topic, voice, usage)
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/generate] subject line failed')
   }
   try {
-    const p = await runNewsletterPrompt('nl_preview_text', {
-      topic: topic.topic,
-      subjectLine: subjectLine ?? '',
-      targetAudience: voice.targetAudience,
-    })
-    await usage.record(p.response)
-    previewText = cleanTextOutput(p.content) || null
+    previewText = await generatePreview(topic, subjectLine, voice, usage)
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/generate] preview text failed')
   }
 
-  const validation = validateNewsletter({
-    featureArticle,
-    teasers,
-    quickHits,
-    fun,
-    subjectLine,
-    previewText,
-    research,
-    needsRecipe: !!topic.recipe,
-  })
-
-  // Build update with only the sections that produced content (JSON columns can't
-  // be set to plain null via Prisma; leaving them out keeps the default null).
+  // Persist sections that produced content (Json columns can't be set to plain
+  // null via Prisma; leaving them out keeps the default null).
   const data: Prisma.NewsletterUpdateInput = {
     status: 'ready_for_review',
     cost: usage.cost,
@@ -444,7 +545,6 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
     featureArticle: J(featureArticle),
     quickHits: J(quickHits),
     fun: J(fun),
-    validation: J(validation),
   }
   if (secondaryArticle) data.secondaryArticle = J(secondaryArticle)
   if (teasers && teasers.length > 0) data.teasers = J(teasers)
@@ -452,9 +552,90 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
   if (subjectLine) data.subjectLine = subjectLine
   if (previewText) data.previewText = previewText
 
-  await prisma.newsletter.update({ where: { id: newsletter.id }, data })
-  logger.info(
-    { topicId, userId, completion: validation.completionPercentage, cost: usage.cost },
-    '[newsletter/generate] ready_for_review',
-  )
+  await prisma.newsletter.update({ where: { id: row.id }, data })
+
+  // Render + validate from the persisted row.
+  await renderAndSave(row.id)
+  logger.info({ topicId, userId, cost: usage.cost }, '[newsletter/generate] ready_for_review')
+}
+
+// ── Single-section regeneration ────────────────────────────────────────────────
+
+export type NewsletterSection =
+  | 'feature'
+  | 'secondary'
+  | 'teasers'
+  | 'quickHits'
+  | 'fun'
+  | 'modules'
+  | 'subject'
+  | 'preview'
+  | 'all'
+
+/**
+ * Re-run one section's generator, write just its column, bump cost, then re-render
+ * + re-validate. 'all' re-runs the whole edition.
+ */
+export async function regenerateNewsletterSection(
+  newsletterId: string,
+  section: NewsletterSection,
+): Promise<void> {
+  if (section === 'all') {
+    const nl = await prisma.newsletter.findUnique({
+      where: { id: newsletterId },
+      select: { userId: true, topicId: true },
+    })
+    if (!nl) throw new Error(`Newsletter ${newsletterId} not found`)
+    await generateNewsletterForCustomer(nl.userId, nl.topicId)
+    return
+  }
+
+  const ctx = await loadGenContext(newsletterId)
+  const { topic, voice, research, usage, bullets, topicVars, userId } = ctx
+  const data: Prisma.NewsletterUpdateInput = {}
+
+  switch (section) {
+    case 'feature':
+      data.featureArticle = J(
+        await generateArticle(topic.topic, bullets, voice, `${topic.id}/${userId}-feature`, usage),
+      )
+      break
+    case 'secondary':
+      if (!topic.secondaryTopic) throw new Error('No secondary topic for this edition')
+      data.secondaryArticle = J(
+        await generateArticle(topic.secondaryTopic, bullets, voice, `${topic.id}/${userId}-secondary`, usage),
+      )
+      break
+    case 'teasers':
+      data.teasers = J(await voiceTeasers(research.teaserSources ?? [], voice, usage))
+      break
+    case 'quickHits':
+      data.quickHits = J(await generateQuickHits(topicVars, voice, usage))
+      break
+    case 'fun':
+      data.fun = J(await generateFun(topicVars, voice, usage))
+      break
+    case 'modules':
+      data.modules = J(await generateModules(topic, research, voice, usage))
+      break
+    case 'subject':
+      data.subjectLine = (await generateSubject(topic, voice, usage)) ?? null
+      break
+    case 'preview': {
+      const nl = await prisma.newsletter.findUnique({
+        where: { id: newsletterId },
+        select: { subjectLine: true },
+      })
+      data.previewText = (await generatePreview(topic, nl?.subjectLine ?? null, voice, usage)) ?? null
+      break
+    }
+  }
+
+  data.cost = { increment: usage.cost }
+  data.inputTokens = { increment: usage.input }
+  data.outputTokens = { increment: usage.output }
+
+  await prisma.newsletter.update({ where: { id: newsletterId }, data })
+  await renderAndSave(newsletterId)
+  logger.info({ newsletterId, section }, '[newsletter/generate] section regenerated')
 }

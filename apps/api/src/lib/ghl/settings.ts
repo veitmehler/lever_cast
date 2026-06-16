@@ -83,3 +83,47 @@ export async function getPromoEmailConfig(userId: string): Promise<PromoEmailCon
     fromEmail: row.promoEmailFromEmail,
   }
 }
+
+export interface NewsletterEmailConfig {
+  apiKey: string
+  locationId: string
+  ghlUserId: string
+  tagId: string
+  tagName: string | null
+  sendTime: string // "HH:mm"
+  timezone: string
+  fromName: string | null
+  fromEmail: string
+}
+
+/**
+ * Returns the newsletter delivery config only when fully usable: a decryptable
+ * API key, locationId, GHL user id (campaign owner), a target tag, and a From
+ * email. Otherwise null so the approve route can return a clear error.
+ */
+export async function getNewsletterEmailConfig(userId: string): Promise<NewsletterEmailConfig | null> {
+  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  if (
+    !row?.ghlApiKey ||
+    !row.ghlLocationId ||
+    !row.ghlUserId ||
+    !row.newsletterTagId ||
+    !row.newsletterFromEmail
+  ) {
+    return null
+  }
+  const apiKey = decrypt(row.ghlApiKey)
+  if (!apiKey) return null
+
+  return {
+    apiKey,
+    locationId: row.ghlLocationId,
+    ghlUserId: row.ghlUserId,
+    tagId: row.newsletterTagId,
+    tagName: row.newsletterTagName,
+    sendTime: row.newsletterSendTime ?? '09:00',
+    timezone: row.newsletterTimezone ?? 'America/New_York',
+    fromName: row.newsletterFromName,
+    fromEmail: row.newsletterFromEmail,
+  }
+}

@@ -201,9 +201,12 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
       })
 
       // Candidate matches: users not already on this calendar, ranked by how well
-      // their BrandSettings industry/specialization matches.
+      // their BrandSettings industry/specialization matches. NOTE: a bare
+      // `{ not: calendar.id }` excludes rows where newsletterCalendarId IS NULL
+      // (SQL `<>` is unknown for NULL), which would hide every unassigned user —
+      // so explicitly include nulls.
       const others = await prisma.user.findMany({
-        where: { newsletterCalendarId: { not: calendar.id } },
+        where: { OR: [{ newsletterCalendarId: null }, { newsletterCalendarId: { not: calendar.id } }] },
         select: {
           id: true,
           name: true,

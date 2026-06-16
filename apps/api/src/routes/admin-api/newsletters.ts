@@ -3,6 +3,7 @@ import { prisma } from '@socioply/shared'
 import { requireAdmin } from '../../middleware/admin'
 import { logger } from '../../lib/logger'
 import { parseNewsletterCsv, commitNewsletterTopics } from '../../newsletter/csv'
+import { enqueueNewsletterGeneration } from '../../newsletter/enqueue'
 
 interface CreateCalendarBody {
   name?: string
@@ -18,6 +19,13 @@ interface UpdateCalendarBody {
 
 interface AssignBody {
   userId?: string
+}
+
+interface GenerateBody {
+  calendarId?: string
+  userId?: string
+  from?: string
+  to?: string
 }
 
 /**
@@ -274,4 +282,31 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
       return reply.send({ ok: true })
     },
   )
+
+  // ── Manual generation trigger ─────────────────────────────────────────────────
+
+  // POST /newsletter/generate — { calendarId, userId, from?, to? } (ISO dates)
+  app.post<{ Body: GenerateBody }>('/newsletter/generate', async (request, reply) => {
+    const admin = await requireAdmin(request, reply)
+    if (!admin) return
+
+    const { calendarId, userId, from, to } = request.body ?? {}
+    if (!calendarId) return reply.status(400).send({ error: 'calendarId is required' })
+    if (!userId) return reply.status(400).send({ error: 'userId is required' })
+
+    const calendar = await prisma.newsletterCalendar.findUnique({ where: { id: calendarId } })
+    if (!calendar) return reply.status(404).send({ error: 'Calendar not found' })
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const fromDate = from ? new Date(from) : undefined
+    const toDate = to ? new Date(to) : undefined
+    if ((from && isNaN(fromDate!.getTime())) || (to && isNaN(toDate!.getTime()))) {
+      return reply.status(400).send({ error: 'Invalid from/to date' })
+    }
+
+    const result = await enqueueNewsletterGeneration(userId, calendarId, fromDate, toDate)
+    return reply.status(202).send(result)
+  })
 }

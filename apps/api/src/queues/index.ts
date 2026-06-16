@@ -95,6 +95,8 @@ export const QUEUES = {
   SYNDICATION_SAFETY: 'syndication-safety',
   PROMO_EMAIL_GENERATE: 'promo-email-generate',
   PROMO_EMAIL_SAFETY: 'promo-email-safety',
+  NEWSLETTER_GENERATE: 'newsletter-generate',
+  NEWSLETTER_SAFETY: 'newsletter-safety',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

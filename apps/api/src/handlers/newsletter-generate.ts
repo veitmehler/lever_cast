@@ -2,9 +2,24 @@ import PgBoss from 'pg-boss'
 import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
+import { getBoss, QUEUES } from '../queues/index'
 import { ensureTopicResearch } from '../newsletter/research'
 import { generateNewsletterForCustomer } from '../newsletter/generate'
 import type { NewsletterGenerateJobData } from '../newsletter/enqueue'
+
+/**
+ * Debounced batch-completion notify. Enqueued after every edition finishes; the
+ * notify handler only emails once no editions remain in progress and is
+ * idempotent (notifiedAt), so firing it per-completion yields at most one email.
+ */
+async function enqueueNotify(userId: string): Promise<void> {
+  try {
+    const boss = await getBoss()
+    await boss.send(QUEUES.NEWSLETTER_NOTIFY, { userId }, { startAfter: 30 })
+  } catch (err) {
+    logger.warn({ userId, err }, '[newsletter-generate] failed to enqueue notify')
+  }
+}
 
 // Terminal-ish states: a job that finds the row here has nothing to do.
 const DONE_STATES = ['ready_for_review', 'approved', 'scheduled', 'sent']
@@ -51,6 +66,10 @@ export async function newsletterGenerateHandler(
         context: { topicId, pgBossJobId: job.id },
       }).catch(() => {})
       throw err
+    } finally {
+      // Either way, this edition has settled — nudge the batch notifier (it waits
+      // until no editions remain in progress, then emails the customer once).
+      await enqueueNotify(userId)
     }
   }
 }

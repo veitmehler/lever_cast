@@ -933,6 +933,9 @@ model Newsletter {
   scheduledFor     DateTime?
   sentAt           DateTime?
   approvedAt       DateTime?
+  // Set when the batch "ready for review" email has been sent for this edition
+  // (prevents re-notifying on subsequent batch completions).
+  notifiedAt       DateTime?
   // cost
   cost             Float           @default(0)
   inputTokens      Int             @default(0)

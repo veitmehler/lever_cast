@@ -30,6 +30,7 @@ import { promoEmailGenerateHandler, PromoEmailGenerateJobData } from './handlers
 import { promoEmailSafetyHandler } from './handlers/promo-email-safety'
 import { newsletterGenerateHandler } from './handlers/newsletter-generate'
 import { newsletterSafetyHandler } from './handlers/newsletter-safety'
+import { newsletterNotifyHandler, NewsletterNotifyJobData } from './handlers/newsletter-notify'
 import type { NewsletterGenerateJobData } from './newsletter/enqueue'
 
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
@@ -228,6 +229,12 @@ async function main() {
     withSentry('newsletter-safety', async () => {
       await newsletterSafetyHandler()
     }),
+  )
+
+  await boss.work<NewsletterNotifyJobData>(
+    QUEUES.NEWSLETTER_NOTIFY,
+    { batchSize: 1 },
+    withSentry('newsletter-notify', newsletterNotifyHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

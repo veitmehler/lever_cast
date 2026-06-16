@@ -7,6 +7,7 @@ import { getPromoEmailConfig } from '../lib/ghl/settings'
 import {
   createGhlEmailCampaign,
   scheduleGhlEmailCampaign,
+  deleteGhlEmailCampaign,
   formatLocalSendAt,
   type GhlEmailMeta,
 } from '../lib/ghl/client'
@@ -128,20 +129,40 @@ export async function promoEmailGenerateHandler(
         userId: config.ghlUserId,
       })
 
+      // Record the created campaign id immediately so a schedule failure leaves a
+      // traceable reference even if rollback also fails.
+      await prisma.articleEmailCampaign.update({
+        where: { jobId },
+        data: { ghlCampaignId: campaign.campaignId },
+      })
+
       // computeSendAt returns the correct UTC instant; GHL wants it as a local
       // wall-clock string paired with timeZone.
       const sendAtUtc = computeSendAt(new Date(publishingDate), config.sendTime, config.timezone)
       const sendAtLocal = formatLocalSendAt(sendAtUtc, config.timezone)
-      await scheduleGhlEmailCampaign({
-        apiKey: config.apiKey,
-        locationId: config.locationId,
-        campaignId: campaign.campaignId,
-        meta,
-        tagIds: [config.tagId],
-        timeZone: config.timezone,
-        userId: config.ghlUserId,
-        sendAt: sendAtLocal,
-      })
+      try {
+        await scheduleGhlEmailCampaign({
+          apiKey: config.apiKey,
+          locationId: config.locationId,
+          campaignId: campaign.campaignId,
+          meta,
+          tagIds: [config.tagId],
+          timeZone: config.timezone,
+          userId: config.ghlUserId,
+          sendAt: sendAtLocal,
+        })
+      } catch (scheduleErr) {
+        // Roll back the just-created draft so failed publishes don't accumulate
+        // orphaned campaigns in GHL. Best-effort: keep the original error.
+        try {
+          await deleteGhlEmailCampaign(config.apiKey, config.locationId, campaign.campaignId)
+          await prisma.articleEmailCampaign.update({ where: { jobId }, data: { ghlCampaignId: null } })
+          logger.info({ jobId, campaignId: campaign.campaignId }, '[promo-email-generate] rolled back draft after schedule failure')
+        } catch (rollbackErr) {
+          logger.warn({ jobId, campaignId: campaign.campaignId, rollbackErr }, '[promo-email-generate] failed to roll back draft campaign')
+        }
+        throw scheduleErr
+      }
 
       await prisma.articleEmailCampaign.update({
         where: { jobId },

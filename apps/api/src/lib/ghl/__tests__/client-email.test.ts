@@ -8,6 +8,7 @@ import {
   listGhlTags,
   createGhlEmailCampaign,
   scheduleGhlEmailCampaign,
+  deleteGhlEmailCampaign,
   formatLocalSendAt,
   type GhlEmailMeta,
 } from '../client'
@@ -130,6 +131,17 @@ describe('scheduleGhlEmailCampaign', () => {
     expect(body.scheduleConfig).toEqual({ sendAt: '2026-06-20T09:00:00' })
     // sendAt must be a local wall-clock string, no Z suffix.
     expect(body.scheduleConfig.sendAt).not.toMatch(/Z$/)
+  })
+})
+
+describe('deleteGhlEmailCampaign', () => {
+  it('DELETEs the campaign by id', async () => {
+    const fetchFn = mockFetch(200, { ok: true })
+    await deleteGhlEmailCampaign('key', 'loc1', 'camp_123')
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toContain('/emails/public/v2/locations/loc1/campaigns/camp_123')
+    expect(url).not.toContain('/schedule')
+    expect(init.method).toBe('DELETE')
   })
 })
 

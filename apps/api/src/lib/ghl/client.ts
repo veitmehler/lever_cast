@@ -410,6 +410,22 @@ export async function scheduleGhlEmailCampaign(
 }
 
 /**
+ * Delete a campaign. Used to roll back a just-created draft when scheduling
+ * fails, so failed publishes don't accumulate orphaned drafts in GHL.
+ */
+export async function deleteGhlEmailCampaign(
+  apiKey: string,
+  locationId: string,
+  campaignId: string,
+): Promise<void> {
+  await ghlRequest<unknown>(
+    apiKey,
+    `/emails/public/v2/locations/${locationId}/campaigns/${campaignId}`,
+    { method: 'DELETE', version: EMAIL_API_VERSION },
+  )
+}
+
+/**
  * Format a UTC instant as GHL's local wall-clock send string
  * ("YYYY-MM-DDTHH:mm:ss", no suffix) in `timeZone`. GHL pairs this with the
  * `timeZone` field, so it must be the local representation, not UTC.

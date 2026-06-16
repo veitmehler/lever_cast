@@ -10,6 +10,7 @@ import {
   Users,
   CheckCircle2,
   XCircle,
+  Download,
 } from 'lucide-react'
 
 interface Topic {
@@ -190,7 +191,15 @@ export default function AdminNewsletterCalendarDetailPage({
         <p className="mb-3 text-xs text-muted-foreground">
           Required columns: <code>date, topic, bullet1, bullet2, bullet3</code>. Optional:{' '}
           <code>secondary_topic, recipe, kids_snack, tech_free_activity, video_url</code>. Re-uploading
-          a date overwrites it (idempotent).
+          a date overwrites it (idempotent).{' '}
+          <a
+            href="/newsletter-topics-template.csv"
+            download
+            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            <Download className="h-3 w-3" />
+            Download template
+          </a>
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <input

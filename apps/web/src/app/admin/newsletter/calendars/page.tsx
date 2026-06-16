@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Loader2, AlertTriangle, Plus, CalendarDays, Users, FileText, ChevronRight } from 'lucide-react'
+import { Loader2, AlertTriangle, Plus, CalendarDays, Users, FileText, ChevronRight, Download } from 'lucide-react'
 
 interface CalendarRow {
   id: string
@@ -74,11 +74,21 @@ export default function AdminNewsletterCalendarsPage() {
 
   return (
     <div className="max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Content Calendars</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Each calendar is scoped to an industry + specialization and holds dated topics uploaded via CSV.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Content Calendars</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Each calendar is scoped to an industry + specialization and holds dated topics uploaded via CSV.
+          </p>
+        </div>
+        <a
+          href="/newsletter-topics-template.csv"
+          download
+          className="inline-flex flex-shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+        >
+          <Download className="h-4 w-4" />
+          CSV template
+        </a>
       </div>
 
       {/* Create form */}

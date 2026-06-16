@@ -80,7 +80,7 @@ async function voiceTeasers(
         bulletPoint: s.bullet,
         articleContent: s.extract,
         writingStyle: voice.writingStyle,
-        targetAudience: voice.targetAudience,
+        who: voice.targetAudience,
         industry: voice.industry,
       })
       await usage.record(response)
@@ -287,7 +287,7 @@ async function generateModules(
 function voiceToVars(v: VoiceVars): Record<string, string> {
   return {
     writingStyle: v.writingStyle,
-    targetAudience: v.targetAudience,
+    who: v.targetAudience,
     industry: v.industry,
     specialization: v.specialization,
   }
@@ -334,7 +334,7 @@ function validateNewsletter(parts: {
 async function generateSubject(topic: { topic: string }, voice: VoiceVars, usage: Usage): Promise<string | null> {
   const s = await runNewsletterPrompt('nl_subject_line', {
     topic: topic.topic,
-    targetAudience: voice.targetAudience,
+    who: voice.targetAudience,
   })
   await usage.record(s.response)
   return cleanTextOutput(s.content) || null
@@ -349,7 +349,7 @@ async function generatePreview(
   const p = await runNewsletterPrompt('nl_preview_text', {
     topic: topic.topic,
     subjectLine: subjectLine ?? '',
-    targetAudience: voice.targetAudience,
+    who: voice.targetAudience,
   })
   await usage.record(p.response)
   return cleanTextOutput(p.content) || null

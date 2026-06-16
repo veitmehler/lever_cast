@@ -144,7 +144,7 @@ export async function researchVideo(
       topic: topic.topic,
       industry: calendar.industry,
       specialization: calendar.specialization ?? '',
-      targetAudience: calendar.specialization ?? '',
+      who: calendar.specialization ?? '',
     })
     const query = cleanTextOutput(content)
     if (query) hit = await youtubeSearch(query)
@@ -200,7 +200,7 @@ export async function researchRecipe(
     previousRecipeTitles: priorTitles.join('\n'),
     industry: calendar.industry,
     specialization: calendar.specialization ?? '',
-    targetAudience: calendar.specialization ?? '',
+    who: calendar.specialization ?? '',
     writingStyle: '',
   })
 
@@ -290,7 +290,7 @@ async function researchOneTeaser(
       bulletPoint: bullet,
       urlCount: String(valid.length),
       urls: valid.join('\n'),
-      targetAudience: calendar.specialization ?? '',
+      who: calendar.specialization ?? '',
     })
     const picked = cleanTextOutput(content).trim()
     if (valid.includes(picked)) chosen = picked

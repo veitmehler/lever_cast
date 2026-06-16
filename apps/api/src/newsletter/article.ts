@@ -59,7 +59,7 @@ export async function generateArticle(
   const base = {
     industry: voice.industry,
     specialization: voice.specialization,
-    targetAudience: voice.targetAudience,
+    who: voice.targetAudience,
     writingStyle: voice.writingStyle,
     bullet1: bullets[0] ?? '',
     bullet2: bullets[1] ?? '',

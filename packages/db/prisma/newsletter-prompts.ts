@@ -7,12 +7,12 @@
  *
  * Ported (and industry-neutralized) from the reference chiropractic newsletter
  * workflow — see .plans/newsletter-creation-workflow.md. Chiropractic specifics
- * are replaced with {{industry}} / {{specialization}} / {{targetAudience}} so the
+ * are replaced with {{industry}} / {{specialization}} / {{who}} so the
  * same prompts serve any productized vertical.
  *
  * Variable convention (literal {{var}} substitution, same as the article pipeline):
- *   {{writingStyle}}    - BrandSettings/Settings writing style (per-customer voice)
- *   {{targetAudience}}  - BrandSettings.who
+ *   {{writingStyle}}    - Settings.writingStyle (per-customer voice)
+ *   {{who}}             - BrandSettings.who (target audience)
  *   {{industry}}        - BrandSettings.industry
  *   {{specialization}}  - BrandSettings.specialization
  *   plus per-step topic / bullet / article-context variables noted inline.
@@ -58,7 +58,7 @@ KEY ANGLES:
 
 INDUSTRY: {{industry}}
 SPECIALIZATION: {{specialization}}
-TARGET AUDIENCE: {{targetAudience}}
+TARGET AUDIENCE: {{who}}
 
 Requirements:
 - People-First / Helpful-Content compliant; concrete, non-fluffy.
@@ -154,7 +154,7 @@ Return the facts grouped under each section.`,
     defaultModel: CLAUDE,
     maxTokens: 4096,
     systemPrompt: null,
-    userPrompt: `You are an expert human writer producing a newsletter feature article for a business in the {{industry}} industry (specialization: {{specialization}}), writing for this audience: {{targetAudience}}.
+    userPrompt: `You are an expert human writer producing a newsletter feature article for a business in the {{industry}} industry (specialization: {{specialization}}), writing for this audience: {{who}}.
 
 Write like a real, knowledgeable human:
 - High perplexity and burstiness — vary sentence length and structure naturally.
@@ -236,7 +236,7 @@ Return ONLY the image prompt text.`,
     defaultProvider: 'gemini',
     defaultModel: GEMINI_FLASH,
     systemPrompt: 'You pick the single best, most-educational source URL for a given angle.',
-    userPrompt: `From the {{urlCount}} candidate URLs below, pick the SINGLE highest-quality, most educational and trustworthy page for this angle, for our audience ({{targetAudience}}).
+    userPrompt: `From the {{urlCount}} candidate URLs below, pick the SINGLE highest-quality, most educational and trustworthy page for this angle, for our audience ({{who}}).
 
 ANGLE: {{bulletPoint}}
 
@@ -254,7 +254,7 @@ Return ONLY the chosen URL — no explanation, nothing else.`,
     defaultModel: CLAUDE,
     maxTokens: 2000,
     systemPrompt: null,
-    userPrompt: `You are a veteran newsletter writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+    userPrompt: `You are a veteran newsletter writer for a business in the {{industry}} industry, writing for: {{who}}.
 Write at a 5th–7th grade reading level. Use single quotes (not double) inside prose. Match this voice: {{writingStyle}}.
 
 Output STRICT JSON only (no markdown fences, no commentary) in EXACTLY this shape:
@@ -293,7 +293,7 @@ Output STRICT JSON only in the shape defined by the system instructions.`,
     defaultModel: CLAUDE,
     maxTokens: 1500,
     systemPrompt: null,
-    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{who}}.
 Visceral, real-life, simple language at a 5th–7th grade reading level. Vary grammar across items. Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
 
 Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
@@ -327,7 +327,7 @@ Output STRICT JSON only in the shape defined by the system instructions.`,
     defaultModel: CLAUDE,
     maxTokens: 1500,
     systemPrompt: null,
-    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{who}}.
 Simple, vivid language at a 5th–7th grade reading level. Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
 
 Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
@@ -362,7 +362,7 @@ Output STRICT JSON only in the shape defined by the system instructions.`,
     defaultModel: CLAUDE,
     maxTokens: 1000,
     systemPrompt: null,
-    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{targetAudience}}.
+    userPrompt: `You are an expert writer for a business in the {{industry}} industry, writing for: {{who}}.
 Single quotes only. Match this voice: {{writingStyle}}. The current year is {{ $now.year }}.
 
 Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
@@ -397,7 +397,7 @@ Output STRICT JSON only in the shape defined by the system instructions.`,
     defaultModel: CLAUDE,
     maxTokens: 1000,
     systemPrompt: null,
-    userPrompt: `You are a genuinely funny comedy writer producing a "Joke of the Day" for a {{industry}} newsletter audience: {{targetAudience}}.
+    userPrompt: `You are a genuinely funny comedy writer producing a "Joke of the Day" for a {{industry}} newsletter audience: {{who}}.
 Clean, clever, observational humour. Single quotes only. Match this voice: {{writingStyle}}.
 
 Output STRICT JSON only (no fences, no commentary), starting with { and ending with }, in EXACTLY this shape:
@@ -431,7 +431,7 @@ Output STRICT JSON only in the shape defined by the system instructions.`,
     defaultProvider: 'gemini',
     defaultModel: GEMINI_FLASH,
     systemPrompt: 'You craft the single best YouTube search query to find a high-quality, informative video.',
-    userPrompt: `To find the best, highest-quality, most informative video for the topic "{{topic}}" for an audience of {{targetAudience}} in the {{industry}} industry, what is the single best YouTube search query?
+    userPrompt: `To find the best, highest-quality, most informative video for the topic "{{topic}}" for an audience of {{who}} in the {{industry}} industry, what is the single best YouTube search query?
 
 ONLY return the search query — no explanation, no commentary, no quotes.`,
     isActive: true,
@@ -445,7 +445,7 @@ ONLY return the search query — no explanation, no commentary, no quotes.`,
     systemPrompt: 'You write high-open-rate email subject lines.',
     userPrompt: `Write ONE email subject line for a newsletter edition about: {{topic}}
 
-Audience: {{targetAudience}}
+Audience: {{who}}
 
 Requirements:
 - 40–60 characters, keyword-rich, curiosity-driven.
@@ -464,7 +464,7 @@ Return ONLY the subject line text.`,
     userPrompt: `Write the email preview (preheader) text for a newsletter edition about: {{topic}}
 
 SUBJECT LINE (do not repeat it): {{subjectLine}}
-Audience: {{targetAudience}}
+Audience: {{who}}
 
 Requirements:
 - 80–100 characters, complements (does not repeat) the subject.
@@ -495,7 +495,7 @@ Using live search, return 3 related, high-quality recipe ideas (as "## Recipe 1"
     defaultModel: CLAUDE,
     maxTokens: 2500,
     systemPrompt: null,
-    userPrompt: `You are a professional recipe writer for a {{industry}} newsletter audience: {{targetAudience}}. Match this voice: {{writingStyle}}.
+    userPrompt: `You are a professional recipe writer for a {{industry}} newsletter audience: {{who}}. Match this voice: {{writingStyle}}.
 
 Write ONE excellent, approachable recipe based on the research provided.
 RECIPE IDEA: {{recipeHint}}
@@ -563,7 +563,7 @@ Using live search, return ideas and key ingredients/technique notes for a fun, h
     defaultModel: CLAUDE,
     maxTokens: 2000,
     systemPrompt: null,
-    userPrompt: `You write fun, healthy kids snack recipes for a {{industry}} newsletter audience of parents: {{targetAudience}}. Match this voice: {{writingStyle}}.
+    userPrompt: `You write fun, healthy kids snack recipes for a {{industry}} newsletter audience of parents: {{who}}. Match this voice: {{writingStyle}}.
 
 SNACK IDEA: {{snackHint}}
 RESEARCH:
@@ -629,7 +629,7 @@ Using live search, return ideas, required materials, and step notes for an engag
     defaultModel: CLAUDE,
     maxTokens: 2000,
     systemPrompt: null,
-    userPrompt: `You write engaging, screen-free family activities for a {{industry}} newsletter audience: {{targetAudience}}. Match this voice: {{writingStyle}}.
+    userPrompt: `You write engaging, screen-free family activities for a {{industry}} newsletter audience: {{who}}. Match this voice: {{writingStyle}}.
 
 ACTIVITY IDEA: {{activityHint}}
 RESEARCH:

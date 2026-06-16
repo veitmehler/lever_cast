@@ -29,6 +29,7 @@ export function useSettingsData() {
 
   // Article Brand Profile — content fields
   const [industry, setIndustry]                         = useState('')
+  const [specialization, setSpecialization]             = useState('')
   const [businessDescription, setBusinessDescription]   = useState('')
   const [geolocation, setGeolocation]                   = useState('')
   const [who, setWho]                                   = useState('')
@@ -108,6 +109,7 @@ export function useSettingsData() {
         if (brandRes.ok) {
           const brand = await brandRes.json()
           if (brand.industry)             setIndustry(brand.industry)
+          if (brand.specialization)       setSpecialization(brand.specialization)
           if (brand.businessDescription) setBusinessDescription(brand.businessDescription)
           if (brand.geolocation)          setGeolocation(brand.geolocation)
           if (brand.who)                  setWho(brand.who)
@@ -318,6 +320,7 @@ export function useSettingsData() {
         body: JSON.stringify({
           geolocation: geolocation || null,
           industry: industry || null,
+          specialization: specialization || null,
           businessDescription: businessDescription || null,
           who: who || null,
           ourExperience: ourExperience || null,
@@ -437,6 +440,7 @@ export function useSettingsData() {
     isSavingTelegramChatId, setIsSavingTelegramChatId,
     // Brand profile — content
     industry, setIndustry,
+    specialization, setSpecialization,
     businessDescription, setBusinessDescription,
     geolocation, setGeolocation,
     who, setWho,

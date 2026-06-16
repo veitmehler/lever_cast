@@ -8,6 +8,7 @@ import type { SettingsData } from './useSettingsData'
 export function BrandProfileSection({ settings }: { settings: SettingsData }) {
   const {
     industry, setIndustry,
+    specialization, setSpecialization,
     businessDescription, setBusinessDescription,
     geolocation, setGeolocation,
     who, setWho,
@@ -67,6 +68,24 @@ export function BrandProfileSection({ settings }: { settings: SettingsData }) {
           />
           <p className="text-xs text-muted-foreground mt-1">
             Appears as the <code className="rounded bg-muted px-1">{'{{industry}}'}</code> variable in article prompts.
+          </p>
+        </div>
+
+        {/* Specialization — drives newsletter calendar matching + voice */}
+        <div>
+          <label className="block text-sm font-medium text-card-foreground mb-1">
+            Specialization <span className="text-muted-foreground">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={specialization}
+            onChange={(e) => setSpecialization(e.target.value)}
+            placeholder='e.g. "family care", "sports", "pediatrics"'
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            A focus within your industry. Used to match you to the right newsletter content calendar
+            and as the <code className="rounded bg-muted px-1">{'{{specialization}}'}</code> variable.
           </p>
         </div>
 

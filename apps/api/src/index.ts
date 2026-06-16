@@ -19,6 +19,7 @@ import { topicRoutes } from './routes/topics'
 import multipart from '@fastify/multipart'
 import { articleRoutes } from './routes/articles'
 import { wpConnectionRoutes } from './routes/wp-connections'
+import { newsletterRoutes } from './routes/newsletters'
 import { adminApiRoutes } from './routes/admin-api/index'
 import { populateClerkId } from './middleware/clerk-context'
 import { handleError } from './lib/error-handler'
@@ -77,6 +78,7 @@ async function main() {
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })
   await app.register(wpConnectionRoutes, { prefix: '/api' })
+  await app.register(newsletterRoutes, { prefix: '/api' })
   await app.register(adminApiRoutes, { prefix: '/api/admin' })
 
   // Admin UI — only registered when explicitly enabled; blocked externally by Caddy

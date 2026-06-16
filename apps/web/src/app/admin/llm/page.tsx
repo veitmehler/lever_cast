@@ -18,6 +18,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic / Claude',
   openrouter: 'OpenRouter',
   'fal-ai': 'Fal.ai',
+  resend: 'Resend (transactional email)',
 }
 
 export default function LLMKeysPage() {
@@ -27,6 +28,39 @@ export default function LLMKeysPage() {
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [migrating, setMigrating] = useState(false)
+
+  // Transactional email "From" address (PlatformSettings, not a secret key).
+  const [fromEmail, setFromEmail] = useState('')
+  const [savingFrom, setSavingFrom] = useState(false)
+
+  async function fetchFromEmail() {
+    try {
+      const res = await fetch('/api/admin/platform-settings')
+      if (res.ok) {
+        const data = await res.json()
+        setFromEmail(data.settings?.transactionalEmailFrom ?? '')
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  async function saveFromEmail() {
+    setSavingFrom(true)
+    try {
+      const res = await fetch('/api/admin/platform-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionalEmailFrom: fromEmail.trim() || null }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success('Transactional From address saved')
+    } catch {
+      toast.error('Failed to save From address')
+    } finally {
+      setSavingFrom(false)
+    }
+  }
 
   async function fetchStatuses() {
     setLoading(true)
@@ -43,6 +77,7 @@ export default function LLMKeysPage() {
 
   useEffect(() => {
     fetchStatuses()
+    fetchFromEmail()
   }, [])
 
   async function saveKey(provider: string) {
@@ -191,9 +226,31 @@ export default function LLMKeysPage() {
         </div>
       )}
 
+      {/* Transactional email From address (Resend) */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <p className="font-medium text-sm text-foreground">Transactional email — From address</p>
+        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+          The “From” address for transactional emails (e.g. the newsletter “ready for review”
+          notification), sent via the Resend key above. Use a domain verified in Resend.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            placeholder="hello@yourdomain.com"
+            value={fromEmail}
+            onChange={(e) => setFromEmail(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <Button size="sm" onClick={saveFromEmail} disabled={savingFrom}>
+            {savingFrom ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+      </div>
+
       <p className="text-xs text-muted-foreground">
-        Env-var keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, FAL_KEY)
-        are always read first. DB keys are a fallback for changing keys without redeploying.
+        Env-var keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, FAL_KEY,
+        RESEND_API_KEY) are always read first. DB keys are a fallback for changing keys without
+        redeploying.
       </p>
     </div>
   )

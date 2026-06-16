@@ -12,6 +12,7 @@ interface UpdateFrameworkBody {
 
 interface UpdatePlatformSettingsBody {
   googleGuidelines?: string | null
+  transactionalEmailFrom?: string | null
 }
 
 interface SchemaTypeRule {
@@ -73,7 +74,9 @@ export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
 
     const settings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } })
 
-    return reply.send({ settings: settings ?? { id: 'singleton', googleGuidelines: null } })
+    return reply.send({
+      settings: settings ?? { id: 'singleton', googleGuidelines: null, transactionalEmailFrom: null },
+    })
   })
 
   // PUT /api/admin/platform-settings
@@ -83,12 +86,21 @@ export async function outlineFrameworksAdminRoutes(app: FastifyInstance) {
       const clerkId = await requireAdmin(request, reply)
       if (!clerkId) return
 
-      const { googleGuidelines } = request.body ?? {}
+      const { googleGuidelines, transactionalEmailFrom } = request.body ?? {}
 
       const updated = await prisma.platformSettings.upsert({
         where: { id: 'singleton' },
-        create: { id: 'singleton', googleGuidelines: googleGuidelines ?? null },
-        update: { ...(googleGuidelines !== undefined ? { googleGuidelines } : {}) },
+        create: {
+          id: 'singleton',
+          googleGuidelines: googleGuidelines ?? null,
+          transactionalEmailFrom: transactionalEmailFrom ?? null,
+        },
+        update: {
+          ...(googleGuidelines !== undefined ? { googleGuidelines } : {}),
+          ...(transactionalEmailFrom !== undefined
+            ? { transactionalEmailFrom: transactionalEmailFrom || null }
+            : {}),
+        },
       })
 
       return reply.send({ settings: updated })

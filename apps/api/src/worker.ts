@@ -28,6 +28,10 @@ import { syndicationGenerateHandler, SyndicationGenerateJobData } from './handle
 import { syndicationSafetyHandler } from './handlers/syndication-safety'
 import { promoEmailGenerateHandler, PromoEmailGenerateJobData } from './handlers/promo-email-generate'
 import { promoEmailSafetyHandler } from './handlers/promo-email-safety'
+import { newsletterGenerateHandler } from './handlers/newsletter-generate'
+import { newsletterSafetyHandler } from './handlers/newsletter-safety'
+import { newsletterNotifyHandler, NewsletterNotifyJobData } from './handlers/newsletter-notify'
+import type { NewsletterGenerateJobData } from './newsletter/enqueue'
 
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
 function withSentry<T>(
@@ -76,6 +80,7 @@ async function main() {
   await boss.schedule(QUEUES.SOCIAL_AUTOMATION_SAFETY, '*/5 * * * *', {}) // every 5 min
   await boss.schedule(QUEUES.SYNDICATION_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.PROMO_EMAIL_SAFETY, '*/10 * * * *', {})      // every 10 min
+  await boss.schedule(QUEUES.NEWSLETTER_SAFETY, '*/10 * * * *', {})       // every 10 min
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -209,6 +214,27 @@ async function main() {
     withSentry('promo-email-safety', async () => {
       await promoEmailSafetyHandler()
     }),
+  )
+
+  // ── Newsletter ────────────────────────────────────────────────────────────────
+  await boss.work<NewsletterGenerateJobData>(
+    QUEUES.NEWSLETTER_GENERATE,
+    { batchSize: 1 },
+    withSentry('newsletter-generate', newsletterGenerateHandler),
+  )
+
+  await boss.work(
+    QUEUES.NEWSLETTER_SAFETY,
+    { batchSize: 1 },
+    withSentry('newsletter-safety', async () => {
+      await newsletterSafetyHandler()
+    }),
+  )
+
+  await boss.work<NewsletterNotifyJobData>(
+    QUEUES.NEWSLETTER_NOTIFY,
+    { batchSize: 1 },
+    withSentry('newsletter-notify', newsletterNotifyHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

@@ -15,6 +15,7 @@ import {
   X,
   Workflow,
   Images,
+  Mail,
 } from 'lucide-react'
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { label: 'Workflow', href: '/workflow', icon: Workflow },
   { label: 'Image Library', href: '/images', icon: Images },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
+  { label: 'Newsletter', href: '/newsletter', icon: Mail },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },
   { label: 'Account', href: '/account', icon: User },

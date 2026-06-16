@@ -17,7 +17,7 @@ interface PromoEmailConfig {
 }
 
 const DEFAULT_PROMO_EMAIL: PromoEmailConfig = {
-  enabled: false,
+  enabled: true,
   tagId: null,
   tagName: null,
   sendTime: '09:00',

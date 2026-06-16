@@ -28,7 +28,7 @@ export async function ghlRoutes(app: FastifyInstance) {
         lastVerifiedAt: null,
         lastError: null,
         promoEmail: {
-          enabled: false,
+          enabled: true,
           tagId: null,
           tagName: null,
           sendTime: '09:00',

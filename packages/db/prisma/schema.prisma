@@ -196,7 +196,7 @@ model GhlSettings {
   lastVerifiedAt DateTime?
   lastError      String?
   // Promotional email automation (one campaign per published article, sent to a tag/smart list)
-  promoEmailEnabled   Boolean @default(false)
+  promoEmailEnabled   Boolean @default(true)
   promoEmailTagId     String?
   promoEmailTagName   String?
   promoEmailSendTime  String? @default("09:00") // "HH:mm" 24h, in promoEmailTimezone

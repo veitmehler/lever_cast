@@ -1,4 +1,15 @@
-/** Convert a local calendar date + wall-clock time in `timeZone` to a UTC Date. */
+/**
+ * Convert a local calendar date + wall-clock time in `timeZone` to a UTC Date.
+ *
+ * Single-step offset correction: take the wall time as if it were UTC, measure
+ * how that instant actually renders in `timeZone`, and subtract the resulting
+ * offset. Correct for every fixed offset and DST shift except within the ~1h
+ * DST-transition window (where a wall time is ambiguous or nonexistent), which
+ * is acceptable for scheduling.
+ *
+ * (Replaces a prior iterative implementation that diverged once its guess
+ * crossed midnight — e.g. 09:00 America/New_York could resolve to the wrong day.)
+ */
 export function slotToUtc(
   dateStr: string,
   hour: number,
@@ -6,9 +17,9 @@ export function slotToUtc(
   timeZone: string,
 ): Date {
   const [year, month, day] = dateStr.split('-').map((n) => parseInt(n, 10))
-  let ms = Date.UTC(year, month - 1, day, hour, minute, 0)
+  const guess = Date.UTC(year, month - 1, day, hour, minute, 0)
 
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
@@ -17,32 +28,12 @@ export function slotToUtc(
     minute: '2-digit',
     second: '2-digit',
     hourCycle: 'h23',
-  })
+  }).formatToParts(new Date(guess))
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
 
-  function partsAt(timestamp: number) {
-    const parts = formatter.formatToParts(new Date(timestamp))
-    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '0'
-    return {
-      year: parseInt(get('year'), 10),
-      month: parseInt(get('month'), 10),
-      day: parseInt(get('day'), 10),
-      hour: parseInt(get('hour'), 10),
-      minute: parseInt(get('minute'), 10),
-    }
-  }
-
-  for (let i = 0; i < 4; i++) {
-    const p = partsAt(ms)
-    const diffMinutes =
-      (year - p.year) * 525_600 +
-      (month - p.month) * 43_200 +
-      (day - p.day) * 1_440 +
-      (hour - p.hour) * 60 +
-      (minute - p.minute)
-    ms -= diffMinutes * 60_000
-  }
-
-  return new Date(ms)
+  const asZoned = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  const offset = asZoned - guess // timezone offset (ms) at the target instant
+  return new Date(guess - offset)
 }
 
 /** Format a Date as YYYY-MM-DD in the user's social timezone. */

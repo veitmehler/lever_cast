@@ -17,6 +17,9 @@ const ENV_VAR_MAP: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openrouter: 'OPENROUTER_API_KEY',
   'fal-ai': 'FAL_KEY',
+  // Transactional email (Resend) — not an LLM, but managed in the same admin key
+  // store. Env var wins, else the DB SystemApiKey row.
+  resend: 'RESEND_API_KEY',
 }
 
 export async function getSystemApiKey(provider: string): Promise<string | null> {

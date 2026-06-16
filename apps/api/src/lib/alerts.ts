@@ -1,6 +1,30 @@
 import { prisma } from '@socioply/shared'
 import { logger } from './logger'
 import { Prisma } from '@prisma/client'
+import { getSystemApiKey } from './system-keys'
+
+const DEFAULT_FROM = 'hello@socioply.com'
+
+/** Resend API key — env (RESEND_API_KEY) first, else the admin-managed DB key. */
+async function getResendApiKey(): Promise<string | null> {
+  return getSystemApiKey('resend')
+}
+
+/**
+ * From address for transactional email — admin-managed PlatformSettings value,
+ * then env fallbacks, then a default.
+ */
+async function getTransactionalFrom(): Promise<string> {
+  const ps = await prisma.platformSettings
+    .findUnique({ where: { id: 'singleton' }, select: { transactionalEmailFrom: true } })
+    .catch(() => null)
+  return (
+    ps?.transactionalEmailFrom?.trim() ||
+    process.env.TRANSACTIONAL_EMAIL_FROM ||
+    process.env.ALERT_EMAIL_FROM ||
+    DEFAULT_FROM
+  )
+}
 
 export interface FailureAlertInput {
   userId?: string
@@ -26,7 +50,7 @@ export async function sendFailureAlert(input: FailureAlertInput): Promise<void> 
       logger.error({ err }, '[alerts] failed to write ErrorLog')
     })
 
-  const resendKey = process.env.RESEND_API_KEY
+  const resendKey = await getResendApiKey()
   const from = process.env.ALERT_EMAIL_FROM ?? 'alerts@socioply.com'
   const adminTo = process.env.ALERT_EMAIL_TO
 
@@ -76,9 +100,12 @@ export async function sendTransactionalEmail(input: {
   html?: string
   text: string
 }): Promise<boolean> {
-  const resendKey = process.env.RESEND_API_KEY
-  if (!resendKey) return false
-  const from = process.env.TRANSACTIONAL_EMAIL_FROM ?? process.env.ALERT_EMAIL_FROM ?? 'hello@socioply.com'
+  const resendKey = await getResendApiKey()
+  if (!resendKey) {
+    logger.info({ to: input.to }, '[alerts] no Resend key configured — skipping transactional email')
+    return false
+  }
+  const from = await getTransactionalFrom()
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',

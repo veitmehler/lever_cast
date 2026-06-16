@@ -784,6 +784,9 @@ model PlatformSettings {
   id               String   @id @default("singleton") // only one row
   googleGuidelines String?  @db.Text // Google Helpful Content guidelines text
   schemaTypeRules  Json? // [{ keyword, articleType, publisherType }]
+  // From address for transactional emails (newsletter "ready for review", etc.).
+  // The Resend API key itself is a SystemApiKey row (provider "resend").
+  transactionalEmailFrom String?
   updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")

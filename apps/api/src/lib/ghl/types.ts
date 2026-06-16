@@ -30,3 +30,9 @@ export interface GhlSocialAccount {
   isExpired?: boolean
   expire?: string
 }
+
+export interface GhlTag {
+  id: string
+  name: string
+  locationId?: string
+}

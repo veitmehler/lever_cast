@@ -12,6 +12,7 @@ import { ReviewContentPanel } from '@/features/workflow/ReviewContentPanel'
 import { SchemaPanel } from '@/features/workflow/SchemaPanel'
 import { SocialMediaSetSection } from '@/features/workflow/SocialMediaSetSection'
 import { SyndicationPanels } from '@/features/workflow/SyndicationPanels'
+import { PromoEmailPanel } from '@/features/workflow/PromoEmailPanel'
 import { ACTIVE_STATUSES, TOTAL_PIPELINE_STEPS } from '@/features/workflow/constants'
 import { resolveCitations } from '@/features/workflow/review-text'
 import { useWorkflowJob, type WorkflowView } from '@/features/workflow/useWorkflowJob'
@@ -122,6 +123,8 @@ export default function WorkflowJobPage() {
         {/* Platform Articles (LinkedIn/Medium) above the Social media set —
             matches the actual production order. */}
         <SyndicationPanels workflow={view} />
+
+        <PromoEmailPanel workflow={view} />
 
         <SocialMediaSetSection workflow={view} />
 

@@ -27,6 +27,7 @@ export async function GET() {
       settings ?? {
         geolocation: null,
         industry: null,
+        specialization: null,
         businessDescription: null,
         who: null,
         ourExperience: null,
@@ -87,6 +88,7 @@ export async function PATCH(request: NextRequest) {
     const stringFields = [
       'geolocation',
       'industry',
+      'specialization',
       'businessDescription',
       'who',
       'ourExperience',

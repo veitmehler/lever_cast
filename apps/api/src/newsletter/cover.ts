@@ -89,7 +89,9 @@ async function renderCover(html: string, key: string): Promise<string> {
   const page = await browser.newPage()
   try {
     await page.setViewport({ width: 680, height: 900, deviceScaleFactor: 2 })
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    // Icons are embedded as data URIs, so 'load' (images decoded) is enough —
+    // and 'networkidle0' isn't a valid setContent waitUntil in puppeteer-core v24.
+    await page.setContent(html, { waitUntil: 'load' })
     const el = await page.$('#cover')
     if (!el) throw new Error('cover element not found')
     const shot = await el.screenshot({ type: 'png' })

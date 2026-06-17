@@ -7,15 +7,16 @@ import { Loader2, AlertTriangle, ArrowLeft, Save, RefreshCw, CheckCircle2 } from
 type Template = Record<string, string>
 type Delivery = Record<string, string>
 
-const COLOR_FIELDS: Array<[string, string]> = [
-  ['nlHeaderBgColor', 'Header background'],
-  ['nlFooterBgColor', 'Footer background'],
-  ['nlSectionColor1', 'Content band 1'],
-  ['nlSectionColor2', 'Content band 2'],
-  ['nlSectionColor3', 'Content band 3'],
-  ['nlSectionColor4', 'Content band 4'],
-  ['nlFontColor', 'Body text color'],
-  ['nlLinkColor', 'Link color'],
+// [key, label, default] — defaults mirror the renderer so the pickers never show black.
+const COLOR_FIELDS: Array<[string, string, string]> = [
+  ['nlHeaderBgColor', 'Header background', '#fa00bb'],
+  ['nlFooterBgColor', 'Footer background', '#011328'],
+  ['nlSectionColor1', 'General bands (tips, joke, video, trivia)', '#fa00bb'],
+  ['nlSectionColor2', 'Curated article bands', '#00bbf9'],
+  ['nlSectionColor3', 'Articles & “Did you know” bands', '#00142b'],
+  ['nlSectionColor4', 'Recipe bands', '#00dd81'],
+  ['nlFontColor', 'Body text color', '#00142b'],
+  ['nlLinkColor', 'Link color', '#fa00bb'],
 ]
 const WEIGHTS = ['400', '500', '600', '700', '800']
 
@@ -193,12 +194,12 @@ export default function NewsletterTemplatePage() {
               Appearance
             </h3>
             <div className="space-y-3">
-              {COLOR_FIELDS.map(([key, label]) => (
+              {COLOR_FIELDS.map(([key, label, def]) => (
                 <div key={key} className="flex items-center justify-between gap-3">
                   <label className="text-sm text-foreground">{label}</label>
                   <input
                     type="color"
-                    value={template[key] || '#000000'}
+                    value={template[key] || def}
                     onChange={(e) => setT(key, e.target.value)}
                     className="h-8 w-12 cursor-pointer rounded border border-border"
                   />
@@ -284,11 +285,11 @@ export default function NewsletterTemplatePage() {
           {/* Delivery */}
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Delivery (GoHighLevel)
+              Delivery (Omniply)
             </h3>
             {!ghlConnected && (
               <p className="mb-3 text-xs text-amber-600">
-                Connect GoHighLevel in Settings to enable sending.
+                Connect Omniply in Settings to enable sending.
               </p>
             )}
             <div className="space-y-3">

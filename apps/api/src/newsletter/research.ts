@@ -29,7 +29,7 @@ import {
   scrapeUrl,
   urlStatus,
 } from './oxylabs'
-import { overlayPlayButton, overlayTitleBanner, cacheBust } from './image-overlay'
+import { overlayPlayButton, overlayTitleBanner, vtoken } from './image-overlay'
 
 const NL_IMAGE_SIZE = 'landscape_16_9'
 
@@ -114,8 +114,8 @@ async function thumbnailToS3(topicId: string, thumbnailUrl: string | null): Prom
   // Fallback: store the plain thumbnail if the overlay step failed.
   try {
     const buf = await downloadImageFromUrl(thumbnailUrl)
-    const { url } = await uploadBufferWithKey(`newsletter/${topicId}/video-thumb.jpg`, buf, 'image/jpeg')
-    return cacheBust(url)
+    const { url } = await uploadBufferWithKey(`newsletter/${topicId}/video-thumb-${vtoken()}.jpg`, buf, 'image/jpeg')
+    return url
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] thumbnail S3 upload failed (non-fatal)')
     return null
@@ -234,8 +234,8 @@ export async function researchOneRecipe(
       // Composite the recipe name onto the image; fall back to the plain upload.
       imageUrl = title ? await overlayTitleBanner(dataUri, title, `${topicId}/${slot}`) : null
       if (!imageUrl) {
-        const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}.jpg`, buf, 'image/jpeg')
-        imageUrl = cacheBust(url)
+        const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}-${vtoken()}.jpg`, buf, 'image/jpeg')
+        imageUrl = url
       }
     }
   } catch (err) {

@@ -178,109 +178,31 @@ async function generateFun(
   return fun
 }
 
+interface RecipeModule {
+  intro: string
+  ingredients: string
+  instructions: string
+  imageUrl: string | null
+}
 interface Modules {
-  recipe?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  kidsSnack?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  techFreeActivity?: { intro: string; materials: string; instructions: string }
+  recipe?: RecipeModule
+  recipe2?: RecipeModule
 }
 
-async function falImage(prompt: string, key: string): Promise<string | null> {
-  try {
-    const falKey = await getSystemApiKey('fal-ai')
-    const clean = cleanTextOutput(prompt)
-    if (!falKey || !clean) return null
-    const buf = await generateWithFalAI(falKey, clean, NL_IMAGE_MODEL)
-    const { url } = await uploadBufferWithKey(`newsletter/${key}.jpg`, buf, 'image/jpeg')
-    return url
-  } catch (err) {
-    logger.warn({ key, err }, '[newsletter/generate] module image failed (non-fatal)')
-    return null
-  }
-}
-
-async function generateModules(
-  topic: { id: string; recipe: string | null; kidsSnack: string | null; techFreeActivity: string | null },
-  research: TopicResearch,
-  voice: VoiceVars,
-  usage: Usage,
-): Promise<Modules> {
+/**
+ * Modules = the two recipes, both reused from the shared (neutral-voice) research
+ * (written once per topic, identical for every customer). No per-customer LLM here.
+ */
+function buildModules(research: TopicResearch): Modules {
   const modules: Modules = {}
-
-  // Recipe: reuse the shared (neutral-voice) research as-is — it was written once
-  // per topic and is the same for every customer.
-  if (research.recipe) {
-    modules.recipe = {
-      intro: research.recipe.intro,
-      ingredients: research.recipe.ingredients,
-      instructions: research.recipe.instructions,
-      imageUrl: research.recipe.imageUrl,
-    }
-  }
-
-  // Kids snack: generated per customer (not part of shared research).
-  if (topic.kidsSnack) {
-    try {
-      const r = await runNewsletterPrompt('nl_kids_snack_researcher', { snackHint: topic.kidsSnack }, { useSearch: true })
-      await usage.record(r.response)
-      const { data, response } = await runNewsletterWriterJson<{
-        kids_snack_intro?: string
-        kids_snack_ingredients?: string
-        kids_snack_instructions?: string
-      }>('nl_kids_snack_writer_system', 'nl_kids_snack_writer_user', {
-        snackHint: topic.kidsSnack,
-        snackResearch: r.content,
-        previousSnackTitles: '',
-        ...voiceToVars(voice),
-      })
-      await usage.record(response)
-      const intro = data.kids_snack_intro ?? ''
-      let imageUrl: string | null = null
-      try {
-        const img = await runNewsletterPrompt('nl_kids_snack_image_prompt', {
-          snackContent: `${intro}\n${data.kids_snack_ingredients ?? ''}`,
-        })
-        await usage.record(img.response)
-        imageUrl = await falImage(img.content, `${topic.id}/kids-snack`)
-      } catch (err) {
-        logger.warn({ topicId: topic.id, err }, '[newsletter/generate] kids snack image prompt failed')
-      }
-      modules.kidsSnack = {
-        intro,
-        ingredients: data.kids_snack_ingredients ?? '',
-        instructions: data.kids_snack_instructions ?? '',
-        imageUrl,
-      }
-    } catch (err) {
-      logger.warn({ topicId: topic.id, err }, '[newsletter/generate] kids snack failed')
-    }
-  }
-
-  // Tech-free activity: per customer, no image.
-  if (topic.techFreeActivity) {
-    try {
-      const r = await runNewsletterPrompt('nl_tech_free_researcher', { activityHint: topic.techFreeActivity }, { useSearch: true })
-      await usage.record(r.response)
-      const { data, response } = await runNewsletterWriterJson<{
-        tech_free_activity_intro?: string
-        tech_free_activity_materials?: string
-        tech_free_activity_instructions?: string
-      }>('nl_tech_free_writer_system', 'nl_tech_free_writer_user', {
-        activityHint: topic.techFreeActivity,
-        research: r.content,
-        previousActivityTitles: '',
-        ...voiceToVars(voice),
-      })
-      await usage.record(response)
-      modules.techFreeActivity = {
-        intro: data.tech_free_activity_intro ?? '',
-        materials: data.tech_free_activity_materials ?? '',
-        instructions: data.tech_free_activity_instructions ?? '',
-      }
-    } catch (err) {
-      logger.warn({ topicId: topic.id, err }, '[newsletter/generate] tech-free activity failed')
-    }
-  }
-
+  const map = (r: NonNullable<TopicResearch['recipe']>) => ({
+    intro: r.intro,
+    ingredients: r.ingredients,
+    instructions: r.instructions,
+    imageUrl: r.imageUrl,
+  })
+  if (research.recipe) modules.recipe = map(research.recipe)
+  if (research.recipe2) modules.recipe2 = map(research.recipe2)
   return modules
 }
 
@@ -520,7 +442,7 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
 
   const quickHits = await generateQuickHits(topicVars, voice, usage)
   const fun = await generateFun(topicVars, voice, usage)
-  const modules = await generateModules(topic, research, voice, usage)
+  const modules = buildModules(research)
 
   let subjectLine: string | null = null
   let previewText: string | null = null
@@ -616,7 +538,7 @@ export async function regenerateNewsletterSection(
       data.fun = J(await generateFun(topicVars, voice, usage))
       break
     case 'modules':
-      data.modules = J(await generateModules(topic, research, voice, usage))
+      data.modules = J(buildModules(research))
       break
     case 'subject':
       data.subjectLine = (await generateSubject(topic, voice, usage)) ?? null

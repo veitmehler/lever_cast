@@ -155,10 +155,9 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
         bullet1: r.bullet1,
         bullet2: r.bullet2,
         bullet3: r.bullet3,
-        secondaryTopic: r.secondaryTopic,
+        secondaryArticle: r.secondaryTopic,
         recipe: r.recipe,
-        kidsSnack: r.kidsSnack,
-        techFreeActivity: r.techFreeActivity,
+        recipe2: r.recipe2,
         videoUrl: r.videoUrl,
       }))
 

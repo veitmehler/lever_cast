@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { parseNewsletterCsv } from '../csv'
 
-const HEADER = 'date,topic,bullet1,bullet2,bullet3,secondary_topic,recipe,kids_snack,tech_free_activity,video_url'
+const HEADER = 'date,topic,bullet1,bullet2,bullet3,secondary_article,recipe,recipe_2,video_url'
 
 describe('parseNewsletterCsv', () => {
-  it('parses a valid row with optional module columns', () => {
+  it('parses a valid row with optional columns', () => {
     const csv = `${HEADER}
-2026-07-01,Back pain basics,b1,b2,b3,Posture tips,Quinoa salad,,,https://youtu.be/abc`
+2026-07-01,Back pain basics,b1,b2,b3,Posture tips,Quinoa salad,Energy bites,https://youtu.be/abc`
     const { rows, errors, headerError } = parseNewsletterCsv(csv)
     expect(headerError).toBeUndefined()
     expect(errors).toHaveLength(0)
@@ -15,21 +15,20 @@ describe('parseNewsletterCsv', () => {
     expect(r.topic).toBe('Back pain basics')
     expect(r.secondaryTopic).toBe('Posture tips')
     expect(r.recipe).toBe('Quinoa salad')
-    expect(r.kidsSnack).toBeNull()
-    expect(r.techFreeActivity).toBeNull()
+    expect(r.recipe2).toBe('Energy bites')
     expect(r.videoUrl).toBe('https://youtu.be/abc')
     expect(r.date.toISOString().slice(0, 10)).toBe('2026-07-01')
   })
 
   it('accepts header aliases (spaces / underscores) and trims', () => {
-    const csv = `Date, Topic , Bullet 1,Bullet 2,Bullet 3,Tech Free Activity
-2026-07-02, Neck care , one, two, three, Nature walk`
+    const csv = `Date, Topic , Bullet 1,Bullet 2,Bullet 3,Recipe 2
+2026-07-02, Neck care , one, two, three, Nut-free trail mix`
     const { rows, errors, headerError } = parseNewsletterCsv(csv)
     expect(headerError).toBeUndefined()
     expect(errors).toHaveLength(0)
     expect(rows[0].topic).toBe('Neck care')
     expect(rows[0].bullet1).toBe('one')
-    expect(rows[0].techFreeActivity).toBe('Nature walk')
+    expect(rows[0].recipe2).toBe('Nut-free trail mix')
   })
 
   it('reports a fatal header error when a required column is missing', () => {

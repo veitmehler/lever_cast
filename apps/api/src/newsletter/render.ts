@@ -133,6 +133,18 @@ function content(inner: string): string {
   return `<tr><td style="background-color:#ffffff;padding:32px 28px;">${inner}</td></tr>`
 }
 
+/** 30px vertical spacer between sections. */
+function spacer(): string {
+  return `<tr><td style="height:30px;line-height:30px;font-size:0;background-color:#ffffff;">&nbsp;</td></tr>`
+}
+
+/** A large plain heading (no colored band) on white — used for the trivia question. */
+function plainHeading(title: string, theme: Theme): string {
+  return `<tr><td style="background-color:#ffffff;padding:8px 24px 0;text-align:center;">
+    <h1 style="margin:0;font-family:${HEADING_STACK};font-size:30px;font-weight:${theme.headingWeight};color:${theme.fontColor};letter-spacing:0.3px;line-height:1.2;">${esc(title)}</h1>
+  </td></tr>`
+}
+
 function para(html: string, theme: Theme, align: 'left' | 'center' = 'left'): string {
   return `<div style="font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;text-align:${align};">${html}</div>`
 }
@@ -151,11 +163,14 @@ function readMoreButton(link: string, theme: Theme, label = 'Read full article �
   return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.linkColor};text-decoration:none;border:2px solid ${theme.linkColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
 }
 
-function articleBlock(a: RenderArticle, theme: Theme): string {
+function articleBlock(a: RenderArticle, theme: Theme, showTitle = true): string {
   const img = a.imageUrl
     ? `<img src="${esc(a.imageUrl)}" width="624" alt="${esc(a.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
     : ''
-  const h2 = `<h2 style="margin:0 0 14px;font-family:${theme.fontStack};font-size:24px;font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(a.title)}</h2>`
+  // When the band already shows the article title (secondary), skip the inner h2.
+  const h2 = showTitle
+    ? `<h2 style="margin:0 0 14px;font-family:${theme.fontStack};font-size:24px;font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(a.title)}</h2>`
+    : ''
   const tldr = a.tldr
     ? `<p style="margin:0 0 14px;font-family:${theme.fontStack};font-size:15px;color:${theme.fontColor};"><u>TL;DR:</u> ${esc(a.tldr)}</p>`
     : ''
@@ -172,7 +187,8 @@ function videoCard(v: RenderVideo, theme: Theme): string {
   const img = thumb
     ? `<img src="${esc(thumb)}" width="624" alt="${esc(title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;" />`
     : ''
-  return `<a href="${esc(v.url || '#')}" target="_blank" style="text-decoration:none;">${img}<div style="font-family:${theme.fontStack};font-size:18px;font-weight:${theme.headingWeight};color:${theme.linkColor};margin:12px 0 0;text-align:center;">&#9658; ${esc(title)}</div></a>`
+  // The play button is composited onto the thumbnail server-side, so no glyph here.
+  return `<a href="${esc(v.url || '#')}" target="_blank" style="text-decoration:none;">${img}<div style="font-family:${theme.fontStack};font-size:18px;font-weight:${theme.headingWeight};color:${theme.linkColor};margin:12px 0 0;text-align:center;">${esc(title)}</div></a>`
 }
 
 function recipeBlock(r: RenderRecipe, theme: Theme): string {
@@ -214,12 +230,15 @@ export function buildRenderInput(
 export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): string {
   const theme = resolveTheme(brand)
   const rows: string[] = []
-  let colorIdx = 0
+  // Start the band cycle at color 2 so the first band never matches the header
+  // (whose default equals section color 1).
+  let colorIdx = 1
   const nextColor = () => theme.sections[colorIdx++ % theme.sections.length]
-  // Emit a colored band + white content block for one section.
+  // Emit a colored band + white content block + spacer for one section.
   const section = (title: string, inner: string) => {
     rows.push(band(title, nextColor(), theme))
     rows.push(content(inner))
+    rows.push(spacer())
   }
 
   // Header (logo on header band)
@@ -227,13 +246,16 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     ? `<img src="${esc(theme.logoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.logoWidth}" style="display:block;width:100%;max-width:${theme.logoWidth}px;height:auto;margin:0 auto;" />`
     : `<div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
   rows.push(`<tr><td style="background-color:${theme.headerBg};padding:24px;text-align:center;">${logo}</td></tr>`)
+  rows.push(spacer())
 
   const fun = input.fun
   const teasers = input.teasers ?? []
 
-  // Trivia question
+  // Trivia question — plain heading (no band)
   if (fun?.triviaQuestion) {
-    section('Trivia Question', para(`<p style="margin:0;font-size:20px;">${esc(fun.triviaQuestion)}</p>`, theme, 'center'))
+    rows.push(plainHeading('Trivia Question', theme))
+    rows.push(content(para(`<p style="margin:0;font-size:20px;">${esc(fun.triviaQuestion)}</p>`, theme, 'center')))
+    rows.push(spacer())
   }
 
   // Cover summary image (full-width, no band)
@@ -241,6 +263,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     rows.push(
       `<tr><td style="background-color:#ffffff;padding:0;"><img src="${esc(input.summaryImageUrl)}" width="680" alt="In this issue" style="display:block;width:100%;max-width:680px;height:auto;" /></td></tr>`,
     )
+    rows.push(spacer())
   }
 
   // Video
@@ -271,8 +294,8 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   // Teaser 3
   if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme))
 
-  // Secondary (specialization) article
-  if (input.secondaryArticle) section('Also In This Issue', articleBlock(input.secondaryArticle, theme))
+  // Secondary (specialization) article — band shows its own headline
+  if (input.secondaryArticle) section(input.secondaryArticle.title, articleBlock(input.secondaryArticle, theme, false))
 
   // Recipes
   if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme))

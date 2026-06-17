@@ -16,7 +16,7 @@ import { runNewsletterPrompt } from './llm'
 import type { UsageRecorder } from './article'
 
 const FALLBACK_ICON_STYLE =
-  'flat minimalist icon, single centered subject, bold simple shapes, soft duotone palette, clean solid light background, vector style, no text, no words'
+  'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters'
 const FALLBACK_ICON_MODEL = 'fal-ai/flux-pro'
 
 export interface CoverItem {
@@ -38,15 +38,17 @@ function esc(s: string): string {
 }
 
 export function buildCoverHtml(title: string, date: string, tiles: Tile[], colors: CoverColors): string {
+  // Minimal 2-color scheme: dark navy + white. Navy background + caption strip,
+  // white icon panel with a centered monoline icon, white text.
+  const navy = colors.headerBg
   const cells = tiles
-    .map((t, i) => {
-      const accent = colors.sections[i % colors.sections.length]
+    .map((t) => {
       const icon = t.iconDataUri
         ? `<div class="ico" style="background-image:url('${t.iconDataUri}')"></div>`
         : `<div class="ico ico-empty"></div>`
       return `<div class="tile">
         ${icon}
-        <div class="cap" style="background:${accent}">${esc(t.headline)}</div>
+        <div class="cap">${esc(t.headline)}</div>
       </div>`
     })
     .join('')
@@ -54,15 +56,15 @@ export function buildCoverHtml(title: string, date: string, tiles: Tile[], color
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:${colors.headerBg}; }
-  #cover { width:680px; background:${colors.headerBg}; padding:28px 24px 32px; font-family:'Trebuchet MS','Segoe UI',Helvetica,Arial,sans-serif; }
+  body { background:${navy}; }
+  #cover { width:680px; background:${navy}; padding:30px 26px 34px; font-family:'Trebuchet MS','Segoe UI',Helvetica,Arial,sans-serif; }
   .title { color:#fff; font-size:46px; font-weight:800; line-height:1.05; letter-spacing:0.5px; text-align:left; }
-  .date { color:#fff; opacity:0.8; font-size:18px; font-weight:600; margin:8px 0 24px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .tile { background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.25); display:flex; flex-direction:column; }
-  .ico { height:118px; background-size:cover; background-position:center; background-repeat:no-repeat; }
-  .ico-empty { background:#eef2f7; }
-  .cap { color:#fff; font-size:15px; font-weight:700; line-height:1.25; padding:12px 14px; min-height:64px; display:flex; align-items:center; }
+  .date { color:#fff; opacity:0.75; font-size:18px; font-weight:600; margin:8px 0 26px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .tile { background:#ffffff; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .ico { height:120px; background:#ffffff; background-size:contain; background-position:center; background-repeat:no-repeat; margin:14px 14px 0; }
+  .ico-empty { background:#f1f4f8; border-radius:8px; }
+  .cap { color:#ffffff; background:${navy}; font-size:15px; font-weight:700; line-height:1.25; padding:14px 16px; min-height:66px; display:flex; align-items:center; }
 </style></head>
 <body><div id="cover">
   <div class="title">${esc(title)}</div>

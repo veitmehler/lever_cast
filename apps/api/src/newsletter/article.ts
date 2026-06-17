@@ -17,6 +17,7 @@ import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
+const NL_IMAGE_SIZE = 'landscape_16_9'
 
 /** Sink for per-call cost/token accounting (implemented by the generator). */
 export interface UsageRecorder {
@@ -133,7 +134,7 @@ export async function generateArticle(
     const falKey = await getSystemApiKey('fal-ai')
     const prompt = cleanTextOutput(imgPrompt.content)
     if (falKey && prompt) {
-      const buf = await generateWithFalAI(falKey, prompt, NL_IMAGE_MODEL)
+      const buf = await generateWithFalAI(falKey, prompt, NL_IMAGE_MODEL, NL_IMAGE_SIZE)
       const { url } = await uploadBufferWithKey(`newsletter/${imageKey}.jpg`, buf, 'image/jpeg')
       imageUrl = url
     }

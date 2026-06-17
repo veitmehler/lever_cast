@@ -218,7 +218,10 @@ export function generateImagePrompt(
 export async function generateWithFalAI(
   apiKey: string,
   prompt: string,
-  model: string = 'fal-ai/flux/schnell'
+  model: string = 'fal-ai/flux/schnell',
+  // Fal image_size enum: square_hd | square | portrait_4_3 | portrait_16_9 |
+  // landscape_4_3 | landscape_16_9. Default preserves prior behavior.
+  imageSize: string = 'square_hd'
 ): Promise<Buffer> {
   // Configure Fal.ai client with API key
   fal.config({
@@ -228,6 +231,7 @@ export async function generateWithFalAI(
   console.log('[Fal.ai API] Request:', {
     model,
     promptLength: prompt.length,
+    imageSize,
   })
 
   try {
@@ -236,7 +240,7 @@ export async function generateWithFalAI(
     const result = await fal.subscribe(model, {
       input: {
         prompt,
-        image_size: 'square_hd', // Use square_hd for better quality
+        image_size: imageSize,
       },
       pollInterval: 2000, // Poll every 2 seconds
       logs: true,

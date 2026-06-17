@@ -20,6 +20,13 @@ const ENV_VAR_MAP: Record<string, string> = {
   // Transactional email (Resend) — not an LLM, but managed in the same admin key
   // store. Env var wins, else the DB SystemApiKey row.
   resend: 'RESEND_API_KEY',
+  // Oxylabs credentials (web research). Two product pairs, admin-managed; each
+  // value falls back to its specific env var, then the legacy shared
+  // OXYLABS_USERNAME/PASSWORD (handled in lib/oxylabs-auth.ts).
+  oxylabs_serp_username: 'OXYLABS_SERP_USERNAME',
+  oxylabs_serp_password: 'OXYLABS_SERP_PASSWORD',
+  oxylabs_proxy_username: 'OXYLABS_PROXY_USERNAME',
+  oxylabs_proxy_password: 'OXYLABS_PROXY_PASSWORD',
 }
 
 export async function getSystemApiKey(provider: string): Promise<string | null> {

@@ -133,7 +133,7 @@ export async function researchVideo(
     }
   }
 
-  if (!isOxylabsConfigured()) {
+  if (!(await isOxylabsConfigured())) {
     return { url: null, title: null, thumbnailUrl: null, s3Url: null, manual: true }
   }
 
@@ -308,7 +308,7 @@ export async function researchTeaserSources(
   topic: NewsletterTopic,
   calendar: NewsletterCalendar,
 ): Promise<TeaserSource[]> {
-  if (!isOxylabsConfigured()) return []
+  if (!(await isOxylabsConfigured())) return []
   const bullets = [topic.bullet1, topic.bullet2, topic.bullet3].filter(Boolean)
   const out: TeaserSource[] = []
   for (const bullet of bullets) {

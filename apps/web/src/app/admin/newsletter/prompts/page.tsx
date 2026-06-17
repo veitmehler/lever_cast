@@ -55,7 +55,7 @@ const GROUPS: { label: string; keys: string[] }[] = [
     ],
   },
   {
-    label: 'Teasers (Around the web)',
+    label: 'Teasers (curated articles)',
     keys: ['nl_teaser_url_selector', 'nl_teaser_summarizer_system', 'nl_teaser_summarizer_user'],
   },
   {
@@ -76,21 +76,12 @@ const GROUPS: { label: string; keys: string[] }[] = [
     keys: ['nl_youtube_query', 'nl_subject_line', 'nl_preview_text'],
   },
   {
-    label: 'Modules — Recipe',
+    label: 'Recipes (recipe + recipe 2)',
     keys: ['nl_recipe_researcher', 'nl_recipe_writer_system', 'nl_recipe_writer_user', 'nl_recipe_image_prompt'],
   },
   {
-    label: 'Modules — Kids Snack',
-    keys: [
-      'nl_kids_snack_researcher',
-      'nl_kids_snack_writer_system',
-      'nl_kids_snack_writer_user',
-      'nl_kids_snack_image_prompt',
-    ],
-  },
-  {
-    label: 'Modules — Tech-Free Activity',
-    keys: ['nl_tech_free_researcher', 'nl_tech_free_writer_system', 'nl_tech_free_writer_user'],
+    label: 'Cover summary image',
+    keys: ['nl_summary_title', 'nl_summary_icon_style'],
   },
 ]
 

@@ -58,6 +58,7 @@ class Usage implements UsageRecorder {
 }
 
 interface Teaser {
+  headline: string | null // real source article title (preferred heading)
   title: string
   body: string
   cta: string
@@ -85,6 +86,7 @@ async function voiceTeasers(
       })
       await usage.record(response)
       out.push({
+        headline: s.headline,
         title: (data.title ?? s.bullet).trim(),
         body: data.body ?? '',
         cta: data.cta ?? '',
@@ -327,25 +329,20 @@ async function loadGenContext(newsletterId: string): Promise<GenContext> {
 
 // ── Render + validate persistence ──────────────────────────────────────────────
 
-function toRenderBrand(b: {
-  organizationName?: string | null
-  organizationLogoUrl?: string | null
-  organizationAddress?: string | null
-  nlHeaderBgColor?: string | null
-  nlFooterBgColor?: string | null
-  nlFontFamily?: string | null
-  nlFontColor?: string | null
-  nlHeadingFontWeight?: string | null
-  nlBodyFontWeight?: string | null
-  nlLinkColor?: string | null
-} | null): RenderBrand {
+function toRenderBrand(b: RenderBrand | null): RenderBrand {
   if (!b) return {}
   return {
     organizationName: b.organizationName,
     organizationLogoUrl: b.organizationLogoUrl,
     organizationAddress: b.organizationAddress,
+    nlLogoUrl: b.nlLogoUrl,
+    nlLogoWidth: b.nlLogoWidth,
     nlHeaderBgColor: b.nlHeaderBgColor,
     nlFooterBgColor: b.nlFooterBgColor,
+    nlSectionColor1: b.nlSectionColor1,
+    nlSectionColor2: b.nlSectionColor2,
+    nlSectionColor3: b.nlSectionColor3,
+    nlSectionColor4: b.nlSectionColor4,
     nlFontFamily: b.nlFontFamily,
     nlFontColor: b.nlFontColor,
     nlHeadingFontWeight: b.nlHeadingFontWeight,

@@ -1,6 +1,24 @@
 import { describe, it, expect } from 'vitest'
-import { extractReadable } from '../research'
+import { extractReadable, cleanHeadline } from '../research'
 import { fillPrompt } from '../llm'
+
+describe('cleanHeadline', () => {
+  it('strips a pipe site suffix', () => {
+    expect(cleanHeadline('Better Posture at a Desk | Healthline')).toBe('Better Posture at a Desk')
+  })
+  it('strips a short trailing dash brand', () => {
+    expect(cleanHeadline('Do I need therapy? Signs you should see a private therapist - Priory')).toBe(
+      'Do I need therapy? Signs you should see a private therapist',
+    )
+  })
+  it('keeps a long dash tail (likely real title)', () => {
+    const t = 'How to stretch - a complete daily routine for everyone at home'
+    expect(cleanHeadline(t)).toBe(t)
+  })
+  it('passes through null', () => {
+    expect(cleanHeadline(null)).toBeNull()
+  })
+})
 
 describe('extractReadable', () => {
   it('pulls h1/h2/h3/p/li into a normalized block', () => {

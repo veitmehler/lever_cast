@@ -14,10 +14,9 @@ describe('buildCoverHtml', () => {
     expect(html).toContain('Jul 1, 2026')
     expect(html).toContain('Back Pain Myths')
     expect(html).toContain('Better Sleep')
-    expect(html).toContain('#011328') // header bg
-    expect(html).toContain('#fa00bb') // accent 1
-    expect(html).toContain('#00bbf9') // accent 2 (cycled to 2nd tile)
-    expect(html).toContain("data:image/jpeg;base64,AAA") // embedded icon
+    expect(html).toContain('#011328') // navy bg + caption (2-color scheme)
+    expect(html).not.toContain('#00dd81') // no 4-color cycling on the cover
+    expect(html).toContain('data:image/jpeg;base64,AAA') // embedded icon
     expect(html).toContain('ico-empty') // tile with no icon
   })
 

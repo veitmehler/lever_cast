@@ -65,7 +65,8 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('Did You Know?')
     expect(html).toContain('Tips Of The Day')
     expect(html).toContain('Article Of The Day')
-    expect(html).toContain('Also In This Issue')
+    expect(html).toContain('Sports Recovery') // secondary band = its own title
+    expect(html).not.toContain('Also In This Issue')
     expect(html).toContain('Recipe Of The Day')
     expect(html).toContain('Another Recipe')
     expect(html).toContain('https://youtu.be/abc')

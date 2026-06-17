@@ -572,7 +572,7 @@ Return ONLY the 3-word title.`,
     defaultModel: 'fal-ai/flux-pro',
     systemPrompt: null,
     userPrompt:
-      'flat minimalist icon, single centered subject, bold simple shapes, soft duotone palette, subtle long shadow, clean solid light background, vector style, no text, no words, no letters',
+      'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters',
     isActive: true,
   },
 ]

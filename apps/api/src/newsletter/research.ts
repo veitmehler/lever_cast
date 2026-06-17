@@ -29,6 +29,9 @@ import {
   scrapeUrl,
   urlStatus,
 } from './oxylabs'
+import { overlayPlayButton, overlayTitleBanner } from './image-overlay'
+
+const NL_IMAGE_SIZE = 'landscape_16_9'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
 const SOCIAL_DOMAINS = [
@@ -105,13 +108,13 @@ async function fetchYouTubeOEmbed(videoUrl: string): Promise<OEmbed | null> {
 
 async function thumbnailToS3(topicId: string, thumbnailUrl: string | null): Promise<string | null> {
   if (!thumbnailUrl) return null
+  // Composite a play button over the thumbnail so it reads as a video.
+  const withPlay = await overlayPlayButton(thumbnailUrl, `${topicId}/video-thumb`)
+  if (withPlay) return withPlay
+  // Fallback: store the plain thumbnail if the overlay step failed.
   try {
     const buf = await downloadImageFromUrl(thumbnailUrl)
-    const { url } = await uploadBufferWithKey(
-      `newsletter/${topicId}/video-thumb.jpg`,
-      buf,
-      'image/jpeg',
-    )
+    const { url } = await uploadBufferWithKey(`newsletter/${topicId}/video-thumb.jpg`, buf, 'image/jpeg')
     return url
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] thumbnail S3 upload failed (non-fatal)')
@@ -216,8 +219,9 @@ export async function researchOneRecipe(
   const intro = data.recipe_intro ?? ''
   const ingredients = data.recipe_ingredients ?? ''
   const instructions = data.recipe_instructions ?? ''
+  const title = firstH2(intro)
 
-  // 3. Image (non-fatal).
+  // 3. Image (16:9, non-fatal) — overlay the recipe name as a navy banner.
   let imageUrl: string | null = null
   try {
     const { content: imgPrompt } = await runNewsletterPrompt('nl_recipe_image_prompt', {
@@ -225,15 +229,20 @@ export async function researchOneRecipe(
     })
     const falKey = await getSystemApiKey('fal-ai')
     if (falKey && imgPrompt.trim()) {
-      const buf = await generateWithFalAI(falKey, cleanTextOutput(imgPrompt), NL_IMAGE_MODEL)
-      const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}.jpg`, buf, 'image/jpeg')
-      imageUrl = url
+      const buf = await generateWithFalAI(falKey, cleanTextOutput(imgPrompt), NL_IMAGE_MODEL, NL_IMAGE_SIZE)
+      const dataUri = `data:image/jpeg;base64,${buf.toString('base64')}`
+      // Composite the recipe name onto the image; fall back to the plain upload.
+      imageUrl = title ? await overlayTitleBanner(dataUri, title, `${topicId}/${slot}`) : null
+      if (!imageUrl) {
+        const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}.jpg`, buf, 'image/jpeg')
+        imageUrl = url
+      }
     }
   } catch (err) {
     logger.warn({ topicId, slot, err }, '[newsletter/research] recipe image failed (non-fatal)')
   }
 
-  return { title: firstH2(intro), intro, ingredients, instructions, imageUrl }
+  return { title, intro, ingredients, instructions, imageUrl }
 }
 
 // ── Teaser sources ────────────────────────────────────────────────────────────
@@ -268,7 +277,24 @@ export function extractMeta(html: string): { headline: string | null; image: str
   const titleTag = clean((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]) ?? null)
   const h1 = clean((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1]) ?? null)
   const image = meta('og:image')
-  return { headline: ogTitle || titleTag || h1, image: image || null }
+  return { headline: cleanHeadline(ogTitle || titleTag || h1), image: image || null }
+}
+
+/**
+ * Strip a source page's site-branding suffix from a headline:
+ * "Title | Site Name" / "Title - Brand" / "Title – Brand" → "Title".
+ * Conservative: only drops a pipe tail, or a dash tail of ≤5 words.
+ */
+export function cleanHeadline(s: string | null): string | null {
+  if (!s) return s
+  let out = s.trim()
+  const pipe = out.lastIndexOf(' | ')
+  if (pipe > 0) out = out.slice(0, pipe).trim()
+  out = out.replace(/\s+[–—-]\s+[^–—-]{1,40}$/, (tail) => {
+    const words = tail.replace(/^\s+[–—-]\s+/, '').trim().split(/\s+/)
+    return words.length <= 5 ? '' : tail
+  })
+  return out.trim() || s
 }
 
 /** Pull readable text from h1/h2/h3/p/li into a normalized block (capped). */

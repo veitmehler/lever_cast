@@ -569,7 +569,7 @@ Return ONLY the 3-word title.`,
     key: 'nl_summary_icon_style',
     stepName: 'newsletter_summary_icon_style',
     defaultProvider: 'fal-ai',
-    defaultModel: 'fal-ai/flux-pro',
+    defaultModel: 'fal-ai/flux/schnell',
     systemPrompt: null,
     userPrompt:
       'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters',

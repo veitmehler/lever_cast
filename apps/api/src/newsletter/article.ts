@@ -15,7 +15,7 @@ import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
-import { cacheBust } from './image-overlay'
+import { vtoken } from './image-overlay'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
 const NL_IMAGE_SIZE = 'landscape_16_9'
@@ -136,8 +136,8 @@ export async function generateArticle(
     const prompt = cleanTextOutput(imgPrompt.content)
     if (falKey && prompt) {
       const buf = await generateWithFalAI(falKey, prompt, NL_IMAGE_MODEL, NL_IMAGE_SIZE)
-      const { url } = await uploadBufferWithKey(`newsletter/${imageKey}.jpg`, buf, 'image/jpeg')
-      imageUrl = cacheBust(url)
+      const { url } = await uploadBufferWithKey(`newsletter/${imageKey}-${vtoken()}.jpg`, buf, 'image/jpeg')
+      imageUrl = url
     }
   } catch (err) {
     logger.warn({ imageKey, err }, '[newsletter/article] image failed (non-fatal)')

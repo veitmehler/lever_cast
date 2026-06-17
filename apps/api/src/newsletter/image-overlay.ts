@@ -19,11 +19,15 @@ function esc(s: string): string {
 }
 
 /**
- * Append a version query so caches don't serve a stale image — our S3 keys are
- * stable (overwritten in place each regeneration), so the URL must change.
+ * A short, time-ordered token used to make each generation's S3 keys unique.
+ *
+ * Cache-busting via a `?v=` query string does NOT work here: CloudFront
+ * (cdn.socioply.com) ignores the query string in its cache key, so a stable key
+ * keeps serving the previously-cached object until its TTL expires. The KEY
+ * itself must change, so the URL points at an object the CDN has never seen.
  */
-export function cacheBust(url: string): string {
-  return url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now()
+export function vtoken(): string {
+  return Date.now().toString(36)
 }
 
 async function composite(src: string, overlayHtml: string, key: string): Promise<string | null> {
@@ -41,8 +45,8 @@ async function composite(src: string, overlayHtml: string, key: string): Promise
     const el = await page.$('#c')
     if (!el) throw new Error('overlay container not found')
     const shot = await el.screenshot({ type: 'jpeg', quality: 88 })
-    const { url } = await uploadBufferWithKey(`newsletter/${key}.jpg`, Buffer.from(shot), 'image/jpeg')
-    return cacheBust(url)
+    const { url } = await uploadBufferWithKey(`newsletter/${key}-${vtoken()}.jpg`, Buffer.from(shot), 'image/jpeg')
+    return url
   } catch (err) {
     logger.warn({ key, err }, '[newsletter/image-overlay] composite failed (non-fatal)')
     return null

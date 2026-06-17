@@ -14,6 +14,7 @@
  */
 
 import { logger } from '../lib/logger'
+import { getOxylabsSerpAuth, basicAuthHeader } from '../lib/oxylabs-auth'
 
 export interface ValidatedCitation {
   title: string
@@ -70,59 +71,14 @@ function classifyStatus(httpStatus: number): ValidatedCitation['status'] {
   return 'uncertain'
 }
 
-/** Build fetch options for a single URL — either direct or via OxyLabs proxy. */
-function buildFetchOptions(url: string): RequestInit & { signal: AbortSignal } {
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-
-  const headers: Record<string, string> = {
-    'User-Agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  }
-
-  const oxyUser = process.env.OXYLABS_USERNAME
-  const oxyPass = process.env.OXYLABS_PASSWORD
-
-  if (oxyUser && oxyPass) {
-    // OxyLabs Web Scraper API — returns the page status without downloading
-    // the full body. Using "universal" source for broad compatibility.
-    // We only care about the HTTP status of the target URL.
-    const credentials = Buffer.from(`${oxyUser}:${oxyPass}`).toString('base64')
-    return {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${credentials}`,
-      },
-      body: JSON.stringify({
-        source: 'universal',
-        url,
-        render: 'html',
-      }),
-      signal: controller.signal,
-    }
-  }
-
-  // Direct HEAD request (no proxy)
-  return {
-    method: 'HEAD',
-    headers,
-    redirect: 'follow',
-    signal: controller.signal,
-  }
-}
 
 async function checkUrl(
   citation: { title: string; url: string },
-  useOxylabs: boolean,
+  authHeader: string | null,
 ): Promise<ValidatedCitation> {
   const { url, title } = citation
   try {
-    if (useOxylabs) {
-      const credentials = Buffer.from(
-        `${process.env.OXYLABS_USERNAME}:${process.env.OXYLABS_PASSWORD}`,
-      ).toString('base64')
+    if (authHeader) {
       const controller = new AbortController()
       setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
@@ -130,7 +86,7 @@ async function checkUrl(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Basic ${credentials}`,
+          Authorization: authHeader,
         },
         body: JSON.stringify({ source: 'universal', url }),
         signal: controller.signal,
@@ -178,11 +134,15 @@ export async function validateCitationUrls(
 ): Promise<ValidatedCitation[]> {
   if (citations.length === 0) return []
 
-  const useOxylabs = !!(process.env.OXYLABS_USERNAME && process.env.OXYLABS_PASSWORD)
+  // Admin-managed Oxylabs SERP/Scraper creds (env fallback). When absent, fall
+  // back to direct HEAD requests.
+  const serpAuth = await getOxylabsSerpAuth()
+  const authHeader = serpAuth ? basicAuthHeader(serpAuth) : null
+  const useOxylabs = !!authHeader
   if (!useOxylabs) {
     logger.warn(
       { jobId },
-      '[citations] OXYLABS_USERNAME/PASSWORD not set — falling back to direct HEAD requests',
+      '[citations] Oxylabs creds not set — falling back to direct HEAD requests',
     )
   }
 
@@ -191,7 +151,7 @@ export async function validateCitationUrls(
   // Process in batches of CONCURRENCY to avoid hammering the proxy
   for (let i = 0; i < citations.length; i += CONCURRENCY) {
     const batch = citations.slice(i, i + CONCURRENCY)
-    const settled = await Promise.allSettled(batch.map((c) => checkUrl(c, useOxylabs)))
+    const settled = await Promise.allSettled(batch.map((c) => checkUrl(c, authHeader)))
     for (let j = 0; j < settled.length; j++) {
       const s = settled[j]
       if (s.status === 'fulfilled') {

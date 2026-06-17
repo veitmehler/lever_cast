@@ -12,21 +12,23 @@
  * vary by source/version, so extraction here is deliberately defensive and logs
  * the raw shape on a miss rather than throwing.
  */
+import { ProxyAgent } from 'undici'
 import { logger } from '../lib/logger'
+import {
+  getOxylabsSerpAuth,
+  getOxylabsProxyAuth,
+  basicAuthHeader,
+  buildProxyUrl,
+} from '../lib/oxylabs-auth'
 
 const OXY_ENDPOINT = 'https://realtime.oxylabs.io/v1/queries'
 const QUERY_TIMEOUT_MS = 90_000
+const SCRAPE_TIMEOUT_MS = 30_000
 const MAX_ATTEMPTS = 3
 
-export function isOxylabsConfigured(): boolean {
-  return !!(process.env.OXYLABS_USERNAME && process.env.OXYLABS_PASSWORD)
-}
-
-function authHeader(): string {
-  const credentials = Buffer.from(
-    `${process.env.OXYLABS_USERNAME}:${process.env.OXYLABS_PASSWORD}`,
-  ).toString('base64')
-  return `Basic ${credentials}`
+/** SERP/Scraper API is the gate for newsletter research (search needs it). */
+export async function isOxylabsConfigured(): Promise<boolean> {
+  return !!(await getOxylabsSerpAuth())
 }
 
 interface OxyResult {
@@ -41,7 +43,9 @@ interface OxyResponse {
 
 /** Low-level POST to the Realtime API with timeout + exponential backoff. */
 async function oxyQuery(payload: Record<string, unknown>): Promise<OxyResponse> {
-  if (!isOxylabsConfigured()) throw new Error('Oxylabs not configured (OXYLABS_USERNAME/PASSWORD)')
+  const auth = await getOxylabsSerpAuth()
+  if (!auth) throw new Error('Oxylabs SERP API not configured')
+  const header = basicAuthHeader(auth)
 
   let lastErr: unknown
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -50,7 +54,7 @@ async function oxyQuery(payload: Record<string, unknown>): Promise<OxyResponse> 
     try {
       const res = await fetch(OXY_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
+        headers: { 'Content-Type': 'application/json', Authorization: header },
         body: JSON.stringify(payload),
         signal: controller.signal,
       })
@@ -69,6 +73,36 @@ async function oxyQuery(payload: Record<string, unknown>): Promise<OxyResponse> 
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
+
+/**
+ * Fetch a URL through the Oxylabs residential proxy. Returns null when no proxy
+ * creds are configured (caller falls back to the Scraper API). Throws on a
+ * network/proxy error so the caller can fall back too.
+ */
+async function proxyFetch(url: string): Promise<{ status: number; html: string } | null> {
+  const auth = await getOxylabsProxyAuth()
+  if (!auth) return null
+  const dispatcher = new ProxyAgent(buildProxyUrl(auth))
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      },
+      // `dispatcher` is an undici extension not in the DOM RequestInit types.
+      dispatcher,
+    } as RequestInit & { dispatcher: ProxyAgent })
+    const html = await res.text()
+    return { status: res.status, html }
+  } finally {
+    clearTimeout(timer)
+    dispatcher.close().catch(() => {})
+  }
 }
 
 // ── Google SERP ───────────────────────────────────────────────────────────────
@@ -206,8 +240,18 @@ export interface ScrapeResult {
   html: string
 }
 
-/** Scrape a page's rendered HTML via the universal source. */
+/**
+ * Scrape a page's HTML. Prefers the residential proxy (cheaper, residential IPs);
+ * falls back to the Scraper API `universal` source on proxy failure or when no
+ * proxy creds are configured.
+ */
 export async function scrapeUrl(url: string): Promise<ScrapeResult> {
+  try {
+    const viaProxy = await proxyFetch(url)
+    if (viaProxy) return { statusCode: viaProxy.status, html: viaProxy.html }
+  } catch (err) {
+    logger.warn({ url, err }, '[newsletter/oxylabs] proxy scrape failed — falling back to Scraper API')
+  }
   const resp = await oxyQuery({ source: 'universal', url, render: 'html' })
   const result = resp.results?.[0]
   const content = result?.content
@@ -217,6 +261,12 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
 
 /** Lightweight validation — returns the target's HTTP status (0 on failure). */
 export async function urlStatus(url: string): Promise<number> {
+  try {
+    const viaProxy = await proxyFetch(url)
+    if (viaProxy) return viaProxy.status
+  } catch {
+    /* fall through to Scraper API */
+  }
   try {
     const resp = await oxyQuery({ source: 'universal', url })
     return resp.results?.[0]?.status_code ?? 0

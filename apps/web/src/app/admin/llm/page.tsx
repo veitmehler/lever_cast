@@ -19,6 +19,10 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: 'OpenRouter',
   'fal-ai': 'Fal.ai',
   resend: 'Resend (transactional email)',
+  oxylabs_serp_username: 'Oxylabs SERP API — Username',
+  oxylabs_serp_password: 'Oxylabs SERP API — Password',
+  oxylabs_proxy_username: 'Oxylabs Residential Proxy — Username',
+  oxylabs_proxy_password: 'Oxylabs Residential Proxy — Password',
 }
 
 export default function LLMKeysPage() {

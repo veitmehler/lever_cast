@@ -4,6 +4,13 @@ vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
+// No Oxylabs creds → these tests exercise the direct-HEAD fallback path.
+vi.mock('../../lib/oxylabs-auth', () => ({
+  getOxylabsSerpAuth: vi.fn().mockResolvedValue(null),
+  basicAuthHeader: (c: { username: string; password: string }) =>
+    `Basic ${Buffer.from(`${c.username}:${c.password}`).toString('base64')}`,
+}))
+
 import { extractCitationsForValidation, validateCitationUrls } from '../citation-validator'
 
 describe('extractCitationsForValidation', () => {

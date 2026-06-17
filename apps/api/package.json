@@ -41,7 +41,8 @@
     "prisma": "^6.19.3",
     "puppeteer-core": "^24",
     "sharp": "^0.34.5",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "undici": "^6"
   },
   "devDependencies": {
     "@types/node": "^20",

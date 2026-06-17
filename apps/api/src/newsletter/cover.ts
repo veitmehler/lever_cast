@@ -18,7 +18,7 @@ import type { UsageRecorder } from './article'
 
 const FALLBACK_ICON_STYLE =
   'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters'
-const FALLBACK_ICON_MODEL = 'fal-ai/flux-pro'
+const FALLBACK_ICON_MODEL = 'fal-ai/flux/schnell'
 
 export interface CoverItem {
   headline: string

@@ -12,20 +12,15 @@
  */
 import { Prisma } from '@prisma/client'
 import { prisma } from '@socioply/shared'
-import {
-  generateWithFalAI,
-  uploadBufferWithKey,
-} from '@socioply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
-import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
-import { generateArticle, type VoiceVars, type UsageRecorder } from './article'
+import { generateArticle, type VoiceVars, type UsageRecorder, type NewsletterArticle } from './article'
 import type { TopicResearch, TeaserSource } from './research'
 import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
+import { generateCoverImage, type CoverItem, type CoverColors } from './cover'
 
-const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
 
 const J = (v: unknown): Prisma.InputJsonValue => v as unknown as Prisma.InputJsonValue
 
@@ -290,6 +285,7 @@ interface GenContext {
   usage: Usage
   bullets: string[]
   topicVars: Record<string, string>
+  brand: RenderBrand | null
 }
 
 async function loadGenContext(newsletterId: string): Promise<GenContext> {
@@ -324,6 +320,67 @@ async function loadGenContext(newsletterId: string): Promise<GenContext> {
       bullet2: topic.bullet2,
       bullet3: topic.bullet3,
     },
+    brand: user?.brandSettings ? toRenderBrand(user.brandSettings) : null,
+  }
+}
+
+// ── Cover summary image ─────────────────────────────────────────────────────
+
+/** Build the cover's tile items (priority order, cap 6) from the edition content. */
+function coverItems(
+  featureArticle: NewsletterArticle | null,
+  secondaryArticle: NewsletterArticle | null,
+  teasers: Teaser[] | null,
+  research: TopicResearch,
+): CoverItem[] {
+  const items: CoverItem[] = []
+  if (featureArticle) items.push({ headline: featureArticle.title })
+  for (const t of teasers ?? []) items.push({ headline: t.headline || t.title })
+  if (secondaryArticle) items.push({ headline: secondaryArticle.title })
+  if (research.recipe?.title) items.push({ headline: research.recipe.title })
+  return items.filter((i) => i.headline?.trim()).slice(0, 6)
+}
+
+/** Resolve the cover palette from the brand (example defaults). */
+function coverColors(brand: RenderBrand | null): CoverColors {
+  return {
+    headerBg: brand?.nlHeaderBgColor?.trim() || '#011328',
+    sections: [
+      brand?.nlSectionColor1?.trim() || '#fa00bb',
+      brand?.nlSectionColor2?.trim() || '#00bbf9',
+      brand?.nlSectionColor3?.trim() || '#00142b',
+      brand?.nlSectionColor4?.trim() || '#00dd81',
+    ],
+  }
+}
+
+/** Build + persist the cover image for an edition. Best-effort (non-fatal). */
+async function buildAndSaveCover(
+  ctx: GenContext,
+  featureArticle: NewsletterArticle | null,
+  secondaryArticle: NewsletterArticle | null,
+  teasers: Teaser[] | null,
+): Promise<void> {
+  const items = coverItems(featureArticle, secondaryArticle, teasers, ctx.research)
+  if (items.length === 0) return
+  try {
+    const { summaryTitle, summaryImageUrl } = await generateCoverImage({
+      keyPrefix: `${ctx.topic.id}/${ctx.userId}`,
+      industry: ctx.voice.industry,
+      who: ctx.voice.targetAudience,
+      editionDate: ctx.topic.date,
+      items,
+      colors: coverColors(ctx.brand),
+      usage: ctx.usage,
+    })
+    const data: Prisma.NewsletterUpdateInput = {}
+    if (summaryTitle) data.summaryTitle = summaryTitle
+    if (summaryImageUrl) data.summaryImageUrl = summaryImageUrl
+    if (Object.keys(data).length > 0) {
+      await prisma.newsletter.update({ where: { id: ctx.newsletterId }, data })
+    }
+  } catch (err) {
+    logger.warn({ newsletterId: ctx.newsletterId, err }, '[newsletter/generate] cover build failed')
   }
 }
 
@@ -473,6 +530,9 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
 
   await prisma.newsletter.update({ where: { id: row.id }, data })
 
+  // Cover summary image (best-effort) — sets summaryImageUrl before we render.
+  await buildAndSaveCover(ctx, featureArticle, secondaryArticle, teasers)
+
   // Render + validate from the persisted row.
   await renderAndSave(row.id)
   logger.info({ topicId, userId, cost: usage.cost }, '[newsletter/generate] ready_for_review')
@@ -489,6 +549,7 @@ export type NewsletterSection =
   | 'modules'
   | 'subject'
   | 'preview'
+  | 'summaryImage'
   | 'all'
 
 /**
@@ -546,6 +607,19 @@ export async function regenerateNewsletterSection(
         select: { subjectLine: true },
       })
       data.previewText = (await generatePreview(topic, nl?.subjectLine ?? null, voice, usage)) ?? null
+      break
+    }
+    case 'summaryImage': {
+      const nl = await prisma.newsletter.findUnique({
+        where: { id: newsletterId },
+        select: { featureArticle: true, secondaryArticle: true, teasers: true },
+      })
+      await buildAndSaveCover(
+        ctx,
+        (nl?.featureArticle as NewsletterArticle | null) ?? null,
+        (nl?.secondaryArticle as NewsletterArticle | null) ?? null,
+        (nl?.teasers as Teaser[] | null) ?? null,
+      )
       break
     }
   }

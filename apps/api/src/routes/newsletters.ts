@@ -30,6 +30,7 @@ const REGEN_SECTIONS: NewsletterSection[] = [
   'modules',
   'subject',
   'preview',
+  'summaryImage',
   'all',
 ]
 

@@ -13,6 +13,7 @@ import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt } from './llm'
+import { cacheBust } from './image-overlay'
 import type { UsageRecorder } from './article'
 
 const FALLBACK_ICON_STYLE =
@@ -98,7 +99,7 @@ async function renderCover(html: string, key: string): Promise<string> {
     if (!el) throw new Error('cover element not found')
     const shot = await el.screenshot({ type: 'png' })
     const { url } = await uploadBufferWithKey(`newsletter/${key}-cover.png`, Buffer.from(shot), 'image/png')
-    return url
+    return cacheBust(url)
   } finally {
     await page.close().catch(() => {})
   }

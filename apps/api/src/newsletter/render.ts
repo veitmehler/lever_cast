@@ -195,9 +195,12 @@ function recipeBlock(r: RenderRecipe, theme: Theme): string {
   const img = r.imageUrl
     ? `<img src="${esc(r.imageUrl)}" width="624" alt="Recipe" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
     : ''
+  // The recipe name is overlaid on the image, so drop the leading <h2> from the
+  // intro when an image is present (avoid duplicating the title).
+  const intro = r.imageUrl ? r.intro.replace(/<h2[^>]*>[\s\S]*?<\/h2>/i, '').trim() : r.intro
   const h3 = (t: string) =>
     `<h3 style="margin:22px 0 10px;font-family:${theme.fontStack};font-size:18px;font-weight:${theme.headingWeight};color:${theme.fontColor};">${t}</h3>`
-  return `${img}${para(r.intro, theme)}${h3('Ingredients')}${para(r.ingredients, theme)}${h3('Instructions')}${para(r.instructions, theme)}`
+  return `${img}${para(intro, theme)}${h3('Ingredients')}${para(r.ingredients, theme)}${h3('Instructions')}${para(r.instructions, theme)}`
 }
 
 export function buildRenderInput(
@@ -230,13 +233,12 @@ export function buildRenderInput(
 export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): string {
   const theme = resolveTheme(brand)
   const rows: string[] = []
-  // Start the band cycle at color 2 so the first band never matches the header
-  // (whose default equals section color 1).
-  let colorIdx = 1
-  const nextColor = () => theme.sections[colorIdx++ % theme.sections.length]
+  // Semantic band colors (from the 4 brand section colors):
+  //   pink = the rest · lightBlue = curated teasers · navy = articles + facts · green = recipes
+  const [pink, lightBlue, navy, green] = theme.sections
   // Emit a colored band + white content block + spacer for one section.
-  const section = (title: string, inner: string) => {
-    rows.push(band(title, nextColor(), theme))
+  const section = (title: string, inner: string, color: string) => {
+    rows.push(band(title, color, theme))
     rows.push(content(inner))
     rows.push(spacer())
   }
@@ -266,44 +268,44 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     rows.push(spacer())
   }
 
-  // Video
-  if (input.video?.url) section('Watch This', videoCard(input.video, theme))
+  // Video (pink)
+  if (input.video?.url) section('Watch This', videoCard(input.video, theme), pink)
 
-  // Facts
+  // Facts (navy)
   if (input.quickHits && input.quickHits.facts.length > 0) {
-    section('Did You Know?', bulletList(input.quickHits.facts, theme))
+    section('Did You Know?', bulletList(input.quickHits.facts, theme), navy)
   }
 
-  // Teaser 1
-  if (teasers[0]) section(teaserHeading(teasers[0]), teaserBlock(teasers[0], theme))
+  // Teaser 1 (curated → light blue)
+  if (teasers[0]) section(teaserHeading(teasers[0]), teaserBlock(teasers[0], theme), lightBlue)
 
-  // Tips
+  // Tips (pink)
   if (input.quickHits && input.quickHits.tips.length > 0) {
-    section('Tips Of The Day', bulletList(input.quickHits.tips, theme))
+    section('Tips Of The Day', bulletList(input.quickHits.tips, theme), pink)
   }
 
-  // Teaser 2
-  if (teasers[1]) section(teaserHeading(teasers[1]), teaserBlock(teasers[1], theme))
+  // Teaser 2 (curated → light blue)
+  if (teasers[1]) section(teaserHeading(teasers[1]), teaserBlock(teasers[1], theme), lightBlue)
 
-  // Joke
-  if (fun?.joke) section('Joke Of The Day', para(fun.joke, theme, 'center'))
+  // Joke (pink)
+  if (fun?.joke) section('Joke Of The Day', para(fun.joke, theme, 'center'), pink)
 
-  // Feature article
-  if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme))
+  // Feature article (navy)
+  if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme), navy)
 
-  // Teaser 3
-  if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme))
+  // Teaser 3 (curated → light blue)
+  if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme), lightBlue)
 
-  // Secondary (specialization) article — band shows its own headline
-  if (input.secondaryArticle) section(input.secondaryArticle.title, articleBlock(input.secondaryArticle, theme, false))
+  // Secondary (specialization) article — band shows its own headline (navy)
+  if (input.secondaryArticle) section(input.secondaryArticle.title, articleBlock(input.secondaryArticle, theme, false), navy)
 
-  // Recipes
-  if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme))
-  if (input.modules?.recipe2) section('Another Recipe', recipeBlock(input.modules.recipe2, theme))
+  // Recipes (green)
+  if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme), green)
+  if (input.modules?.recipe2) section('Another Recipe', recipeBlock(input.modules.recipe2, theme), green)
 
-  // Trivia answer (payoff, last)
+  // Trivia answer (payoff, last — pink)
   if (fun?.triviaQuestion && fun?.triviaAnswer) {
-    section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'))
+    section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'), pink)
   }
 
   // Footer

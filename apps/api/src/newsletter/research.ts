@@ -29,7 +29,7 @@ import {
   scrapeUrl,
   urlStatus,
 } from './oxylabs'
-import { overlayPlayButton, overlayTitleBanner } from './image-overlay'
+import { overlayPlayButton, overlayTitleBanner, cacheBust } from './image-overlay'
 
 const NL_IMAGE_SIZE = 'landscape_16_9'
 
@@ -115,7 +115,7 @@ async function thumbnailToS3(topicId: string, thumbnailUrl: string | null): Prom
   try {
     const buf = await downloadImageFromUrl(thumbnailUrl)
     const { url } = await uploadBufferWithKey(`newsletter/${topicId}/video-thumb.jpg`, buf, 'image/jpeg')
-    return url
+    return cacheBust(url)
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] thumbnail S3 upload failed (non-fatal)')
     return null
@@ -235,7 +235,7 @@ export async function researchOneRecipe(
       imageUrl = title ? await overlayTitleBanner(dataUri, title, `${topicId}/${slot}`) : null
       if (!imageUrl) {
         const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}.jpg`, buf, 'image/jpeg')
-        imageUrl = url
+        imageUrl = cacheBust(url)
       }
     }
   } catch (err) {

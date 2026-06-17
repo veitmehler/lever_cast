@@ -18,6 +18,14 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+/**
+ * Append a version query so caches don't serve a stale image — our S3 keys are
+ * stable (overwritten in place each regeneration), so the URL must change.
+ */
+export function cacheBust(url: string): string {
+  return url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now()
+}
+
 async function composite(src: string, overlayHtml: string, key: string): Promise<string | null> {
   const browser = await getDiagramRasterBrowser()
   const page = await browser.newPage()
@@ -34,7 +42,7 @@ async function composite(src: string, overlayHtml: string, key: string): Promise
     if (!el) throw new Error('overlay container not found')
     const shot = await el.screenshot({ type: 'jpeg', quality: 88 })
     const { url } = await uploadBufferWithKey(`newsletter/${key}.jpg`, Buffer.from(shot), 'image/jpeg')
-    return url
+    return cacheBust(url)
   } catch (err) {
     logger.warn({ key, err }, '[newsletter/image-overlay] composite failed (non-fatal)')
     return null
@@ -52,10 +60,12 @@ export function overlayPlayButton(src: string, key: string): Promise<string | nu
   return composite(src, play, key)
 }
 
-/** Overlay a dark-navy translucent banner + white recipe name along the bottom. */
+/** Overlay a dark-navy translucent banner + centered white recipe name, ~2/3 down. */
 export function overlayTitleBanner(src: string, title: string, key: string): Promise<string | null> {
-  const banner = `<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(1,19,40,0.82);padding:30px 40px;">
-    <div style="font-family:'Trebuchet MS','Segoe UI',Helvetica,Arial,sans-serif;color:#ffffff;font-size:46px;font-weight:800;line-height:1.12;letter-spacing:0.3px;">${esc(title)}</div>
+  // Banner top at ~62% of the image height (sits in the lower third), generous
+  // vertical padding, text centered both axes.
+  const banner = `<div style="position:absolute;left:0;right:0;top:62%;bottom:0;background:rgba(1,19,40,0.82);display:flex;align-items:center;justify-content:center;padding:36px 48px;">
+    <div style="font-family:'Trebuchet MS','Segoe UI',Helvetica,Arial,sans-serif;color:#ffffff;font-size:46px;font-weight:800;line-height:1.15;letter-spacing:0.3px;text-align:center;">${esc(title)}</div>
   </div>`
   return composite(src, banner, key)
 }

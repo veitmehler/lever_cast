@@ -10,6 +10,10 @@ type Delivery = Record<string, string>
 const COLOR_FIELDS: Array<[string, string]> = [
   ['nlHeaderBgColor', 'Header background'],
   ['nlFooterBgColor', 'Footer background'],
+  ['nlSectionColor1', 'Content band 1'],
+  ['nlSectionColor2', 'Content band 2'],
+  ['nlSectionColor3', 'Content band 3'],
+  ['nlSectionColor4', 'Content band 4'],
   ['nlFontColor', 'Body text color'],
   ['nlLinkColor', 'Link color'],
 ]
@@ -71,8 +75,46 @@ export default function NewsletterTemplatePage() {
     })()
   }, [refreshPreview])
 
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
   function setT(key: string, value: string) {
     setTemplate((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setUploadingLogo(true)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/newsletters/logo', { method: 'POST', body: form })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Logo upload failed')
+        return
+      }
+      setTemplate((prev) => ({ ...prev, nlLogoUrl: data.url }))
+      setNotice('Logo uploaded.')
+    } catch (err) {
+      setError((err as Error).message ?? 'Logo upload failed')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  async function removeLogo() {
+    setUploadingLogo(true)
+    try {
+      await fetch('/api/newsletters/logo', { method: 'DELETE' })
+      setTemplate((prev) => ({ ...prev, nlLogoUrl: '' }))
+    } catch {
+      /* ignore */
+    } finally {
+      setUploadingLogo(false)
+    }
   }
   function setD(key: string, value: string) {
     setDelivery((prev) => ({ ...prev, [key]: value }))
@@ -198,6 +240,43 @@ export default function NewsletterTemplatePage() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Header logo */}
+              <div className="border-t border-border pt-3">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Header logo (shown in the email header)
+                </label>
+                {template.nlLogoUrl ? (
+                  <div className="mb-2 flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={template.nlLogoUrl}
+                      alt="Newsletter logo"
+                      style={{ width: `${parseInt(template.nlLogoWidth || '0', 10) || 200}px`, maxWidth: '100%' }}
+                      className="rounded border border-border bg-white p-1"
+                    />
+                    <button onClick={removeLogo} disabled={uploadingLogo} className="text-xs text-red-600 hover:underline">
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+                <div className="flex items-center gap-3">
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={uploadLogo} className="text-sm" />
+                  {uploadingLogo && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                </div>
+                <label className="mb-1 mt-3 block text-xs font-medium text-muted-foreground">
+                  Logo width: {parseInt(template.nlLogoWidth || '0', 10) || 320}px
+                </label>
+                <input
+                  type="range"
+                  min={120}
+                  max={600}
+                  step={10}
+                  value={parseInt(template.nlLogoWidth || '0', 10) || 320}
+                  onChange={(e) => setT('nlLogoWidth', e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>

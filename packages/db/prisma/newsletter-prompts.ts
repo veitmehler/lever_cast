@@ -542,116 +542,37 @@ Return ONLY the image prompt text.`,
     isActive: true,
   },
 
-  // ── Module: Kids snack ───────────────────────────────────────────────────────
+  // ── Cover summary image ──────────────────────────────────────────────────────
   {
-    stepNumber: 326,
-    key: 'nl_kids_snack_researcher',
-    stepName: 'newsletter_kids_snack_researcher',
-    defaultProvider: 'gemini',
-    defaultModel: GEMINI_PRO,
-    systemPrompt: 'You research fun, healthy, easy kids snack ideas using live web data.',
-    userPrompt: `Research the kids snack idea: {{snackHint}}
+    stepNumber: 333,
+    key: 'nl_summary_title',
+    stepName: 'newsletter_summary_title',
+    defaultProvider: 'anthropic',
+    defaultModel: CLAUDE,
+    maxTokens: 60,
+    systemPrompt: 'You write punchy, catchy newsletter cover titles.',
+    userPrompt: `Write a catchy title of EXACTLY 3 words for this edition's cover, for a {{industry}} audience ({{who}}).
 
-Using live search, return ideas and key ingredients/technique notes for a fun, healthy, easy-to-make kids snack.`,
+This edition covers: {{headlines}}
+
+Rules:
+- Exactly 3 words, title case, no punctuation, no quotes, no emojis.
+- Evocative and on-theme; not a sentence.
+
+Return ONLY the 3-word title.`,
     isActive: true,
   },
   {
-    stepNumber: 327,
-    key: 'nl_kids_snack_writer_system',
-    stepName: 'newsletter_kids_snack_writer_system',
-    defaultProvider: 'anthropic',
-    defaultModel: CLAUDE,
-    maxTokens: 2000,
+    // Config holder (not an LLM call): the cover-icon Fal model + a fixed style
+    // suffix appended to each per-tile icon prompt so the icons read as one set.
+    stepNumber: 334,
+    key: 'nl_summary_icon_style',
+    stepName: 'newsletter_summary_icon_style',
+    defaultProvider: 'fal-ai',
+    defaultModel: 'fal-ai/flux-pro',
     systemPrompt: null,
-    userPrompt: `You write fun, healthy kids snack recipes for a {{industry}} newsletter audience of parents: {{who}}. Match this voice: {{writingStyle}}.
-
-SNACK IDEA: {{snackHint}}
-RESEARCH:
-{{snackResearch}}
-
-Uniqueness — do NOT duplicate any of these previously-used snack titles:
-{{previousSnackTitles}}
-
-Output STRICT JSON only (no fences, no commentary) in EXACTLY this shape:
-{"kids_snack_intro": "HTML — <h2> title + 1 <p> intro", "kids_snack_ingredients": "HTML <ul><li> only", "kids_snack_instructions": "HTML <ol><li> only"}
-Use ONLY <h2>/<ul>/<ol>/<li>/<p>.`,
-    isActive: true,
-  },
-  {
-    stepNumber: 328,
-    key: 'nl_kids_snack_writer_user',
-    stepName: 'newsletter_kids_snack_writer_user',
-    defaultProvider: 'anthropic',
-    defaultModel: CLAUDE,
-    maxTokens: 2000,
-    systemPrompt: null,
-    userPrompt: `Write the kids snack based on the context provided in the system instructions. Output STRICT JSON only in the shape defined there.`,
-    isActive: true,
-  },
-  {
-    stepNumber: 329,
-    key: 'nl_kids_snack_image_prompt',
-    stepName: 'newsletter_kids_snack_image_prompt',
-    defaultProvider: 'anthropic',
-    defaultModel: CLAUDE,
-    maxTokens: 500,
-    systemPrompt: 'You write photo-realistic, text-free, people-free food image prompts for Flux Pro.',
-    userPrompt: `Write a single image-generation prompt for a photo of this finished kids snack.
-
-SNACK:
-{{snackContent}}
-
-Requirements:
-- Photo-realistic, fun, appetising. NO text, NO logos, NO people.
-
-Return ONLY the image prompt text.`,
-    isActive: true,
-  },
-
-  // ── Module: Tech-free activity (no image) ────────────────────────────────────
-  {
-    stepNumber: 330,
-    key: 'nl_tech_free_researcher',
-    stepName: 'newsletter_tech_free_researcher',
-    defaultProvider: 'gemini',
-    defaultModel: GEMINI_PRO,
-    systemPrompt: 'You research engaging, screen-free family activities using live web data.',
-    userPrompt: `Research the tech-free activity idea: {{activityHint}}
-
-Using live search, return ideas, required materials, and step notes for an engaging, screen-free activity families can do together.`,
-    isActive: true,
-  },
-  {
-    stepNumber: 331,
-    key: 'nl_tech_free_writer_system',
-    stepName: 'newsletter_tech_free_writer_system',
-    defaultProvider: 'anthropic',
-    defaultModel: CLAUDE,
-    maxTokens: 2000,
-    systemPrompt: null,
-    userPrompt: `You write engaging, screen-free family activities for a {{industry}} newsletter audience: {{who}}. Match this voice: {{writingStyle}}.
-
-ACTIVITY IDEA: {{activityHint}}
-RESEARCH:
-{{research}}
-
-Uniqueness — do NOT duplicate any of these previously-used activity titles:
-{{previousActivityTitles}}
-
-Output STRICT JSON only (no fences, no commentary) in EXACTLY this shape:
-{"tech_free_activity_intro": "HTML — <h2> title + 1 <p> intro", "tech_free_activity_materials": "HTML <ul><li> only", "tech_free_activity_instructions": "HTML <ol><li> only"}
-Use ONLY <h2>/<ul>/<ol>/<li>/<p>.`,
-    isActive: true,
-  },
-  {
-    stepNumber: 332,
-    key: 'nl_tech_free_writer_user',
-    stepName: 'newsletter_tech_free_writer_user',
-    defaultProvider: 'anthropic',
-    defaultModel: CLAUDE,
-    maxTokens: 2000,
-    systemPrompt: null,
-    userPrompt: `Write the tech-free activity based on the context provided in the system instructions. Output STRICT JSON only in the shape defined there.`,
+    userPrompt:
+      'flat minimalist icon, single centered subject, bold simple shapes, soft duotone palette, subtle long shadow, clean solid light background, vector style, no text, no words, no letters',
     isActive: true,
   },
 ]

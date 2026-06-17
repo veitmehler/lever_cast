@@ -30,21 +30,27 @@ const REGEN_SECTIONS: NewsletterSection[] = [
   'modules',
   'subject',
   'preview',
+  'summaryImage',
   'all',
 ]
 
 // JSON section columns that inline edit (PATCH) may overwrite wholesale.
 const EDITABLE_JSON = ['featureArticle', 'secondaryArticle', 'teasers', 'quickHits', 'fun', 'modules'] as const
 
-// BrandSettings.nl* fields the template editor controls.
+// BrandSettings.nl* string fields the template editor controls.
 const TEMPLATE_FIELDS = [
   'nlHeaderBgColor',
   'nlFooterBgColor',
+  'nlSectionColor1',
+  'nlSectionColor2',
+  'nlSectionColor3',
+  'nlSectionColor4',
   'nlFontFamily',
   'nlFontColor',
   'nlHeadingFontWeight',
   'nlBodyFontWeight',
   'nlLinkColor',
+  'nlLogoUrl',
 ] as const
 
 // GhlSettings.newsletter* delivery fields the user configures.
@@ -68,12 +74,13 @@ const SAMPLE_PREVIEW: RenderInput = {
     imageUrl: null,
   },
   teasers: [
-    { title: 'Around the web: a highlight', body: '<p>A short, voiced teaser of a curated article.</p>', cta: '<p>Worth a read.</p>', link: 'https://example.com' },
+    { headline: 'A Curated Article Headline', title: 'A highlight', body: '<p>A short, voiced teaser of a curated article.</p>', cta: '<p>Worth a read.</p>', link: 'https://example.com' },
   ],
   quickHits: { tips: ['A punchy, practical tip', 'Another quick win'], facts: ['A surprising did-you-know fact'] },
   fun: { triviaQuestion: 'A curious question?', triviaAnswer: 'The satisfying answer.', joke: '<p>A light setup…</p><p>…and the payoff.</p>' },
   modules: null,
   video: null,
+  summaryImageUrl: null,
 }
 
 function pick<T extends Record<string, unknown>>(src: T | null, keys: readonly string[]): Record<string, unknown> {
@@ -359,8 +366,10 @@ export async function newsletterRoutes(app: FastifyInstance) {
     const brand = await prisma.brandSettings.findUnique({ where: { userId } })
     const ghl = await prisma.ghlSettings.findUnique({ where: { userId } })
 
+    const template = pick(brand as Record<string, unknown> | null, TEMPLATE_FIELDS)
+    template.nlLogoWidth = brand?.nlLogoWidth ?? null
     return reply.send({
-      template: pick(brand as Record<string, unknown> | null, TEMPLATE_FIELDS),
+      template,
       delivery: pick(ghl as Record<string, unknown> | null, DELIVERY_FIELDS),
       ghlConnected: !!(ghl?.ghlApiKey && ghl?.ghlLocationId && ghl?.ghlUserId),
     })
@@ -378,9 +387,13 @@ export async function newsletterRoutes(app: FastifyInstance) {
       const { template, delivery } = request.body ?? {}
 
       if (template) {
-        const data: Record<string, string | null> = {}
+        const data: Record<string, string | number | null> = {}
         for (const k of TEMPLATE_FIELDS) {
           if (template[k] !== undefined) data[k] = (template[k] as string) || null
+        }
+        if (template.nlLogoWidth !== undefined) {
+          const w = parseInt(String(template.nlLogoWidth), 10)
+          data.nlLogoWidth = Number.isFinite(w) && w > 0 ? w : null
         }
         if (Object.keys(data).length > 0) {
           await prisma.brandSettings.upsert({
@@ -421,17 +434,24 @@ export async function newsletterRoutes(app: FastifyInstance) {
       const brand = await prisma.brandSettings.findUnique({ where: { userId } })
       // Overlay any unsaved edits from the request on top of the saved brand.
       const t = request.body?.template ?? {}
+      const s = (k: string) => (t[k] as string) ?? (brand as Record<string, unknown> | null)?.[k] ?? null
       const renderBrand: RenderBrand = {
         organizationName: brand?.organizationName,
         organizationLogoUrl: brand?.organizationLogoUrl,
         organizationAddress: brand?.organizationAddress,
-        nlHeaderBgColor: (t.nlHeaderBgColor as string) ?? brand?.nlHeaderBgColor,
-        nlFooterBgColor: (t.nlFooterBgColor as string) ?? brand?.nlFooterBgColor,
-        nlFontFamily: (t.nlFontFamily as string) ?? brand?.nlFontFamily,
-        nlFontColor: (t.nlFontColor as string) ?? brand?.nlFontColor,
-        nlHeadingFontWeight: (t.nlHeadingFontWeight as string) ?? brand?.nlHeadingFontWeight,
-        nlBodyFontWeight: (t.nlBodyFontWeight as string) ?? brand?.nlBodyFontWeight,
-        nlLinkColor: (t.nlLinkColor as string) ?? brand?.nlLinkColor,
+        nlLogoUrl: s('nlLogoUrl'),
+        nlLogoWidth: (t.nlLogoWidth as number) ?? brand?.nlLogoWidth ?? null,
+        nlHeaderBgColor: s('nlHeaderBgColor'),
+        nlFooterBgColor: s('nlFooterBgColor'),
+        nlSectionColor1: s('nlSectionColor1'),
+        nlSectionColor2: s('nlSectionColor2'),
+        nlSectionColor3: s('nlSectionColor3'),
+        nlSectionColor4: s('nlSectionColor4'),
+        nlFontFamily: s('nlFontFamily'),
+        nlFontColor: s('nlFontColor'),
+        nlHeadingFontWeight: s('nlHeadingFontWeight'),
+        nlBodyFontWeight: s('nlBodyFontWeight'),
+        nlLinkColor: s('nlLinkColor'),
       }
       return reply.send({ html: renderNewsletterHtml(SAMPLE_PREVIEW, renderBrand) })
     },

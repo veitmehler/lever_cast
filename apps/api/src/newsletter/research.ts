@@ -69,11 +69,14 @@ export interface TeaserSource {
   bullet: string
   url: string
   extract: string
+  headline: string | null // the source article's real title (og:title/<title>/<h1>)
+  image: string | null // the source's og:image (for the cover tile), if any
 }
 
 export interface TopicResearch {
   video?: VideoResearch
   recipe?: RecipeResearch
+  recipe2?: RecipeResearch
   teaserSources?: TeaserSource[]
 }
 
@@ -175,17 +178,23 @@ function firstH2(html: string): string | null {
   return m[1].replace(/<[^>]+>/g, '').trim() || null
 }
 
-export async function researchRecipe(
-  topic: NewsletterTopic,
+/**
+ * Research + write one recipe (shared, neutral voice). `slot` namespaces the S3
+ * image key so recipe and recipe2 don't collide. Used for both CSV recipe columns.
+ */
+export async function researchOneRecipe(
+  hint: string,
   calendar: NewsletterCalendar,
   priorTitles: string[],
+  topicId: string,
+  slot: 'recipe' | 'recipe2',
 ): Promise<RecipeResearch | null> {
-  if (!topic.recipe) return null
+  if (!hint) return null
 
   // 1. Grounded research.
   const { content: research } = await runNewsletterPrompt(
     'nl_recipe_researcher',
-    { recipeHint: topic.recipe },
+    { recipeHint: hint },
     { useSearch: true },
   )
 
@@ -195,7 +204,7 @@ export async function researchRecipe(
     recipe_ingredients?: string
     recipe_instructions?: string
   }>('nl_recipe_writer_system', 'nl_recipe_writer_user', {
-    recipeHint: topic.recipe,
+    recipeHint: hint,
     recipeResearch: research,
     previousRecipeTitles: priorTitles.join('\n'),
     industry: calendar.industry,
@@ -217,15 +226,11 @@ export async function researchRecipe(
     const falKey = await getSystemApiKey('fal-ai')
     if (falKey && imgPrompt.trim()) {
       const buf = await generateWithFalAI(falKey, cleanTextOutput(imgPrompt), NL_IMAGE_MODEL)
-      const { url } = await uploadBufferWithKey(
-        `newsletter/${topic.id}/recipe.jpg`,
-        buf,
-        'image/jpeg',
-      )
+      const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}.jpg`, buf, 'image/jpeg')
       imageUrl = url
     }
   } catch (err) {
-    logger.warn({ topicId: topic.id, err }, '[newsletter/research] recipe image failed (non-fatal)')
+    logger.warn({ topicId, slot, err }, '[newsletter/research] recipe image failed (non-fatal)')
   }
 
   return { title: firstH2(intro), intro, ingredients, instructions, imageUrl }
@@ -241,6 +246,29 @@ function isUsableUrl(url: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Extract the source article's real headline (og:title → <title> → first <h1>) + og:image. */
+export function extractMeta(html: string): { headline: string | null; image: string | null } {
+  if (!html) return { headline: null, image: null }
+  const meta = (prop: string): string | null => {
+    const re = new RegExp(
+      `<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`,
+      'i',
+    )
+    const m = html.match(re) ?? html.match(
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`, 'i'),
+    )
+    return m ? m[1].trim() : null
+  }
+  const clean = (s: string | null) =>
+    s ? s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim() || null : null
+
+  const ogTitle = clean(meta('og:title'))
+  const titleTag = clean((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]) ?? null)
+  const h1 = clean((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1]) ?? null)
+  const image = meta('og:image')
+  return { headline: ogTitle || titleTag || h1, image: image || null }
 }
 
 /** Pull readable text from h1/h2/h3/p/li into a normalized block (capped). */
@@ -301,7 +329,8 @@ async function researchOneTeaser(
   const { html } = await scrapeUrl(chosen)
   const extract = extractReadable(html)
   if (!extract) return null
-  return { bullet, url: chosen, extract }
+  const { headline, image } = extractMeta(html)
+  return { bullet, url: chosen, extract, headline, image }
 }
 
 export async function researchTeaserSources(
@@ -333,8 +362,8 @@ async function priorRecipeTitles(calendarId: string, excludeTopicId: string): Pr
   const titles: string[] = []
   for (const r of rows) {
     const research = r.research as TopicResearch | null
-    const t = research?.recipe?.title
-    if (t) titles.push(t)
+    if (research?.recipe?.title) titles.push(research.recipe.title)
+    if (research?.recipe2?.title) titles.push(research.recipe2.title)
   }
   return titles
 }
@@ -365,14 +394,25 @@ export async function ensureTopicResearch(topicId: string): Promise<ResearchOutc
     logger.warn({ topicId, err }, '[newsletter/research] video research threw')
   }
 
-  // Recipe (only when the column is populated).
+  // Recipes (each only when its column is populated). Both share neutral voice.
+  const priors = topic.recipe || topic.recipe2 ? await priorRecipeTitles(calendar.id, topic.id) : []
   if (topic.recipe) {
     try {
-      const priors = await priorRecipeTitles(calendar.id, topic.id)
-      const recipe = await researchRecipe(topic, calendar, priors)
-      if (recipe) research.recipe = recipe
+      const recipe = await researchOneRecipe(topic.recipe, calendar, priors, topic.id, 'recipe')
+      if (recipe) {
+        research.recipe = recipe
+        if (recipe.title) priors.push(recipe.title)
+      }
     } catch (err) {
       logger.warn({ topicId, err }, '[newsletter/research] recipe research threw')
+    }
+  }
+  if (topic.recipe2) {
+    try {
+      const recipe2 = await researchOneRecipe(topic.recipe2, calendar, priors, topic.id, 'recipe2')
+      if (recipe2) research.recipe2 = recipe2
+    } catch (err) {
+      logger.warn({ topicId, err }, '[newsletter/research] recipe2 research threw')
     }
   }
 
@@ -383,12 +423,12 @@ export async function ensureTopicResearch(topicId: string): Promise<ResearchOutc
     logger.warn({ topicId, err }, '[newsletter/research] teaser research threw')
   }
 
-  // Completeness: a found-or-manual video, recipe iff required, all 3 teasers.
+  // Completeness: a found-or-manual video, recipes iff required, all 3 teasers.
   const videoOk = !!research.video && (!!research.video.url || research.video.manual)
-  const recipeOk = !topic.recipe || !!research.recipe
+  const recipeOk = (!topic.recipe || !!research.recipe) && (!topic.recipe2 || !!research.recipe2)
   const teaserOk = (research.teaserSources?.length ?? 0) >= 3
   const anything =
-    !!research.video || !!research.recipe || (research.teaserSources?.length ?? 0) > 0
+    !!research.video || !!research.recipe || !!research.recipe2 || (research.teaserSources?.length ?? 0) > 0
 
   const status: ResearchOutcome['status'] =
     videoOk && recipeOk && teaserOk ? 'complete' : anything ? 'partial' : 'failed'

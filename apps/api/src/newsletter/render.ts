@@ -2,13 +2,14 @@
  * Magazine newsletter email renderer.
  *
  * Pure function (no DB) → an email-safe HTML string used as both the on-app
- * preview and the body sent to GHL (editorContent). Table-based, ~600px centered,
- * critical CSS inlined; a small <style> block only for progressive enhancement
- * (dark mode) that degrades gracefully. Customizable via BrandSettings.nl* fields.
+ * preview and the body sent to GHL. Table-based, ~680px centered, critical CSS
+ * inlined. Visual hierarchy = full-width colored heading bands (cycling 4 brand
+ * "section" colors) separating white content blocks.
  *
- * Section order (plan §8): preheader → header → feature article → secondary
- * article → "Around the web" teasers → tips → facts → video → fun → modules →
- * footer. Each section renders only when it has content.
+ * Section order (redesign): header → trivia question → cover summary image →
+ * video → facts → teaser 1 → tips → teaser 2 → joke → feature → teaser 3 →
+ * secondary article → recipe → recipe 2 → trivia answer → footer. Sections with
+ * no data drop out.
  */
 
 export interface RenderArticle {
@@ -20,7 +21,8 @@ export interface RenderArticle {
 }
 
 export interface RenderTeaser {
-  title: string
+  headline: string | null // the real source article title (preferred heading)
+  title: string // voiced teaser title (fallback heading)
   body: string // HTML
   cta: string // HTML
   link: string
@@ -34,18 +36,30 @@ export interface RenderVideo {
   manual: boolean
 }
 
+export interface RenderRecipe {
+  intro: string
+  ingredients: string
+  instructions: string
+  imageUrl: string | null
+}
+
 export interface RenderModules {
-  recipe?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  kidsSnack?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  techFreeActivity?: { intro: string; materials: string; instructions: string }
+  recipe?: RenderRecipe
+  recipe2?: RenderRecipe
 }
 
 export interface RenderBrand {
   organizationName?: string | null
-  organizationLogoUrl?: string | null
   organizationAddress?: string | null
+  nlLogoUrl?: string | null
+  organizationLogoUrl?: string | null
+  nlLogoWidth?: number | null
   nlHeaderBgColor?: string | null
   nlFooterBgColor?: string | null
+  nlSectionColor1?: string | null
+  nlSectionColor2?: string | null
+  nlSectionColor3?: string | null
+  nlSectionColor4?: string | null
   nlFontFamily?: string | null
   nlFontColor?: string | null
   nlHeadingFontWeight?: string | null
@@ -62,138 +76,114 @@ export interface RenderInput {
   modules?: RenderModules | null
   previewText?: string | null
   video?: RenderVideo | null
+  summaryImageUrl?: string | null
 }
 
 interface Theme {
   headerBg: string
   footerBg: string
+  sections: string[] // 4 band colors, cycled
   fontStack: string
   fontColor: string
   headingWeight: string
   bodyWeight: string
   linkColor: string
+  logoUrl: string | null
+  logoWidth: number
 }
 
 const FALLBACK_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+const HEADING_STACK = "'Trebuchet MS', 'Segoe UI', Helvetica, Arial, sans-serif"
 
 function resolveTheme(brand: RenderBrand): Theme {
   const primary = brand.nlFontFamily?.trim()
   return {
-    headerBg: brand.nlHeaderBgColor?.trim() || '#1a1a1a',
-    footerBg: brand.nlFooterBgColor?.trim() || '#f4f4f4',
+    headerBg: brand.nlHeaderBgColor?.trim() || '#fa00bb',
+    footerBg: brand.nlFooterBgColor?.trim() || '#011328',
+    sections: [
+      brand.nlSectionColor1?.trim() || '#fa00bb',
+      brand.nlSectionColor2?.trim() || '#00bbf9',
+      brand.nlSectionColor3?.trim() || '#00142b',
+      brand.nlSectionColor4?.trim() || '#00dd81',
+    ],
     fontStack: primary ? `${primary}, ${FALLBACK_FONTS}` : FALLBACK_FONTS,
-    fontColor: brand.nlFontColor?.trim() || '#333333',
+    fontColor: brand.nlFontColor?.trim() || '#00142b',
     headingWeight: brand.nlHeadingFontWeight?.trim() || '700',
     bodyWeight: brand.nlBodyFontWeight?.trim() || '400',
-    linkColor: brand.nlLinkColor?.trim() || '#2563eb',
+    linkColor: brand.nlLinkColor?.trim() || '#fa00bb',
+    logoUrl: brand.nlLogoUrl?.trim() || brand.organizationLogoUrl?.trim() || null,
+    logoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
   }
 }
 
 function esc(s: string | null | undefined): string {
   if (!s) return ''
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-/** A full-width section wrapper row (single-column table cell). */
-function section(inner: string, bg = '#ffffff', padding = '24px'): string {
-  return `<tr><td style="background-color:${bg};padding:${padding};">${inner}</td></tr>`
+/** A full-width colored heading band. */
+function band(title: string, bg: string, theme: Theme): string {
+  return `<tr><td style="background-color:${bg};padding:22px 24px;text-align:center;">
+    <h1 style="margin:0;font-family:${HEADING_STACK};font-size:30px;font-weight:${theme.headingWeight};color:#ffffff;letter-spacing:0.5px;line-height:1.2;">${esc(title)}</h1>
+  </td></tr>`
 }
 
-function heading(text: string, theme: Theme, size = '22px'): string {
-  return `<h2 style="margin:0 0 12px;font-family:${theme.fontStack};font-size:${size};font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(text)}</h2>`
+/** A white content row. */
+function content(inner: string): string {
+  return `<tr><td style="background-color:#ffffff;padding:32px 28px;">${inner}</td></tr>`
 }
 
-function articleBlock(a: RenderArticle, theme: Theme, label?: string): string {
-  const img = a.imageUrl
-    ? `<img src="${esc(a.imageUrl)}" width="552" alt="${esc(a.title)}" style="display:block;width:100%;max-width:552px;height:auto;border-radius:6px;margin:0 0 16px;" />`
-    : ''
-  const tldr = a.tldr
-    ? `<p style="margin:0 0 12px;font-family:${theme.fontStack};font-size:15px;font-style:italic;color:${theme.fontColor};line-height:1.5;">${esc(a.tldr)}</p>`
-    : ''
-  const eyebrow = label
-    ? `<div style="font-family:${theme.fontStack};font-size:12px;font-weight:${theme.headingWeight};letter-spacing:1px;text-transform:uppercase;color:${theme.linkColor};margin:0 0 8px;">${esc(label)}</div>`
-    : ''
-  return `${eyebrow}${img}${heading(a.title, theme)}${tldr}<div style="font-family:${theme.fontStack};font-size:15px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${a.body}</div>`
-}
-
-function teaserCard(t: RenderTeaser, theme: Theme): string {
-  const link = t.link ? esc(t.link) : '#'
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;border:1px solid #e5e7eb;border-radius:6px;">
-    <tr><td style="padding:16px;">
-      <a href="${link}" style="font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.fontColor};text-decoration:none;">${esc(t.title)}</a>
-      <div style="font-family:${theme.fontStack};font-size:14px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.5;margin:8px 0;">${t.body}</div>
-      <div style="font-family:${theme.fontStack};font-size:14px;">${t.cta}</div>
-      <a href="${link}" style="font-family:${theme.fontStack};font-size:14px;font-weight:${theme.headingWeight};color:${theme.linkColor};text-decoration:none;">Read more &rarr;</a>
-    </td></tr>
-  </table>`
+function para(html: string, theme: Theme, align: 'left' | 'center' = 'left'): string {
+  return `<div style="font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;text-align:${align};">${html}</div>`
 }
 
 function bulletList(items: string[], theme: Theme): string {
   const lis = items
     .map(
       (i) =>
-        `<li style="margin:0 0 8px;font-family:${theme.fontStack};font-size:15px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.5;">${esc(i)}</li>`,
+        `<li style="margin:0 0 12px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.5;">${esc(i)}</li>`,
     )
     .join('')
-  return `<ul style="margin:0;padding:0 0 0 20px;">${lis}</ul>`
+  return `<ul style="margin:0;padding:0 0 0 22px;">${lis}</ul>`
+}
+
+function readMoreButton(link: string, theme: Theme, label = 'Read full article →'): string {
+  return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.linkColor};text-decoration:none;border:2px solid ${theme.linkColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
+}
+
+function articleBlock(a: RenderArticle, theme: Theme): string {
+  const img = a.imageUrl
+    ? `<img src="${esc(a.imageUrl)}" width="624" alt="${esc(a.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
+    : ''
+  const h2 = `<h2 style="margin:0 0 14px;font-family:${theme.fontStack};font-size:24px;font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(a.title)}</h2>`
+  const tldr = a.tldr
+    ? `<p style="margin:0 0 14px;font-family:${theme.fontStack};font-size:15px;color:${theme.fontColor};"><u>TL;DR:</u> ${esc(a.tldr)}</p>`
+    : ''
+  return `${img}${h2}${tldr}${para(a.body, theme)}`
+}
+
+function teaserBlock(t: RenderTeaser, theme: Theme): string {
+  return `${para(t.body, theme)}<div style="margin-top:14px;">${para(t.cta, theme)}</div>${readMoreButton(t.link, theme)}`
 }
 
 function videoCard(v: RenderVideo, theme: Theme): string {
-  if (!v.url) return ''
   const thumb = v.s3Url || v.thumbnailUrl
   const title = v.title || 'Watch the video'
   const img = thumb
-    ? `<img src="${esc(thumb)}" width="552" alt="${esc(title)}" style="display:block;width:100%;max-width:552px;height:auto;border-radius:6px;" />`
+    ? `<img src="${esc(thumb)}" width="624" alt="${esc(title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;" />`
     : ''
-  return `${heading('Watch this', theme)}
-    <a href="${esc(v.url)}" style="text-decoration:none;">
-      ${img}
-      <div style="font-family:${theme.fontStack};font-size:15px;font-weight:${theme.headingWeight};color:${theme.linkColor};margin:10px 0 0;">&#9658; ${esc(title)}</div>
-    </a>`
+  return `<a href="${esc(v.url || '#')}" target="_blank" style="text-decoration:none;">${img}<div style="font-family:${theme.fontStack};font-size:18px;font-weight:${theme.headingWeight};color:${theme.linkColor};margin:12px 0 0;text-align:center;">&#9658; ${esc(title)}</div></a>`
 }
 
-function funBlock(
-  fun: NonNullable<RenderInput['fun']>,
-  theme: Theme,
-): string {
-  const parts: string[] = []
-  if (fun.triviaQuestion && fun.triviaAnswer) {
-    parts.push(
-      `${heading('Trivia', theme, '18px')}
-      <p style="margin:0 0 6px;font-family:${theme.fontStack};font-size:15px;font-weight:${theme.headingWeight};color:${theme.fontColor};">${esc(fun.triviaQuestion)}</p>
-      <p style="margin:0 0 16px;font-family:${theme.fontStack};font-size:15px;font-weight:${theme.bodyWeight};color:${theme.fontColor};">${esc(fun.triviaAnswer)}</p>`,
-    )
-  }
-  if (fun.joke) {
-    parts.push(
-      `${heading('Joke of the day', theme, '18px')}<div style="font-family:${theme.fontStack};font-size:15px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.5;">${fun.joke}</div>`,
-    )
-  }
-  return parts.join('')
-}
-
-function moduleBlock(
-  title: string,
-  intro: string,
-  list: string,
-  instructions: string,
-  imageUrl: string | null,
-  theme: Theme,
-): string {
-  const img = imageUrl
-    ? `<img src="${esc(imageUrl)}" width="552" alt="${esc(title)}" style="display:block;width:100%;max-width:552px;height:auto;border-radius:6px;margin:0 0 12px;" />`
+function recipeBlock(r: RenderRecipe, theme: Theme): string {
+  const img = r.imageUrl
+    ? `<img src="${esc(r.imageUrl)}" width="624" alt="Recipe" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
     : ''
-  return `${heading(title, theme)}${img}<div style="font-family:${theme.fontStack};font-size:15px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${intro}${list}${instructions}</div>`
+  const h3 = (t: string) =>
+    `<h3 style="margin:22px 0 10px;font-family:${theme.fontStack};font-size:18px;font-weight:${theme.headingWeight};color:${theme.fontColor};">${t}</h3>`
+  return `${img}${para(r.intro, theme)}${h3('Ingredients')}${para(r.ingredients, theme)}${h3('Instructions')}${para(r.instructions, theme)}`
 }
 
-/**
- * Map the Newsletter row's JSON section columns (+ topic video research) into the
- * renderer input. Tolerant of the loosely-typed Json values.
- */
 export function buildRenderInput(
   nl: {
     featureArticle?: unknown
@@ -203,6 +193,7 @@ export function buildRenderInput(
     fun?: unknown
     modules?: unknown
     previewText?: string | null
+    summaryImageUrl?: string | null
   },
   video?: RenderVideo | null,
 ): RenderInput {
@@ -216,75 +207,88 @@ export function buildRenderInput(
     modules: (nl.modules as RenderModules | null) ?? null,
     previewText: nl.previewText ?? null,
     video: video ?? null,
+    summaryImageUrl: nl.summaryImageUrl ?? null,
   }
 }
 
 export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): string {
   const theme = resolveTheme(brand)
   const rows: string[] = []
-
-  // Header
-  const logo = brand.organizationLogoUrl
-    ? `<img src="${esc(brand.organizationLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" height="40" style="display:block;height:40px;width:auto;margin:0 auto;" />`
-    : `<div style="font-family:${theme.fontStack};font-size:22px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
-  rows.push(section(logo, theme.headerBg, '24px'))
-
-  // Feature article
-  if (input.featureArticle) {
-    rows.push(section(articleBlock(input.featureArticle, theme)))
+  let colorIdx = 0
+  const nextColor = () => theme.sections[colorIdx++ % theme.sections.length]
+  // Emit a colored band + white content block for one section.
+  const section = (title: string, inner: string) => {
+    rows.push(band(title, nextColor(), theme))
+    rows.push(content(inner))
   }
 
-  // Secondary article
-  if (input.secondaryArticle) {
-    rows.push(section(articleBlock(input.secondaryArticle, theme, 'Also in this issue')))
+  // Header (logo on header band)
+  const logo = theme.logoUrl
+    ? `<img src="${esc(theme.logoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.logoWidth}" style="display:block;width:100%;max-width:${theme.logoWidth}px;height:auto;margin:0 auto;" />`
+    : `<div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
+  rows.push(`<tr><td style="background-color:${theme.headerBg};padding:24px;text-align:center;">${logo}</td></tr>`)
+
+  const fun = input.fun
+  const teasers = input.teasers ?? []
+
+  // Trivia question
+  if (fun?.triviaQuestion) {
+    section('Trivia Question', para(`<p style="margin:0;font-size:20px;">${esc(fun.triviaQuestion)}</p>`, theme, 'center'))
   }
 
-  // Teasers — "Around the web"
-  if (input.teasers && input.teasers.length > 0) {
-    const cards = input.teasers.map((t) => teaserCard(t, theme)).join('')
-    rows.push(section(`${heading('Around the web', theme)}${cards}`))
-  }
-
-  // Tips
-  if (input.quickHits && input.quickHits.tips.length > 0) {
-    rows.push(section(`${heading('Quick tips', theme)}${bulletList(input.quickHits.tips, theme)}`))
-  }
-
-  // Facts
-  if (input.quickHits && input.quickHits.facts.length > 0) {
-    rows.push(section(`${heading('Did you know?', theme)}${bulletList(input.quickHits.facts, theme)}`))
+  // Cover summary image (full-width, no band)
+  if (input.summaryImageUrl) {
+    rows.push(
+      `<tr><td style="background-color:#ffffff;padding:0;"><img src="${esc(input.summaryImageUrl)}" width="680" alt="In this issue" style="display:block;width:100%;max-width:680px;height:auto;" /></td></tr>`,
+    )
   }
 
   // Video
-  if (input.video && input.video.url) {
-    rows.push(section(videoCard(input.video, theme)))
+  if (input.video?.url) section('Watch This', videoCard(input.video, theme))
+
+  // Facts
+  if (input.quickHits && input.quickHits.facts.length > 0) {
+    section('Did You Know?', bulletList(input.quickHits.facts, theme))
   }
 
-  // Fun
-  if (input.fun && (input.fun.joke || (input.fun.triviaQuestion && input.fun.triviaAnswer))) {
-    rows.push(section(funBlock(input.fun, theme)))
+  // Teaser 1
+  if (teasers[0]) section(teaserHeading(teasers[0]), teaserBlock(teasers[0], theme))
+
+  // Tips
+  if (input.quickHits && input.quickHits.tips.length > 0) {
+    section('Tips Of The Day', bulletList(input.quickHits.tips, theme))
   }
 
-  // Modules
-  const m = input.modules
-  if (m?.recipe) {
-    rows.push(section(moduleBlock('Recipe of the month', m.recipe.intro, m.recipe.ingredients, m.recipe.instructions, m.recipe.imageUrl, theme)))
-  }
-  if (m?.kidsSnack) {
-    rows.push(section(moduleBlock('Kids snack', m.kidsSnack.intro, m.kidsSnack.ingredients, m.kidsSnack.instructions, m.kidsSnack.imageUrl, theme)))
-  }
-  if (m?.techFreeActivity) {
-    rows.push(section(moduleBlock('Tech-free activity', m.techFreeActivity.intro, m.techFreeActivity.materials, m.techFreeActivity.instructions, null, theme)))
+  // Teaser 2
+  if (teasers[1]) section(teaserHeading(teasers[1]), teaserBlock(teasers[1], theme))
+
+  // Joke
+  if (fun?.joke) section('Joke Of The Day', para(fun.joke, theme, 'center'))
+
+  // Feature article
+  if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme))
+
+  // Teaser 3
+  if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme))
+
+  // Secondary (specialization) article
+  if (input.secondaryArticle) section('Also In This Issue', articleBlock(input.secondaryArticle, theme))
+
+  // Recipes
+  if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme))
+  if (input.modules?.recipe2) section('Another Recipe', recipeBlock(input.modules.recipe2, theme))
+
+  // Trivia answer (payoff, last)
+  if (fun?.triviaQuestion && fun?.triviaAnswer) {
+    section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'))
   }
 
-  // Footer (GHL injects the unsubscribe link — leave a placeholder note).
+  // Footer
   const addr = brand.organizationAddress ? `<br/>${esc(brand.organizationAddress)}` : ''
   rows.push(
-    section(
-      `<div style="font-family:${theme.fontStack};font-size:12px;color:#888888;text-align:center;line-height:1.5;">${esc(brand.organizationName ?? '')}${addr}<br/><span style="color:#aaaaaa;">You are receiving this newsletter as a valued subscriber.</span></div>`,
-      theme.footerBg,
-      '24px',
-    ),
+    `<tr><td style="background-color:${theme.footerBg};padding:32px 24px;">
+      <div style="font-family:${theme.fontStack};font-size:12px;color:#ffffff;text-align:center;line-height:1.6;opacity:0.85;">${esc(brand.organizationName ?? '')}${addr}<br/>You are receiving this newsletter as a valued subscriber.</div>
+    </td></tr>`,
   )
 
   const preheader = input.previewText
@@ -298,25 +302,27 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta name="color-scheme" content="light dark" />
-<meta name="supported-color-schemes" content="light dark" />
 <title>Newsletter</title>
 <style>
   body { margin:0; padding:0; width:100% !important; -webkit-text-size-adjust:100%; }
   img { border:0; outline:none; text-decoration:none; }
-  @media only screen and (max-width:600px) {
-    .nl-container { width:100% !important; }
-  }
+  @media only screen and (max-width:680px) { .nl-container { width:100% !important; } }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:#eeeeee;">
+<body style="margin:0;padding:0;background-color:#f5f5f5;">
 ${preheader}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eeeeee;">
-  <tr><td align="center" style="padding:16px;">
-    <table role="presentation" class="nl-container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;">
+  <tr><td align="center" style="padding:20px 10px;">
+    <table role="presentation" class="nl-container" width="680" cellpadding="0" cellspacing="0" style="width:680px;max-width:680px;background-color:#ffffff;">
       ${rows.join('\n      ')}
     </table>
   </td></tr>
 </table>
 </body>
 </html>`
+}
+
+/** Teaser heading = the real source article title, falling back to the voiced title. */
+function teaserHeading(t: RenderTeaser): string {
+  return (t.headline || t.title || 'Around the web').trim()
 }

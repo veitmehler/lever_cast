@@ -1,0 +1,309 @@
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" lang="en">
+
+<head>
+	<title>{{ $json.subject_line }}</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"><!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]--><!--[if !mso]><!-->
+	<meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+	<style>
+      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@100;200;300;400;500;600;700;800;900&family=Splash&display=swap');
+      @font-face {
+    font-family: 'Aksana';
+    src: url('https://health-essentials.s3.amazonaws.com/Aksana.ttf.woff') format('woff'),
+         url('https://health-essentials.s3.amazonaws.com/Aksana.ttf.svg#Aksana') format('svg'),
+         url('https://health-essentials.s3.amazonaws.com/Aksana.ttf.eot'),
+         url('https://health-essentials.s3.amazonaws.com/Aksana.ttf.eot?#iefix') format('embedded-opentype'); 
+    font-weight: 100;
+    font-style: normal;
+    }
+    .white_bg {background-color: #FFFFFF;}
+    .dark_blue_bg {background-color: #011328;}
+    .dark_text {color: #00142b;}
+    .text_align-center {text-align: center;}
+    .text_align-left {text-align: left;}
+    .align_center {margin: 0 auto;}
+    .width {width: 680px; max-width: 680px;}
+    .max-width {max-width: 100%;}
+    .padding-text {padding: 70px 20px;}
+    .text_trivia_question {font-size: 24px; font-weight: 300; padding-left: 50px; padding-right: 50px; margin-top:0px; padding-top: 0px;}
+
+    @media (max-width: 480px) and (orientation: portrait) {
+        .text_trivia_question {font-size: 20px; font-weight: 300; padding-left: 35px; padding-right: 35px; margin-top:0px; padding-top: 0px;}
+    }
+
+</style>
+</head>
+
+<body style="background-color: #f5f5f5; margin: 0 auto 0 auto; padding: 35px 10px; -webkit-text-size-adjust: none; text-size-adjust: none;">
+<div style="display:none;max-height:0px;overflow:hidden;">{{ $json.preview_text }}</div>
+
+<table align="center" style="width:100%;max-width:680px;background:#ffffff; margin: 0 auto 0 auto;">
+    <tbody>
+      <tr class="align_center" style="background-color:#fa00bb">
+        <td style="width:100%;padding-bottom:35px;padding-top:5px;padding-left:5px;padding-right:5px;margin-top:0px">
+          <div style="max-width:100%;display:block;height:auto;border:0;margin:0 auto;text-align:center">
+            <center>
+              <img src="https://wellnessmattersdaily.s3.us-east-1.amazonaws.com/WellnessMattersDaily_Logo_640w.png" alt="Wellness Matters Daily Newsletter Logo" title="Wellness Matters Daily Newsletter Logo" style="width:100%;height:auto;max-width:500px;margin-top:0px">
+            </center>
+          </div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff">
+        <td>
+            <div style="padding-top: 35px;"
+            <center>
+          <h1 style="font-family:Aksana,Brush MT Script,cursive;margin-bottom:0px;padding-bottom:0px;color:#fa00bb;margin-top:0px;font-size:36px; text-align: center;">Trivia Question</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;font-weight:300; padding:0px 20px 0px 20px;">
+            <div style="padding-top:35px"></div>
+          <p style="text-align:center">{{ $json.trivia_question }}</p>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;box-sizing:content-box;color:#00142b">
+        <td style="max-width:680px;width:100%;padding:0px 0px 0px 0px;font-size:20px;font-family:Open Sans,sans-serif;" width="100%">
+          <div align="center" style="max-width:100%;min-width:320px">
+            <a href="{{ $json.yt_url }}" title="{{ $json.yt_title }}" style="border:none;text-decoration:none" target="_blank" >
+              <center>
+                <img src="https://health-essentials-newsletter-content-images.s3.amazonaws.com/{{ $json.url_thumbnail }}" alt="You Tube Video - {{ $json.yt_title }}" style="height:auto;max-width:640px;min-height:180px;min-width:320px;background-repeat:no-repeat;width:100%;">
+              </center>
+            </a>
+          </div>
+          <h2 style="padding-bottom:0px;margin-bottom:0;font-size:24px;font-family:Open Sans,sans-serif;font-weight:300;padding-left:20px;padding-right:20px;text-align:center">{{ $json.yt_title }}</h2>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00bbf9;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Did You Know? </h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300;background-color:#ffffff;color:#00142b">
+            <div style="padding-top:35px"></div>
+          <p style="text-align:left">{{ $json.article_teaser }}</p>
+          <ul style="margin-top:35px;text-align:left;font-size:20px;font-family:Open Sans,sans-serif;padding-left:20px;padding-right:20px;color:#00142b">
+            <li style="margin-bottom:24px"><strong>{{ $json.facts_1 }}</strong></li>
+            <li style="margin-bottom:24px">{{ $json.facts_2 }}</li>
+            <li style="margin-bottom:24px"><strong>{{ $json.facts_3 }}</strong></li>
+            <li style="margin-bottom:24px">{{ $json.facts_4 }}</li>
+          </ul>
+          <div style="padding-bottom:46px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00142b;color:#ffffff">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Article Summary</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+            <div style="padding-top:35px"></div>
+          <h2 style="margin-bottom:35px;font-size:30px;font-family:Open Sans,sans-serif;font-weight:300">{{ $json.summary_01_hl }}</h2>
+          <p class="text_align-left">{{ $json.summary_01 }}{{ $json.summary_01_cta }}</p>
+          <div align="left" style="margin-top:35px">
+            <a href="{{ $json.summary_01_link }}" style="text-decoration:none;display:inline-block;color:#fa00bb!important;background-color:transparent;border-radius:4px;width:auto;border-top:2px solid #fa00bb;font-weight:400;border-right:2px solid #fa00bb;border-bottom:2px solid #fa00bb;border-left:2px solid #fa00bb;padding-top:12px;padding-bottom:12px;padding-left:24px;padding-right:24px;font-size:20px;text-align:center;word-break:keep-all;margin-bottom:70px" target="_blank">
+              <span style="padding-left:20px;padding-right:20px;font-size:20px;display:inline-block;letter-spacing:normal">
+                <span dir="ltr" style="word-break:break-word;line-height:40px">Read Full Article ></span>
+              </span>
+            </a>
+          </div>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#fa00bb;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Tips Of The Day</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+          <ul style="text-align:left;font-size:20px;font-family:Open Sans,sans-serif;color:#00142b;padding-left:50px;padding-right:50px">
+            <div style="padding-top:35px"></div>
+            <li style="margin-bottom:24px;text-align:left;color:#00142b"><strong>{{ $json.action_tips_1 }}</strong></li>
+            <li style="margin-bottom:24px;text-align:left;color:#00142b">{{ $json.action_tips_2 }}</li>
+            <li style="margin-bottom:24px;text-align:left;color:#00142b"><strong>{{ $json.action_tips_3 }}</strong></li>
+            <li style="margin-bottom:24px;text-align:left;color:#00142b">{{ $json.action_tips_4 }}</li>
+          </ul>
+          <div style="padding-bottom:46px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00142b;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Article Summary</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+            <div style="padding-top:35px"></div>
+          <h2 style="margin-bottom:35px;font-size:30px;font-family:Open Sans,sans-serif;font-weight:300">{{ $json.summary_02_hl }}</h2>
+          <p class="text_align-center">{{ $json.summary_02 }}{{ $json.summary_02_cta }}</p>
+          <div align="left" style="margin-top:35px">
+            <a href="{{ $json.summary_02_link }}" style="text-decoration:none;display:inline-block;color:#fa00bb;background-color:transparent;border-radius:4px;width:auto;border-top:2px solid #fa00bb;font-weight:400;border-right:2px solid #fa00bb;border-bottom:2px solid #fa00bb;border-left:2px solid #fa00bb;padding-top:12px;padding-bottom:12px;padding-left:24px;padding-right:24px;font-family:Nunito,Arial,Helvetica Neue,Helvetica,sans-serif;font-size:20px;text-align:center;word-break:keep-all" target="_blank">
+              <span style="padding-left:20px;padding-right:20px;font-size:20px;display:inline-block;letter-spacing:normal">
+                <span dir="ltr" style="word-break:break-word;line-height:40px">Read Full Article ></span>
+              </span>
+            </a>
+          </div>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00bbf9;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Joke Of The Day</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+            <div style="padding-top:35px"></div>
+            <p class="text_align-center">{{ $json.joke }}</p>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00142b;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Article Of The Day</h1>
+            </center>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+            <div style="padding-top:35px"></div>
+          <h2 style="margin-bottom:35px;font-size:30px;font-family:Open Sans,sans-serif;font-weight:300">{{ $json.article_title }}</h2>
+          <p style="text-align:left"><u>TLDR:</u> {{ $json.article_tldr }}</p>
+          <span class="text_align-left">{{ $json.article_body }}</span>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#00dd81;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Herb Of The Day</h1>
+            </center>   
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+        <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+            <div style="padding-top:35px"></div>
+            <p class="text_align-center">{{ $json.herb_of_day }}</p>
+          <div style="padding-bottom:70px"></div>
+        </td>
+      </tr>
+      <tr class="align_center" style="background-color:#fa00bb;color:#ffffff;">
+        <td>
+            <center>
+          <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">TCM Perspective</h1>
+            </center>
+        </td>
+    </tr>
+    <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+      <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+        <div style="padding-top:35px"></div>
+        <p class="text_align-left">{{ $json.tcm_perspective }}</p>
+        <div style="padding-bottom:70px"></div>
+      </td>
+    </tr>
+    <tr class="align_center" style="background-color:#fa00bb;color:#ffffff;">
+      <td>
+        <center>
+        <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Ayurveda Perspective</h1>
+        </center>
+      </td>
+    </tr>
+    <tr style="background-color:#ffffff;color:#00142b">
+      <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+        <div style="padding-top:35px"></div>
+        <p class="text_align-left">{{ $json.ayurveda_perspective }}</p>
+        <div style="padding-bottom:70px"></div>
+      </td>
+    </tr>
+    <tr class="align_center" style="background-color:#00bbf9;color:#ffffff;">
+      <td>
+        <center>
+        <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Recipe Of The Day</h1>
+        </center>
+      </td>
+    </tr>
+    <tr style="background-color:#ffffff;color:#00142b">
+      <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+        <center>
+          <h2 style="text-align:left;margin-bottom:35px;font-size:24px">
+            <img src="https://health-essentials-newsletter-content-images.s3.amazonaws.com/{{ $json.recipe_img_filename }}" alt="{{ $json.recipe_title }}" style="width:100%;max-width:620px;height:auto">
+          </h2>
+        </center>
+        <h3 style="margin-top:35px">Ingredients:</h3>
+        <span style="margin-left:35px; text-align: left;">{{ $json.recipe_ingredients }}</span>
+        <h3 style="margin-top:35px; text-align: left;">Instructions:</h3>
+        <span style="margin-left:35px; text-align: left;">{{ $json.recipe_body }}</span>
+        <div style="padding-bottom:70px"></div>
+      </td>
+    </tr>
+    <tr class="align_center" style="background-color:#00142b;color:#ffffff;">
+      <td>
+        <center>
+        <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Article Summary</h1>
+        </center>
+      </td>
+    </tr>
+    <tr style="background-color:#ffffff;color:#00142b">
+      <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+        <div style="padding-top:35px"></div>
+        <h2 style="margin-bottom:35px;font-size:30px;font-family:Open Sans,sans-serif;font-weight:300">{{ $json.summary_03_hl }}</h2>
+        <p class="text_align-left">{{ $json.summary_03 }}{{ $json.summary_03_cta }}</p>
+        <div align="left" style="margin-top:35px">
+          <a href="{{ $json.summary_03_link }}" style="text-decoration:none;display:inline-block;color:#fa00bb;background-color:transparent;border-radius:4px;width:auto;border-top:2px solid #fa00bb;font-weight:400;border-right:2px solid #fa00bb;border-bottom:2px solid #fa00bb;border-left:2px solid #fa00bb;padding-top:12px;padding-bottom:12px;padding-left:24px;padding-right:24px;font-family:Nunito,Arial,Helvetica Neue,Helvetica,sans-serif;font-size:20px;text-align:center;word-break:keep-all" target="_blank">
+            <span style="padding-left:20px;padding-right:20px;font-size:20px;display:inline-block;letter-spacing:normal">
+              <span dir="ltr" style="word-break:break-word;line-height:40px">Read Full Article ></span>
+            </span>
+          </a>
+        </div>
+        <div style="padding-bottom:70px"></div>
+      </td>
+    </tr>
+    <tr class="align_center" style="background-color:#fa00bb;color:#ffffff;">
+      <td>
+        <center>
+        <h1 style="font-family:Aksana,'Brush Script MT',sans-serif;font-size:36px;color:#ffffff;margin-bottom:20px">Trivia Answer</h1>
+        </center>
+      </td>
+    </tr>
+    <tr class="align_center" style="background-color:#ffffff;color:#00142b">
+      <td style="width:100%;font-size:20px;font-family:Open Sans,sans-serif;padding:0px 20px 0px 20px;font-weight:300">
+        <div style="padding-top:35px"></div>
+        <p style="font-size:30px;font-weight:300;text-align:center">{{ $json.trivia_answer }}</p>
+        <div style="padding-bottom:70px"></div>
+      </td>
+    </tr>
+    <tr style="background-color:#011328">
+      <td style="width:100%;font-size:12px;font-family:Open Sans,sans-serif;padding:70px 20px;font-weight:300;background-color:#011328">
+        <center>
+          <img src="https://wellnessmattersdaily.s3.us-east-1.amazonaws.com/WellnessMattersDaily_Logo_640w.png" alt="Wellness Matters Daily Newsletter Logo" title="Wellness Matters Daily Newsletter Logo" height="82" width="250" align="center" style="display:block;height:auto;margin:0 auto 0 auto;border:0">
+        </center>
+        <p style="margin:20px auto;color:#ffffff;text-align:center">1150 Nw 72nd Ave Tower I Ste 455, Miami FL 33126<br>Miami, FL, 33126, USA<br> <a style="color:#ffffff;" href="mailto:gethelp@wellnessmattersdaily.com" target="_blank" rel="noopener"><u>gethelp@healthessentials.news</u></a><br> (888) 695-3937</p>
+        <p style="margin:20px auto;color:#ffffff;text-align:center">You received this email because you are subscribed to this email magazine on one of our websites. This is an email magazine about natural health and living tips to improve your life. If you don't want to hear from us, <a style="color:#ffffff;" href="{unsubscribe_text}" target="_blank" rel="noopener"><u>click here</u></a>.</p>
+        <p style="margin:20px auto;color:#ffffff;text-align:center">For complaints, please <a style="color:#ffffff;" href="{unsubscribe_text}" target="_blank" rel="noopener"><u>click here</u></a>.</p>
+        <p style="margin:20px auto;color:#ffffff;text-align:center">Please note that if you follow any link in this email and make a purchase after that, we may get compensated for the purchase. That shouldn't alter the price for you, but helps to support our work.</p>
+        <p style="margin:20px auto;color:#ffffff;text-align:center">Need assistance? Reply to this email.</p>
+        <p style="margin:20px auto;color:#ffffff;text-align:center;font-size:10px"><a href="https://wellnessmattersdaily.com/disclaimer/" style="color:#ffffff;" target="_blank" rel="noopener"><u>Disclaimer</u></a>&nbsp;&nbsp;&nbsp;|&nbsp; <a href="https://wellnessmattersdaily.com/terms/" style="color:#ffffff;" target="_blank" rel="noopener"><u>Privacy+TOS</u></a>&nbsp;&nbsp;&nbsp;|&nbsp; <a href="https://wellnessmattersdaily.com/disclosure/" style="color:#ffffff;" target="_blank" rel="noopener"><u>Disclosure</u></a></p>
+        <div style="margin-bottom:70px;">&nbsp;</div>
+      </td>
+    </tr> 
+  </tbody>
+</table>
+</body>
+</html>

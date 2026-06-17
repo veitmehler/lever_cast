@@ -28,9 +28,10 @@ const SECTIONS: Array<{ key: string; label: string }> = [
   { key: 'teasers', label: 'Around the web' },
   { key: 'quickHits', label: 'Tips & facts' },
   { key: 'fun', label: 'Trivia & joke' },
-  { key: 'modules', label: 'Modules' },
+  { key: 'modules', label: 'Recipes' },
   { key: 'subject', label: 'Subject line' },
   { key: 'preview', label: 'Preview text' },
+  { key: 'summaryImage', label: 'Cover image' },
 ]
 
 export default function NewsletterEditionPage({ params }: { params: Promise<{ id: string }> }) {

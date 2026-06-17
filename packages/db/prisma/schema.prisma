@@ -857,6 +857,13 @@ model BrandSettings {
   nlHeadingFontWeight String?
   nlBodyFontWeight    String?
   nlLinkColor         String?
+  // Four content-section band colors (cycled) + header logo (header band only)
+  nlSectionColor1     String?
+  nlSectionColor2     String?
+  nlSectionColor3     String?
+  nlSectionColor4     String?
+  nlLogoUrl           String?
+  nlLogoWidth         Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -894,10 +901,9 @@ model NewsletterTopic {
   bullet1          String
   bullet2          String
   bullet3          String
-  secondaryTopic   String? // → second full-length article
-  recipe           String? // module hints (populated column ⇒ generate)
-  kidsSnack        String?
-  techFreeActivity String?
+  secondaryTopic   String? // → second (specialization) article; CSV column `secondary_article`
+  recipe           String? // recipe #1 hint; CSV column `recipe`
+  recipe2          String? // recipe #2 hint; CSV column `recipe_2`
   videoUrl         String? // explicit video override
   // shared research write-back (computed once, reused across customers in this calendar)
   research         Json? // { video:{...}, recipe:{...}, teaserSources:[{bullet,url,extract}] }
@@ -929,6 +935,8 @@ model Newsletter {
   modules          Json? // {recipe?,kidsSnack?,techFreeActivity?}
   subjectLine      String?
   previewText      String?
+  summaryTitle     String? // LLM 3-word cover title
+  summaryImageUrl  String?         @db.Text // composited cover image URL
   renderedHtml     String?         @db.Text
   validation       Json? // completion score + issues
   // delivery

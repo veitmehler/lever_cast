@@ -12,20 +12,15 @@
  */
 import { Prisma } from '@prisma/client'
 import { prisma } from '@socioply/shared'
-import {
-  generateWithFalAI,
-  uploadBufferWithKey,
-} from '@socioply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
-import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
-import { generateArticle, type VoiceVars, type UsageRecorder } from './article'
+import { generateArticle, type VoiceVars, type UsageRecorder, type NewsletterArticle } from './article'
 import type { TopicResearch, TeaserSource } from './research'
 import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
+import { generateCoverImage, type CoverItem, type CoverColors } from './cover'
 
-const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
 
 const J = (v: unknown): Prisma.InputJsonValue => v as unknown as Prisma.InputJsonValue
 
@@ -58,6 +53,7 @@ class Usage implements UsageRecorder {
 }
 
 interface Teaser {
+  headline: string | null // real source article title (preferred heading)
   title: string
   body: string
   cta: string
@@ -85,6 +81,7 @@ async function voiceTeasers(
       })
       await usage.record(response)
       out.push({
+        headline: s.headline,
         title: (data.title ?? s.bullet).trim(),
         body: data.body ?? '',
         cta: data.cta ?? '',
@@ -178,109 +175,31 @@ async function generateFun(
   return fun
 }
 
+interface RecipeModule {
+  intro: string
+  ingredients: string
+  instructions: string
+  imageUrl: string | null
+}
 interface Modules {
-  recipe?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  kidsSnack?: { intro: string; ingredients: string; instructions: string; imageUrl: string | null }
-  techFreeActivity?: { intro: string; materials: string; instructions: string }
+  recipe?: RecipeModule
+  recipe2?: RecipeModule
 }
 
-async function falImage(prompt: string, key: string): Promise<string | null> {
-  try {
-    const falKey = await getSystemApiKey('fal-ai')
-    const clean = cleanTextOutput(prompt)
-    if (!falKey || !clean) return null
-    const buf = await generateWithFalAI(falKey, clean, NL_IMAGE_MODEL)
-    const { url } = await uploadBufferWithKey(`newsletter/${key}.jpg`, buf, 'image/jpeg')
-    return url
-  } catch (err) {
-    logger.warn({ key, err }, '[newsletter/generate] module image failed (non-fatal)')
-    return null
-  }
-}
-
-async function generateModules(
-  topic: { id: string; recipe: string | null; kidsSnack: string | null; techFreeActivity: string | null },
-  research: TopicResearch,
-  voice: VoiceVars,
-  usage: Usage,
-): Promise<Modules> {
+/**
+ * Modules = the two recipes, both reused from the shared (neutral-voice) research
+ * (written once per topic, identical for every customer). No per-customer LLM here.
+ */
+function buildModules(research: TopicResearch): Modules {
   const modules: Modules = {}
-
-  // Recipe: reuse the shared (neutral-voice) research as-is — it was written once
-  // per topic and is the same for every customer.
-  if (research.recipe) {
-    modules.recipe = {
-      intro: research.recipe.intro,
-      ingredients: research.recipe.ingredients,
-      instructions: research.recipe.instructions,
-      imageUrl: research.recipe.imageUrl,
-    }
-  }
-
-  // Kids snack: generated per customer (not part of shared research).
-  if (topic.kidsSnack) {
-    try {
-      const r = await runNewsletterPrompt('nl_kids_snack_researcher', { snackHint: topic.kidsSnack }, { useSearch: true })
-      await usage.record(r.response)
-      const { data, response } = await runNewsletterWriterJson<{
-        kids_snack_intro?: string
-        kids_snack_ingredients?: string
-        kids_snack_instructions?: string
-      }>('nl_kids_snack_writer_system', 'nl_kids_snack_writer_user', {
-        snackHint: topic.kidsSnack,
-        snackResearch: r.content,
-        previousSnackTitles: '',
-        ...voiceToVars(voice),
-      })
-      await usage.record(response)
-      const intro = data.kids_snack_intro ?? ''
-      let imageUrl: string | null = null
-      try {
-        const img = await runNewsletterPrompt('nl_kids_snack_image_prompt', {
-          snackContent: `${intro}\n${data.kids_snack_ingredients ?? ''}`,
-        })
-        await usage.record(img.response)
-        imageUrl = await falImage(img.content, `${topic.id}/kids-snack`)
-      } catch (err) {
-        logger.warn({ topicId: topic.id, err }, '[newsletter/generate] kids snack image prompt failed')
-      }
-      modules.kidsSnack = {
-        intro,
-        ingredients: data.kids_snack_ingredients ?? '',
-        instructions: data.kids_snack_instructions ?? '',
-        imageUrl,
-      }
-    } catch (err) {
-      logger.warn({ topicId: topic.id, err }, '[newsletter/generate] kids snack failed')
-    }
-  }
-
-  // Tech-free activity: per customer, no image.
-  if (topic.techFreeActivity) {
-    try {
-      const r = await runNewsletterPrompt('nl_tech_free_researcher', { activityHint: topic.techFreeActivity }, { useSearch: true })
-      await usage.record(r.response)
-      const { data, response } = await runNewsletterWriterJson<{
-        tech_free_activity_intro?: string
-        tech_free_activity_materials?: string
-        tech_free_activity_instructions?: string
-      }>('nl_tech_free_writer_system', 'nl_tech_free_writer_user', {
-        activityHint: topic.techFreeActivity,
-        research: r.content,
-        previousActivityTitles: '',
-        ...voiceToVars(voice),
-      })
-      await usage.record(response)
-      modules.techFreeActivity = {
-        intro: data.tech_free_activity_intro ?? '',
-        materials: data.tech_free_activity_materials ?? '',
-        instructions: data.tech_free_activity_instructions ?? '',
-      }
-    } catch (err) {
-      logger.warn({ topicId: topic.id, err }, '[newsletter/generate] tech-free activity failed')
-    }
-  }
-
+  const map = (r: NonNullable<TopicResearch['recipe']>) => ({
+    intro: r.intro,
+    ingredients: r.ingredients,
+    instructions: r.instructions,
+    imageUrl: r.imageUrl,
+  })
+  if (research.recipe) modules.recipe = map(research.recipe)
+  if (research.recipe2) modules.recipe2 = map(research.recipe2)
   return modules
 }
 
@@ -366,6 +285,7 @@ interface GenContext {
   usage: Usage
   bullets: string[]
   topicVars: Record<string, string>
+  brand: RenderBrand | null
 }
 
 async function loadGenContext(newsletterId: string): Promise<GenContext> {
@@ -400,30 +320,86 @@ async function loadGenContext(newsletterId: string): Promise<GenContext> {
       bullet2: topic.bullet2,
       bullet3: topic.bullet3,
     },
+    brand: user?.brandSettings ? toRenderBrand(user.brandSettings) : null,
+  }
+}
+
+// ── Cover summary image ─────────────────────────────────────────────────────
+
+/** Build the cover's tile items (priority order, cap 6) from the edition content. */
+function coverItems(
+  featureArticle: NewsletterArticle | null,
+  secondaryArticle: NewsletterArticle | null,
+  teasers: Teaser[] | null,
+  research: TopicResearch,
+): CoverItem[] {
+  const items: CoverItem[] = []
+  if (featureArticle) items.push({ headline: featureArticle.title })
+  for (const t of teasers ?? []) items.push({ headline: t.headline || t.title })
+  if (secondaryArticle) items.push({ headline: secondaryArticle.title })
+  if (research.recipe?.title) items.push({ headline: research.recipe.title })
+  return items.filter((i) => i.headline?.trim()).slice(0, 6)
+}
+
+/** Resolve the cover palette from the brand (example defaults). */
+function coverColors(brand: RenderBrand | null): CoverColors {
+  return {
+    headerBg: brand?.nlHeaderBgColor?.trim() || '#011328',
+    sections: [
+      brand?.nlSectionColor1?.trim() || '#fa00bb',
+      brand?.nlSectionColor2?.trim() || '#00bbf9',
+      brand?.nlSectionColor3?.trim() || '#00142b',
+      brand?.nlSectionColor4?.trim() || '#00dd81',
+    ],
+  }
+}
+
+/** Build + persist the cover image for an edition. Best-effort (non-fatal). */
+async function buildAndSaveCover(
+  ctx: GenContext,
+  featureArticle: NewsletterArticle | null,
+  secondaryArticle: NewsletterArticle | null,
+  teasers: Teaser[] | null,
+): Promise<void> {
+  const items = coverItems(featureArticle, secondaryArticle, teasers, ctx.research)
+  if (items.length === 0) return
+  try {
+    const { summaryTitle, summaryImageUrl } = await generateCoverImage({
+      keyPrefix: `${ctx.topic.id}/${ctx.userId}`,
+      industry: ctx.voice.industry,
+      who: ctx.voice.targetAudience,
+      editionDate: ctx.topic.date,
+      items,
+      colors: coverColors(ctx.brand),
+      usage: ctx.usage,
+    })
+    const data: Prisma.NewsletterUpdateInput = {}
+    if (summaryTitle) data.summaryTitle = summaryTitle
+    if (summaryImageUrl) data.summaryImageUrl = summaryImageUrl
+    if (Object.keys(data).length > 0) {
+      await prisma.newsletter.update({ where: { id: ctx.newsletterId }, data })
+    }
+  } catch (err) {
+    logger.warn({ newsletterId: ctx.newsletterId, err }, '[newsletter/generate] cover build failed')
   }
 }
 
 // ── Render + validate persistence ──────────────────────────────────────────────
 
-function toRenderBrand(b: {
-  organizationName?: string | null
-  organizationLogoUrl?: string | null
-  organizationAddress?: string | null
-  nlHeaderBgColor?: string | null
-  nlFooterBgColor?: string | null
-  nlFontFamily?: string | null
-  nlFontColor?: string | null
-  nlHeadingFontWeight?: string | null
-  nlBodyFontWeight?: string | null
-  nlLinkColor?: string | null
-} | null): RenderBrand {
+function toRenderBrand(b: RenderBrand | null): RenderBrand {
   if (!b) return {}
   return {
     organizationName: b.organizationName,
     organizationLogoUrl: b.organizationLogoUrl,
     organizationAddress: b.organizationAddress,
+    nlLogoUrl: b.nlLogoUrl,
+    nlLogoWidth: b.nlLogoWidth,
     nlHeaderBgColor: b.nlHeaderBgColor,
     nlFooterBgColor: b.nlFooterBgColor,
+    nlSectionColor1: b.nlSectionColor1,
+    nlSectionColor2: b.nlSectionColor2,
+    nlSectionColor3: b.nlSectionColor3,
+    nlSectionColor4: b.nlSectionColor4,
     nlFontFamily: b.nlFontFamily,
     nlFontColor: b.nlFontColor,
     nlHeadingFontWeight: b.nlHeadingFontWeight,
@@ -520,7 +496,7 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
 
   const quickHits = await generateQuickHits(topicVars, voice, usage)
   const fun = await generateFun(topicVars, voice, usage)
-  const modules = await generateModules(topic, research, voice, usage)
+  const modules = buildModules(research)
 
   let subjectLine: string | null = null
   let previewText: string | null = null
@@ -554,6 +530,9 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
 
   await prisma.newsletter.update({ where: { id: row.id }, data })
 
+  // Cover summary image (best-effort) — sets summaryImageUrl before we render.
+  await buildAndSaveCover(ctx, featureArticle, secondaryArticle, teasers)
+
   // Render + validate from the persisted row.
   await renderAndSave(row.id)
   logger.info({ topicId, userId, cost: usage.cost }, '[newsletter/generate] ready_for_review')
@@ -570,6 +549,7 @@ export type NewsletterSection =
   | 'modules'
   | 'subject'
   | 'preview'
+  | 'summaryImage'
   | 'all'
 
 /**
@@ -616,7 +596,7 @@ export async function regenerateNewsletterSection(
       data.fun = J(await generateFun(topicVars, voice, usage))
       break
     case 'modules':
-      data.modules = J(await generateModules(topic, research, voice, usage))
+      data.modules = J(buildModules(research))
       break
     case 'subject':
       data.subjectLine = (await generateSubject(topic, voice, usage)) ?? null
@@ -627,6 +607,19 @@ export async function regenerateNewsletterSection(
         select: { subjectLine: true },
       })
       data.previewText = (await generatePreview(topic, nl?.subjectLine ?? null, voice, usage)) ?? null
+      break
+    }
+    case 'summaryImage': {
+      const nl = await prisma.newsletter.findUnique({
+        where: { id: newsletterId },
+        select: { featureArticle: true, secondaryArticle: true, teasers: true },
+      })
+      await buildAndSaveCover(
+        ctx,
+        (nl?.featureArticle as NewsletterArticle | null) ?? null,
+        (nl?.secondaryArticle as NewsletterArticle | null) ?? null,
+        (nl?.teasers as Teaser[] | null) ?? null,
+      )
       break
     }
   }

@@ -29,16 +29,17 @@ const CSV_ALIASES: Record<string, string> = {
   bullet3: 'bullet3',
   'bullet 3': 'bullet3',
   bullet_3: 'bullet3',
+  secondary_article: 'secondaryTopic',
+  'secondary article': 'secondaryTopic',
+  secondaryarticle: 'secondaryTopic',
+  // legacy alias (kept for older CSVs)
   secondary_topic: 'secondaryTopic',
   'secondary topic': 'secondaryTopic',
   secondarytopic: 'secondaryTopic',
   recipe: 'recipe',
-  kids_snack: 'kidsSnack',
-  'kids snack': 'kidsSnack',
-  kidssnack: 'kidsSnack',
-  tech_free_activity: 'techFreeActivity',
-  'tech free activity': 'techFreeActivity',
-  techfreeactivity: 'techFreeActivity',
+  recipe_2: 'recipe2',
+  'recipe 2': 'recipe2',
+  recipe2: 'recipe2',
   video_url: 'videoUrl',
   'video url': 'videoUrl',
   videourl: 'videoUrl',
@@ -56,8 +57,7 @@ export interface ParsedTopicRow {
   bullet3: string
   secondaryTopic: string | null
   recipe: string | null
-  kidsSnack: string | null
-  techFreeActivity: string | null
+  recipe2: string | null
   videoUrl: string | null
 }
 
@@ -149,8 +149,7 @@ export function parseNewsletterCsv(csvText: string): ParseResult {
       bullet3: r.bullet3,
       secondaryTopic: r.secondaryTopic || null,
       recipe: r.recipe || null,
-      kidsSnack: r.kidsSnack || null,
-      techFreeActivity: r.techFreeActivity || null,
+      recipe2: r.recipe2 || null,
       videoUrl: r.videoUrl || null,
     })
   }
@@ -180,8 +179,7 @@ export async function commitNewsletterTopics(
       bullet3: row.bullet3,
       secondaryTopic: row.secondaryTopic,
       recipe: row.recipe,
-      kidsSnack: row.kidsSnack,
-      techFreeActivity: row.techFreeActivity,
+      recipe2: row.recipe2,
       videoUrl: row.videoUrl,
     }
     await prisma.newsletterTopic.upsert({

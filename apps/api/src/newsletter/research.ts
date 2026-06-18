@@ -17,6 +17,7 @@ import {
   downloadImageFromUrl,
   generateWithFalAI,
   uploadBufferWithKey,
+  deleteOldVersions,
 } from '@socioply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
@@ -114,7 +115,10 @@ async function thumbnailToS3(topicId: string, thumbnailUrl: string | null): Prom
   // Fallback: store the plain thumbnail if the overlay step failed.
   try {
     const buf = await downloadImageFromUrl(thumbnailUrl)
-    const { url } = await uploadBufferWithKey(`newsletter/${topicId}/video-thumb-${vtoken()}.jpg`, buf, 'image/jpeg')
+    const base = `newsletter/${topicId}/video-thumb-`
+    const key = `${base}${vtoken()}.jpg`
+    const { url } = await uploadBufferWithKey(key, buf, 'image/jpeg')
+    await deleteOldVersions(base, key)
     return url
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] thumbnail S3 upload failed (non-fatal)')
@@ -234,7 +238,10 @@ export async function researchOneRecipe(
       // Composite the recipe name onto the image; fall back to the plain upload.
       imageUrl = title ? await overlayTitleBanner(dataUri, title, `${topicId}/${slot}`) : null
       if (!imageUrl) {
-        const { url } = await uploadBufferWithKey(`newsletter/${topicId}/${slot}-${vtoken()}.jpg`, buf, 'image/jpeg')
+        const base = `newsletter/${topicId}/${slot}-`
+        const key = `${base}${vtoken()}.jpg`
+        const { url } = await uploadBufferWithKey(key, buf, 'image/jpeg')
+        await deleteOldVersions(base, key)
         imageUrl = url
       }
     }

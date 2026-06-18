@@ -9,6 +9,7 @@
 import {
   generateWithFalAI,
   uploadBufferWithKey,
+  deleteOldVersions,
 } from '@socioply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { getSystemApiKey } from '../lib/system-keys'
@@ -136,7 +137,10 @@ export async function generateArticle(
     const prompt = cleanTextOutput(imgPrompt.content)
     if (falKey && prompt) {
       const buf = await generateWithFalAI(falKey, prompt, NL_IMAGE_MODEL, NL_IMAGE_SIZE)
-      const { url } = await uploadBufferWithKey(`newsletter/${imageKey}-${vtoken()}.jpg`, buf, 'image/jpeg')
+      const base = `newsletter/${imageKey}-`
+      const key = `${base}${vtoken()}.jpg`
+      const { url } = await uploadBufferWithKey(key, buf, 'image/jpeg')
+      await deleteOldVersions(base, key) // GC superseded article-image versions
       imageUrl = url
     }
   } catch (err) {

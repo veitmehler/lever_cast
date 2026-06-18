@@ -7,7 +7,7 @@
  * Source can be an http(s) URL or a data: URI (used for freshly-generated Fal
  * buffers, avoiding a throwaway upload). Output is a 16:9 JPEG in S3.
  */
-import { uploadBufferWithKey } from '@socioply/shared'
+import { uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
 import { getDiagramRasterBrowser } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { logger } from '../lib/logger'
 
@@ -45,7 +45,10 @@ async function composite(src: string, overlayHtml: string, key: string): Promise
     const el = await page.$('#c')
     if (!el) throw new Error('overlay container not found')
     const shot = await el.screenshot({ type: 'jpeg', quality: 88 })
-    const { url } = await uploadBufferWithKey(`newsletter/${key}-${vtoken()}.jpg`, Buffer.from(shot), 'image/jpeg')
+    const base = `newsletter/${key}-`
+    const s3key = `${base}${vtoken()}.jpg`
+    const { url } = await uploadBufferWithKey(s3key, Buffer.from(shot), 'image/jpeg')
+    await deleteOldVersions(base, s3key) // GC superseded overlay versions
     return url
   } catch (err) {
     logger.warn({ key, err }, '[newsletter/image-overlay] composite failed (non-fatal)')

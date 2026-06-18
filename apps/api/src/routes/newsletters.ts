@@ -6,6 +6,7 @@ import { logger } from '../lib/logger'
 import {
   renderAndSave,
   regenerateNewsletterSection,
+  normalizeSocialLinks,
   type NewsletterSection,
 } from '../newsletter/generate'
 import { getNewsletterEmailConfig, type NewsletterEmailConfig } from '../lib/ghl/settings'
@@ -376,9 +377,25 @@ export async function newsletterRoutes(app: FastifyInstance) {
     template.nlLogoSourceUrl = brand?.nlLogoSourceUrl ?? null
     template.nlLogoLightUrl = brand?.nlLogoLightUrl ?? null
     template.nlLogoDarkUrl = brand?.nlLogoDarkUrl ?? null
+
+    // Delivery fields fall back to the promo-email config so the editor is
+    // pre-filled with the user's existing GHL details (still overridable).
+    const PROMO_FALLBACK: Record<string, string> = {
+      newsletterTagId: 'promoEmailTagId',
+      newsletterTagName: 'promoEmailTagName',
+      newsletterSendTime: 'promoEmailSendTime',
+      newsletterTimezone: 'promoEmailTimezone',
+      newsletterFromName: 'promoEmailFromName',
+      newsletterFromEmail: 'promoEmailFromEmail',
+    }
+    const g = ghl as Record<string, unknown> | null
+    const delivery: Record<string, unknown> = {}
+    for (const k of DELIVERY_FIELDS) {
+      delivery[k] = g?.[k] ?? g?.[PROMO_FALLBACK[k]] ?? null
+    }
     return reply.send({
       template,
-      delivery: pick(ghl as Record<string, unknown> | null, DELIVERY_FIELDS),
+      delivery,
       ghlConnected: !!(ghl?.ghlApiKey && ghl?.ghlLocationId && ghl?.ghlUserId),
     })
   })
@@ -451,6 +468,7 @@ export async function newsletterRoutes(app: FastifyInstance) {
         organizationAddress: brand?.organizationAddress,
         organizationEmail: brand?.organizationEmail,
         organizationPhone: brand?.organizationPhone,
+        socialMediaLinks: normalizeSocialLinks(brand?.socialMediaLinks),
         addressLine1: brand?.addressLine1,
         addressLine2: brand?.addressLine2,
         addressLocality: brand?.addressLocality,

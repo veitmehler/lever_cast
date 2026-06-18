@@ -23,6 +23,18 @@ describe('computeSendAt', () => {
     expect(sendAt.toISOString()).toBe('2026-06-20T13:00:00.000Z')
   })
 
+  it('reads a UTC-midnight date-only value in UTC (newsletter) — no off-by-one in a negative-offset zone', () => {
+    // topic.date for a "July 1" edition is stored at UTC midnight.
+    const publishingDate = new Date('2026-07-01T00:00:00.000Z')
+    const now = new Date('2026-06-01T12:00:00.000Z')
+    // With publishDateInUtc=true → July 1 09:00 New York = 13:00 UTC July 1.
+    const sendAt = computeSendAt(publishingDate, '09:00', 'America/New_York', now, true)
+    expect(sendAt.toISOString()).toBe('2026-07-01T13:00:00.000Z')
+    // Without the flag, the old behavior rolls back to June 30 (the bug).
+    const buggy = computeSendAt(publishingDate, '09:00', 'America/New_York', now)
+    expect(buggy.toISOString()).toBe('2026-06-30T13:00:00.000Z')
+  })
+
   it('falls back to now+lead-time when the target time has already passed', () => {
     const publishingDate = new Date('2026-06-20T20:00:00.000Z')
     const now = new Date('2026-06-20T18:00:00.000Z') // past 09:00 EDT (13:00 UTC) already

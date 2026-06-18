@@ -163,74 +163,37 @@ export async function googleSearch(
 export interface YoutubeHit {
   videoId: string
   url: string
-  title: string
+  title: string | null
   thumbnailUrl: string | null
 }
 
-/** Find the first relevant video for a query. Returns null if none parseable. */
+/**
+ * Find the first relevant video for a query. Returns null if none found.
+ *
+ * The `youtube_search` source does NOT support `parse:true` (Oxylabs returns
+ * HTTP 400), so we request the raw search-results HTML and pull the first video
+ * id out of the embedded ytInitialData. Title/thumbnail are filled in by the
+ * caller (deterministic ytimg thumbnail + oEmbed title).
+ */
 export async function youtubeSearch(query: string): Promise<YoutubeHit | null> {
-  const resp = await oxyQuery({ source: 'youtube_search', query, parse: true })
+  const resp = await oxyQuery({ source: 'youtube_search', query })
   const content = resp.results?.[0]?.content
-
-  // Defensive extraction across plausible shapes.
-  const first = findFirstVideo(content)
-  if (!first) {
-    logger.warn({ query }, '[newsletter/oxylabs] youtube_search returned no parseable video')
+  if (typeof content !== 'string') {
+    logger.warn({ query }, '[newsletter/oxylabs] youtube_search returned no HTML content')
     return null
   }
-  return first
-}
-
-function findFirstVideo(node: unknown, depth = 0): YoutubeHit | null {
-  if (depth > 6 || !node || typeof node !== 'object') return null
-  const obj = node as Record<string, unknown>
-
-  // A video-like object has a video_id (or id) + title.
-  const videoId =
-    (typeof obj.video_id === 'string' && obj.video_id) ||
-    (typeof obj.videoId === 'string' && obj.videoId) ||
-    (typeof obj.id === 'string' && obj.id) ||
-    null
-  const title =
-    (typeof obj.title === 'string' && obj.title) ||
-    (typeof obj.name === 'string' && obj.name) ||
-    null
-  if (videoId && title) {
-    return {
-      videoId,
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      title,
-      thumbnailUrl: extractThumbnail(obj),
-    }
+  const m = content.match(/"videoId":"([\w-]{11})"/)
+  if (!m) {
+    logger.warn({ query }, '[newsletter/oxylabs] youtube_search HTML had no videoId')
+    return null
   }
-
-  // Otherwise recurse into arrays/objects (organic/videos/results blocks).
-  for (const v of Object.values(obj)) {
-    if (Array.isArray(v)) {
-      for (const item of v) {
-        const hit = findFirstVideo(item, depth + 1)
-        if (hit) return hit
-      }
-    } else if (v && typeof v === 'object') {
-      const hit = findFirstVideo(v, depth + 1)
-      if (hit) return hit
-    }
+  const videoId = m[1]
+  return {
+    videoId,
+    url: `https://www.youtube.com/watch?v=${videoId}`,
+    title: null,
+    thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
   }
-  return null
-}
-
-function extractThumbnail(obj: Record<string, unknown>): string | null {
-  const t = obj.thumbnails ?? obj.thumbnail
-  if (Array.isArray(t) && t.length > 0) {
-    const pick = (t[1] ?? t[0]) as { url?: string } | string
-    if (typeof pick === 'string') return pick
-    if (pick?.url) return pick.url
-  }
-  if (typeof t === 'string') return t
-  if (t && typeof t === 'object' && typeof (t as { url?: string }).url === 'string') {
-    return (t as { url: string }).url
-  }
-  return null
 }
 
 // ── Universal scrape + URL validation ─────────────────────────────────────────

@@ -173,8 +173,12 @@ export async function researchVideo(
     return { url: null, title: null, thumbnailUrl: null, s3Url: null, manual: true }
   }
 
-  const s3Url = await thumbnailToS3(topic.id, hit.thumbnailUrl)
-  return { url: hit.url, title: hit.title, thumbnailUrl: hit.thumbnailUrl, s3Url, manual: false }
+  // Enrich the search hit the same way as an explicit override: oEmbed for a
+  // clean title, deterministic ytimg thumbnail (fallback to oEmbed's).
+  const oe = await fetchYouTubeOEmbed(hit.url)
+  const thumb = hit.thumbnailUrl ?? oe?.thumbnail_url ?? null
+  const s3Url = await thumbnailToS3(topic.id, thumb)
+  return { url: hit.url, title: oe?.title ?? hit.title ?? null, thumbnailUrl: thumb, s3Url, manual: false }
 }
 
 // ── Recipe ──────────────────────────────────────────────────────────────────

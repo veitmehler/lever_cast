@@ -77,6 +77,8 @@ export interface RenderInput {
   previewText?: string | null
   video?: RenderVideo | null
   summaryImageUrl?: string | null
+  /** The edition's publishing date — shown in the cover masthead band. */
+  editionDate?: Date | string | null
 }
 
 interface Theme {
@@ -215,6 +217,7 @@ export function buildRenderInput(
     summaryImageUrl?: string | null
   },
   video?: RenderVideo | null,
+  editionDate?: Date | string | null,
 ): RenderInput {
   const qh = nl.quickHits as { tips?: string[]; facts?: string[] } | null | undefined
   return {
@@ -227,6 +230,7 @@ export function buildRenderInput(
     previewText: nl.previewText ?? null,
     video: video ?? null,
     summaryImageUrl: nl.summaryImageUrl ?? null,
+    editionDate: editionDate ?? null,
   }
 }
 
@@ -260,8 +264,24 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     rows.push(spacer())
   }
 
-  // Cover summary image (full-width, no band)
+  // Cover summary image (full-width) with a navy "In Today's Edition" masthead
+  // band above it. The band carries the title + publishing date as live HTML
+  // text (not baked into the image), formatted in UTC so the date can't drift.
   if (input.summaryImageUrl) {
+    if (input.editionDate) {
+      const dateStr = new Date(input.editionDate).toLocaleDateString('en-US', {
+        timeZone: 'UTC',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+      rows.push(
+        `<tr><td style="background-color:${navy};padding:22px 24px;text-align:center;">
+          <div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;letter-spacing:0.5px;line-height:1.2;">In Today's Edition</div>
+          <div style="font-family:${theme.fontStack};font-size:16px;font-weight:600;color:#ffffff;opacity:0.85;margin-top:6px;">${esc(dateStr)}</div>
+        </td></tr>`,
+      )
+    }
     rows.push(
       `<tr><td style="background-color:#ffffff;padding:0;"><img src="${esc(input.summaryImageUrl)}" width="680" alt="In this issue" style="display:block;width:100%;max-width:680px;height:auto;" /></td></tr>`,
     )

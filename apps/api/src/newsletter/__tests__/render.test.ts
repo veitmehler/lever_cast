@@ -38,6 +38,7 @@ const full: RenderInput = {
   },
   video: { url: 'https://youtu.be/abc', title: 'Great video', thumbnailUrl: 'https://img/abc.jpg', s3Url: 'https://cdn.example.com/thumb.jpg', manual: false },
   summaryImageUrl: 'https://cdn.example.com/cover.png',
+  editionDate: '2026-07-01T00:00:00.000Z',
 }
 
 describe('renderNewsletterHtml', () => {
@@ -82,6 +83,22 @@ describe('renderNewsletterHtml', () => {
     expect(q).toBeLessThan(cover)
     expect(cover).toBeLessThan(video)
     expect(answer).toBeGreaterThan(video) // answer is last
+  })
+
+  it('renders the cover masthead band with the UTC-formatted publishing date', () => {
+    const html = renderNewsletterHtml(full, brand)
+    expect(html).toContain("In Today's Edition")
+    // 2026-07-01T00:00:00Z must render as July 1 (UTC), never June 30 (off-by-one).
+    expect(html).toContain('July 1, 2026')
+    expect(html).not.toContain('June 30, 2026')
+    // Masthead sits directly above the cover image.
+    expect(html.indexOf("In Today's Edition")).toBeLessThan(html.indexOf('cover.png'))
+  })
+
+  it('omits the masthead band when no edition date is provided', () => {
+    const html = renderNewsletterHtml({ ...full, editionDate: null }, brand)
+    expect(html).toContain('cover.png')
+    expect(html).not.toContain("In Today's Edition")
   })
 
   it('falls back to a voiced title when a teaser has no real headline', () => {

@@ -575,4 +575,33 @@ Return ONLY the 3-word title.`,
       'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters',
     isActive: true,
   },
+  {
+    // Config holder (not an LLM call): the style guide appended to the cover
+    // prompt + the Gemini image model used to render the whole cover in one shot.
+    // defaultModel selects the Nano Banana tier (flash = cheap, pro = premium).
+    stepNumber: 335,
+    key: 'nl_summary_style_guide',
+    stepName: 'newsletter_summary_style_guide',
+    defaultProvider: 'gemini',
+    defaultModel: 'gemini-3.1-flash-image',
+    systemPrompt: null,
+    userPrompt: `Style Instructions:
+
+Overall Aesthetic: Sophisticated, minimalist, modern infographic style. Clean-line vector art. The overall impression should be a high-end glowing blueprint or technical diagram.
+
+Background: Use a solid, deep matte indigo-blue/dark navy background. Strictly no gradients or background clutter.
+
+Line Work: Render all subjects using continuous, fine, uniform-weight outlines. Strictly no solid color fills or shading within the subjects — rely entirely on minimalist contour lines.
+
+Color Palette (Strict Duo-Tone):
+- Primary Line Color: Cool, luminescent white or icy blue (used for the main subjects, structural outlines, and typography).
+- Accent Line Color: Warm, burnished copper or orange-gold (used sparingly for highlights, secondary details, and motion indicators).
+
+Accents & Details: Incorporate elegant, sweeping, thin curved lines to separate elements or create visual flow. Use small, curved accent strokes in the copper/orange color to indicate motion, energy, tension, or vibration around the subjects.
+
+Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white/icy blue color.
+
+Lighting & Finish: Apply a very subtle, soft luminescent glow (like a faint neon effect) to all lines and text so they pop crisply against the dark background.`,
+    isActive: true,
+  },
 ]

@@ -7,7 +7,7 @@
  * the text is composited, not generated). Returns the S3 URL.
  */
 import { prisma } from '@socioply/shared'
-import { generateWithFalAI, uploadBufferWithKey } from '@socioply/shared'
+import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey } from '@socioply/shared'
 import { getDiagramRasterBrowser } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
@@ -15,6 +15,40 @@ import { logger } from '../lib/logger'
 import { runNewsletterPrompt } from './llm'
 import { vtoken } from './image-overlay'
 import type { UsageRecorder } from './article'
+
+// Primary cover path: one Gemini ("Nano Banana") image rendering the whole cover
+// (icons + short labels) in a single call. The title/date are NOT in the image —
+// they're a navy HTML masthead band emitted above the cover in render.ts. On any
+// failure we fall back to the legacy text-free-icon composite below.
+const FALLBACK_COVER_MODEL = 'gemini-3.1-flash-image'
+const FALLBACK_STYLE_GUIDE = `Style Instructions:
+
+Overall Aesthetic: Sophisticated, minimalist, modern infographic style. Clean-line vector art. The overall impression should be a high-end glowing blueprint or technical diagram.
+
+Background: Use a solid, deep matte indigo-blue/dark navy background. Strictly no gradients or background clutter.
+
+Line Work: Render all subjects using continuous, fine, uniform-weight outlines. Strictly no solid color fills or shading within the subjects — rely entirely on minimalist contour lines.
+
+Color Palette (Strict Duo-Tone):
+- Primary Line Color: Cool, luminescent white or icy blue (used for the main subjects, structural outlines, and typography).
+- Accent Line Color: Warm, burnished copper or orange-gold (used sparingly for highlights, secondary details, and motion indicators).
+
+Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white/icy blue color.
+
+Lighting & Finish: Apply a very subtle, soft luminescent glow (like a faint neon effect) to all lines and text so they pop crisply against the dark background.`
+
+/** Compose the one-shot cover prompt: what to depict + short-label rules + style guide. */
+function buildCoverPrompt(items: CoverItem[], industry: string, who: string, styleGuide: string): string {
+  const topics = items.map((i) => `- ${i.headline}`).join('\n')
+  return `Create a single MAGAZINE-COVER infographic that is a catchy visual summary of this ${industry || 'wellness'} newsletter edition${who ? ` for this audience: ${who}` : ''}.
+
+Show 4-6 of these as small illustrated icons/vignettes arranged in ONE balanced composition, each with a SHORT all-caps label (1-3 words, correctly spelled, exactly one label per icon, no duplicate labels):
+${topics}
+
+Only short labels — no sentences, no paragraphs, no body text, no fake or garbled lettering. Fill the entire square frame with the artwork — no empty banner and no large title text (a title and date are added outside the image). Square 1:1 composition.
+
+${styleGuide}`
+}
 
 const FALLBACK_ICON_STYLE =
   'minimal single-color line icon, dark navy (#011328) on a plain solid white background, thin uniform monoline strokes, outline only, no fill, no shadow, no gradient, centered single subject, vector style, no text, no words, no letters'
@@ -116,14 +150,47 @@ export interface GenerateCoverParams {
 }
 
 /**
- * Build the cover: LLM 3-word title + date, one Fal icon per item, composite →
- * S3. Returns { summaryTitle, summaryImageUrl } (either may be null on failure).
+ * Build the cover. Primary path: one Gemini ("Nano Banana") image of the whole
+ * cover. Falls back to the legacy text-free-icon composite on any failure.
+ * Returns { summaryTitle, summaryImageUrl } (summaryTitle is null on the Gemini
+ * path — the title is an HTML masthead band in render.ts).
  */
 export async function generateCoverImage(
   params: GenerateCoverParams,
 ): Promise<{ summaryTitle: string | null; summaryImageUrl: string | null }> {
   const items = params.items.slice(0, 6).filter((i) => i.headline?.trim())
   if (items.length === 0) return { summaryTitle: null, summaryImageUrl: null }
+
+  const cfg = await prisma.promptTemplate.findUnique({ where: { key: 'nl_summary_style_guide' } })
+  const styleGuide = cfg?.userPrompt?.trim() || FALLBACK_STYLE_GUIDE
+  const model = cfg?.defaultModel || FALLBACK_COVER_MODEL
+  const geminiKey = await getSystemApiKey('gemini')
+
+  if (geminiKey) {
+    try {
+      const prompt = buildCoverPrompt(items, params.industry, params.who, styleGuide)
+      const buf = await generateWithGeminiImage(geminiKey, prompt, model, '1:1')
+      const { url } = await uploadBufferWithKey(
+        `newsletter/${params.keyPrefix}-cover-${vtoken()}.png`,
+        buf,
+        'image/png',
+      )
+      return { summaryTitle: null, summaryImageUrl: url }
+    } catch (err) {
+      logger.warn({ err }, '[newsletter/cover] Gemini cover failed; falling back to icon composite')
+    }
+  }
+  return generateCoverComposite(params, items)
+}
+
+/**
+ * Legacy fallback: LLM 3-word title + date, one Fal icon per item, composite →
+ * S3. Returns { summaryTitle, summaryImageUrl } (either may be null on failure).
+ */
+async function generateCoverComposite(
+  params: GenerateCoverParams,
+  items: CoverItem[],
+): Promise<{ summaryTitle: string | null; summaryImageUrl: string | null }> {
 
   // 1. 3-word title.
   let summaryTitle: string | null = null

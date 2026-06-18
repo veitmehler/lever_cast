@@ -295,6 +295,55 @@ export async function generateWithFalAI(
 }
 
 /**
+ * Generate an image with a Google Gemini image model ("Nano Banana"), e.g.
+ * gemini-3.1-flash-image / gemini-3-pro-image. Unlike diffusion models these
+ * render legible text, so they can produce a full composed cover in one call.
+ *
+ * @param apiKey - Gemini API key
+ * @param prompt - Image generation prompt
+ * @param model - Model id (e.g. "gemini-3.1-flash-image")
+ * @param aspectRatio - imageConfig aspect ratio ("1:1", "4:5", "16:9", …)
+ * @returns Buffer containing the generated image
+ * @throws if the response contains no image part (callers may fall back)
+ */
+export async function generateWithGeminiImage(
+  apiKey: string,
+  prompt: string,
+  model: string = 'gemini-3.1-flash-image',
+  aspectRatio: string = '1:1'
+): Promise<Buffer> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseModalities: ['IMAGE'],
+      imageConfig: { aspectRatio },
+    },
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(`Gemini image API error ${response.status}: ${text.slice(0, 400)}`)
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string } }> } }>
+  }
+  const parts = data.candidates?.[0]?.content?.parts ?? []
+  const b64 = parts.find((p) => p.inlineData?.data)?.inlineData?.data
+  if (!b64) {
+    throw new Error('Gemini image API returned no image (possible refusal/safety block)')
+  }
+  return Buffer.from(b64, 'base64')
+}
+
+/**
  * Generate image using OpenAI DALL-E
  * @param apiKey - OpenAI API key
  * @param prompt - Image generation prompt

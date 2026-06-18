@@ -437,7 +437,7 @@ export async function renderAndSave(newsletterId: string): Promise<string> {
     needsRecipe: !!nl.topic.recipe,
   })
 
-  const html = renderNewsletterHtml(buildRenderInput(nl, video), toRenderBrand(brandRow))
+  const html = renderNewsletterHtml(buildRenderInput(nl, video, nl.topic.date), toRenderBrand(brandRow))
   await prisma.newsletter.update({
     where: { id: newsletterId },
     data: { renderedHtml: html, validation: J(validation) },

@@ -387,7 +387,7 @@ async function buildAndSaveCover(
 // ── Render + validate persistence ──────────────────────────────────────────────
 
 /** Coerce the BrandSettings.socialMediaLinks JSON into the typed render shape. */
-function normalizeSocialLinks(v: unknown): RenderBrand['socialMediaLinks'] {
+export function normalizeSocialLinks(v: unknown): RenderBrand['socialMediaLinks'] {
   if (!Array.isArray(v)) return null
   const out = v
     .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')

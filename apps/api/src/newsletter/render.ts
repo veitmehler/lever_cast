@@ -391,9 +391,13 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme), green)
   if (input.modules?.recipe2) section('Another Recipe', recipeBlock(input.modules.recipe2, theme), green)
 
-  // Trivia answer (payoff, last — pink)
+  // Trivia answer (payoff, last — pink). Extra 60px bottom padding for whitespace
+  // before the footer (no trailing spacer — the padding is the gap).
   if (fun?.triviaQuestion && fun?.triviaAnswer) {
-    section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'), pink)
+    rows.push(band('Trivia Answer', pink, theme))
+    rows.push(
+      `<tr><td style="background-color:#ffffff;padding:32px 28px 60px;">${para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center')}</td></tr>`,
+    )
   }
 
   // Footer: logo · org name + stacked address + phone · social row · disclaimer · unsubscribe
@@ -443,18 +447,20 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   const disclaimer =
     brand.nlFooterDisclaimer?.trim() ||
     'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you — it helps support our work.'
-  const unsub = `You're receiving this because you subscribed. Prefer not to get these? <a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a>. Questions? Just reply to this email.`
+  // Name only when there's no logo (the logo already carries the brand).
+  const nameLine = footerLogo ? '' : `<div style="font-weight:600;">${esc(brand.organizationName ?? '')}</div>`
 
   rows.push(
-    `<tr><td style="background-color:${theme.footerBg};padding:32px 24px;">
+    `<tr><td style="background-color:${theme.footerBg};padding:60px 24px 32px;">
       <div style="font-family:${theme.fontStack};font-size:13px;color:#ffffff;text-align:center;line-height:1.6;">
         ${footerLogo}
-        <div style="font-weight:600;">${esc(brand.organizationName ?? '')}</div>
+        ${nameLine}
         ${addrLine}
         ${contactLine}
         ${socialRow}
         <div style="font-size:11px;opacity:0.7;margin-top:18px;">${disclaimer}</div>
-        <div style="font-size:11px;opacity:0.85;margin-top:12px;">${unsub}</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:12px;">You're receiving this because you subscribed. Questions? Just reply to this email.</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:10px;"><a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a></div>
       </div>
     </td></tr>`,
   )

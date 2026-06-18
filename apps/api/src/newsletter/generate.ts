@@ -386,12 +386,27 @@ async function buildAndSaveCover(
 
 // ── Render + validate persistence ──────────────────────────────────────────────
 
-function toRenderBrand(b: RenderBrand | null): RenderBrand {
+/** Coerce the BrandSettings.socialMediaLinks JSON into the typed render shape. */
+function normalizeSocialLinks(v: unknown): RenderBrand['socialMediaLinks'] {
+  if (!Array.isArray(v)) return null
+  const out = v
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+    .filter((x) => typeof x.url === 'string' && (x.url as string).trim())
+    .map((x) => ({ platform: typeof x.platform === 'string' ? x.platform : '', url: x.url as string }))
+  return out.length > 0 ? out : null
+}
+
+function toRenderBrand(
+  b: (Partial<Omit<RenderBrand, 'socialMediaLinks'>> & { socialMediaLinks?: unknown }) | null,
+): RenderBrand {
   if (!b) return {}
   return {
     organizationName: b.organizationName,
     organizationLogoUrl: b.organizationLogoUrl,
     organizationAddress: b.organizationAddress,
+    organizationEmail: b.organizationEmail,
+    organizationPhone: b.organizationPhone,
+    socialMediaLinks: normalizeSocialLinks(b.socialMediaLinks),
     nlLogoUrl: b.nlLogoUrl,
     nlLogoWidth: b.nlLogoWidth,
     nlHeaderBgColor: b.nlHeaderBgColor,

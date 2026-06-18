@@ -6,6 +6,14 @@ const brand: RenderBrand = {
   nlLogoUrl: 'https://cdn.example.com/logo.png',
   nlLogoWidth: 280,
   organizationAddress: '123 Main St, Springfield',
+  organizationEmail: 'hello@acme.test',
+  organizationPhone: '+1 555 0100',
+  organizationLogoUrl: 'https://cdn.example.com/orglogo.png',
+  socialMediaLinks: [
+    { platform: 'instagram', url: 'https://instagram.com/acme' },
+    { platform: 'twitter', url: 'https://x.com/acme' },
+    { platform: 'unknownnet', url: 'https://u.test' },
+  ],
   nlHeaderBgColor: '#0d1b2a',
   nlFooterBgColor: '#eef2f7',
   nlSectionColor1: '#aa0011',
@@ -99,6 +107,22 @@ describe('renderNewsletterHtml', () => {
     const html = renderNewsletterHtml({ ...full, editionDate: null }, brand)
     expect(html).toContain('cover.png')
     expect(html).not.toContain("In Today's Edition")
+  })
+
+  it('renders a full footer: contact, social icons, unsubscribe merge field', () => {
+    const html = renderNewsletterHtml(full, brand)
+    expect(html).toContain('mailto:hello@acme.test')
+    expect(html).toContain('+1 555 0100')
+    expect(html).toContain('123 Main St, Springfield')
+    expect(html).toContain('https://cdn.example.com/orglogo.png') // footer logo
+    // social icons: instagram + x (twitter→x alias); unknown platform skipped
+    expect(html).toContain('/newsletter/social/instagram.png')
+    expect(html).toContain('/newsletter/social/x.png')
+    expect(html).toContain('https://instagram.com/acme')
+    expect(html).not.toContain('u.test')
+    // unsubscribe as a merge field with our own wording
+    expect(html).toContain('{{unsubscribe_url}}')
+    expect(html).toContain('Unsubscribe here')
   })
 
   it('falls back to a voiced title when a teaser has no real headline', () => {

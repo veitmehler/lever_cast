@@ -51,6 +51,9 @@ export interface RenderModules {
 export interface RenderBrand {
   organizationName?: string | null
   organizationAddress?: string | null
+  organizationEmail?: string | null
+  organizationPhone?: string | null
+  socialMediaLinks?: Array<{ platform?: string | null; url?: string | null }> | null
   nlLogoUrl?: string | null
   organizationLogoUrl?: string | null
   nlLogoWidth?: number | null
@@ -129,6 +132,29 @@ function band(title: string, bg: string, theme: Theme): string {
     <h1 style="margin:0;font-family:${HEADING_STACK};font-size:30px;font-weight:${theme.headingWeight};color:#ffffff;letter-spacing:0.5px;line-height:1.2;">${esc(title)}</h1>
   </td></tr>`
 }
+
+// ── Footer: social icons + unsubscribe ───────────────────────────────────────
+
+/** White monochrome platform icons live at a stable S3/CDN path. */
+const SOCIAL_ICON_BASE = 'https://cdn.socioply.com/newsletter/social'
+const SOCIAL_ICONS = new Set([
+  'facebook', 'instagram', 'x', 'linkedin', 'youtube', 'tiktok', 'pinterest', 'threads',
+])
+const SOCIAL_ALIASES: Record<string, string> = {
+  fb: 'facebook', ig: 'instagram', insta: 'instagram', twitter: 'x', 'twitter/x': 'x',
+  yt: 'youtube', 'youtube.com': 'youtube', 'linked-in': 'linkedin',
+}
+
+/** Map a stored platform label to a known icon slug, or null if unsupported. */
+function socialSlug(platform?: string | null): string | null {
+  const p = (platform ?? '').trim().toLowerCase()
+  const slug = SOCIAL_ALIASES[p] ?? p
+  return SOCIAL_ICONS.has(slug) ? slug : null
+}
+
+// GHL/Omniply unsubscribe URL merge field. CONFIRM the exact token in the GHL
+// email builder's merge-field menu — change here if it differs.
+const UNSUBSCRIBE_MERGE = '{{unsubscribe_url}}'
 
 /** A white content row. */
 function content(inner: string): string {
@@ -328,11 +354,46 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'), pink)
   }
 
-  // Footer
-  const addr = brand.organizationAddress ? `<br/>${esc(brand.organizationAddress)}` : ''
+  // Footer: logo · org name + address + contact · social row · disclaimer · unsubscribe
+  const footerLogoUrl = brand.organizationLogoUrl || brand.nlLogoUrl
+  const footerLogo = footerLogoUrl
+    ? `<img src="${esc(footerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" height="56" style="display:block;height:56px;width:auto;max-width:240px;margin:0 auto 18px;" />`
+    : ''
+
+  const contactBits: string[] = []
+  if (brand.organizationEmail)
+    contactBits.push(`<a href="mailto:${esc(brand.organizationEmail)}" style="color:#ffffff;"><u>${esc(brand.organizationEmail)}</u></a>`)
+  if (brand.organizationPhone) contactBits.push(esc(brand.organizationPhone))
+  const contactLine = contactBits.length ? `<div style="margin-top:6px;">${contactBits.join(' &nbsp;·&nbsp; ')}</div>` : ''
+  const addrLine = brand.organizationAddress ? `<div style="margin-top:6px;">${esc(brand.organizationAddress)}</div>` : ''
+
+  const socialItems = (brand.socialMediaLinks ?? [])
+    .map((l) => ({ slug: socialSlug(l.platform), url: (l.url ?? '').trim() }))
+    .filter((l): l is { slug: string; url: string } => !!l.slug && !!l.url)
+  const socialRow = socialItems.length
+    ? `<div style="margin:20px 0 4px;">${socialItems
+        .map(
+          (l) =>
+            `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:inline-block;margin:0 7px;"><img src="${SOCIAL_ICON_BASE}/${l.slug}.png" width="26" height="26" alt="${l.slug}" style="display:inline-block;width:26px;height:26px;border:0;" /></a>`,
+        )
+        .join('')}</div>`
+    : ''
+
+  const disclaimer =
+    'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you — it helps support our work.'
+  const unsub = `You're receiving this because you subscribed. Prefer not to get these? <a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a>. Questions? Just reply to this email.`
+
   rows.push(
     `<tr><td style="background-color:${theme.footerBg};padding:32px 24px;">
-      <div style="font-family:${theme.fontStack};font-size:12px;color:#ffffff;text-align:center;line-height:1.6;opacity:0.85;">${esc(brand.organizationName ?? '')}${addr}<br/>You are receiving this newsletter as a valued subscriber.</div>
+      <div style="font-family:${theme.fontStack};font-size:13px;color:#ffffff;text-align:center;line-height:1.6;">
+        ${footerLogo}
+        <div style="font-weight:600;">${esc(brand.organizationName ?? '')}</div>
+        ${addrLine}
+        ${contactLine}
+        ${socialRow}
+        <div style="font-size:11px;opacity:0.7;margin-top:18px;">${disclaimer}</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:12px;">${unsub}</div>
+      </div>
     </td></tr>`,
   )
 

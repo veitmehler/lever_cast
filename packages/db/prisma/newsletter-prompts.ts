@@ -593,13 +593,13 @@ Background: Use a solid, deep matte indigo-blue/dark navy background. Strictly n
 
 Line Work: Render all subjects using continuous, fine, uniform-weight outlines. Strictly no solid color fills or shading within the subjects — rely entirely on minimalist contour lines.
 
-Color Palette (Strict Duo-Tone):
-- Primary Line Color: Cool, luminescent white or icy blue (used for the main subjects, structural outlines, and typography).
-- Accent Line Color: Warm, burnished copper or orange-gold (used sparingly for highlights, secondary details, and motion indicators).
+Color Palette (Strict Duo-Tone — only these two ink colors, nothing else):
+- Primary Line Color: Pure bright white (used for the main subjects, structural outlines, and typography). Do NOT use blue or any other color for the line work — the lines and text are white only.
+- Accent Line Color: Warm, burnished copper / brown-gold (used sparingly for highlights, secondary details, and motion indicators). This is the ONLY non-white color in the artwork.
 
-Accents & Details: Incorporate elegant, sweeping, thin curved lines to separate elements or create visual flow. Use small, curved accent strokes in the copper/orange color to indicate motion, energy, tension, or vibration around the subjects.
+Accents & Details: Incorporate elegant, sweeping, thin curved lines to separate elements or create visual flow. Use small, curved accent strokes in the copper/brown-gold color to indicate motion, energy, tension, or vibration around the subjects.
 
-Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white/icy blue color.
+Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white color.
 
 Lighting & Finish: Apply a very subtle, soft luminescent glow (like a faint neon effect) to all lines and text so they pop crisply against the dark background.`,
     isActive: true,

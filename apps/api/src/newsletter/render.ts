@@ -54,8 +54,22 @@ export interface RenderBrand {
   organizationEmail?: string | null
   organizationPhone?: string | null
   socialMediaLinks?: Array<{ platform?: string | null; url?: string | null }> | null
+  // Structured address (stacked footer lines); falls back to organizationAddress
+  addressLine1?: string | null
+  addressLine2?: string | null
+  addressLocality?: string | null
+  addressRegion?: string | null
+  postalCode?: string | null
+  addressCountryName?: string | null
   nlLogoUrl?: string | null
   organizationLogoUrl?: string | null
+  // Auto-generated light/dark logo variants + per-placement assignment
+  nlLogoLightUrl?: string | null
+  nlLogoDarkUrl?: string | null
+  nlHeaderLogoVariant?: string | null // 'auto' | 'light' | 'dark'
+  nlFooterLogoVariant?: string | null
+  nlFooterLogoWidth?: number | null
+  nlFooterDisclaimer?: string | null
   nlLogoWidth?: number | null
   nlHeaderBgColor?: string | null
   nlFooterBgColor?: string | null
@@ -93,18 +107,44 @@ interface Theme {
   headingWeight: string
   bodyWeight: string
   linkColor: string
-  logoUrl: string | null
-  logoWidth: number
+  headerLogoUrl: string | null
+  headerLogoWidth: number
+  footerLogoUrl: string | null
+  footerLogoWidth: number
 }
 
 const FALLBACK_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 const HEADING_STACK = "'Trebuchet MS', 'Segoe UI', Helvetica, Arial, sans-serif"
 
+/** Perceived luminance of a #rrggbb colour (0–255); < 140 ≈ a dark background. */
+function luminance(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return 255
+  const n = parseInt(m[1], 16)
+  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)
+}
+
+/**
+ * Pick the logo variant for a band: explicit light/dark, or auto by the band's
+ * background luminance (dark bg → white logo, light bg → navy logo). Falls back
+ * through the chosen variant → other variant → legacy single logo.
+ */
+function pickLogo(brand: RenderBrand, variant: string | null | undefined, bg: string): string | null {
+  const light = brand.nlLogoLightUrl?.trim() || null
+  const dark = brand.nlLogoDarkUrl?.trim() || null
+  const legacy = brand.nlLogoUrl?.trim() || brand.organizationLogoUrl?.trim() || null
+  const v = (variant ?? 'auto').toLowerCase()
+  const wantLight = v === 'light' ? true : v === 'dark' ? false : luminance(bg) < 140
+  return wantLight ? light ?? dark ?? legacy : dark ?? light ?? legacy
+}
+
 function resolveTheme(brand: RenderBrand): Theme {
   const primary = brand.nlFontFamily?.trim()
+  const headerBg = brand.nlHeaderBgColor?.trim() || '#fa00bb'
+  const footerBg = brand.nlFooterBgColor?.trim() || '#011328'
   return {
-    headerBg: brand.nlHeaderBgColor?.trim() || '#fa00bb',
-    footerBg: brand.nlFooterBgColor?.trim() || '#011328',
+    headerBg,
+    footerBg,
     sections: [
       brand.nlSectionColor1?.trim() || '#fa00bb',
       brand.nlSectionColor2?.trim() || '#00bbf9',
@@ -116,8 +156,10 @@ function resolveTheme(brand: RenderBrand): Theme {
     headingWeight: brand.nlHeadingFontWeight?.trim() || '700',
     bodyWeight: brand.nlBodyFontWeight?.trim() || '400',
     linkColor: brand.nlLinkColor?.trim() || '#fa00bb',
-    logoUrl: brand.nlLogoUrl?.trim() || brand.organizationLogoUrl?.trim() || null,
-    logoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
+    headerLogoUrl: pickLogo(brand, brand.nlHeaderLogoVariant, headerBg),
+    headerLogoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
+    footerLogoUrl: pickLogo(brand, brand.nlFooterLogoVariant, footerBg),
+    footerLogoWidth: brand.nlFooterLogoWidth && brand.nlFooterLogoWidth > 0 ? brand.nlFooterLogoWidth : 200,
   }
 }
 
@@ -274,8 +316,8 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   }
 
   // Header (logo on header band)
-  const logo = theme.logoUrl
-    ? `<img src="${esc(theme.logoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.logoWidth}" style="display:block;width:100%;max-width:${theme.logoWidth}px;height:auto;margin:0 auto;" />`
+  const logo = theme.headerLogoUrl
+    ? `<img src="${esc(theme.headerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.headerLogoWidth}" style="display:block;width:100%;max-width:${theme.headerLogoWidth}px;height:auto;margin:0 auto;" />`
     : `<div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
   rows.push(`<tr><td style="background-color:${theme.headerBg};padding:24px;text-align:center;">${logo}</td></tr>`)
   rows.push(spacer())
@@ -354,18 +396,37 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     section('Trivia Answer', para(`<p style="margin:0;font-size:22px;">${esc(fun.triviaAnswer)}</p>`, theme, 'center'), pink)
   }
 
-  // Footer: logo · org name + address + contact · social row · disclaimer · unsubscribe
-  const footerLogoUrl = brand.organizationLogoUrl || brand.nlLogoUrl
-  const footerLogo = footerLogoUrl
-    ? `<img src="${esc(footerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" height="56" style="display:block;height:56px;width:auto;max-width:240px;margin:0 auto 18px;" />`
+  // Footer: logo · org name + stacked address + phone · social row · disclaimer · unsubscribe
+  const footerLogo = theme.footerLogoUrl
+    ? `<img src="${esc(theme.footerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.footerLogoWidth}" style="display:block;width:100%;max-width:${theme.footerLogoWidth}px;height:auto;margin:0 auto 18px;" />`
     : ''
 
-  const contactBits: string[] = []
-  if (brand.organizationEmail)
-    contactBits.push(`<a href="mailto:${esc(brand.organizationEmail)}" style="color:#ffffff;"><u>${esc(brand.organizationEmail)}</u></a>`)
-  if (brand.organizationPhone) contactBits.push(esc(brand.organizationPhone))
-  const contactLine = contactBits.length ? `<div style="margin-top:6px;">${contactBits.join(' &nbsp;·&nbsp; ')}</div>` : ''
-  const addrLine = brand.organizationAddress ? `<div style="margin-top:6px;">${esc(brand.organizationAddress)}</div>` : ''
+  // Stacked address: L1 street, L2 city/state/zip/country, L3 phone.
+  // Falls back to the legacy combined organizationAddress when structured fields are empty.
+  const street = [brand.addressLine1, brand.addressLine2].filter(Boolean).join(', ')
+  const cityLine = [
+    [brand.addressLocality, brand.addressRegion].filter(Boolean).join(', '),
+    brand.postalCode,
+    brand.addressCountryName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+,/g, ',')
+  const addrLines: string[] = []
+  if (street || cityLine) {
+    if (street) addrLines.push(esc(street))
+    if (cityLine) addrLines.push(esc(cityLine))
+  } else if (brand.organizationAddress) {
+    addrLines.push(esc(brand.organizationAddress))
+  }
+  if (brand.organizationPhone) addrLines.push(esc(brand.organizationPhone))
+  const addrLine = addrLines.length
+    ? `<div style="margin-top:8px;">${addrLines.join('<br/>')}</div>`
+    : ''
+
+  const contactLine = brand.organizationEmail
+    ? `<div style="margin-top:6px;"><a href="mailto:${esc(brand.organizationEmail)}" style="color:#ffffff;"><u>${esc(brand.organizationEmail)}</u></a></div>`
+    : ''
 
   const socialItems = (brand.socialMediaLinks ?? [])
     .map((l) => ({ slug: socialSlug(l.platform), url: (l.url ?? '').trim() }))
@@ -380,6 +441,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     : ''
 
   const disclaimer =
+    brand.nlFooterDisclaimer?.trim() ||
     'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you — it helps support our work.'
   const unsub = `You're receiving this because you subscribed. Prefer not to get these? <a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a>. Questions? Just reply to this email.`
 

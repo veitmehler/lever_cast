@@ -3,8 +3,17 @@ import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@socioply/shared'
 
-// Newsletter header logo upload. Separate from the article/org logo so a customer
-// can use a different mark in the newsletter. Persists BrandSettings.nlLogoUrl.
+// Newsletter logo upload. `slot` selects what's being uploaded:
+//   source (default) → BrandSettings.nlLogoSourceUrl (then the API processes it
+//                       into light/dark variants)
+//   light | dark      → manual override of a variant (BrandSettings.nlLogo{Light,Dark}Url)
+// Separate from the article/org logo so a customer can use a different mark.
+
+const SLOTS: Record<string, { field: 'nlLogoSourceUrl' | 'nlLogoLightUrl' | 'nlLogoDarkUrl'; name: string }> = {
+  source: { field: 'nlLogoSourceUrl', name: 'nl-logo-source' },
+  light: { field: 'nlLogoLightUrl', name: 'nl-logo-light' },
+  dark: { field: 'nlLogoDarkUrl', name: 'nl-logo-dark' },
+}
 
 function getS3Client(): S3Client {
   const accessKeyId = process.env.ACCESS_KEY_ID
@@ -52,6 +61,9 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+    const slot = SLOTS[(formData.get('slot') as string) || 'source']
+    if (!slot) return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
+
     const ext = ALLOWED[file.type]
     if (!ext) {
       return NextResponse.json({ error: 'Unsupported file type. Use PNG, JPG, WebP or SVG.' }, { status: 400 })
@@ -60,10 +72,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Logo must be smaller than 2 MB.' }, { status: 400 })
     }
 
-    const newKey = `brand-assets/${userId}/nl-logo.${ext}`
-    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { nlLogoUrl: true } })
-    if (existing?.nlLogoUrl) {
-      const oldKey = keyFromUrl(existing.nlLogoUrl)
+    const newKey = `brand-assets/${userId}/${slot.name}.${ext}`
+    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { [slot.field]: true } })
+    const prev = (existing as Record<string, string | null> | null)?.[slot.field]
+    if (prev) {
+      const oldKey = keyFromUrl(prev)
       if (oldKey && oldKey !== newKey) {
         try {
           await getS3Client().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: oldKey }))
@@ -81,27 +94,31 @@ export async function POST(request: NextRequest) {
 
     await prisma.brandSettings.upsert({
       where: { userId },
-      create: { userId, nlLogoUrl: url },
-      update: { nlLogoUrl: url },
+      create: { userId, [slot.field]: url },
+      update: { [slot.field]: url },
     })
 
-    return NextResponse.json({ url })
+    return NextResponse.json({ url, slot: slot.field })
   } catch (err) {
     console.error('[newsletters/logo] POST error:', err)
     return NextResponse.json({ error: 'Failed to upload logo' }, { status: 500 })
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
     const { userId: clerkId } = await auth()
     if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const userId = await getUserId(clerkId)
     if (!userId) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { nlLogoUrl: true } })
-    if (existing?.nlLogoUrl) {
-      const key = keyFromUrl(existing.nlLogoUrl)
+    const slot = SLOTS[new URL(request.url).searchParams.get('slot') || 'source']
+    if (!slot) return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
+
+    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { [slot.field]: true } })
+    const prev = (existing as Record<string, string | null> | null)?.[slot.field]
+    if (prev) {
+      const key = keyFromUrl(prev)
       if (key) {
         try {
           await getS3Client().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }))
@@ -109,7 +126,7 @@ export async function DELETE() {
           /* non-fatal */
         }
       }
-      await prisma.brandSettings.update({ where: { userId }, data: { nlLogoUrl: null } })
+      await prisma.brandSettings.update({ where: { userId }, data: { [slot.field]: null } })
     }
     return NextResponse.json({ ok: true })
   } catch (err) {

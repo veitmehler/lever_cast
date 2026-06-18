@@ -10,6 +10,7 @@ import {
 } from '../newsletter/generate'
 import { getNewsletterEmailConfig, type NewsletterEmailConfig } from '../lib/ghl/settings'
 import { renderNewsletterHtml, type RenderBrand, type RenderInput } from '../newsletter/render'
+import { processLogo } from '../newsletter/logo-process'
 import { computeSendAt } from '../handlers/promo-email-generate'
 import {
   createGhlEmailCampaign,
@@ -51,6 +52,9 @@ const TEMPLATE_FIELDS = [
   'nlBodyFontWeight',
   'nlLinkColor',
   'nlLogoUrl',
+  'nlHeaderLogoVariant',
+  'nlFooterLogoVariant',
+  'nlFooterDisclaimer',
 ] as const
 
 // GhlSettings.newsletter* delivery fields the user configures.
@@ -368,6 +372,10 @@ export async function newsletterRoutes(app: FastifyInstance) {
 
     const template = pick(brand as Record<string, unknown> | null, TEMPLATE_FIELDS)
     template.nlLogoWidth = brand?.nlLogoWidth ?? null
+    template.nlFooterLogoWidth = brand?.nlFooterLogoWidth ?? null
+    template.nlLogoSourceUrl = brand?.nlLogoSourceUrl ?? null
+    template.nlLogoLightUrl = brand?.nlLogoLightUrl ?? null
+    template.nlLogoDarkUrl = brand?.nlLogoDarkUrl ?? null
     return reply.send({
       template,
       delivery: pick(ghl as Record<string, unknown> | null, DELIVERY_FIELDS),
@@ -391,9 +399,11 @@ export async function newsletterRoutes(app: FastifyInstance) {
         for (const k of TEMPLATE_FIELDS) {
           if (template[k] !== undefined) data[k] = (template[k] as string) || null
         }
-        if (template.nlLogoWidth !== undefined) {
-          const w = parseInt(String(template.nlLogoWidth), 10)
-          data.nlLogoWidth = Number.isFinite(w) && w > 0 ? w : null
+        for (const wk of ['nlLogoWidth', 'nlFooterLogoWidth'] as const) {
+          if (template[wk] !== undefined) {
+            const w = parseInt(String(template[wk]), 10)
+            data[wk] = Number.isFinite(w) && w > 0 ? w : null
+          }
         }
         if (Object.keys(data).length > 0) {
           await prisma.brandSettings.upsert({
@@ -439,7 +449,21 @@ export async function newsletterRoutes(app: FastifyInstance) {
         organizationName: brand?.organizationName,
         organizationLogoUrl: brand?.organizationLogoUrl,
         organizationAddress: brand?.organizationAddress,
+        organizationEmail: brand?.organizationEmail,
+        organizationPhone: brand?.organizationPhone,
+        addressLine1: brand?.addressLine1,
+        addressLine2: brand?.addressLine2,
+        addressLocality: brand?.addressLocality,
+        addressRegion: brand?.addressRegion,
+        postalCode: brand?.postalCode,
+        addressCountryName: brand?.addressCountryName,
         nlLogoUrl: s('nlLogoUrl'),
+        nlLogoLightUrl: brand?.nlLogoLightUrl,
+        nlLogoDarkUrl: brand?.nlLogoDarkUrl,
+        nlHeaderLogoVariant: s('nlHeaderLogoVariant'),
+        nlFooterLogoVariant: s('nlFooterLogoVariant'),
+        nlFooterLogoWidth: (t.nlFooterLogoWidth as number) ?? brand?.nlFooterLogoWidth ?? null,
+        nlFooterDisclaimer: s('nlFooterDisclaimer'),
         nlLogoWidth: (t.nlLogoWidth as number) ?? brand?.nlLogoWidth ?? null,
         nlHeaderBgColor: s('nlHeaderBgColor'),
         nlFooterBgColor: s('nlFooterBgColor'),
@@ -456,4 +480,29 @@ export async function newsletterRoutes(app: FastifyInstance) {
       return reply.send({ html: renderNewsletterHtml(SAMPLE_PREVIEW, renderBrand) })
     },
   )
+
+  // POST /newsletters/logo/process — generate light/dark variants from the
+  // stored source logo (called after a source upload, and on "re-process").
+  app.post('/newsletters/logo/process', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+
+    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    const sourceUrl = brand?.nlLogoSourceUrl
+    if (!sourceUrl) return reply.status(400).send({ error: 'No source logo uploaded yet' })
+
+    try {
+      const { lightUrl, darkUrl } = await processLogo(userId, sourceUrl)
+      await prisma.brandSettings.update({
+        where: { userId },
+        data: { nlLogoLightUrl: lightUrl, nlLogoDarkUrl: darkUrl },
+      })
+      return reply.send({ lightUrl, darkUrl })
+    } catch (err) {
+      logger.error({ userId, err }, '[newsletters] logo processing failed')
+      return reply.status(500).send({ error: 'Logo processing failed' })
+    }
+  })
 }

@@ -77,40 +77,81 @@ export default function NewsletterTemplatePage() {
   }, [refreshPreview])
 
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [processingLogo, setProcessingLogo] = useState(false)
 
   function setT(key: string, value: string) {
     setTemplate((prev) => ({ ...prev, [key]: value }))
   }
 
-  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
+  const SLOT_FIELD: Record<string, string> = {
+    source: 'nlLogoSourceUrl',
+    light: 'nlLogoLightUrl',
+    dark: 'nlLogoDarkUrl',
+  }
+
+  async function uploadLogoSlot(file: File, slot: 'source' | 'light' | 'dark'): Promise<string | null> {
     setUploadingLogo(true)
     setError(null)
     try {
       const form = new FormData()
       form.append('file', file)
+      form.append('slot', slot)
       const res = await fetch('/api/newsletters/logo', { method: 'POST', body: form })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError(data.error ?? 'Logo upload failed')
-        return
+        return null
       }
-      setTemplate((prev) => ({ ...prev, nlLogoUrl: data.url }))
-      setNotice('Logo uploaded.')
+      setTemplate((prev) => ({ ...prev, [SLOT_FIELD[slot]]: data.url }))
+      return data.url as string
     } catch (err) {
       setError((err as Error).message ?? 'Logo upload failed')
+      return null
     } finally {
       setUploadingLogo(false)
     }
   }
 
-  async function removeLogo() {
+  /** Generate light + dark variants from the stored source logo. */
+  async function processSourceLogo() {
+    setProcessingLogo(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/newsletters/logo/process', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Logo processing failed')
+        return
+      }
+      setTemplate((prev) => ({ ...prev, nlLogoLightUrl: data.lightUrl, nlLogoDarkUrl: data.darkUrl }))
+      setNotice('Logo processed into light + dark versions.')
+    } catch (err) {
+      setError((err as Error).message ?? 'Logo processing failed')
+    } finally {
+      setProcessingLogo(false)
+    }
+  }
+
+  async function onSourceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const url = await uploadLogoSlot(file, 'source')
+    if (url) await processSourceLogo()
+  }
+
+  async function onOverrideUpload(e: React.ChangeEvent<HTMLInputElement>, slot: 'light' | 'dark') {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    await uploadLogoSlot(file, slot)
+  }
+
+  async function removeLogoSlot(slot: 'source' | 'light' | 'dark') {
     setUploadingLogo(true)
     try {
-      await fetch('/api/newsletters/logo', { method: 'DELETE' })
-      setTemplate((prev) => ({ ...prev, nlLogoUrl: '' }))
+      await fetch(`/api/newsletters/logo?slot=${slot}`, { method: 'DELETE' })
+      setTemplate((prev) => ({ ...prev, [SLOT_FIELD[slot]]: '' }))
     } catch {
       /* ignore */
     } finally {
@@ -243,40 +284,125 @@ export default function NewsletterTemplatePage() {
                 </div>
               </div>
 
-              {/* Header logo */}
+              {/* Logo: upload once → auto light + dark variants */}
               <div className="border-t border-border pt-3">
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Header logo (shown in the email header)
-                </label>
-                {template.nlLogoUrl ? (
-                  <div className="mb-2 flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={template.nlLogoUrl}
-                      alt="Newsletter logo"
-                      style={{ width: `${parseInt(template.nlLogoWidth || '0', 10) || 200}px`, maxWidth: '100%' }}
-                      className="rounded border border-border bg-white p-1"
-                    />
-                    <button onClick={removeLogo} disabled={uploadingLogo} className="text-xs text-red-600 hover:underline">
-                      Remove
+                <label className="mb-1 block text-xs font-medium text-foreground">Logo</label>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Upload your logo once — we generate a white (for dark backgrounds) and a dark (for light
+                  backgrounds) transparent version automatically. Replace either manually if needed.
+                </p>
+                <div className="mb-3 flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={onSourceUpload}
+                    className="text-sm"
+                  />
+                  {(uploadingLogo || processingLogo) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  {processingLogo && <span className="text-xs text-muted-foreground">Generating variants…</span>}
+                </div>
+
+                {(template.nlLogoLightUrl || template.nlLogoDarkUrl) && (
+                  <div className="mb-3 grid grid-cols-2 gap-3">
+                    {/* Light variant on a dark swatch */}
+                    <div className="rounded-lg border border-border p-2">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground">Light (dark bg)</span>
+                        <label className="cursor-pointer text-[11px] text-blue-600 hover:underline">
+                          Replace
+                          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => onOverrideUpload(e, 'light')} className="hidden" />
+                        </label>
+                      </div>
+                      <div className="flex h-20 items-center justify-center rounded" style={{ backgroundColor: '#011328' }}>
+                        {template.nlLogoLightUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={template.nlLogoLightUrl} alt="Light logo" className="max-h-16 max-w-[90%]" />
+                        ) : (
+                          <span className="text-[11px] text-white/50">—</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Dark variant on a light swatch */}
+                    <div className="rounded-lg border border-border p-2">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground">Dark (light bg)</span>
+                        <label className="cursor-pointer text-[11px] text-blue-600 hover:underline">
+                          Replace
+                          <input type="file" accept="image/png,image/svg+xml" onChange={(e) => onOverrideUpload(e, 'dark')} className="hidden" />
+                        </label>
+                      </div>
+                      <div className="flex h-20 items-center justify-center rounded" style={{ backgroundColor: '#f5f5f5' }}>
+                        {template.nlLogoDarkUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={template.nlLogoDarkUrl} alt="Dark logo" className="max-h-16 max-w-[90%]" />
+                        ) : (
+                          <span className="text-[11px] text-black/40">—</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {template.nlLogoSourceUrl && (
+                  <div className="mb-3 flex items-center gap-3">
+                    <button
+                      onClick={processSourceLogo}
+                      disabled={processingLogo}
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Re-process
+                    </button>
+                    <button onClick={() => removeLogoSlot('source')} disabled={uploadingLogo} className="text-xs text-red-600 hover:underline">
+                      Remove logo
                     </button>
                   </div>
-                ) : null}
-                <div className="flex items-center gap-3">
-                  <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={uploadLogo} className="text-sm" />
-                  {uploadingLogo && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                )}
+
+                {/* Header / footer placement: variant + size */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Header logo</label>
+                    <select
+                      value={template.nlHeaderLogoVariant || 'auto'}
+                      onChange={(e) => setT('nlHeaderLogoVariant', e.target.value)}
+                      className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    >
+                      <option value="auto">Auto (by header colour)</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">
+                      Width: {parseInt(template.nlLogoWidth || '0', 10) || 320}px
+                    </label>
+                    <input type="range" min={120} max={600} step={10} value={parseInt(template.nlLogoWidth || '0', 10) || 320} onChange={(e) => setT('nlLogoWidth', e.target.value)} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Footer logo</label>
+                    <select
+                      value={template.nlFooterLogoVariant || 'auto'}
+                      onChange={(e) => setT('nlFooterLogoVariant', e.target.value)}
+                      className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    >
+                      <option value="auto">Auto (by footer colour)</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">
+                      Width: {parseInt(template.nlFooterLogoWidth || '0', 10) || 200}px
+                    </label>
+                    <input type="range" min={100} max={500} step={10} value={parseInt(template.nlFooterLogoWidth || '0', 10) || 200} onChange={(e) => setT('nlFooterLogoWidth', e.target.value)} className="w-full" />
+                  </div>
                 </div>
-                <label className="mb-1 mt-3 block text-xs font-medium text-muted-foreground">
-                  Logo width: {parseInt(template.nlLogoWidth || '0', 10) || 320}px
-                </label>
-                <input
-                  type="range"
-                  min={120}
-                  max={600}
-                  step={10}
-                  value={parseInt(template.nlLogoWidth || '0', 10) || 320}
-                  onChange={(e) => setT('nlLogoWidth', e.target.value)}
-                  className="w-full"
+
+                {/* Footer disclaimer */}
+                <label className="mb-1 mt-4 block text-xs font-medium text-muted-foreground">Footer disclaimer</label>
+                <textarea
+                  value={template.nlFooterDisclaimer || ''}
+                  onChange={(e) => setT('nlFooterDisclaimer', e.target.value)}
+                  rows={3}
+                  placeholder="If you follow a link in this email and make a purchase, we may earn a small commission…"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>

@@ -302,7 +302,8 @@ export async function generateWithFalAI(
  * @param apiKey - Gemini API key
  * @param prompt - Image generation prompt
  * @param model - Model id (e.g. "gemini-3.1-flash-image")
- * @param aspectRatio - imageConfig aspect ratio ("1:1", "4:5", "16:9", …)
+ * @param aspectRatio - imageConfig aspect ratio ("1:1", "4:5", "16:9", …) — ignored when inputImage is set (the input drives the canvas)
+ * @param inputImage - optional base64 image for image-to-image editing (e.g. logo recolor)
  * @returns Buffer containing the generated image
  * @throws if the response contains no image part (callers may fall back)
  */
@@ -310,15 +311,20 @@ export async function generateWithGeminiImage(
   apiKey: string,
   prompt: string,
   model: string = 'gemini-3.1-flash-image',
-  aspectRatio: string = '1:1'
+  aspectRatio: string = '1:1',
+  inputImage?: { mimeType: string; data: string }
 ): Promise<Buffer> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const reqParts: Array<Record<string, unknown>> = []
+  if (inputImage) reqParts.push({ inline_data: { mime_type: inputImage.mimeType, data: inputImage.data } })
+  reqParts.push({ text: prompt })
+  const generationConfig: Record<string, unknown> = { responseModalities: ['IMAGE'] }
+  // For text-to-image we request an aspect ratio; for editing we let the input
+  // image define the canvas (Gemini preserves it).
+  if (!inputImage) generationConfig.imageConfig = { aspectRatio }
   const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseModalities: ['IMAGE'],
-      imageConfig: { aspectRatio },
-    },
+    contents: [{ parts: reqParts }],
+    generationConfig,
   }
 
   const response = await fetch(url, {

@@ -862,8 +862,16 @@ model BrandSettings {
   nlSectionColor2     String?
   nlSectionColor3     String?
   nlSectionColor4     String?
-  nlLogoUrl           String?
-  nlLogoWidth         Int?
+  nlLogoUrl           String? // legacy single newsletter logo (read fallback)
+  nlLogoWidth         Int? // header logo width (px)
+  // Auto-generated light/dark logo variants (one upload → white + navy transparent)
+  nlLogoSourceUrl     String? // original upload, kept so re-processing needs no re-upload
+  nlLogoLightUrl      String? // white-on-transparent (for dark backgrounds)
+  nlLogoDarkUrl       String? // navy-on-transparent (for light backgrounds)
+  nlHeaderLogoVariant String? // 'auto' | 'light' | 'dark' (default auto)
+  nlFooterLogoVariant String? // 'auto' | 'light' | 'dark' (default auto)
+  nlFooterLogoWidth   Int? // footer logo width (px)
+  nlFooterDisclaimer  String? @db.Text // editable footer disclaimer (renderer has a default)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -418,6 +418,10 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     ? `<img src="${esc(theme.footerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.footerLogoWidth}" style="display:block;width:100%;max-width:${theme.footerLogoWidth}px;height:auto;margin:0 auto 18px;" />`
     : ''
 
+  // Footer text flips with the background (synced with the logo/icon variant):
+  // white on a dark footer, dark navy on a light footer.
+  const footerText = theme.footerIconVariant === 'light' ? '#ffffff' : '#00142b'
+
   // Stacked address: L1 street, L2 city/state/zip/country, L3 phone.
   // Falls back to the legacy combined organizationAddress when structured fields are empty.
   const street = [brand.addressLine1, brand.addressLine2].filter(Boolean).join(', ')
@@ -442,7 +446,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     : ''
 
   const contactLine = brand.organizationEmail
-    ? `<div style="margin-top:6px;"><a href="mailto:${esc(brand.organizationEmail)}" style="color:#ffffff;"><u>${esc(brand.organizationEmail)}</u></a></div>`
+    ? `<div style="margin-top:6px;"><a href="mailto:${esc(brand.organizationEmail)}" style="color:${footerText};"><u>${esc(brand.organizationEmail)}</u></a></div>`
     : ''
 
   const socialItems = (brand.socialMediaLinks ?? [])
@@ -466,7 +470,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
 
   rows.push(
     `<tr><td style="background-color:${theme.footerBg};padding:60px 24px 32px;">
-      <div style="font-family:${theme.fontStack};font-size:13px;color:#ffffff;text-align:center;line-height:1.6;">
+      <div style="font-family:${theme.fontStack};font-size:13px;color:${footerText};text-align:center;line-height:1.6;">
         ${footerLogo}
         ${nameLine}
         ${addrLine}
@@ -474,7 +478,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
         ${socialRow}
         <div style="font-size:11px;opacity:0.7;margin-top:18px;">${disclaimer}</div>
         <div style="font-size:11px;opacity:0.85;margin-top:12px;">You're receiving this because you subscribed.</div>
-        <div style="font-size:11px;opacity:0.85;margin-top:10px;"><a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a></div>
+        <div style="font-size:11px;opacity:0.85;margin-top:10px;"><a href="${UNSUBSCRIBE_MERGE}" style="color:${footerText};"><u>Unsubscribe here</u></a></div>
         <div style="font-size:11px;opacity:0.85;margin-top:10px;">Have questions? Just reply to this email.</div>
       </div>
     </td></tr>`,

@@ -215,6 +215,34 @@ export async function deleteS3Prefix(prefix: string): Promise<void> {
 }
 
 /**
+ * Delete every object under `prefix` EXCEPT `keepKey`. Used to garbage-collect
+ * superseded versions of an asset that uses unique (time-tokened) keys — call it
+ * right after uploading the new version so prior versions don't accumulate.
+ * Best-effort: never throws (cleanup must not break the caller).
+ */
+export async function deleteOldVersions(prefix: string, keepKey: string): Promise<number> {
+  try {
+    const s3 = getS3Client()
+    const bucket = getBucket()
+    const stale: string[] = []
+    let continuationToken: string | undefined
+    do {
+      const list = await s3.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken }),
+      )
+      for (const o of list.Contents ?? []) {
+        if (o.Key && o.Key !== keepKey) stale.push(o.Key)
+      }
+      continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined
+    } while (continuationToken)
+    await deleteS3Keys(stale)
+    return stale.length
+  } catch {
+    return 0
+  }
+}
+
+/**
  * Read an object from S3 by its key and return its body as a Buffer.
  * Used server-side to proxy private/CORS-restricted objects to the browser.
  */

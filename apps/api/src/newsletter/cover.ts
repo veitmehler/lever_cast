@@ -7,7 +7,7 @@
  * the text is composited, not generated). Returns the S3 URL.
  */
 import { prisma } from '@socioply/shared'
-import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey } from '@socioply/shared'
+import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
 import { getDiagramRasterBrowser } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
@@ -179,11 +179,10 @@ export async function generateCoverImage(
     try {
       const prompt = buildCoverPrompt(items, params.industry, params.who, styleGuide)
       const buf = await generateWithGeminiImage(geminiKey, prompt, model, '1:1')
-      const { url } = await uploadBufferWithKey(
-        `newsletter/${params.keyPrefix}-cover-${vtoken()}.png`,
-        buf,
-        'image/png',
-      )
+      const base = `newsletter/${params.keyPrefix}-cover-`
+      const key = `${base}${vtoken()}.png`
+      const { url } = await uploadBufferWithKey(key, buf, 'image/png')
+      await deleteOldVersions(base, key) // GC superseded cover versions
       return { summaryTitle: null, summaryImageUrl: url }
     } catch (err) {
       logger.warn({ err }, '[newsletter/cover] Gemini cover failed; falling back to icon composite')

@@ -9,6 +9,8 @@ const brand: RenderBrand = {
   organizationEmail: 'hello@acme.test',
   organizationPhone: '+1 555 0100',
   organizationLogoUrl: 'https://cdn.example.com/orglogo.png',
+  nlLogoLightUrl: 'https://cdn.example.com/logo-light.png',
+  nlLogoDarkUrl: 'https://cdn.example.com/logo-dark.png',
   socialMediaLinks: [
     { platform: 'instagram', url: 'https://instagram.com/acme' },
     { platform: 'twitter', url: 'https://x.com/acme' },
@@ -56,7 +58,7 @@ describe('renderNewsletterHtml', () => {
     // preheader + cover image + logo
     expect(html).toContain('This month: back pain myths busted')
     expect(html).toContain('https://cdn.example.com/cover.png')
-    expect(html).toContain('https://cdn.example.com/logo.png')
+    expect(html).toContain('https://cdn.example.com/logo-light.png') // header logo (dark header bg → light variant)
     // brand colors
     expect(html).toContain('#0d1b2a') // header bg
     expect(html).toContain('#eef2f7') // footer bg
@@ -109,12 +111,43 @@ describe('renderNewsletterHtml', () => {
     expect(html).not.toContain("In Today's Edition")
   })
 
+  it('auto-picks logo variant by background luminance (header dark → light, footer light → dark)', () => {
+    const html = renderNewsletterHtml(full, brand) // header bg #0d1b2a (dark), footer bg #eef2f7 (light)
+    const headerEnd = html.indexOf('In this issue')
+    expect(html.slice(0, headerEnd)).toContain('logo-light.png') // dark header → white logo
+    expect(html).toContain('logo-dark.png') // light footer → dark logo
+  })
+
+  it('honors an explicit logo variant override', () => {
+    const html = renderNewsletterHtml(full, { ...brand, nlHeaderLogoVariant: 'dark' })
+    const headerEnd = html.indexOf('In this issue')
+    expect(html.slice(0, headerEnd)).toContain('logo-dark.png')
+  })
+
+  it('stacks the address (street / city-state-zip-country / phone) from structured fields', () => {
+    const html = renderNewsletterHtml(full, {
+      ...brand,
+      addressLine1: '12 Ocean Rd',
+      addressLocality: 'Buddina',
+      addressRegion: 'QLD',
+      postalCode: '4575',
+      addressCountryName: 'Australia',
+    })
+    expect(html).toContain('12 Ocean Rd')
+    expect(html).toContain('Buddina, QLD 4575 Australia')
+  })
+
+  it('uses a custom footer disclaimer when set', () => {
+    const html = renderNewsletterHtml(full, { ...brand, nlFooterDisclaimer: 'Custom disclaimer XYZ.' })
+    expect(html).toContain('Custom disclaimer XYZ.')
+  })
+
   it('renders a full footer: contact, social icons, unsubscribe merge field', () => {
     const html = renderNewsletterHtml(full, brand)
     expect(html).toContain('mailto:hello@acme.test')
     expect(html).toContain('+1 555 0100')
     expect(html).toContain('123 Main St, Springfield')
-    expect(html).toContain('https://cdn.example.com/orglogo.png') // footer logo
+    expect(html).toContain('https://cdn.example.com/logo-dark.png') // footer logo (light footer bg → dark variant)
     // social icons: instagram + x (twitter→x alias); unknown platform skipped
     expect(html).toContain('/newsletter/social/instagram.png')
     expect(html).toContain('/newsletter/social/x.png')

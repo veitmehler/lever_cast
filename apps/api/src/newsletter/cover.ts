@@ -29,23 +29,32 @@ Background: Use a solid, deep matte indigo-blue/dark navy background. Strictly n
 
 Line Work: Render all subjects using continuous, fine, uniform-weight outlines. Strictly no solid color fills or shading within the subjects — rely entirely on minimalist contour lines.
 
-Color Palette (Strict Duo-Tone):
-- Primary Line Color: Cool, luminescent white or icy blue (used for the main subjects, structural outlines, and typography).
-- Accent Line Color: Warm, burnished copper or orange-gold (used sparingly for highlights, secondary details, and motion indicators).
+Color Palette (Strict Duo-Tone — only these two ink colors, nothing else):
+- Primary Line Color: Pure bright white (used for the main subjects, structural outlines, and typography). Do NOT use blue or any other color for the line work — the lines and text are white only.
+- Accent Line Color: Warm, burnished copper / brown-gold (used sparingly for highlights, secondary details, and motion indicators). This is the ONLY non-white color in the artwork.
 
-Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white/icy blue color.
+Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif font using the primary white color.
 
 Lighting & Finish: Apply a very subtle, soft luminescent glow (like a faint neon effect) to all lines and text so they pop crisply against the dark background.`
 
-/** Compose the one-shot cover prompt: what to depict + short-label rules + style guide. */
+/** Compose the one-shot cover prompt: what to depict + label/dedupe rules + style guide. */
 function buildCoverPrompt(items: CoverItem[], industry: string, who: string, styleGuide: string): string {
-  const topics = items.map((i) => `- ${i.headline}`).join('\n')
+  // Drop exact-duplicate headlines; the prompt also tells the model to merge
+  // near-duplicate themes so the same concept is never drawn twice.
+  const seen = new Set<string>()
+  const unique = items.filter((i) => {
+    const k = i.headline.trim().toLowerCase()
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  const topics = unique.map((i) => `- ${i.headline}`).join('\n')
   return `Create a single MAGAZINE-COVER infographic that is a catchy visual summary of this ${industry || 'wellness'} newsletter edition${who ? ` for this audience: ${who}` : ''}.
 
-Show 4-6 of these as small illustrated icons/vignettes arranged in ONE balanced composition, each with a SHORT all-caps label (1-3 words, correctly spelled, exactly one label per icon, no duplicate labels):
+Show these as small illustrated icons/vignettes arranged in ONE balanced composition, each with its own short all-caps label (correctly spelled):
 ${topics}
 
-Only short labels — no sentences, no paragraphs, no body text, no fake or garbled lettering. Fill the entire square frame with the artwork — no empty banner and no large title text (a title and date are added outside the image). Square 1:1 composition.
+Each distinct topic gets exactly ONE icon and ONE label. If two topics cover the same theme (e.g. both about recovery), MERGE them into a single icon — never draw the same concept twice and never repeat a label. No sentences, no paragraphs, no body text, no fake or garbled lettering. Fill the entire square frame with the artwork — no empty banner and no large title text (a title and date are added outside the image). Square 1:1 composition.
 
 ${styleGuide}`
 }

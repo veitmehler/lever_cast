@@ -154,8 +154,9 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('https://instagram.com/acme')
     expect(html).not.toContain('u.test')
     // unsubscribe as a merge field with our own wording
-    expect(html).toContain('{{unsubscribe_url}}')
+    expect(html).toContain('{{email.unsubscribe_link}}')
     expect(html).toContain('Unsubscribe here')
+    expect(html).toContain('Have questions? Just reply to this email.')
   })
 
   it('falls back to a voiced title when a teaser has no real headline', () => {

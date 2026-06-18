@@ -142,7 +142,9 @@ async function approveOne(
     await prisma.newsletter.update({ where: { id: newsletterId }, data: { ghlCampaignId: campaignId } })
   }
 
-  const sendAtUtc = computeSendAt(nl.topic.date, config.sendTime, config.timezone)
+  // topic.date is a date-only value (UTC midnight) → read its day in UTC so the
+  // edition sends on the date the user picked, regardless of their timezone.
+  const sendAtUtc = computeSendAt(nl.topic.date, config.sendTime, config.timezone, new Date(), true)
   const sendAtLocal = formatLocalSendAt(sendAtUtc, config.timezone)
   try {
     await scheduleGhlEmailCampaign({

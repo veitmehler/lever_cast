@@ -75,9 +75,20 @@ export function computeSendAt(
   sendTime: string,
   timezone: string,
   now: Date = new Date(),
+  // The newsletter passes a date-only value stored at UTC midnight (the calendar
+  // day the user picked). Read its day in UTC, not in `timezone` — otherwise a
+  // negative-offset zone (e.g. America/New_York) rolls it back one day. The promo
+  // path passes a real publish instant and wants the day in the user's zone.
+  publishDateInUtc = false,
 ): Date {
   const [hour, minute] = sendTime.split(':').map((n) => parseInt(n, 10))
-  const { year, month, day } = calendarDateInZone(publishingDate, timezone)
+  const { year, month, day } = publishDateInUtc
+    ? {
+        year: publishingDate.getUTCFullYear(),
+        month: publishingDate.getUTCMonth() + 1,
+        day: publishingDate.getUTCDate(),
+      }
+    : calendarDateInZone(publishingDate, timezone)
   const target = zonedWallTimeToUtc(year, month, day, hour, minute, timezone)
 
   const earliest = new Date(now.getTime() + GHL_MIN_SCHEDULE_LEAD_MS)

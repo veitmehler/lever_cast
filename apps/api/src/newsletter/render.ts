@@ -102,6 +102,7 @@ interface Theme {
   headerBg: string
   footerBg: string
   sections: string[] // 4 band colors, cycled
+  fontFamily: string
   fontStack: string
   fontColor: string
   headingWeight: string
@@ -114,6 +115,12 @@ interface Theme {
 }
 
 const FALLBACK_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+const DEFAULT_FONT = 'Open Sans'
+// Google Fonts we offer in the editor — emails get a <link> import so supporting
+// clients (Apple Mail, etc.) render them; others fall back to the stack.
+const GOOGLE_FONTS = new Set([
+  'Open Sans', 'Roboto', 'Lato', 'Montserrat', 'Poppins', 'Merriweather', 'Playfair Display',
+])
 const HEADING_STACK = "'Trebuchet MS', 'Segoe UI', Helvetica, Arial, sans-serif"
 
 /** Perceived luminance of a #rrggbb colour (0–255); < 140 ≈ a dark background. */
@@ -139,7 +146,7 @@ function pickLogo(brand: RenderBrand, variant: string | null | undefined, bg: st
 }
 
 function resolveTheme(brand: RenderBrand): Theme {
-  const primary = brand.nlFontFamily?.trim()
+  const primary = brand.nlFontFamily?.trim() || DEFAULT_FONT
   const headerBg = brand.nlHeaderBgColor?.trim() || '#fa00bb'
   const footerBg = brand.nlFooterBgColor?.trim() || '#011328'
   return {
@@ -151,7 +158,8 @@ function resolveTheme(brand: RenderBrand): Theme {
       brand.nlSectionColor3?.trim() || '#00142b',
       brand.nlSectionColor4?.trim() || '#00dd81',
     ],
-    fontStack: primary ? `${primary}, ${FALLBACK_FONTS}` : FALLBACK_FONTS,
+    fontFamily: primary,
+    fontStack: `'${primary}', ${FALLBACK_FONTS}`,
     fontColor: brand.nlFontColor?.trim() || '#00142b',
     headingWeight: brand.nlHeadingFontWeight?.trim() || '700',
     bodyWeight: brand.nlBodyFontWeight?.trim() || '400',
@@ -194,9 +202,8 @@ function socialSlug(platform?: string | null): string | null {
   return SOCIAL_ICONS.has(slug) ? slug : null
 }
 
-// GHL/Omniply unsubscribe URL merge field. CONFIRM the exact token in the GHL
-// email builder's merge-field menu — change here if it differs.
-const UNSUBSCRIBE_MERGE = '{{unsubscribe_url}}'
+// GHL/Omniply unsubscribe URL merge field.
+const UNSUBSCRIBE_MERGE = '{{email.unsubscribe_link}}'
 
 /** A white content row. */
 function content(inner: string): string {
@@ -459,14 +466,21 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
         ${contactLine}
         ${socialRow}
         <div style="font-size:11px;opacity:0.7;margin-top:18px;">${disclaimer}</div>
-        <div style="font-size:11px;opacity:0.85;margin-top:12px;">You're receiving this because you subscribed. Questions? Just reply to this email.</div>
+        <div style="font-size:11px;opacity:0.85;margin-top:12px;">You're receiving this because you subscribed.</div>
         <div style="font-size:11px;opacity:0.85;margin-top:10px;"><a href="${UNSUBSCRIBE_MERGE}" style="color:#ffffff;"><u>Unsubscribe here</u></a></div>
+        <div style="font-size:11px;opacity:0.85;margin-top:10px;">Have questions? Just reply to this email.</div>
       </div>
     </td></tr>`,
   )
 
   const preheader = input.previewText
     ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(input.previewText)}</div>`
+    : ''
+
+  // Google Fonts import for the chosen family (supporting clients render it; the
+  // rest fall back to the system stack).
+  const fontLink = GOOGLE_FONTS.has(theme.fontFamily)
+    ? `<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(theme.fontFamily).replace(/%20/g, '+')}:wght@400;600;700&display=swap" rel="stylesheet" />`
     : ''
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -477,6 +491,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta name="color-scheme" content="light dark" />
 <title>Newsletter</title>
+${fontLink}
 <style>
   body { margin:0; padding:0; width:100% !important; -webkit-text-size-adjust:100%; }
   img { border:0; outline:none; text-decoration:none; }

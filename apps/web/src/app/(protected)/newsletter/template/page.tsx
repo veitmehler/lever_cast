@@ -19,6 +19,11 @@ const COLOR_FIELDS: Array<[string, string, string]> = [
   ['nlLinkColor', 'Link color', '#fa00bb'],
 ]
 const WEIGHTS = ['400', '500', '600', '700', '800']
+// Open Sans first = default. Google Fonts (imported in the email) + web-safe fonts.
+const FONT_OPTIONS = [
+  'Open Sans', 'Roboto', 'Lato', 'Montserrat', 'Poppins', 'Merriweather', 'Playfair Display',
+  'Arial', 'Georgia', 'Helvetica', 'Trebuchet MS', 'Times New Roman', 'Verdana',
+]
 
 export default function NewsletterTemplatePage() {
   const [template, setTemplate] = useState<Template>({})
@@ -247,15 +252,18 @@ export default function NewsletterTemplatePage() {
                 </div>
               ))}
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Font family (CSS stack)
-                </label>
-                <input
-                  value={template.nlFontFamily || ''}
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Select a font</label>
+                <select
+                  value={template.nlFontFamily || 'Open Sans'}
                   onChange={(e) => setT('nlFontFamily', e.target.value)}
-                  placeholder="Georgia, serif"
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                />
+                >
+                  {FONT_OPTIONS.map((f) => (
+                    <option key={f} value={f} style={{ fontFamily: f }}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

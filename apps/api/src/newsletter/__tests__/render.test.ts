@@ -118,6 +118,12 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('logo-dark.png') // light footer → dark logo
   })
 
+  it('syncs social icon colour with the footer (dark footer → white icons)', () => {
+    const html = renderNewsletterHtml(full, { ...brand, nlFooterBgColor: '#011328' }) // dark footer
+    expect(html).toContain('/newsletter/social/instagram.png') // white (no -dark suffix)
+    expect(html).not.toContain('/newsletter/social/instagram-dark.png')
+  })
+
   it('honors an explicit logo variant override', () => {
     const html = renderNewsletterHtml(full, { ...brand, nlHeaderLogoVariant: 'dark' })
     const headerEnd = html.indexOf('In this issue')
@@ -148,9 +154,10 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('+1 555 0100')
     expect(html).toContain('123 Main St, Springfield')
     expect(html).toContain('https://cdn.example.com/logo-dark.png') // footer logo (light footer bg → dark variant)
-    // social icons: instagram + x (twitter→x alias); unknown platform skipped
-    expect(html).toContain('/newsletter/social/instagram.png')
-    expect(html).toContain('/newsletter/social/x.png')
+    // social icons: instagram + x (twitter→x alias); unknown platform skipped.
+    // Light footer bg (#eef2f7) → dark icon variant (synced with footer logo).
+    expect(html).toContain('/newsletter/social/instagram-dark.png')
+    expect(html).toContain('/newsletter/social/x-dark.png')
     expect(html).toContain('https://instagram.com/acme')
     expect(html).not.toContain('u.test')
     // unsubscribe as a merge field with our own wording

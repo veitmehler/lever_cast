@@ -112,6 +112,7 @@ interface Theme {
   headerLogoWidth: number
   footerLogoUrl: string | null
   footerLogoWidth: number
+  footerIconVariant: 'light' | 'dark' // social icon colour, synced with the footer logo
 }
 
 const FALLBACK_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
@@ -136,13 +137,17 @@ function luminance(hex: string): number {
  * background luminance (dark bg → white logo, light bg → navy logo). Falls back
  * through the chosen variant → other variant → legacy single logo.
  */
+/** Whether a band should use the LIGHT (white) asset: explicit, else by bg luminance. */
+function wantLight(variant: string | null | undefined, bg: string): boolean {
+  const v = (variant ?? 'auto').toLowerCase()
+  return v === 'light' ? true : v === 'dark' ? false : luminance(bg) < 140
+}
+
 function pickLogo(brand: RenderBrand, variant: string | null | undefined, bg: string): string | null {
   const light = brand.nlLogoLightUrl?.trim() || null
   const dark = brand.nlLogoDarkUrl?.trim() || null
   const legacy = brand.nlLogoUrl?.trim() || brand.organizationLogoUrl?.trim() || null
-  const v = (variant ?? 'auto').toLowerCase()
-  const wantLight = v === 'light' ? true : v === 'dark' ? false : luminance(bg) < 140
-  return wantLight ? light ?? dark ?? legacy : dark ?? light ?? legacy
+  return wantLight(variant, bg) ? light ?? dark ?? legacy : dark ?? light ?? legacy
 }
 
 function resolveTheme(brand: RenderBrand): Theme {
@@ -168,6 +173,7 @@ function resolveTheme(brand: RenderBrand): Theme {
     headerLogoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
     footerLogoUrl: pickLogo(brand, brand.nlFooterLogoVariant, footerBg),
     footerLogoWidth: brand.nlFooterLogoWidth && brand.nlFooterLogoWidth > 0 ? brand.nlFooterLogoWidth : 200,
+    footerIconVariant: wantLight(brand.nlFooterLogoVariant, footerBg) ? 'light' : 'dark',
   }
 }
 
@@ -442,11 +448,12 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   const socialItems = (brand.socialMediaLinks ?? [])
     .map((l) => ({ slug: socialSlug(l.platform), url: (l.url ?? '').trim() }))
     .filter((l): l is { slug: string; url: string } => !!l.slug && !!l.url)
+  const iconSuffix = theme.footerIconVariant === 'dark' ? '-dark' : ''
   const socialRow = socialItems.length
     ? `<div style="margin:20px 0 4px;">${socialItems
         .map(
           (l) =>
-            `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:inline-block;margin:0 7px;"><img src="${SOCIAL_ICON_BASE}/${l.slug}.png" width="26" height="26" alt="${l.slug}" style="display:inline-block;width:26px;height:26px;border:0;" /></a>`,
+            `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:inline-block;margin:0 7px;"><img src="${SOCIAL_ICON_BASE}/${l.slug}${iconSuffix}.png" width="26" height="26" alt="${l.slug}" style="display:inline-block;width:26px;height:26px;border:0;" /></a>`,
         )
         .join('')}</div>`
     : ''
@@ -490,9 +497,13 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
 <title>Newsletter</title>
 ${fontLink}
 <style>
+  /* Declare dark-mode support so clients (Apple Mail/iOS) keep our designed
+     colours instead of auto-inverting the footer, bands, and headings. */
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
   body { margin:0; padding:0; width:100% !important; -webkit-text-size-adjust:100%; }
   img { border:0; outline:none; text-decoration:none; }
   @media only screen and (max-width:680px) { .nl-container { width:100% !important; } }

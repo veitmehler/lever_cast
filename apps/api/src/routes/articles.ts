@@ -467,6 +467,18 @@ export async function articleRoutes(app: FastifyInstance) {
       })
     }
 
+    // Block publishing while a teammate still has open edit requests.
+    if (job.sitePage?.id) {
+      const openEdits = await prisma.articleEditRequest.count({
+        where: { sitePageId: job.sitePage.id, status: 'open' },
+      })
+      if (openEdits > 0) {
+        return reply.status(409).send({
+          error: `Cannot publish: ${openEdits} edit request(s) are still open. Resolve them first.`,
+        })
+      }
+    }
+
     await prisma.articleJob.update({
       where: { id: jobId },
       data: { status: 'published' },

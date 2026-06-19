@@ -652,14 +652,44 @@ model SitePage {
   enrichedAt           DateTime?
   keyTakeawaysHtml     String?               @db.Text
   tocHtml              String?               @db.Text
+  // Collaborative review (Phase 7): null | edits_requested | re_review_requested
+  reviewState          String?
   diagrams             ArticleDiagram[]
   sectionEnrichments   SectionEnrichment[]
   socialAutomationRuns SocialAutomationRun[]
+  editRequests         ArticleEditRequest[]
 
   @@unique([userId, slug])
   @@index([primaryKeyword])
   @@index([userId])
   @@map("site_pages")
+}
+
+// Collaborative edit request (Phase 7): a reviewer highlights text + writes a
+// note, then hands a batch (reviewRoundId) to a teammate. Anchored by text-quote
+// (quotedText + surrounding context) so it survives light edits; rendered as an
+// overlay, never baked into bodyHtml.
+model ArticleEditRequest {
+  id                String    @id @default(cuid())
+  sitePageId        String
+  sitePage          SitePage  @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  reviewRoundId     String // groups one "send to teammate" action
+  requestedByUserId String
+  assigneeEmail     String
+  assigneeUserId    String?
+  quotedText        String    @db.Text
+  prefixContext     String?   @db.Text
+  suffixContext     String?   @db.Text
+  note              String    @db.Text
+  status            String    @default("open") // open | resolved | wont_fix | orphaned
+  resolvedByUserId  String?
+  resolvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([sitePageId])
+  @@index([reviewRoundId])
+  @@map("article_edit_requests")
 }
 
 model SectionEnrichment {

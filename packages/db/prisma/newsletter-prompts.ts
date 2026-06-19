@@ -604,4 +604,27 @@ Typography: Any text labels must be clean, crisp, all-caps, modern sans-serif fo
 Lighting & Finish: Apply a very subtle, soft luminescent glow (like a faint neon effect) to all lines and text so they pop crisply against the dark background.`,
     isActive: true,
   },
+  {
+    // Drafts an offer/promo from a one-line brief. Output is strict JSON.
+    stepNumber: 336,
+    key: 'nl_offer_draft',
+    stepName: 'newsletter_offer_draft',
+    defaultProvider: 'gemini',
+    defaultModel: 'gemini-3.1-flash-lite',
+    systemPrompt: null,
+    userPrompt: `You write short, compelling promotional offers for a business in the {{industry}} industry, speaking to this audience: {{who}}.
+
+From this brief, craft a newsletter offer:
+BRIEF: {{brief}}
+
+Requirements:
+- Punchy, benefit-led, trustworthy. No hype, no ALL-CAPS, no emojis.
+- title: <= 6 words.
+- body: 1-2 short sentences (~30 words) that make the reader want to act.
+- ctaLabel: 2-4 words (e.g. "Book Now", "Claim Offer").
+
+Output STRICT JSON only (no markdown, no commentary):
+{"title": "...", "body": "...", "ctaLabel": "..."}`,
+    isActive: true,
+  },
 ]

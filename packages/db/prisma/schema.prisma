@@ -47,6 +47,7 @@ model User {
   newsletterCalendarId String?
   newsletterCalendar   NewsletterCalendar? @relation("UserNewsletterCalendar", fields: [newsletterCalendarId], references: [id], onDelete: SetNull)
   newsletters          Newsletter[]
+  newsletterOffers     NewsletterOffer[]
 
   @@index([newsletterCalendarId])
   @@map("users")
@@ -966,4 +967,27 @@ model Newsletter {
   @@index([userId, status])
   @@index([topicId])
   @@map("newsletters")
+}
+
+// Per-customer promotional offers included in their newsletter. Evergreen
+// (no dates) render after the feature article; seasonal (date window) render
+// after "Tips Of The Day" and auto-expire.
+model NewsletterOffer {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String    @db.Text
+  ctaLabel  String?
+  ctaUrl    String?
+  imageUrl  String?   @db.Text // optional 16:9 banner (AI-generated or uploaded)
+  startDate DateTime? // null + null endDate = evergreen
+  endDate   DateTime?
+  enabled   Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, enabled])
+  @@map("newsletter_offers")
 }

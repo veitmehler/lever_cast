@@ -84,9 +84,19 @@ export interface RenderBrand {
   nlLinkColor?: string | null
 }
 
+export interface RenderOffer {
+  title: string
+  body: string
+  ctaLabel?: string | null
+  ctaUrl?: string | null
+  imageUrl?: string | null
+}
+
 export interface RenderInput {
   featureArticle?: RenderArticle | null
   secondaryArticle?: RenderArticle | null
+  evergreenOffer?: RenderOffer | null // after the feature article
+  seasonalOffer?: RenderOffer | null // after Tips Of The Day
   teasers?: RenderTeaser[] | null
   quickHits?: { tips: string[]; facts: string[] } | null
   fun?: { triviaQuestion: string | null; triviaAnswer: string | null; joke: string | null } | null
@@ -246,6 +256,22 @@ function readMoreButton(link: string, theme: Theme, label = 'Read full article �
   return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.linkColor};text-decoration:none;border:2px solid ${theme.linkColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
 }
 
+/** A promotional offer card: accent band + optional 16:9 banner + headline + pitch + filled CTA. */
+function offerCard(offer: RenderOffer, theme: Theme, accent: string): string {
+  const img = offer.imageUrl
+    ? `<img src="${esc(offer.imageUrl)}" width="624" alt="${esc(offer.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
+    : ''
+  const cta = offer.ctaUrl
+    ? `<div style="margin-top:18px;"><a href="${esc(offer.ctaUrl)}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:#ffffff;background-color:${accent};text-decoration:none;border-radius:6px;padding:12px 28px;">${esc(offer.ctaLabel || 'Learn More')}</a></div>`
+    : ''
+  const inner = `${img}<h2 style="margin:0 0 12px;font-family:${HEADING_STACK};font-size:24px;font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(offer.title)}</h2>${para(`<p style="margin:0;">${esc(offer.body)}</p>`, theme, 'center')}${cta}`
+  return (
+    band('Special Offer', accent, theme) +
+    `<tr><td style="background-color:#ffffff;padding:32px 28px;text-align:center;">${inner}</td></tr>` +
+    spacer()
+  )
+}
+
 function articleBlock(a: RenderArticle, theme: Theme, showTitle = true): string {
   const img = a.imageUrl
     ? `<img src="${esc(a.imageUrl)}" width="624" alt="${esc(a.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
@@ -299,6 +325,7 @@ export function buildRenderInput(
   },
   video?: RenderVideo | null,
   editionDate?: Date | string | null,
+  offers?: { evergreen?: RenderOffer | null; seasonal?: RenderOffer | null },
 ): RenderInput {
   const qh = nl.quickHits as { tips?: string[]; facts?: string[] } | null | undefined
   return {
@@ -312,6 +339,8 @@ export function buildRenderInput(
     video: video ?? null,
     summaryImageUrl: nl.summaryImageUrl ?? null,
     editionDate: editionDate ?? null,
+    evergreenOffer: offers?.evergreen ?? null,
+    seasonalOffer: offers?.seasonal ?? null,
   }
 }
 
@@ -385,6 +414,9 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     section('Tips Of The Day', bulletList(input.quickHits.tips, theme), pink)
   }
 
+  // Seasonal offer (after Tips)
+  if (input.seasonalOffer) rows.push(offerCard(input.seasonalOffer, theme, green))
+
   // Teaser 2 (curated → light blue)
   if (teasers[1]) section(teaserHeading(teasers[1]), teaserBlock(teasers[1], theme), lightBlue)
 
@@ -393,6 +425,9 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
 
   // Feature article (navy)
   if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme), navy)
+
+  // Evergreen offer (after the feature)
+  if (input.evergreenOffer) rows.push(offerCard(input.evergreenOffer, theme, green))
 
   // Teaser 3 (curated → light blue)
   if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme), lightBlue)

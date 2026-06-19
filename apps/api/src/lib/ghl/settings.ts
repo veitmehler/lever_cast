@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { ghlSettingsForUser } from '@socioply/shared'
 import { decrypt, encrypt } from '@socioply/shared'
 import type { GhlAccountIds } from './types'
 
@@ -10,7 +10,7 @@ export interface GhlCredentials {
 }
 
 export async function getGhlCredentials(userId: string): Promise<GhlCredentials | null> {
-  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  const row = await ghlSettingsForUser(userId)
   if (!row?.ghlApiKey || !row.ghlLocationId || !row.ghlUserId) {
     return null
   }
@@ -58,7 +58,7 @@ export interface PromoEmailConfig {
  * and a target tag. Otherwise null so callers can cheaply skip.
  */
 export async function getPromoEmailConfig(userId: string): Promise<PromoEmailConfig | null> {
-  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  const row = await ghlSettingsForUser(userId)
   if (
     !row?.promoEmailEnabled ||
     !row.ghlApiKey ||
@@ -102,7 +102,7 @@ export interface NewsletterEmailConfig {
  * email. Otherwise null so the approve route can return a clear error.
  */
 export async function getNewsletterEmailConfig(userId: string): Promise<NewsletterEmailConfig | null> {
-  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  const row = await ghlSettingsForUser(userId)
   if (
     !row?.ghlApiKey ||
     !row.ghlLocationId ||

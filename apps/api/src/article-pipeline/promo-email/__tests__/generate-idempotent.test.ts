@@ -17,6 +17,7 @@ vi.mock('@socioply/shared', () => ({
     brandSettings: { findUnique: vi.fn().mockResolvedValue(null) },
     promptTemplate: { findUnique: (...a: unknown[]) => promptFindUnique(...a) },
   },
+  brandSettingsForUser: vi.fn().mockResolvedValue(null),
 }))
 
 const adapterCall = vi.fn()

@@ -18,7 +18,7 @@
  */
 
 import type { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { StepRunner } from './step-runner'
@@ -314,7 +314,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
 
   try {
     const [brand, platformSettings, sitePage] = await Promise.all([
-      prisma.brandSettings.findUnique({ where: { userId } }),
+      brandSettingsForUser(userId),
       prisma.platformSettings.findUnique({ where: { id: 'singleton' } }),
       prisma.sitePage.findUnique({
         where: { jobId },

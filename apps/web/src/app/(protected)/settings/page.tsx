@@ -10,6 +10,7 @@ import { DiagramStyleSection } from '@/features/settings/DiagramStyleSection'
 import { ArticleTypographySection } from '@/features/settings/ArticleTypographySection'
 import { WordPressSection } from '@/features/settings/WordPressSection'
 import { ConnectedAccountsSection } from '@/features/settings/ConnectedAccountsSection'
+import { TeamSection } from '@/features/settings/TeamSection'
 import { useSettingsData } from '@/features/settings/useSettingsData'
 import { useSocialConnections } from '@/features/settings/useSocialConnections'
 
@@ -30,6 +31,8 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         <AppearanceSection />
+
+        <TeamSection />
 
         <WritingStyleSection settings={settings} />
 

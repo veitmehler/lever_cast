@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma, accountMemberIdsForUser } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import {
   generateCarouselAssets,
@@ -286,7 +286,7 @@ export async function socialRoutes(app: FastifyInstance) {
 
     const { jobId } = request.params as { jobId: string }
     const row = await prisma.videoGenerationJob.findUnique({ where: { id: jobId } })
-    if (!row || row.userId !== user.id) {
+    if (!row || !(await accountMemberIdsForUser(user.id)).includes(row.userId)) {
       return reply.status(404).send({ error: 'Video job not found' })
     }
 

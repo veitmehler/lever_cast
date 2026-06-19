@@ -14,6 +14,24 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// A tenant: up to 3 Users share one Account with equal permissions. Brand-level
+// singletons (BrandSettings, GhlSettings, newsletter routing) and all content are
+// shared across an Account's members.
+model Account {
+  id          String   @id @default(cuid())
+  name        String?
+  ownerUserId String?  @unique // the creating user (scalar, not a relation, to avoid a 2nd User↔Account relation)
+  // Default "assistant" recipient for collaborative edit requests (Phase 7);
+  // overridable per send. Usually one of the account's members.
+  assistantEmail String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members User[] @relation("AccountMembers")
+
+  @@map("accounts")
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -22,6 +40,10 @@ model User {
   role      String   @default("user") // user | admin
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Account membership (tenant). Nullable during rollout; backfilled 1 account per user.
+  accountId String?
+  account   Account? @relation("AccountMembers", fields: [accountId], references: [id], onDelete: SetNull)
 
   // Relations
   drafts               Draft[]
@@ -50,6 +72,7 @@ model User {
   newsletterOffers     NewsletterOffer[]
 
   @@index([newsletterCalendarId])
+  @@index([accountId])
   @@map("users")
 }
 

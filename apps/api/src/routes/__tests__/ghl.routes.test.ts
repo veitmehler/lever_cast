@@ -22,6 +22,10 @@ vi.mock('@socioply/shared', () => ({
   decrypt: (v: string) => `dec(${v})`,
   encrypt: (v: string) => `enc(${v})`,
   maskApiKey: (v: string) => `mask(${v})`,
+  // Account-scoped helpers: keep driving the existing ghlFindUnique mock and
+  // treat the caller as their own account owner (single-member account in tests).
+  ghlSettingsForUser: (userId: string) => ghlFindUnique({ where: { userId } }),
+  canonicalAccountUserId: (userId: string) => userId,
 }))
 
 const getGhlOAuthStartUrl = vi.fn()

@@ -11,7 +11,7 @@
  * with the content populated.
  */
 import { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
@@ -483,7 +483,7 @@ export async function renderAndSave(newsletterId: string): Promise<string> {
     include: { topic: true },
   })
   if (!nl) throw new Error(`Newsletter ${newsletterId} not found`)
-  const brandRow = await prisma.brandSettings.findUnique({ where: { userId: nl.userId } })
+  const brandRow = await brandSettingsForUser(nl.userId)
   const research = (nl.topic.research as TopicResearch | null) ?? {}
   const video = (research.video as RenderVideo | undefined) ?? null
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser, ghlSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
 import {
@@ -375,8 +375,8 @@ export async function newsletterRoutes(app: FastifyInstance) {
     const userId = await resolveUserId(clerkId)
     if (!userId) return reply.status(404).send({ error: 'User not found' })
 
-    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
-    const ghl = await prisma.ghlSettings.findUnique({ where: { userId } })
+    const brand = await brandSettingsForUser(userId)
+    const ghl = await ghlSettingsForUser(userId)
 
     const template = pick(brand as Record<string, unknown> | null, TEMPLATE_FIELDS)
     template.nlLogoWidth = brand?.nlLogoWidth ?? null
@@ -417,6 +417,8 @@ export async function newsletterRoutes(app: FastifyInstance) {
       if (!userId) return reply.status(404).send({ error: 'User not found' })
 
       const { template, delivery } = request.body ?? {}
+      // Brand + GHL are account-shared singletons → write to the account owner's row.
+      const ownerUserId = await canonicalAccountUserId(userId)
 
       if (template) {
         const data: Record<string, string | number | null> = {}
@@ -431,8 +433,8 @@ export async function newsletterRoutes(app: FastifyInstance) {
         }
         if (Object.keys(data).length > 0) {
           await prisma.brandSettings.upsert({
-            where: { userId },
-            create: { userId, ...data },
+            where: { userId: ownerUserId },
+            create: { userId: ownerUserId, ...data },
             update: data,
           })
         }
@@ -445,8 +447,8 @@ export async function newsletterRoutes(app: FastifyInstance) {
         }
         if (Object.keys(data).length > 0) {
           await prisma.ghlSettings.upsert({
-            where: { userId },
-            create: { userId, ...data },
+            where: { userId: ownerUserId },
+            create: { userId: ownerUserId, ...data },
             update: data,
           })
         }
@@ -465,7 +467,7 @@ export async function newsletterRoutes(app: FastifyInstance) {
       const userId = await resolveUserId(clerkId)
       if (!userId) return reply.status(404).send({ error: 'User not found' })
 
-      const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+      const brand = await brandSettingsForUser(userId)
       // Overlay any unsaved edits from the request on top of the saved brand.
       const t = request.body?.template ?? {}
       const s = (k: string) => (t[k] as string) ?? (brand as Record<string, unknown> | null)?.[k] ?? null
@@ -514,14 +516,14 @@ export async function newsletterRoutes(app: FastifyInstance) {
     const userId = await resolveUserId(clerkId)
     if (!userId) return reply.status(404).send({ error: 'User not found' })
 
-    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    const brand = await brandSettingsForUser(userId)
     const sourceUrl = brand?.nlLogoSourceUrl
     if (!sourceUrl) return reply.status(400).send({ error: 'No source logo uploaded yet' })
 
     try {
       const { lightUrl, darkUrl } = await processLogo(userId, sourceUrl)
       await prisma.brandSettings.update({
-        where: { userId },
+        where: { userId: await canonicalAccountUserId(userId) },
         data: { nlLogoLightUrl: lightUrl, nlLogoDarkUrl: darkUrl },
       })
       return reply.send({ lightUrl, darkUrl })
@@ -621,7 +623,7 @@ export async function newsletterRoutes(app: FastifyInstance) {
     const geminiKey = await getSystemApiKey('gemini')
     if (!geminiKey) return reply.status(400).send({ error: 'Gemini API key not configured' })
 
-    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    const brand = await brandSettingsForUser(userId)
     const prompt = `High-quality, eye-catching advertising banner photo for this promotional offer: "${offer.title}". ${offer.body}. Industry: ${brand?.industry || 'wellness'}. A clean, modern, inviting promotional visual with a strong focal subject and professional lighting. NO text, NO words, NO letters, NO logos in the image — purely a visual. 16:9 banner.`
     try {
       const buf = await generateWithGeminiImage(geminiKey, prompt, 'gemini-3.1-flash-image', '16:9')
@@ -645,7 +647,7 @@ export async function newsletterRoutes(app: FastifyInstance) {
     if (!userId) return reply.status(404).send({ error: 'User not found' })
     const brief = (request.body?.brief ?? '').trim()
     if (!brief) return reply.status(400).send({ error: 'Brief is required' })
-    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    const brand = await brandSettingsForUser(userId)
     try {
       const { content } = await runNewsletterPrompt('nl_offer_draft', {
         brief,

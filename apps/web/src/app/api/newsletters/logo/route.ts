@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 
 // Newsletter logo upload. `slot` selects what's being uploaded:
 //   source (default) → BrandSettings.nlLogoSourceUrl (then the API processes it
@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     const newKey = `brand-assets/${userId}/${slot.name}.${ext}`
-    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { [slot.field]: true } })
+    const ownerUserId = await canonicalAccountUserId(userId)
+    const existing = await brandSettingsForUser(userId)
     const prev = (existing as Record<string, string | null> | null)?.[slot.field]
     if (prev) {
       const oldKey = keyFromUrl(prev)
@@ -93,8 +94,8 @@ export async function POST(request: NextRequest) {
     const url = `${getCdnBase()}/${newKey}`
 
     await prisma.brandSettings.upsert({
-      where: { userId },
-      create: { userId, [slot.field]: url },
+      where: { userId: ownerUserId },
+      create: { userId: ownerUserId, [slot.field]: url },
       update: { [slot.field]: url },
     })
 
@@ -115,7 +116,7 @@ export async function DELETE(request: NextRequest) {
     const slot = SLOTS[new URL(request.url).searchParams.get('slot') || 'source']
     if (!slot) return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
 
-    const existing = await prisma.brandSettings.findUnique({ where: { userId }, select: { [slot.field]: true } })
+    const existing = await brandSettingsForUser(userId)
     const prev = (existing as Record<string, string | null> | null)?.[slot.field]
     if (prev) {
       const key = keyFromUrl(prev)
@@ -126,7 +127,10 @@ export async function DELETE(request: NextRequest) {
           /* non-fatal */
         }
       }
-      await prisma.brandSettings.update({ where: { userId }, data: { [slot.field]: null } })
+      await prisma.brandSettings.update({
+        where: { userId: await canonicalAccountUserId(userId) },
+        data: { [slot.field]: null },
+      })
     }
     return NextResponse.json({ ok: true })
   } catch (err) {

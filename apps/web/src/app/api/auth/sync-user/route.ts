@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma, getOrCreateUserWithAccount } from '@socioply/shared'
 
 /**
  * Sync Clerk user to database
@@ -34,18 +34,16 @@ export async function POST() {
       ? `${clerkUser.firstName}${clerkUser.lastName ? ' ' + clerkUser.lastName : ''}`
       : email.split('@')[0]
 
-    // Upsert user in database
-    const user = await prisma.user.upsert({
-      where: { clerkId },
-      update: {
-        name,
-        email,
-      },
-      create: {
-        clerkId,
-        name,
-        email,
-      },
+    // Find-or-create the user together with its Account (tenant), honoring an
+    // invitation's target account, then keep name/email fresh from Clerk.
+    const invitedAccountId =
+      typeof clerkUser.publicMetadata?.accountId === 'string'
+        ? clerkUser.publicMetadata.accountId
+        : undefined
+    const created = await getOrCreateUserWithAccount({ clerkId, email, name }, invitedAccountId)
+    const user = await prisma.user.update({
+      where: { id: created.id },
+      data: { name, email },
     })
 
     // Create default settings if they don't exist
@@ -97,10 +95,10 @@ export async function GET() {
       },
     })
 
-    // If user doesn't exist, create them
+    // If user doesn't exist, create them together with their Account (tenant).
     if (!user) {
       const clerkUser = await currentUser()
-      
+
       if (!clerkUser) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
       }
@@ -117,22 +115,19 @@ export async function GET() {
         ? `${clerkUser.firstName}${clerkUser.lastName ? ' ' + clerkUser.lastName : ''}`
         : email.split('@')[0]
 
-      // Create user
-      user = await prisma.user.create({
-        data: {
-          clerkId,
-          name,
-          email,
-          settings: {
-            create: {
-              theme: 'light',
-              sidebarState: 'open',
-            },
-          },
-        },
-        include: {
-          settings: true,
-        },
+      const invitedAccountId =
+        typeof clerkUser.publicMetadata?.accountId === 'string'
+          ? clerkUser.publicMetadata.accountId
+          : undefined
+      const created = await getOrCreateUserWithAccount({ clerkId, email, name }, invitedAccountId)
+      await prisma.settings.upsert({
+        where: { userId: created.id },
+        update: {},
+        create: { userId: created.id, theme: 'light', sidebarState: 'open' },
+      })
+      user = await prisma.user.findUnique({
+        where: { id: created.id },
+        include: { settings: true },
       })
     }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { Prisma } from '@prisma/client'
-import { prisma, hemisphereForCountry } from '@socioply/shared'
+import { prisma, hemisphereForCountry, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 
 const SPECIALIZATIONS_FIELD = 'specializations'
 
@@ -12,10 +12,12 @@ const SPECIALIZATIONS_FIELD = 'specializations'
  * applies only on equator-straddling "edge" countries).
  */
 async function routeNewsletterCalendar(userId: string) {
-  const bs = await prisma.brandSettings.findUnique({
-    where: { userId },
-    select: { primarySpecialization: true, organizationCountryCode: true, hemisphereOverride: true },
-  })
+  // Brand is account-scoped; routing is set on the account owner (the account's
+  // single newsletter recipient).
+  const [bs, ownerUserId] = await Promise.all([
+    brandSettingsForUser(userId),
+    canonicalAccountUserId(userId),
+  ])
   const primary = bs?.primarySpecialization?.trim()
   let calendarId: string | null = null
   if (primary && bs?.organizationCountryCode?.trim()) {
@@ -28,7 +30,7 @@ async function routeNewsletterCalendar(userId: string) {
     })
     calendarId = cal?.id ?? null
   }
-  await prisma.user.update({ where: { id: userId }, data: { newsletterCalendarId: calendarId } })
+  await prisma.user.update({ where: { id: ownerUserId }, data: { newsletterCalendarId: calendarId } })
 }
 
 async function getUserId(clerkId: string): Promise<string | null> {
@@ -48,7 +50,7 @@ export async function GET() {
     const userId = await getUserId(clerkId)
     if (!userId) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    const settings = await prisma.brandSettings.findUnique({ where: { userId } })
+    const settings = await brandSettingsForUser(userId)
 
     // Return empty-but-shaped object if no row exists yet
     return NextResponse.json(
@@ -226,9 +228,11 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Brand profile is account-shared → write to the account owner's row.
+    const ownerUserId = await canonicalAccountUserId(userId)
     const settings = await prisma.brandSettings.upsert({
-      where: { userId },
-      create: { userId, ...data } as Prisma.BrandSettingsUncheckedCreateInput,
+      where: { userId: ownerUserId },
+      create: { userId: ownerUserId, ...data } as Prisma.BrandSettingsUncheckedCreateInput,
       update: data,
     })
 

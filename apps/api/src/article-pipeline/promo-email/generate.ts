@@ -7,7 +7,7 @@
  * Campaign from it.
  */
 
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
 
@@ -120,10 +120,7 @@ export async function generatePromoEmail(jobId: string, userId: string): Promise
         slug: true,
       },
     }),
-    prisma.brandSettings.findUnique({
-      where: { userId },
-      select: { organizationWebsite: true },
-    }),
+    brandSettingsForUser(userId),
     prisma.promptTemplate.findUnique({
       where: { stepNumber: PROMO_EMAIL_STEP_NUMBER },
       select: {

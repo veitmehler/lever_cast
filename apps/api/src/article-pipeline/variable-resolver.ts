@@ -1,5 +1,5 @@
 import type { BrandSettings, PlatformSettings, OutlineFramework } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { getGlobalExcludedKeywords } from './keyword-validator'
 
 // Maps generic {{<step_name>_output}} variable suffixes to step numbers
@@ -46,7 +46,7 @@ export interface PipelineContext {
 
 async function getBrandSettings(ctx: PipelineContext): Promise<BrandSettings | null> {
   if (ctx.brandSettingsCache !== undefined) return ctx.brandSettingsCache
-  ctx.brandSettingsCache = await prisma.brandSettings.findUnique({ where: { userId: ctx.userId } })
+  ctx.brandSettingsCache = await brandSettingsForUser(ctx.userId)
   return ctx.brandSettingsCache
 }
 

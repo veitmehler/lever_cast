@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { downloadImageFromStorage } from '@socioply/shared'
 import { themeFromBrand } from '../article-pipeline/enrichment/diagram-theme'
 
@@ -26,7 +26,7 @@ export interface SocialBrandTheme {
 
 export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandTheme> {
   const [brand, settings] = await Promise.all([
-    prisma.brandSettings.findUnique({ where: { userId } }),
+    brandSettingsForUser(userId),
     prisma.settings.findUnique({ where: { userId } }),
   ])
   const theme = themeFromBrand(brand)

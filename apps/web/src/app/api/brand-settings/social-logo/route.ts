@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 
 function getS3Client(): S3Client {
   const accessKeyId = process.env.ACCESS_KEY_ID
@@ -73,10 +73,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Logo must be smaller than 2 MB.' }, { status: 400 })
     }
 
-    const existing = await prisma.brandSettings.findUnique({
-      where: { userId },
-      select: { socialLogoUrl: true },
-    })
+    const existing = await brandSettingsForUser(userId)
+    const ownerUserId = await canonicalAccountUserId(userId)
     const newKey = socialLogoKey(userId, ext)
     if (existing?.socialLogoUrl) {
       const oldKey = keyFromUrl(existing.socialLogoUrl)
@@ -102,8 +100,8 @@ export async function POST(request: NextRequest) {
     const url = `${getCdnBase()}/${newKey}`
 
     await prisma.brandSettings.upsert({
-      where: { userId },
-      create: { userId, socialLogoUrl: url },
+      where: { userId: ownerUserId },
+      create: { userId: ownerUserId, socialLogoUrl: url },
       update: { socialLogoUrl: url },
     })
 
@@ -122,10 +120,7 @@ export async function DELETE() {
     const userId = await getUserId(clerkId)
     if (!userId) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    const settings = await prisma.brandSettings.findUnique({
-      where: { userId },
-      select: { socialLogoUrl: true },
-    })
+    const settings = await brandSettingsForUser(userId)
 
     if (settings?.socialLogoUrl) {
       const key = keyFromUrl(settings.socialLogoUrl)
@@ -139,7 +134,7 @@ export async function DELETE() {
     }
 
     await prisma.brandSettings.updateMany({
-      where: { userId },
+      where: { userId: await canonicalAccountUserId(userId) },
       data: { socialLogoUrl: null },
     })
 

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, ghlSettingsForUser } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
@@ -483,10 +483,7 @@ export async function articleRoutes(app: FastifyInstance) {
 
       // Promotional email → GHL Email Campaign, scheduled for the publish day.
       // Gated on the global per-user setting; full config is re-checked in the worker.
-      const ghl = await prisma.ghlSettings.findUnique({
-        where: { userId: user.id },
-        select: { promoEmailEnabled: true, promoEmailTagId: true },
-      })
+      const ghl = await ghlSettingsForUser(user.id)
       if (ghl?.promoEmailEnabled && ghl.promoEmailTagId) {
         enqueuePromoEmail({ jobId, userId: user.id, publishingDate }).catch((err) =>
           logger.error({ jobId, err }, '[publish] failed to enqueue promo email'),

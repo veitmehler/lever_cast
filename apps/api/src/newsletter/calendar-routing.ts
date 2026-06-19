@@ -4,7 +4,13 @@
  * The hemisphere override is honored ONLY when the client's country is an edge
  * (equator-straddling) country. Sets/clears user.newsletterCalendarId.
  */
-import { prisma, hemisphereForCountry, type Hemisphere } from '@socioply/shared'
+import {
+  prisma,
+  hemisphereForCountry,
+  brandSettingsForUser,
+  canonicalAccountUserId,
+  type Hemisphere,
+} from '@socioply/shared'
 import { logger } from '../lib/logger'
 
 /** Resolve a specialization key to its display label (for {{specialization}} in prompts). */
@@ -32,13 +38,15 @@ export function effectiveHemisphere(
 }
 
 export async function resolveNewsletterCalendar(userId: string): Promise<RoutingResult> {
-  const brand = await prisma.brandSettings.findUnique({
-    where: { userId },
-    select: { primarySpecialization: true, organizationCountryCode: true, hemisphereOverride: true },
-  })
+  // Brand is account-scoped; routing is set on the account owner (the account's
+  // single newsletter "customer"). All members resolve to the same calendar.
+  const [brand, ownerUserId] = await Promise.all([
+    brandSettingsForUser(userId),
+    canonicalAccountUserId(userId),
+  ])
 
   const setCalendar = async (id: string | null) => {
-    await prisma.user.update({ where: { id: userId }, data: { newsletterCalendarId: id } })
+    await prisma.user.update({ where: { id: ownerUserId }, data: { newsletterCalendarId: id } })
   }
 
   const primary = brand?.primarySpecialization?.trim()

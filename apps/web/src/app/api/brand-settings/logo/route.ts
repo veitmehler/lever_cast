@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 
 // ── S3 helpers ───────────────────────────────────────────────────────────────
 
@@ -88,10 +88,8 @@ export async function POST(request: NextRequest) {
     }
 
     // If user already has a logo with a DIFFERENT key (different extension), delete the old object
-    const existing = await prisma.brandSettings.findUnique({
-      where: { userId },
-      select: { organizationLogoUrl: true },
-    })
+    const existing = await brandSettingsForUser(userId)
+    const ownerUserId = await canonicalAccountUserId(userId)
     const newKey = logoKey(userId, ext)
     if (existing?.organizationLogoUrl) {
       const oldKey = keyFromUrl(existing.organizationLogoUrl)
@@ -119,8 +117,8 @@ export async function POST(request: NextRequest) {
 
     // Persist URL immediately — no need for a separate Save click
     await prisma.brandSettings.upsert({
-      where:  { userId },
-      create: { userId, organizationLogoUrl: url },
+      where:  { userId: ownerUserId },
+      create: { userId: ownerUserId, organizationLogoUrl: url },
       update: { organizationLogoUrl: url },
     })
 
@@ -141,10 +139,7 @@ export async function DELETE() {
     const userId = await getUserId(clerkId)
     if (!userId) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    const settings = await prisma.brandSettings.findUnique({
-      where: { userId },
-      select: { organizationLogoUrl: true },
-    })
+    const settings = await brandSettingsForUser(userId)
 
     if (settings?.organizationLogoUrl) {
       const key = keyFromUrl(settings.organizationLogoUrl)
@@ -158,7 +153,7 @@ export async function DELETE() {
     }
 
     await prisma.brandSettings.updateMany({
-      where: { userId },
+      where: { userId: await canonicalAccountUserId(userId) },
       data:  { organizationLogoUrl: null },
     })
 

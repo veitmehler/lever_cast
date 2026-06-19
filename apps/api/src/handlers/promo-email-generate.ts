@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { generatePromoEmail, htmlToPreviewText } from '../article-pipeline/promo-email/generate'
@@ -134,7 +134,7 @@ export async function promoEmailGenerateHandler(
 
       // Wrap the promo content in the SAME branded chrome as the newsletter
       // (header logo + theme + footer) for brand consistency.
-      const brandRow = await prisma.brandSettings.findUnique({ where: { userId } })
+      const brandRow = await brandSettingsForUser(userId)
       const brandedHtml = renderPromoEmail(email.bodyHtml, toRenderBrand(brandRow), meta.previewText)
 
       // Idempotency: reuse a campaign created by a prior attempt (e.g. a retry

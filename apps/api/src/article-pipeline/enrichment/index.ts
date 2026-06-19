@@ -8,7 +8,7 @@
  * 5) Optional WP tags (up to 4) when topic has wordPressConnectionId
  */
 
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
 import { decrypt } from '@socioply/shared'
@@ -381,15 +381,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   let failCount = 0
   const figuresToInsert: Array<{ afterH2Offset: number; figureHtml: string }> = []
 
-  const brandStyle = await prisma.brandSettings.findUnique({
-    where: { userId: job.userId },
-    select: {
-      diagramPrimaryColor: true,
-      diagramSecondaryColor: true,
-      diagramLineColor: true,
-      diagramFontFamily: true,
-    },
-  })
+  const brandStyle = await brandSettingsForUser(job.userId)
   const theme = themeFromBrand(brandStyle ?? undefined)
   const diagramInitDirective = buildDiagramInitDirective(theme)
   const darkDiagramInitDirective = buildDarkDiagramInitDirective(theme)

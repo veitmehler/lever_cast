@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { ghlSettingsForUser } from '@socioply/shared'
 import { decrypt, encrypt } from '@socioply/shared'
 import type { GhlAccountIds } from './types'
 
@@ -10,7 +10,7 @@ export interface GhlCredentials {
 }
 
 export async function getGhlCredentials(userId: string): Promise<GhlCredentials | null> {
-  const row = await prisma.ghlSettings.findUnique({ where: { userId } })
+  const row = await ghlSettingsForUser(userId)
   if (!row?.ghlApiKey || !row.ghlLocationId || !row.ghlUserId) {
     return null
   }

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma, ghlSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { decrypt, encrypt, maskApiKey } from '@socioply/shared'
@@ -16,7 +16,7 @@ export async function ghlRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { clerkId } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const row = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+    const row = await ghlSettingsForUser(user.id)
 
     if (!row) {
       return {
@@ -86,7 +86,7 @@ export async function ghlRoutes(app: FastifyInstance) {
       }
     }
 
-    const existing = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+    const existing = await ghlSettingsForUser(user.id)
 
     // Validate + build promotional-email update (only when the client sends it).
     const promoUpdate: Record<string, unknown> = {}
@@ -135,10 +135,12 @@ export async function ghlRoutes(app: FastifyInstance) {
 
     const accountIds = body.accountIds ?? (existing?.accountIds as GhlAccountIds | null) ?? {}
 
+    // GHL settings are account-shared → write to the account owner's row.
+    const ownerUserId = await canonicalAccountUserId(user.id)
     const row = await prisma.ghlSettings.upsert({
-      where: { userId: user.id },
+      where: { userId: ownerUserId },
       create: {
-        userId: user.id,
+        userId: ownerUserId,
         ghlApiKey,
         ghlLocationId,
         ghlUserId,
@@ -180,10 +182,11 @@ export async function ghlRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { clerkId } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const row = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+    const row = await ghlSettingsForUser(user.id)
     if (!row?.ghlApiKey || !row.ghlLocationId) {
       return reply.status(400).send({ error: 'Save your GHL API key and Location ID first' })
     }
+    const ownerUserId = await canonicalAccountUserId(user.id)
 
     const apiKey = decrypt(row.ghlApiKey)
     if (!apiKey) {
@@ -193,7 +196,7 @@ export async function ghlRoutes(app: FastifyInstance) {
     try {
       const accounts = await listGhlAccounts(apiKey, row.ghlLocationId)
       await prisma.ghlSettings.update({
-        where: { userId: user.id },
+        where: { userId: ownerUserId },
         data: { lastVerifiedAt: new Date(), lastError: null },
       })
 
@@ -214,7 +217,7 @@ export async function ghlRoutes(app: FastifyInstance) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error({ userId: user.id, locationId: row.ghlLocationId, err }, '[ghl] listGhlAccounts threw')
       await prisma.ghlSettings.update({
-        where: { userId: user.id },
+        where: { userId: ownerUserId },
         data: { lastError: message },
       }).catch(() => {})
       return reply.status(400).send({ error: message })
@@ -229,7 +232,7 @@ export async function ghlRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { clerkId } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const row = await prisma.ghlSettings.findUnique({ where: { userId: user.id } })
+    const row = await ghlSettingsForUser(user.id)
     if (!row?.ghlApiKey || !row.ghlLocationId) {
       return reply.status(400).send({ error: 'Save your GHL API key and Location ID first' })
     }

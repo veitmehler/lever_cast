@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma, accountMemberIdsForUser } from '@socioply/shared'
 import { refreshInstagramUsername } from '@socioply/shared'
 
 /**
@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
     }
 
-    if (connection.userId !== user.id) {
-      console.log('[Refresh Instagram Username API] Unauthorized - connection belongs to different user')
+    if (!(await accountMemberIdsForUser(user.id)).includes(connection.userId)) {
+      console.log('[Refresh Instagram Username API] Unauthorized - connection belongs to a different account')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

@@ -396,7 +396,7 @@ export function normalizeSocialLinks(v: unknown): RenderBrand['socialMediaLinks'
   return out.length > 0 ? out : null
 }
 
-function toRenderBrand(
+export function toRenderBrand(
   b: (Partial<Omit<RenderBrand, 'socialMediaLinks'>> & { socialMediaLinks?: unknown }) | null,
 ): RenderBrand {
   if (!b) return {}

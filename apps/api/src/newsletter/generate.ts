@@ -402,6 +402,7 @@ export function toRenderBrand(
   if (!b) return {}
   return {
     organizationName: b.organizationName,
+    defaultAuthorName: b.defaultAuthorName,
     organizationLogoUrl: b.organizationLogoUrl,
     organizationAddress: b.organizationAddress,
     organizationEmail: b.organizationEmail,

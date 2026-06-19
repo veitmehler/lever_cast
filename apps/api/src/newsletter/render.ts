@@ -580,7 +580,10 @@ export function renderPromoEmail(bodyHtml: string, brand: RenderBrand, previewTe
   const signoff = author
     ? `<p style="margin:24px 0 0;font-weight:${theme.bodyWeight};">Best wishes,<br/>${esc(author)}</p>`
     : ''
-  const card = `<tr><td style="background-color:#ffffff;padding:32px 28px 200px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${greeting}${bodyHtml}${signoff}</td></tr>`
+  // The greeting leads — strip a leading headline from the body (the headline is
+  // already the email subject), keeping the rest of the HTML as-is.
+  const body = bodyHtml.replace(/^\s*<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>\s*/i, '')
+  const card = `<tr><td style="background-color:#ffffff;padding:32px 28px 200px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${greeting}${body}${signoff}</td></tr>`
   const rows = [headerBlock(brand, theme), card, footerBlock(brand, theme)]
   return emailShell(theme, previewText ?? null, rows.join('\n      '))
 }

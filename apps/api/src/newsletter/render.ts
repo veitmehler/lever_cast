@@ -257,7 +257,7 @@ function readMoreButton(link: string, theme: Theme, label = 'Read full article �
 }
 
 /** A promotional offer card: accent band + optional 16:9 banner + headline + pitch + filled CTA. */
-function offerCard(offer: RenderOffer, theme: Theme, accent: string): string {
+function offerCard(offer: RenderOffer, theme: Theme, accent: string, label: string): string {
   const img = offer.imageUrl
     ? `<img src="${esc(offer.imageUrl)}" width="624" alt="${esc(offer.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
     : ''
@@ -266,7 +266,7 @@ function offerCard(offer: RenderOffer, theme: Theme, accent: string): string {
     : ''
   const inner = `${img}<h2 style="margin:0 0 12px;font-family:${HEADING_STACK};font-size:24px;font-weight:${theme.headingWeight};color:${theme.fontColor};line-height:1.3;">${esc(offer.title)}</h2>${para(`<p style="margin:0;">${esc(offer.body)}</p>`, theme, 'center')}${cta}`
   return (
-    band('Special Offer', accent, theme) +
+    band(label, accent, theme) +
     `<tr><td style="background-color:#ffffff;padding:32px 28px;text-align:center;">${inner}</td></tr>` +
     spacer()
   )
@@ -414,8 +414,8 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     section('Tips Of The Day', bulletList(input.quickHits.tips, theme), pink)
   }
 
-  // Seasonal offer (after Tips)
-  if (input.seasonalOffer) rows.push(offerCard(input.seasonalOffer, theme, green))
+  // Seasonal offer (after Tips) — green "Special Offer"
+  if (input.seasonalOffer) rows.push(offerCard(input.seasonalOffer, theme, green, 'Special Offer'))
 
   // Teaser 2 (curated → light blue)
   if (teasers[1]) section(teaserHeading(teasers[1]), teaserBlock(teasers[1], theme), lightBlue)
@@ -426,8 +426,8 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   // Feature article (navy)
   if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme), navy)
 
-  // Evergreen offer (after the feature)
-  if (input.evergreenOffer) rows.push(offerCard(input.evergreenOffer, theme, green))
+  // Evergreen offer (after the feature) — pink "Remember" call-to-action
+  if (input.evergreenOffer) rows.push(offerCard(input.evergreenOffer, theme, pink, 'Remember'))
 
   // Teaser 3 (curated → light blue)
   if (teasers[2]) section(teaserHeading(teasers[2]), teaserBlock(teasers[2], theme), lightBlue)

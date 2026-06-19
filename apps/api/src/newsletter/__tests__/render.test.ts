@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderNewsletterHtml, type RenderInput, type RenderBrand } from '../render'
+import { renderNewsletterHtml, renderPromoEmail, type RenderInput, type RenderBrand } from '../render'
 
 const brand: RenderBrand = {
   organizationName: 'Acme Wellness',
@@ -218,5 +218,24 @@ describe('renderNewsletterHtml', () => {
       {},
     )
     expect(html).toContain('A &amp; B &lt;x&gt;?')
+  })
+})
+
+describe('renderPromoEmail', () => {
+  it('wraps promo content in the branded chrome (header logo + footer), no offers', () => {
+    const html = renderPromoEmail(
+      '<p>Our latest article is live.</p><a href="https://acme.test/article">Read more</a>',
+      brand,
+    )
+    // promo content preserved as-is (including the plain text link)
+    expect(html).toContain('Our latest article is live.')
+    expect(html).toContain('https://acme.test/article')
+    // shared chrome: header logo (dark header bg → light variant) + footer unsubscribe
+    expect(html).toContain('https://cdn.example.com/logo-light.png')
+    expect(html).toContain('{{email.unsubscribe_link}}')
+    expect(html).toContain('supported-color-schemes')
+    // no offer cards in promos
+    expect(html).not.toContain('Special Offer')
+    expect(html).not.toContain('Remember')
   })
 })

@@ -3,6 +3,8 @@ import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { generatePromoEmail, htmlToPreviewText } from '../article-pipeline/promo-email/generate'
+import { renderPromoEmail } from '../newsletter/render'
+import { toRenderBrand } from '../newsletter/generate'
 import { getPromoEmailConfig } from '../lib/ghl/settings'
 import {
   createGhlEmailCampaign,
@@ -130,6 +132,11 @@ export async function promoEmailGenerateHandler(
         previewText: htmlToPreviewText(email.bodyHtml),
       }
 
+      // Wrap the promo content in the SAME branded chrome as the newsletter
+      // (header logo + theme + footer) for brand consistency.
+      const brandRow = await prisma.brandSettings.findUnique({ where: { userId } })
+      const brandedHtml = renderPromoEmail(email.bodyHtml, toRenderBrand(brandRow), meta.previewText)
+
       // Idempotency: reuse a campaign created by a prior attempt (e.g. a retry
       // after a schedule failure whose rollback didn't delete it) instead of
       // creating another one. Rollback nulls ghlCampaignId on successful delete,
@@ -147,7 +154,7 @@ export async function promoEmailGenerateHandler(
           locationId: config.locationId,
           name: `Article promo — ${email.subject}`.slice(0, 120),
           meta,
-          bodyHtml: email.bodyHtml,
+          bodyHtml: brandedHtml,
           timeZone: config.timezone,
           userId: config.ghlUserId,
         })

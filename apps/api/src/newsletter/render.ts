@@ -358,11 +358,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   }
 
   // Header (logo on header band)
-  const logo = theme.headerLogoUrl
-    ? `<img src="${esc(theme.headerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.headerLogoWidth}" style="display:block;width:100%;max-width:${theme.headerLogoWidth}px;height:auto;margin:0 auto;" />`
-    : `<div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
-  rows.push(`<tr><td style="background-color:${theme.headerBg};padding:24px;text-align:center;">${logo}</td></tr>`)
-  rows.push(spacer())
+  rows.push(headerBlock(brand, theme))
 
   const fun = input.fun
   const teasers = input.teasers ?? []
@@ -448,17 +444,30 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     )
   }
 
-  // Footer: logo · org name + stacked address + phone · social row · disclaimer · unsubscribe
+  // Footer (shared chrome)
+  rows.push(footerBlock(brand, theme))
+
+  return emailShell(theme, input.previewText ?? null, rows.join('\n      '))
+}
+
+// ── Shared chrome (header band · footer · document shell) ────────────────────
+
+/** Branded header band with the logo (variant-aware) + a spacer. */
+function headerBlock(brand: RenderBrand, theme: Theme): string {
+  const logo = theme.headerLogoUrl
+    ? `<img src="${esc(theme.headerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.headerLogoWidth}" style="display:block;width:100%;max-width:${theme.headerLogoWidth}px;height:auto;margin:0 auto;" />`
+    : `<div style="font-family:${HEADING_STACK};font-size:26px;font-weight:${theme.headingWeight};color:#ffffff;text-align:center;">${esc(brand.organizationName ?? '')}</div>`
+  return `<tr><td style="background-color:${theme.headerBg};padding:24px;text-align:center;">${logo}</td></tr>\n      ${spacer()}`
+}
+
+/** Branded footer: logo · org name · stacked address+phone · social · disclaimer · unsubscribe. */
+function footerBlock(brand: RenderBrand, theme: Theme): string {
   const footerLogo = theme.footerLogoUrl
     ? `<img src="${esc(theme.footerLogoUrl)}" alt="${esc(brand.organizationName ?? 'Logo')}" width="${theme.footerLogoWidth}" style="display:block;width:100%;max-width:${theme.footerLogoWidth}px;height:auto;margin:0 auto 18px;" />`
     : ''
-
-  // Footer text flips with the background (synced with the logo/icon variant):
-  // white on a dark footer, dark navy on a light footer.
+  // Footer text flips with the background (synced with the logo/icon variant).
   const footerText = theme.footerIconVariant === 'light' ? '#ffffff' : '#00142b'
 
-  // Stacked address: L1 street, L2 city/state/zip/country, L3 phone.
-  // Falls back to the legacy combined organizationAddress when structured fields are empty.
   const street = [brand.addressLine1, brand.addressLine2].filter(Boolean).join(', ')
   const cityLine = [
     [brand.addressLocality, brand.addressRegion].filter(Boolean).join(', '),
@@ -476,9 +485,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
     addrLines.push(esc(brand.organizationAddress))
   }
   if (brand.organizationPhone) addrLines.push(esc(brand.organizationPhone))
-  const addrLine = addrLines.length
-    ? `<div style="margin-top:8px;">${addrLines.join('<br/>')}</div>`
-    : ''
+  const addrLine = addrLines.length ? `<div style="margin-top:8px;">${addrLines.join('<br/>')}</div>` : ''
 
   const contactLine = brand.organizationEmail
     ? `<div style="margin-top:6px;"><a href="mailto:${esc(brand.organizationEmail)}" style="color:${footerText};"><u>${esc(brand.organizationEmail)}</u></a></div>`
@@ -500,11 +507,9 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   const disclaimer =
     brand.nlFooterDisclaimer?.trim() ||
     'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you — it helps support our work.'
-  // Name only when there's no logo (the logo already carries the brand).
   const nameLine = footerLogo ? '' : `<div style="font-weight:600;">${esc(brand.organizationName ?? '')}</div>`
 
-  rows.push(
-    `<tr><td style="background-color:${theme.footerBg};padding:60px 24px 32px;">
+  return `<tr><td style="background-color:${theme.footerBg};padding:60px 24px 32px;">
       <div style="font-family:${theme.fontStack};font-size:13px;color:${footerText};text-align:center;line-height:1.6;">
         ${footerLogo}
         ${nameLine}
@@ -516,19 +521,17 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
         <div style="font-size:11px;opacity:0.85;margin-top:10px;"><a href="${UNSUBSCRIBE_MERGE}" style="color:${footerText};"><u>Unsubscribe here</u></a></div>
         <div style="font-size:11px;opacity:0.85;margin-top:10px;">Have questions? Just reply to this email.</div>
       </div>
-    </td></tr>`,
-  )
+    </td></tr>`
+}
 
-  const preheader = input.previewText
-    ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(input.previewText)}</div>`
+/** Wrap content rows in the branded email document (head, fonts, dark-mode opt-out, container). */
+function emailShell(theme: Theme, previewText: string | null, rowsHtml: string): string {
+  const preheader = previewText
+    ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(previewText)}</div>`
     : ''
-
-  // Google Fonts import for the chosen family (supporting clients render it; the
-  // rest fall back to the system stack).
   const fontLink = GOOGLE_FONTS.has(theme.fontFamily)
     ? `<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(theme.fontFamily).replace(/%20/g, '+')}:wght@400;600;700&display=swap" rel="stylesheet" />`
     : ''
-
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
@@ -553,12 +556,25 @@ ${preheader}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;">
   <tr><td align="center" style="padding:20px 10px;">
     <table role="presentation" class="nl-container" width="680" cellpadding="0" cellspacing="0" style="width:680px;max-width:680px;background-color:#ffffff;">
-      ${rows.join('\n      ')}
+      ${rowsHtml}
     </table>
   </td></tr>
 </table>
 </body>
 </html>`
+}
+
+/**
+ * Render a promotional email in the SAME branded chrome as the newsletter:
+ * header logo band → the promo HTML (as returned by the generator, dropped into
+ * a themed white content card) → footer. No offers, no CTA button — links stay
+ * as-is. `bodyHtml` is the generator's output; `previewText` is optional.
+ */
+export function renderPromoEmail(bodyHtml: string, brand: RenderBrand, previewText?: string | null): string {
+  const theme = resolveTheme(brand)
+  const card = `<tr><td style="background-color:#ffffff;padding:32px 28px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${bodyHtml}</td></tr>`
+  const rows = [headerBlock(brand, theme), card, spacer(), footerBlock(brand, theme)]
+  return emailShell(theme, previewText ?? null, rows.join('\n      '))
 }
 
 /** Teaser heading = the real source article title, falling back to the voiced title. */

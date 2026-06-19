@@ -263,6 +263,36 @@ export async function topicRoutes(app: FastifyInstance) {
     return reply.send(topics)
   })
 
+  // POST /api/topics/plan — schedule a planned article topic WITHOUT generating
+  // (generation happens later, manually or via bulk). Used by the content plan to
+  // place a new topic or adopt an admin article-calendar suggestion onto a date.
+  app.post<{ Body: { topic?: string; scheduledDate?: string; source?: string } }>(
+    '/topics/plan',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+      const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const topic = request.body?.topic?.trim()
+      const scheduledDate = request.body?.scheduledDate
+      if (!topic) return reply.status(400).send({ error: 'topic is required' })
+      if (!scheduledDate) return reply.status(400).send({ error: 'scheduledDate is required' })
+
+      const planned = await prisma.topic.create({
+        data: {
+          userId: user.id,
+          topic,
+          scheduledDate: new Date(scheduledDate),
+          status: 'pending',
+          source: request.body?.source === 'article_calendar' ? 'article_calendar' : 'manual',
+          mode: 'article_first',
+        },
+      })
+      return reply.status(201).send({ topic: planned })
+    },
+  )
+
   // ── Idea bank ─────────────────────────────────────────────────────────────
 
   // POST /api/topics/idea — capture an unscheduled article idea (no job)

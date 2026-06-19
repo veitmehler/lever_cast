@@ -7,6 +7,7 @@ import { DashboardInput } from '@/features/dashboard/sections/DashboardInput'
 import { GeneratedPosts } from '@/features/dashboard/sections/GeneratedPosts'
 import { FeatureOverview } from '@/features/dashboard/sections/FeatureOverview'
 import { IdeaBank } from '@/features/dashboard/IdeaBank'
+import { ReviewInbox } from '@/features/dashboard/ReviewInbox'
 
 export default function DashboardPage() {
   const dashboard = useDashboard()
@@ -19,6 +20,8 @@ export default function DashboardPage() {
           Convert your spontaneous ideas into polished, multi-platform social posts.
         </p>
       </div>
+
+      <ReviewInbox />
 
       <IdeaBank />
 

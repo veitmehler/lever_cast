@@ -16,6 +16,7 @@ import {
   Workflow,
   Images,
   Mail,
+  CalendarRange,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { label: 'Content Plan', href: '/plan', icon: <CalendarRange className="w-5 h-5" /> },
   { label: 'Posts', href: '/posts', icon: <FileText className="w-5 h-5" /> },
   { label: 'Workflow', href: '/workflow', icon: <Workflow className="w-5 h-5" /> },
   { label: 'Image Library', href: '/images', icon: <Images className="w-5 h-5" /> },

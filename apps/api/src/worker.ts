@@ -19,6 +19,7 @@ import { pgMonitorHandler } from './handlers/pg-monitor'
 import { articlePipelineHandler, ArticlePipelineJobData } from './handlers/article-pipeline'
 import { articleEnrichmentHandler, ArticleEnrichmentJobData } from './handlers/article-enrichment'
 import { qualityGateHandler, QualityGateJobData } from './handlers/quality-gate'
+import { contentBatchMonitorHandler } from './handlers/content-batch-monitor'
 import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-output'
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
@@ -82,6 +83,7 @@ async function main() {
   await boss.schedule(QUEUES.SYNDICATION_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.PROMO_EMAIL_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.NEWSLETTER_SAFETY, '*/10 * * * *', {})       // every 10 min
+  await boss.schedule(QUEUES.CONTENT_BATCH_MONITOR, '* * * * *', {})      // every minute
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -145,6 +147,12 @@ async function main() {
     QUEUES.ARTICLE_QUALITY_GATE,
     { batchSize: 1 },
     withSentry('article-quality-gate', qualityGateHandler),
+  )
+
+  await boss.work(
+    QUEUES.CONTENT_BATCH_MONITOR,
+    { batchSize: 1 },
+    withSentry('content-batch-monitor', async () => { await contentBatchMonitorHandler() }),
   )
 
   await boss.work<ArticleEnrichmentJobData>(

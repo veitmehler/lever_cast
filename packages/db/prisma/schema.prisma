@@ -983,6 +983,41 @@ model NewsletterTopic {
   @@map("newsletter_topics")
 }
 
+// A bulk content-generation batch kicked off from the content plan. Items run
+// sequentially (one per account at a time); when all reach ready/flagged, a
+// single "ready to review" email is sent.
+model ContentBatch {
+  id              String             @id @default(cuid())
+  accountId       String
+  createdByUserId String
+  status          String             @default("running") // running | completed
+  createdAt       DateTime           @default(now())
+  completedAt     DateTime?
+  items           ContentBatchItem[]
+
+  @@index([accountId])
+  @@index([status])
+  @@map("content_batches")
+}
+
+model ContentBatchItem {
+  id                String       @id @default(cuid())
+  batchId           String
+  batch             ContentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  kind              String // 'article' | 'newsletter'
+  date              DateTime
+  topicId           String? // article source Topic
+  articleJobId      String? // article job once started
+  newsletterTopicId String? // newsletter source NewsletterTopic
+  newsletterId      String? // Newsletter row once started
+  status            String       @default("pending") // pending | generating | ready | flagged | failed
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([batchId])
+  @@map("content_batch_items")
+}
+
 // Admin-curated article content calendar — same specialization × hemisphere
 // routing as newsletters, but SEPARATE (article cadence/fields differ). Accounts
 // are auto-routed via Account.articleCalendarId. Topics uploaded via CSV.

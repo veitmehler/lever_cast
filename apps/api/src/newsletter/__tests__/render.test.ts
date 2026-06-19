@@ -166,6 +166,34 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('Have questions? Just reply to this email.')
   })
 
+  it('places seasonal offer after Tips and evergreen offer after the feature article', () => {
+    const html = renderNewsletterHtml(
+      {
+        ...full,
+        seasonalOffer: { title: 'Mothers Day Special', body: '20% off massage', ctaLabel: 'Claim', ctaUrl: 'https://x.test/claim', imageUrl: 'https://cdn.example.com/offer-seasonal.jpg' },
+        evergreenOffer: { title: 'Book an Adjustment', body: 'Come in today', ctaLabel: 'Book Now', ctaUrl: 'https://x.test/book', imageUrl: null },
+      },
+      brand,
+    )
+    expect(html).toContain('Mothers Day Special')
+    expect(html).toContain('Book an Adjustment')
+    expect(html).toContain('https://x.test/book')
+    expect(html).toContain('offer-seasonal.jpg')
+    expect(html.match(/Special Offer/g)?.length).toBe(2)
+    const tips = html.indexOf('Tips Of The Day')
+    const seasonal = html.indexOf('Mothers Day Special')
+    const feature = html.indexOf('Article Of The Day')
+    const evergreen = html.indexOf('Book an Adjustment')
+    expect(tips).toBeLessThan(seasonal)
+    expect(seasonal).toBeLessThan(feature)
+    expect(feature).toBeLessThan(evergreen)
+  })
+
+  it('renders no offer cards when none provided', () => {
+    const html = renderNewsletterHtml(full, brand)
+    expect(html).not.toContain('Special Offer')
+  })
+
   it('falls back to a voiced title when a teaser has no real headline', () => {
     const html = renderNewsletterHtml(
       { teasers: [{ headline: null, title: 'Voiced Fallback Title', body: '<p>x</p>', cta: '<p>y</p>', link: 'https://z.com' }] },

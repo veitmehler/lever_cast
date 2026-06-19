@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Loader2, AlertTriangle, Mail, Settings, CheckCircle2, ChevronRight } from 'lucide-react'
+import { Loader2, AlertTriangle, Mail, Settings, CheckCircle2, ChevronRight, Tag } from 'lucide-react'
 
 interface NewsletterRow {
   id: string
@@ -95,13 +95,22 @@ export default function NewsletterQueuePage() {
             Review, tweak, and approve your editions. Approving schedules the email.
           </p>
         </div>
-        <Link
-          href="/newsletter/template"
-          className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
-        >
-          <Settings className="h-4 w-4" />
-          Template
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/newsletter/offers"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <Tag className="h-4 w-4" />
+            Offers
+          </Link>
+          <Link
+            href="/newsletter/template"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <Settings className="h-4 w-4" />
+            Template
+          </Link>
+        </div>
       </div>
 
       {readyCount > 0 && (

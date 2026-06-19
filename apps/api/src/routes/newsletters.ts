@@ -12,6 +12,11 @@ import {
 import { getNewsletterEmailConfig, type NewsletterEmailConfig } from '../lib/ghl/settings'
 import { renderNewsletterHtml, type RenderBrand, type RenderInput } from '../newsletter/render'
 import { processLogo } from '../newsletter/logo-process'
+import { generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions, deleteS3Keys } from '@socioply/shared'
+import { getSystemApiKey } from '../lib/system-keys'
+import { vtoken } from '../newsletter/image-overlay'
+import { runNewsletterPrompt } from '../newsletter/llm'
+import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { computeSendAt } from '../handlers/promo-email-generate'
 import {
   createGhlEmailCampaign,
@@ -523,6 +528,141 @@ export async function newsletterRoutes(app: FastifyInstance) {
     } catch (err) {
       logger.error({ userId, err }, '[newsletters] logo processing failed')
       return reply.status(500).send({ error: 'Logo processing failed' })
+    }
+  })
+
+  // ── Offers ─────────────────────────────────────────────────────────────────
+  function offerData(b: Record<string, unknown>): Record<string, unknown> {
+    const d: Record<string, unknown> = {}
+    if ('title' in b) d.title = String(b.title ?? '')
+    if ('body' in b) d.body = String(b.body ?? '')
+    if ('ctaLabel' in b) d.ctaLabel = b.ctaLabel ? String(b.ctaLabel) : null
+    if ('ctaUrl' in b) d.ctaUrl = b.ctaUrl ? String(b.ctaUrl) : null
+    if ('imageUrl' in b) d.imageUrl = b.imageUrl ? String(b.imageUrl) : null
+    if ('startDate' in b) d.startDate = b.startDate ? new Date(b.startDate as string) : null
+    if ('endDate' in b) d.endDate = b.endDate ? new Date(b.endDate as string) : null
+    if ('enabled' in b) d.enabled = !!b.enabled
+    if ('sortOrder' in b) d.sortOrder = Number(b.sortOrder) || 0
+    return d
+  }
+
+  // GET /newsletters/offers — list the user's offers
+  app.get('/newsletters/offers', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+    const offers = await prisma.newsletterOffer.findMany({
+      where: { userId },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    })
+    return reply.send({ offers })
+  })
+
+  // POST /newsletters/offers — create
+  app.post<{ Body: Record<string, unknown> }>('/newsletters/offers', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+    const d = offerData(request.body ?? {})
+    if (!d.title) return reply.status(400).send({ error: 'Title is required' })
+    const offer = await prisma.newsletterOffer.create({
+      data: { userId, title: String(d.title), body: String(d.body ?? ''), ...d },
+    })
+    return reply.status(201).send({ offer })
+  })
+
+  // PUT /newsletters/offers/:id — update
+  app.put<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    '/newsletters/offers/:id',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+      const userId = await resolveUserId(clerkId)
+      if (!userId) return reply.status(404).send({ error: 'User not found' })
+      const existing = await prisma.newsletterOffer.findFirst({ where: { id: request.params.id, userId } })
+      if (!existing) return reply.status(404).send({ error: 'Offer not found' })
+      const offer = await prisma.newsletterOffer.update({
+        where: { id: existing.id },
+        data: offerData(request.body ?? {}),
+      })
+      return reply.send({ offer })
+    },
+  )
+
+  // DELETE /newsletters/offers/:id
+  app.delete<{ Params: { id: string } }>('/newsletters/offers/:id', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+    const existing = await prisma.newsletterOffer.findFirst({ where: { id: request.params.id, userId } })
+    if (!existing) return reply.status(404).send({ error: 'Offer not found' })
+    if (existing.imageUrl) {
+      try {
+        await deleteS3Keys([new URL(existing.imageUrl).pathname.replace(/^\//, '')])
+      } catch {
+        /* non-fatal */
+      }
+    }
+    await prisma.newsletterOffer.delete({ where: { id: existing.id } })
+    return reply.send({ ok: true })
+  })
+
+  // POST /newsletters/offers/:id/generate-image — AI 16:9 banner from the offer copy
+  app.post<{ Params: { id: string } }>('/newsletters/offers/:id/generate-image', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+    const offer = await prisma.newsletterOffer.findFirst({ where: { id: request.params.id, userId } })
+    if (!offer) return reply.status(404).send({ error: 'Offer not found' })
+    const geminiKey = await getSystemApiKey('gemini')
+    if (!geminiKey) return reply.status(400).send({ error: 'Gemini API key not configured' })
+
+    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    const prompt = `High-quality, eye-catching advertising banner photo for this promotional offer: "${offer.title}". ${offer.body}. Industry: ${brand?.industry || 'wellness'}. A clean, modern, inviting promotional visual with a strong focal subject and professional lighting. NO text, NO words, NO letters, NO logos in the image — purely a visual. 16:9 banner.`
+    try {
+      const buf = await generateWithGeminiImage(geminiKey, prompt, 'gemini-3.1-flash-image', '16:9')
+      const base = `newsletter/offers/${userId}/${offer.id}-`
+      const key = `${base}${vtoken()}.jpg`
+      const { url } = await uploadBufferWithKey(key, buf, 'image/jpeg')
+      await deleteOldVersions(base, key)
+      await prisma.newsletterOffer.update({ where: { id: offer.id }, data: { imageUrl: url } })
+      return reply.send({ imageUrl: url })
+    } catch (err) {
+      logger.error({ offerId: offer.id, err }, '[newsletters] offer image generation failed')
+      return reply.status(500).send({ error: 'Image generation failed' })
+    }
+  })
+
+  // POST /newsletters/offers/draft — AI-draft offer copy from a one-line brief
+  app.post<{ Body: { brief?: string } }>('/newsletters/offers/draft', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+    const brief = (request.body?.brief ?? '').trim()
+    if (!brief) return reply.status(400).send({ error: 'Brief is required' })
+    const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+    try {
+      const { content } = await runNewsletterPrompt('nl_offer_draft', {
+        brief,
+        industry: brand?.industry ?? '',
+        who: brand?.who ?? '',
+      })
+      const cleaned = cleanTextOutput(content)
+      const json = cleaned.slice(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)
+      const parsed = JSON.parse(json) as { title?: string; body?: string; ctaLabel?: string }
+      return reply.send({
+        title: parsed.title ?? '',
+        body: parsed.body ?? '',
+        ctaLabel: parsed.ctaLabel ?? '',
+      })
+    } catch (err) {
+      logger.error({ userId, err }, '[newsletters] offer draft failed')
+      return reply.status(500).send({ error: 'Draft failed' })
     }
   })
 }

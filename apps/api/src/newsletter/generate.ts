@@ -436,6 +436,38 @@ function toRenderBrand(
 }
 
 /**
+ * Select the offers to include for an edition: one evergreen (no dates) + one
+ * seasonal whose window contains the edition's day (UTC). Highest priority wins.
+ */
+async function selectOffers(userId: string, editionDate: Date) {
+  const offers = await prisma.newsletterOffer.findMany({
+    where: { userId, enabled: true },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+  })
+  const dayNum = (x: Date) => Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate())
+  const ed = dayNum(new Date(editionDate))
+  const toRender = (o: (typeof offers)[number]) => ({
+    title: o.title,
+    body: o.body,
+    ctaLabel: o.ctaLabel,
+    ctaUrl: o.ctaUrl,
+    imageUrl: o.imageUrl,
+  })
+  const inWindow = (o: (typeof offers)[number]) => {
+    if (!o.startDate && !o.endDate) return false
+    const s = o.startDate ? dayNum(o.startDate) : -Infinity
+    const e = o.endDate ? dayNum(o.endDate) : Infinity
+    return ed >= s && ed <= e
+  }
+  const evergreen = offers.find((o) => !o.startDate && !o.endDate)
+  const seasonal = offers.find((o) => inWindow(o))
+  return {
+    evergreen: evergreen ? toRender(evergreen) : null,
+    seasonal: seasonal ? toRender(seasonal) : null,
+  }
+}
+
+/**
  * Recompute validation from the row's current columns, render the magazine HTML,
  * and persist both. Idempotent — safe to call after a full generate or a
  * single-section regenerate.
@@ -464,7 +496,11 @@ export async function renderAndSave(newsletterId: string): Promise<string> {
     needsRecipe: !!nl.topic.recipe,
   })
 
-  const html = renderNewsletterHtml(buildRenderInput(nl, video, nl.topic.date), toRenderBrand(brandRow))
+  const offers = await selectOffers(nl.userId, nl.topic.date)
+  const html = renderNewsletterHtml(
+    buildRenderInput(nl, video, nl.topic.date, offers),
+    toRenderBrand(brandRow),
+  )
   await prisma.newsletter.update({
     where: { id: newsletterId },
     data: { renderedHtml: html, validation: J(validation) },

@@ -235,6 +235,13 @@ describe('renderPromoEmail', () => {
     expect(html).toContain('Best wishes,')
     expect(html).toContain('Dr. Jane Smith')
     expect(html).toContain('padding:32px 28px 200px')
+  })
+
+  it('strips a leading headline from the promo body (greeting leads)', () => {
+    const html = renderPromoEmail('<h2>Big Headline</h2><p>Body text here.</p>', brand)
+    expect(html).not.toContain('Big Headline')
+    expect(html).toContain('Body text here.')
+    expect(html.indexOf('Hey {{contact.first_name}}')).toBeLessThan(html.indexOf('Body text here.'))
     // shared chrome: header logo (dark header bg → light variant) + footer unsubscribe
     expect(html).toContain('https://cdn.example.com/logo-light.png')
     expect(html).toContain('{{email.unsubscribe_link}}')

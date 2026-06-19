@@ -27,6 +27,7 @@ import { uploadFeaturedImageToS3WithRetry } from './image-uploader'
 import { getBoss, QUEUES } from '../queues/index'
 import type { PipelineContext } from './variable-resolver'
 import { buildArticleSchema, type SchemaTypeRule } from './schema-builder'
+import { validateSchemaJsonLd } from './quality-gate'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -378,13 +379,25 @@ export async function approveArticleJob(jobId: string): Promise<void> {
       modifiedDate: new Date().toISOString(),
     })
 
+    // Deterministic JSON-LD validation (non-fatal; the builder is deterministic
+    // so we flag rather than loop). Surfaces malformed schema for follow-up.
+    const schemaCheck = validateSchemaJsonLd(schemaJson)
+    if (!schemaCheck.ok) {
+      logger.warn({ jobId, errors: schemaCheck.errors }, '[approval] step 16 — schema markup failed validation')
+      Sentry.captureMessage('[approval] schema markup failed JSON-LD validation', {
+        level: 'warning',
+        tags: { phase: 'approval', step: 16, jobId },
+        extra: { errors: schemaCheck.errors },
+      })
+    }
+
     ctx.completedSteps.set(16, schemaJson)
 
     await prisma.sitePage.update({
       where: { jobId },
       data: { schemaJson },
     })
-    logger.info({ jobId }, '[approval] step 16 — schema markup persisted')
+    logger.info({ jobId, schemaValid: schemaCheck.ok }, '[approval] step 16 — schema markup persisted')
   } catch (err) {
     // Schema markup failure is non-fatal — log + Sentry, article is still approved
     logger.error({ jobId, err }, '[approval] step 16 — schema markup failed, continuing')

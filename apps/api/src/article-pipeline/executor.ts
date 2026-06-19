@@ -8,6 +8,7 @@ import type { PipelineContext } from './variable-resolver'
 import { extractCitationsForValidation, validateCitationUrls } from './citation-validator'
 import { insertInlineCitations } from './citation-inserter'
 import { cleanStepOutput } from './approval-service'
+import { getBoss, QUEUES } from '../queues/index'
 import { resolveGroundingUrls } from './grounding-resolver'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -164,6 +165,17 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     data: { status: 'completed', currentStep: 12 },
   })
   logger.info({ jobId }, '[executor] Phase A complete — job status set to completed')
+
+  // Hand off to the automated quality gate (evaluates → auto-approves on pass,
+  // or rewrites / flags for human review). Non-fatal if enqueue fails — the job
+  // stays 'completed' and can be approved manually.
+  try {
+    const boss = await getBoss()
+    await boss.send(QUEUES.ARTICLE_QUALITY_GATE, { jobId })
+    logger.info({ jobId }, '[executor] enqueued quality gate')
+  } catch (err) {
+    logger.error({ jobId, err }, '[executor] failed to enqueue quality gate — job left completed for manual approval')
+  }
 }
 
 /**

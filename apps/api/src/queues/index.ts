@@ -84,6 +84,7 @@ export const QUEUES = {
   DB_BACKUP: 'db-backup',
   PG_CONN_MONITOR: 'pg-conn-monitor',
   ARTICLE_PIPELINE: 'article-pipeline',
+  ARTICLE_QUALITY_GATE: 'article-quality-gate',
   ARTICLE_ENRICHMENT: 'article-enrichment',
   ARTICLE_OUTPUT: 'article-output',
   GENERATE_SOCIAL_FROM_ARTICLE: 'generate-social-from-article',

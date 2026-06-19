@@ -500,9 +500,13 @@ model ArticleJob {
   topic                Topic                 @relation(fields: [topicId], references: [id], onDelete: Cascade)
   userId               String
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status               String                @default("pending") // pending | in_progress | completed | approved | enriched | published | exported | failed
+  status               String                @default("pending") // pending | in_progress | completed | approved | enriched | published | exported | failed | needs_review
   currentStep          Int                   @default(0)
   enrichmentJobId      String?
+  // Auto quality gate (Phase A → gate → auto-approve | rewrite | needs_review)
+  qualityStatus        String? // pass | revise | fail | needs_review | error
+  qualityVerdict       Json? // { verdict, severity, reasons[], geminiSummary }
+  qualityAttempts      Int                   @default(0)
   totalCost            Float                 @default(0)
   totalTokens          Int                   @default(0)
   createdAt            DateTime              @default(now())

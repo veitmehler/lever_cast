@@ -18,6 +18,7 @@ import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
 import { pgMonitorHandler } from './handlers/pg-monitor'
 import { articlePipelineHandler, ArticlePipelineJobData } from './handlers/article-pipeline'
 import { articleEnrichmentHandler, ArticleEnrichmentJobData } from './handlers/article-enrichment'
+import { qualityGateHandler, QualityGateJobData } from './handlers/quality-gate'
 import { articleOutputHandler, ArticleOutputJobData } from './handlers/article-output'
 import { generateSocialFromArticleHandler, GenerateSocialFromArticleJobData } from './handlers/generate-social-from-article'
 import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-generate'
@@ -138,6 +139,12 @@ async function main() {
     QUEUES.ARTICLE_PIPELINE,
     { batchSize: 2 },
     withSentry('article-pipeline', articlePipelineHandler),
+  )
+
+  await boss.work<QualityGateJobData>(
+    QUEUES.ARTICLE_QUALITY_GATE,
+    { batchSize: 1 },
+    withSentry('article-quality-gate', qualityGateHandler),
   )
 
   await boss.work<ArticleEnrichmentJobData>(

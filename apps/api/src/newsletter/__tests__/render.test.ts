@@ -179,7 +179,9 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('Book an Adjustment')
     expect(html).toContain('https://x.test/book')
     expect(html).toContain('offer-seasonal.jpg')
-    expect(html.match(/Special Offer/g)?.length).toBe(2)
+    expect(html).toContain('Special Offer') // seasonal band
+    expect(html).toContain('Remember') // evergreen band (call-to-action, not "Special Offer")
+    expect(html.match(/Special Offer/g)?.length).toBe(1)
     const tips = html.indexOf('Tips Of The Day')
     const seasonal = html.indexOf('Mothers Day Special')
     const feature = html.indexOf('Article Of The Day')

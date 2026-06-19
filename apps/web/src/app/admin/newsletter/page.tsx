@@ -1,12 +1,18 @@
 import Link from 'next/link'
-import { CalendarDays, MessageSquareText, Play, ChevronRight } from 'lucide-react'
+import { CalendarDays, MessageSquareText, Play, ChevronRight, Tags } from 'lucide-react'
 
 const cards = [
   {
     href: '/admin/newsletter/calendars',
     label: 'Content Calendars',
-    description: 'Create calendars (industry + specialization), upload CSV topics, and assign customers.',
+    description: 'Create calendars (specialization + hemisphere), upload CSV topics, and assign customers.',
     icon: CalendarDays,
+  },
+  {
+    href: '/admin/newsletter/specializations',
+    label: 'Specializations',
+    description: 'Manage the specialization list clients pick from and that calendars are scoped to.',
+    icon: Tags,
   },
   {
     href: '/admin/newsletter/prompts',

@@ -1,7 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma, hemisphereForCountry } from '@socioply/shared'
+
+const SPECIALIZATIONS_FIELD = 'specializations'
+
+/**
+ * Auto-route the client to the correct newsletter calendar after their
+ * specialization/country changes. Mirrors apps/api calendar-routing.ts
+ * (calendar = primary specialization × country-derived hemisphere; the override
+ * applies only on equator-straddling "edge" countries).
+ */
+async function routeNewsletterCalendar(userId: string) {
+  const bs = await prisma.brandSettings.findUnique({
+    where: { userId },
+    select: { primarySpecialization: true, organizationCountryCode: true, hemisphereOverride: true },
+  })
+  const primary = bs?.primarySpecialization?.trim()
+  let calendarId: string | null = null
+  if (primary && bs?.organizationCountryCode?.trim()) {
+    const { hemisphere, edge } = hemisphereForCountry(bs.organizationCountryCode)
+    const override = bs.hemisphereOverride
+    const effective = edge && (override === 'north' || override === 'south') ? override : hemisphere
+    const cal = await prisma.newsletterCalendar.findFirst({
+      where: { specializationKey: primary, hemisphere: effective },
+      select: { id: true },
+    })
+    calendarId = cal?.id ?? null
+  }
+  await prisma.user.update({ where: { id: userId }, data: { newsletterCalendarId: calendarId } })
+}
 
 async function getUserId(clerkId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
@@ -28,6 +56,9 @@ export async function GET() {
         geolocation: null,
         industry: null,
         specialization: null,
+        specializations: [],
+        primarySpecialization: null,
+        hemisphereOverride: null,
         businessDescription: null,
         who: null,
         ourExperience: null,
@@ -89,6 +120,8 @@ export async function PATCH(request: NextRequest) {
       'geolocation',
       'industry',
       'specialization',
+      'primarySpecialization',
+      'hemisphereOverride',
       'businessDescription',
       'who',
       'ourExperience',
@@ -156,6 +189,22 @@ export async function PATCH(request: NextRequest) {
       data.organizationCountryCode = code.length === 2 ? code : null
     }
 
+    // hemisphereOverride must be 'north' | 'south' | null
+    if (data.hemisphereOverride != null && typeof data.hemisphereOverride === 'string') {
+      data.hemisphereOverride =
+        data.hemisphereOverride === 'north' || data.hemisphereOverride === 'south'
+          ? data.hemisphereOverride
+          : null
+    }
+
+    // specializations: string[] of specialization keys the client serves
+    if (SPECIALIZATIONS_FIELD in body) {
+      const raw = body[SPECIALIZATIONS_FIELD]
+      data.specializations = Array.isArray(raw)
+        ? raw.filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim())
+        : []
+    }
+
     // Boolean field — can't go through the string coercion loop above
     if ('instagramVerified' in body) {
       data.instagramVerified = Boolean(body.instagramVerified)
@@ -182,6 +231,15 @@ export async function PATCH(request: NextRequest) {
       create: { userId, ...data } as Prisma.BrandSettingsUncheckedCreateInput,
       update: data,
     })
+
+    // Re-route to the matching newsletter calendar whenever the routing inputs change.
+    if (
+      'primarySpecialization' in body ||
+      'organizationCountryCode' in body ||
+      'hemisphereOverride' in body
+    ) {
+      await routeNewsletterCalendar(userId)
+    }
 
     return NextResponse.json(settings)
   } catch (err) {

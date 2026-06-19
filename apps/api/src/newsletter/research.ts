@@ -31,6 +31,7 @@ import {
   urlStatus,
 } from './oxylabs'
 import { overlayPlayButton, overlayTitleBanner, vtoken } from './image-overlay'
+import { specializationLabel } from './calendar-routing'
 
 const NL_IMAGE_SIZE = 'landscape_16_9'
 
@@ -148,13 +149,14 @@ export async function researchVideo(
   }
 
   // Phase 1: AI-generated query. Phase 2: raw topic title.
+  const spec = await specializationLabel(calendar.specializationKey)
   let hit = null
   try {
     const { content } = await runNewsletterPrompt('nl_youtube_query', {
       topic: topic.topic,
       industry: calendar.industry,
-      specialization: calendar.specialization ?? '',
-      who: calendar.specialization ?? '',
+      specialization: spec,
+      who: spec,
     })
     const query = cleanTextOutput(content)
     if (query) hit = await youtubeSearch(query)
@@ -219,8 +221,8 @@ export async function researchOneRecipe(
     recipeResearch: research,
     previousRecipeTitles: priorTitles.join('\n'),
     industry: calendar.industry,
-    specialization: calendar.specialization ?? '',
-    who: calendar.specialization ?? '',
+    specialization: await specializationLabel(calendar.specializationKey),
+    who: await specializationLabel(calendar.specializationKey),
     writingStyle: '',
   })
 
@@ -355,7 +357,7 @@ async function researchOneTeaser(
       bulletPoint: bullet,
       urlCount: String(valid.length),
       urls: valid.join('\n'),
-      who: calendar.specialization ?? '',
+      who: await specializationLabel(calendar.specializationKey),
     })
     const picked = cleanTextOutput(content).trim()
     if (valid.includes(picked)) chosen = picked

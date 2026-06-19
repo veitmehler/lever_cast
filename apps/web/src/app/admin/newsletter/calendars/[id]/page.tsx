@@ -32,7 +32,8 @@ interface CalendarDetail {
   id: string
   name: string
   industry: string
-  specialization: string | null
+  specializationKey: string | null
+  hemisphere: string | null
   topics: Topic[]
   _count: { assignments: number }
 }
@@ -170,7 +171,8 @@ export default function AdminNewsletterCalendarDetailPage({
           <h1 className="text-2xl font-semibold text-foreground">{calendar.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {calendar.industry}
-            {calendar.specialization ? ` · ${calendar.specialization}` : ''} · {calendar.topics.length} topics
+            {calendar.specializationKey ? ` · ${calendar.specializationKey}` : ''}
+            {calendar.hemisphere ? ` · ${calendar.hemisphere}` : ''} · {calendar.topics.length} topics
           </p>
         </div>
         <Link

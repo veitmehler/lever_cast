@@ -801,7 +801,12 @@ model BrandSettings {
   // Article brand context (used by prompt variable resolver)
   geolocation           String? @db.Text
   industry              String? @db.Text // e.g. Chiropractic, Accounting — primes LLM prompts
-  specialization        String? @db.Text // e.g. "family care", "sports" — drives newsletter calendar matching + voice
+  specialization        String? @db.Text // legacy free-text (fallback for {{specialization}}); superseded by primarySpecialization
+  // Deterministic specializations (Specialization.key). Multi-select; one primary
+  // drives the newsletter calendar. hemisphereOverride applies only for edge countries.
+  specializations       String[] // selected Specialization.key values
+  primarySpecialization String? // the primary Specialization.key (drives calendar routing + {{specialization}})
+  hemisphereOverride    String? // 'north' | 'south' — honored only when the client's country is an edge country
   businessDescription   String? @db.Text // free-text: what the business does, who it serves
   who                   String? @db.Text // target audience description
   ourExperience         String? @db.Text // firm / author experience blurb
@@ -886,16 +891,33 @@ model BrandSettings {
 
 // Admin-managed content calendar, scoped per industry + specialization.
 // Topics are uploaded via CSV; customers are explicitly assigned to a calendar.
-model NewsletterCalendar {
-  id             String            @id @default(cuid())
-  name           String
-  industry       String // matches BrandSettings.industry
-  specialization String? // e.g. "family care", "sports"
-  topics         NewsletterTopic[]
-  assignments    User[]            @relation("UserNewsletterCalendar")
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+// Admin-managed list of available specializations (deterministic; replaces the
+// old free-text specialization). `key` is an immutable slug referenced by
+// calendars + clients; `label` is the display name.
+model Specialization {
+  id        String   @id @default(cuid())
+  key       String   @unique // immutable slug, e.g. "family_care"
+  label     String // display name, e.g. "Family Care"
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@map("specializations")
+}
+
+model NewsletterCalendar {
+  id              String            @id @default(cuid())
+  name            String
+  industry        String // matches BrandSettings.industry
+  specializationKey String? // → Specialization.key
+  hemisphere      String? // 'north' | 'south'
+  topics          NewsletterTopic[]
+  assignments     User[]            @relation("UserNewsletterCalendar")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([specializationKey, hemisphere])
   @@map("newsletter_calendars")
 }
 

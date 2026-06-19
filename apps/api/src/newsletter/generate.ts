@@ -20,6 +20,7 @@ import { generateArticle, type VoiceVars, type UsageRecorder, type NewsletterArt
 import type { TopicResearch, TeaserSource } from './research'
 import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
 import { generateCoverImage, type CoverItem, type CoverColors } from './cover'
+import { specializationLabel } from './calendar-routing'
 
 
 const J = (v: unknown): Prisma.InputJsonValue => v as unknown as Prisma.InputJsonValue
@@ -304,7 +305,10 @@ async function loadGenContext(newsletterId: string): Promise<GenContext> {
     writingStyle: user?.settings?.writingStyle ?? '',
     targetAudience: user?.brandSettings?.who ?? '',
     industry: user?.brandSettings?.industry ?? calendar.industry,
-    specialization: user?.brandSettings?.specialization ?? calendar.specialization ?? '',
+    specialization:
+      (await specializationLabel(user?.brandSettings?.primarySpecialization ?? calendar.specializationKey)) ||
+      user?.brandSettings?.specialization ||
+      '',
   }
   return {
     newsletterId,

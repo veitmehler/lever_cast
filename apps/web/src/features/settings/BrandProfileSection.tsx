@@ -5,10 +5,19 @@ import { Button } from '@/components/ui/button'
 import { COUNTRIES } from './countries'
 import type { SettingsData } from './useSettingsData'
 
+// Equator-straddling countries (mirror of packages/shared/src/hemisphere.ts EDGE map).
+// Kept inline so this client component doesn't pull the server bundle into the browser.
+const EDGE_COUNTRIES = new Set([
+  'BR', 'ID', 'EC', 'CD', 'CG', 'TZ', 'PG', 'CO', 'KE', 'UG', 'GA', 'SO', 'ST', 'KI', 'MV',
+])
+
 export function BrandProfileSection({ settings }: { settings: SettingsData }) {
   const {
     industry, setIndustry,
-    specialization, setSpecialization,
+    specializations, setSpecializations,
+    primarySpecialization, setPrimarySpecialization,
+    hemisphereOverride, setHemisphereOverride,
+    availableSpecializations,
     businessDescription, setBusinessDescription,
     geolocation, setGeolocation,
     who, setWho,
@@ -71,23 +80,86 @@ export function BrandProfileSection({ settings }: { settings: SettingsData }) {
           </p>
         </div>
 
-        {/* Specialization — drives newsletter calendar matching + voice */}
+        {/* Specializations — drives newsletter calendar matching + voice */}
         <div>
           <label className="block text-sm font-medium text-card-foreground mb-1">
-            Specialization <span className="text-muted-foreground">(optional)</span>
+            Specializations
           </label>
-          <input
-            type="text"
-            value={specialization}
-            onChange={(e) => setSpecialization(e.target.value)}
-            placeholder='e.g. "family care", "sports", "pediatrics"'
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            A focus within your industry. Used to match you to the right newsletter content calendar
-            and as the <code className="rounded bg-muted px-1">{'{{specialization}}'}</code> variable.
+          <p className="text-xs text-muted-foreground mb-2">
+            Select every area you serve, then mark one as <strong>primary</strong>. The primary
+            specialization (combined with your country) decides which newsletter content calendar
+            you receive, and supplies the{' '}
+            <code className="rounded bg-muted px-1">{'{{specialization}}'}</code> variable.
           </p>
+          {availableSpecializations.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">
+              No specializations are available yet. Please contact your administrator.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {availableSpecializations.map((s) => {
+                const checked = specializations.includes(s.key)
+                const isPrimary = primarySpecialization === s.key
+                return (
+                  <div key={s.key} className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-card-foreground">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSpecializations([...specializations, s.key])
+                            // First one selected becomes primary by default
+                            if (!primarySpecialization) setPrimarySpecialization(s.key)
+                          } else {
+                            setSpecializations(specializations.filter((k) => k !== s.key))
+                            if (isPrimary) setPrimarySpecialization('')
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-input"
+                      />
+                      {s.label}
+                    </label>
+                    {checked && (
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <input
+                          type="radio"
+                          name="primarySpecialization"
+                          checked={isPrimary}
+                          onChange={() => setPrimarySpecialization(s.key)}
+                          className="h-3.5 w-3.5"
+                        />
+                        Primary
+                      </label>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
+
+        {/* Hemisphere override — only meaningful for equator-straddling countries */}
+        {EDGE_COUNTRIES.has((organizationCountryCode || '').toUpperCase()) && (
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-1">
+              Hemisphere
+            </label>
+            <select
+              value={hemisphereOverride}
+              onChange={(e) => setHemisphereOverride(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Auto (based on your country)</option>
+              <option value="north">Northern hemisphere</option>
+              <option value="south">Southern hemisphere</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Your country straddles the equator. Choose the hemisphere whose seasons match your
+              location so the newsletter&apos;s seasonal content lines up.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-card-foreground mb-1">

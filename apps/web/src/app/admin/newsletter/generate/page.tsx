@@ -8,7 +8,8 @@ interface CalendarRow {
   id: string
   name: string
   industry: string
-  specialization: string | null
+  specializationKey: string | null
+  hemisphere: string | null
 }
 
 interface AssignedUser {
@@ -127,7 +128,8 @@ export default function AdminNewsletterGeneratePage() {
             {calendars.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} ({c.industry}
-                {c.specialization ? ` / ${c.specialization}` : ''})
+                {c.specializationKey ? ` / ${c.specializationKey}` : ''}
+                {c.hemisphere ? ` · ${c.hemisphere}` : ''})
               </option>
             ))}
           </select>

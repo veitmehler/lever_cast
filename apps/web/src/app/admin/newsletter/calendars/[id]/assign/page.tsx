@@ -14,8 +14,8 @@ interface Candidate {
   id: string
   name: string | null
   email: string
-  industry: string | null
-  specialization: string | null
+  primarySpecialization: string | null
+  hemisphere: string | null
   alreadyAssignedElsewhere: boolean
   matchScore: number
 }
@@ -175,8 +175,8 @@ export default function AdminNewsletterAssignPage({
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {c.email}
-                        {(c.industry || c.specialization) &&
-                          ` · ${[c.industry, c.specialization].filter(Boolean).join(' / ')}`}
+                        {(c.primarySpecialization || c.hemisphere) &&
+                          ` · ${[c.primarySpecialization, c.hemisphere].filter(Boolean).join(' / ')}`}
                         {c.alreadyAssignedElsewhere && ' · already on another calendar'}
                       </div>
                     </div>

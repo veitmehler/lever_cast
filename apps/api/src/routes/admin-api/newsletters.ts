@@ -4,17 +4,20 @@ import { requireAdmin } from '../../middleware/admin'
 import { logger } from '../../lib/logger'
 import { parseNewsletterCsv, commitNewsletterTopics } from '../../newsletter/csv'
 import { enqueueNewsletterGeneration } from '../../newsletter/enqueue'
+import { reresolveForSpecialization, effectiveHemisphere } from '../../newsletter/calendar-routing'
 
 interface CreateCalendarBody {
   name?: string
   industry?: string
-  specialization?: string | null
+  specializationKey?: string | null
+  hemisphere?: string | null // 'north' | 'south'
 }
 
 interface UpdateCalendarBody {
   name?: string
   industry?: string
-  specialization?: string | null
+  specializationKey?: string | null
+  hemisphere?: string | null
 }
 
 interface AssignBody {
@@ -55,17 +58,22 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
     const admin = await requireAdmin(request, reply)
     if (!admin) return
 
-    const { name, industry, specialization } = request.body ?? {}
+    const { name, industry, specializationKey, hemisphere } = request.body ?? {}
     if (!name?.trim()) return reply.status(400).send({ error: 'name is required' })
     if (!industry?.trim()) return reply.status(400).send({ error: 'industry is required' })
+    if (hemisphere && hemisphere !== 'north' && hemisphere !== 'south')
+      return reply.status(400).send({ error: "hemisphere must be 'north' or 'south'" })
 
     const calendar = await prisma.newsletterCalendar.create({
       data: {
         name: name.trim(),
         industry: industry.trim(),
-        specialization: specialization?.trim() || null,
+        specializationKey: specializationKey?.trim() || null,
+        hemisphere: hemisphere ?? null,
       },
     })
+    // Route any clients whose primary specialization now has a matching calendar.
+    if (calendar.specializationKey) await reresolveForSpecialization(calendar.specializationKey)
     return reply.status(201).send({ calendar })
   })
 
@@ -95,13 +103,14 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
       const existing = await prisma.newsletterCalendar.findUnique({ where: { id: request.params.id } })
       if (!existing) return reply.status(404).send({ error: 'Calendar not found' })
 
-      const { name, industry, specialization } = request.body ?? {}
+      const { name, industry, specializationKey, hemisphere } = request.body ?? {}
       const calendar = await prisma.newsletterCalendar.update({
         where: { id: request.params.id },
         data: {
           ...(name !== undefined ? { name: name.trim() } : {}),
           ...(industry !== undefined ? { industry: industry.trim() } : {}),
-          ...(specialization !== undefined ? { specialization: specialization?.trim() || null } : {}),
+          ...(specializationKey !== undefined ? { specializationKey: specializationKey?.trim() || null } : {}),
+          ...(hemisphere !== undefined ? { hemisphere: hemisphere || null } : {}),
         },
       })
       return reply.send({ calendar })
@@ -211,30 +220,28 @@ export async function newslettersAdminRoutes(app: FastifyInstance) {
           name: true,
           email: true,
           newsletterCalendarId: true,
-          brandSettings: { select: { industry: true, specialization: true } },
+          brandSettings: {
+            select: { primarySpecialization: true, organizationCountryCode: true, hemisphereOverride: true },
+          },
         },
         orderBy: { email: 'asc' },
       })
 
-      const norm = (s?: string | null) => (s ?? '').trim().toLowerCase()
-      const calIndustry = norm(calendar.industry)
-      const calSpec = norm(calendar.specialization)
-
+      // Candidates that route to this calendar = matching primary specialization + hemisphere.
       const candidates = others
         .map((u) => {
-          const ui = norm(u.brandSettings?.industry)
-          const us = norm(u.brandSettings?.specialization)
-          let score = 0
-          if (calIndustry && ui === calIndustry) score += 2
-          if (calSpec && us === calSpec) score += 1
+          const bs = u.brandSettings
+          const specMatch = !!calendar.specializationKey && bs?.primarySpecialization === calendar.specializationKey
+          const hemi = effectiveHemisphere(bs?.organizationCountryCode, bs?.hemisphereOverride)
+          const hemiMatch = !!calendar.hemisphere && hemi === calendar.hemisphere
           return {
             id: u.id,
             name: u.name,
             email: u.email,
-            industry: u.brandSettings?.industry ?? null,
-            specialization: u.brandSettings?.specialization ?? null,
+            primarySpecialization: bs?.primarySpecialization ?? null,
+            hemisphere: hemi,
             alreadyAssignedElsewhere: u.newsletterCalendarId != null,
-            matchScore: score,
+            matchScore: (specMatch ? 2 : 0) + (hemiMatch ? 1 : 0),
           }
         })
         .sort((a, b) => b.matchScore - a.matchScore || a.email.localeCompare(b.email))

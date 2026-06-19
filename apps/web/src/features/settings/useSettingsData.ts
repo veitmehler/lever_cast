@@ -29,7 +29,12 @@ export function useSettingsData() {
 
   // Article Brand Profile — content fields
   const [industry, setIndustry]                         = useState('')
-  const [specialization, setSpecialization]             = useState('')
+  const [specialization, setSpecialization]             = useState('') // legacy free-text (kept for back-compat)
+  const [specializations, setSpecializations]           = useState<string[]>([]) // keys the client serves
+  const [primarySpecialization, setPrimarySpecialization] = useState('') // one of `specializations`
+  const [hemisphereOverride, setHemisphereOverride]     = useState('') // '', 'north', 'south' (edge countries only)
+  const [availableSpecializations, setAvailableSpecializations] =
+    useState<Array<{ key: string; label: string }>>([])
   const [businessDescription, setBusinessDescription]   = useState('')
   const [geolocation, setGeolocation]                   = useState('')
   const [who, setWho]                                   = useState('')
@@ -88,11 +93,17 @@ export function useSettingsData() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const [settingsRes, keysRes, brandRes] = await Promise.all([
+        const [settingsRes, keysRes, brandRes, specsRes] = await Promise.all([
           fetch('/api/settings'),
           fetch('/api/api-keys'),
           fetch('/api/brand-settings'),
+          fetch('/api/specializations'),
         ])
+
+        if (specsRes.ok) {
+          const { specializations: list } = await specsRes.json()
+          if (Array.isArray(list)) setAvailableSpecializations(list)
+        }
 
         if (settingsRes.ok) {
           const settings = await settingsRes.json()
@@ -110,6 +121,9 @@ export function useSettingsData() {
           const brand = await brandRes.json()
           if (brand.industry)             setIndustry(brand.industry)
           if (brand.specialization)       setSpecialization(brand.specialization)
+          if (Array.isArray(brand.specializations)) setSpecializations(brand.specializations)
+          if (brand.primarySpecialization) setPrimarySpecialization(brand.primarySpecialization)
+          if (brand.hemisphereOverride)   setHemisphereOverride(brand.hemisphereOverride)
           if (brand.businessDescription) setBusinessDescription(brand.businessDescription)
           if (brand.geolocation)          setGeolocation(brand.geolocation)
           if (brand.who)                  setWho(brand.who)
@@ -321,6 +335,9 @@ export function useSettingsData() {
           geolocation: geolocation || null,
           industry: industry || null,
           specialization: specialization || null,
+          specializations,
+          primarySpecialization: primarySpecialization || null,
+          hemisphereOverride: hemisphereOverride || null,
           businessDescription: businessDescription || null,
           who: who || null,
           ourExperience: ourExperience || null,
@@ -441,6 +458,10 @@ export function useSettingsData() {
     // Brand profile — content
     industry, setIndustry,
     specialization, setSpecialization,
+    specializations, setSpecializations,
+    primarySpecialization, setPrimarySpecialization,
+    hemisphereOverride, setHemisphereOverride,
+    availableSpecializations,
     businessDescription, setBusinessDescription,
     geolocation, setGeolocation,
     who, setWho,

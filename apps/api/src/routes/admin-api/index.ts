@@ -9,6 +9,7 @@ import { outlineFrameworksAdminRoutes } from './outline-frameworks'
 import { socialAutomationAdminRoutes } from './social-automation'
 import { musicAdminRoutes } from './music'
 import { newslettersAdminRoutes } from './newsletters'
+import { specializationsAdminRoutes } from './specializations'
 
 export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(llmKeysAdminRoutes)
@@ -21,4 +22,5 @@ export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(socialAutomationAdminRoutes)
   await app.register(musicAdminRoutes)
   await app.register(newslettersAdminRoutes)
+  await app.register(specializationsAdminRoutes)
 }

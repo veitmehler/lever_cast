@@ -8,33 +8,55 @@ interface CalendarRow {
   id: string
   name: string
   industry: string
-  specialization: string | null
+  specializationKey: string | null
+  hemisphere: string | null
   createdAt: string
   _count: { topics: number; assignments: number }
 }
 
+interface SpecializationRow {
+  id: string
+  key: string
+  label: string
+  enabled: boolean
+}
+
+const HEMISPHERE_LABEL: Record<string, string> = { north: 'Northern', south: 'Southern' }
+
 export default function AdminNewsletterCalendarsPage() {
   const [calendars, setCalendars] = useState<CalendarRow[]>([])
+  const [specs, setSpecs] = useState<SpecializationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [industry, setIndustry] = useState('')
-  const [specialization, setSpecialization] = useState('')
+  const [specializationKey, setSpecializationKey] = useState('')
+  const [hemisphere, setHemisphere] = useState('north')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+
+  const specLabel = (key: string | null) =>
+    key ? specs.find((s) => s.key === key)?.label ?? key : null
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/newsletter/calendars', { cache: 'no-store' })
-      if (!res.ok) {
-        setError(`HTTP ${res.status}: ${(await res.text()) || res.statusText}`)
+      const [calRes, specRes] = await Promise.all([
+        fetch('/api/admin/newsletter/calendars', { cache: 'no-store' }),
+        fetch('/api/admin/specializations', { cache: 'no-store' }),
+      ])
+      if (!calRes.ok) {
+        setError(`HTTP ${calRes.status}: ${(await calRes.text()) || calRes.statusText}`)
         return
       }
-      const data = await res.json()
+      const data = await calRes.json()
       setCalendars(data.calendars ?? [])
+      if (specRes.ok) {
+        const sd = await specRes.json()
+        setSpecs(sd.specializations ?? [])
+      }
     } catch (err) {
       setError((err as Error).message ?? 'Failed to load calendars')
     } finally {
@@ -54,7 +76,12 @@ export default function AdminNewsletterCalendarsPage() {
       const res = await fetch('/api/admin/newsletter/calendars', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, industry, specialization: specialization || null }),
+        body: JSON.stringify({
+          name,
+          industry,
+          specializationKey: specializationKey || null,
+          hemisphere,
+        }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -63,7 +90,8 @@ export default function AdminNewsletterCalendarsPage() {
       }
       setName('')
       setIndustry('')
-      setSpecialization('')
+      setSpecializationKey('')
+      setHemisphere('north')
       await load()
     } catch (err) {
       setCreateError((err as Error).message ?? 'Failed to create calendar')
@@ -72,13 +100,16 @@ export default function AdminNewsletterCalendarsPage() {
     }
   }
 
+  const enabledSpecs = specs.filter((s) => s.enabled)
+
   return (
     <div className="max-w-4xl">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Content Calendars</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Each calendar is scoped to an industry + specialization and holds dated topics uploaded via CSV.
+            Each calendar is scoped to a specialization + hemisphere and holds dated topics uploaded via CSV.
+            Clients are auto-routed to the calendar matching their primary specialization and country.
           </p>
         </div>
         <a
@@ -100,14 +131,14 @@ export default function AdminNewsletterCalendarsPage() {
           <Plus className="h-4 w-4" />
           New calendar
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Name</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Family Chiropractic 2026"
+              placeholder="Family Care · Southern 2026"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -122,15 +153,31 @@ export default function AdminNewsletterCalendarsPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Specialization <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              value={specialization}
-              onChange={(e) => setSpecialization(e.target.value)}
-              placeholder="family care"
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Specialization</label>
+            <select
+              value={specializationKey}
+              onChange={(e) => setSpecializationKey(e.target.value)}
+              required
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            />
+            >
+              <option value="">Select a specialization…</option>
+              {enabledSpecs.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Hemisphere</label>
+            <select
+              value={hemisphere}
+              onChange={(e) => setHemisphere(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="north">Northern</option>
+              <option value="south">Southern</option>
+            </select>
           </div>
         </div>
         {createError && (
@@ -184,7 +231,8 @@ export default function AdminNewsletterCalendarsPage() {
                 <div className="text-sm font-medium text-foreground">{c.name}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {c.industry}
-                  {c.specialization ? ` · ${c.specialization}` : ''}
+                  {specLabel(c.specializationKey) ? ` · ${specLabel(c.specializationKey)}` : ''}
+                  {c.hemisphere ? ` · ${HEMISPHERE_LABEL[c.hemisphere] ?? c.hemisphere}` : ''}
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">

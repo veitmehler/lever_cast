@@ -458,9 +458,13 @@ model Topic {
   userId                     String
   user                       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   topic                      String
-  scheduledDate              DateTime
+  // Null = an unscheduled "idea" in the idea bank. A date = scheduled (the
+  // primary article topic for that day).
+  scheduledDate              DateTime?
   excludedKeywords           String[]
-  status                     String               @default("pending")
+  status                     String               @default("pending") // idea | pending | ... (idea = unscheduled brainstorm)
+  source                     String?              @default("manual") // idea | csv | article_calendar | manual
+  notes                      String?              @db.Text // free-form note captured with an idea
   mode                       String               @default("social_only") // social_only | article_first | article_only
   defaultOutputTargets       String[]
   wordPressConnectionId      String?

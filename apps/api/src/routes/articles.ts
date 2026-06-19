@@ -475,7 +475,7 @@ export async function articleRoutes(app: FastifyInstance) {
     // Fire-and-forget background generation — both are idempotent with dedup keys
     if (job.sitePage?.id) {
       const settings = await prisma.settings.findUnique({ where: { userId: user.id } })
-      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate ?? new Date()
+      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate ?? new Date() ?? new Date()
 
       enqueueSyndication(jobId, user.id).catch((err) =>
         logger.error({ jobId, err }, '[publish] failed to enqueue syndication'),
@@ -899,7 +899,7 @@ export async function articleRoutes(app: FastifyInstance) {
       }
 
       const settings = await prisma.settings.findUnique({ where: { userId: user.id } })
-      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate
+      const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate ?? new Date()
 
       const result = await enqueueSocialAutomation({
         userId: user.id,

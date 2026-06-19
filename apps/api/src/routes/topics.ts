@@ -190,11 +190,15 @@ export async function topicRoutes(app: FastifyInstance) {
           : null
         const hasExplicitFramework = csvOutlineNumber != null && !isNaN(csvOutlineNumber)
 
+        // A row without a date is captured as an unscheduled idea (no job).
+        const hasDate = !!row.scheduledDate
         const topicRow = await prisma.topic.create({
           data: {
             userId: user.id,
             topic: topicText,
-            scheduledDate: row.scheduledDate ? new Date(row.scheduledDate) : new Date(),
+            scheduledDate: hasDate ? new Date(row.scheduledDate) : null,
+            status: hasDate ? 'pending' : 'idea',
+            source: 'csv',
             mode,
             slug: row.slug || null,
             category: row.category || null,
@@ -208,7 +212,7 @@ export async function topicRoutes(app: FastifyInstance) {
           },
         })
 
-        if (mode === 'social_only') {
+        if (!hasDate || mode === 'social_only') {
           results.push({ row: i + 1, topicId: topicRow.id, mode })
           continue
         }
@@ -257,6 +261,97 @@ export async function topicRoutes(app: FastifyInstance) {
     })
 
     return reply.send(topics)
+  })
+
+  // ── Idea bank ─────────────────────────────────────────────────────────────
+
+  // POST /api/topics/idea — capture an unscheduled article idea (no job)
+  app.post<{ Body: { topic?: string; notes?: string } }>('/topics/idea', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const topic = request.body?.topic?.trim()
+    if (!topic) return reply.status(400).send({ error: 'topic is required' })
+
+    const idea = await prisma.topic.create({
+      data: {
+        userId: user.id,
+        topic,
+        notes: request.body?.notes?.trim() || null,
+        scheduledDate: null,
+        status: 'idea',
+        source: 'idea',
+        mode: 'article_first',
+      },
+    })
+    return reply.status(201).send({ idea })
+  })
+
+  // GET /api/topics/ideas — unscheduled ideas for the account
+  app.get('/topics/ideas', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const ideas = await prisma.topic.findMany({
+      where: { userId: user.id, status: 'idea' }, // extension scopes to account members
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, topic: true, notes: true, source: true, createdAt: true },
+    })
+    return reply.send({ ideas })
+  })
+
+  // PATCH /api/topics/:id — edit text/notes and (un)schedule. Scheduling an idea
+  // makes it the primary article topic for that date (status → pending).
+  app.patch<{ Params: { id: string }; Body: { topic?: string; notes?: string | null; scheduledDate?: string | null } }>(
+    '/topics/:id',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+      const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      // Ownership guard: findFirst is account-scoped by the prisma extension.
+      const owned = await prisma.topic.findFirst({ where: { id: request.params.id, userId: user.id } })
+      if (!owned) return reply.status(404).send({ error: 'Topic not found' })
+
+      const body = request.body ?? {}
+      const data: Record<string, unknown> = {}
+      if (body.topic !== undefined) {
+        if (!body.topic.trim()) return reply.status(400).send({ error: 'topic cannot be empty' })
+        data.topic = body.topic.trim()
+      }
+      if (body.notes !== undefined) data.notes = body.notes?.trim() || null
+      if (body.scheduledDate !== undefined) {
+        if (body.scheduledDate) {
+          data.scheduledDate = new Date(body.scheduledDate)
+          if (owned.status === 'idea') data.status = 'pending'
+        } else {
+          data.scheduledDate = null
+          data.status = 'idea'
+        }
+      }
+
+      const topic = await prisma.topic.update({ where: { id: request.params.id }, data })
+      return reply.send({ topic })
+    },
+  )
+
+  // DELETE /api/topics/:id — delete an idea/topic (account-ownership guarded)
+  app.delete<{ Params: { id: string } }>('/topics/:id', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const owned = await prisma.topic.findFirst({ where: { id: request.params.id, userId: user.id } })
+    if (!owned) return reply.status(404).send({ error: 'Topic not found' })
+
+    await prisma.topic.delete({ where: { id: request.params.id } })
+    return reply.send({ ok: true })
   })
 
   // ── GET /api/outline-frameworks — public list for dashboard dropdown ───────

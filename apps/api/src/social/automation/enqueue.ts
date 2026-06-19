@@ -84,7 +84,7 @@ export async function maybeEnqueueSocialAutomationAfterEnrichment(jobId: string)
   const settings = await prisma.settings.findUnique({ where: { userId: job.userId } })
   if (settings?.socialAutomationEnabled === false) return
 
-  const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate
+  const publishingDate = job.topic.publishingDate ?? job.topic.scheduledDate ?? new Date()
 
   await enqueueSocialAutomation({
     userId: job.userId,

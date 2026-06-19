@@ -50,6 +50,7 @@ export interface RenderModules {
 
 export interface RenderBrand {
   organizationName?: string | null
+  defaultAuthorName?: string | null // promo email sign-off
   organizationAddress?: string | null
   organizationEmail?: string | null
   organizationPhone?: string | null
@@ -572,8 +573,15 @@ ${preheader}
  */
 export function renderPromoEmail(bodyHtml: string, brand: RenderBrand, previewText?: string | null): string {
   const theme = resolveTheme(brand)
-  const card = `<tr><td style="background-color:#ffffff;padding:32px 28px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${bodyHtml}</td></tr>`
-  const rows = [headerBlock(brand, theme), card, spacer(), footerBlock(brand, theme)]
+  // Personalised greeting (GHL merge field, normal weight) + sign-off with the
+  // configured author name. 200px bottom padding focuses the reader on the body.
+  const greeting = `<p style="margin:0 0 16px;font-weight:${theme.bodyWeight};">Hey {{contact.first_name}},</p>`
+  const author = brand.defaultAuthorName?.trim()
+  const signoff = author
+    ? `<p style="margin:24px 0 0;font-weight:${theme.bodyWeight};">Best wishes,<br/>${esc(author)}</p>`
+    : ''
+  const card = `<tr><td style="background-color:#ffffff;padding:32px 28px 200px;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${greeting}${bodyHtml}${signoff}</td></tr>`
+  const rows = [headerBlock(brand, theme), card, footerBlock(brand, theme)]
   return emailShell(theme, previewText ?? null, rows.join('\n      '))
 }
 

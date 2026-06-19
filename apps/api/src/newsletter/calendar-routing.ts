@@ -9,6 +9,7 @@ import {
   hemisphereForCountry,
   brandSettingsForUser,
   canonicalAccountUserId,
+  accountIdForUser,
   type Hemisphere,
 } from '@socioply/shared'
 import { logger } from '../lib/logger'
@@ -79,5 +80,51 @@ export async function reresolveForSpecialization(specializationKey: string): Pro
     select: { userId: true },
   })
   for (const c of clients) await resolveNewsletterCalendar(c.userId)
+  return clients.length
+}
+
+/**
+ * Resolve the account's article calendar = (primary specialization) ×
+ * (country-derived hemisphere). Sets Account.articleCalendarId. Separate from
+ * the newsletter calendar but uses the same routing inputs.
+ */
+export async function resolveArticleCalendar(userId: string): Promise<RoutingResult> {
+  const accountId = await accountIdForUser(userId)
+  const brand = await brandSettingsForUser(userId)
+
+  const setCalendar = async (id: string | null) => {
+    if (accountId) await prisma.account.update({ where: { id: accountId }, data: { articleCalendarId: id } })
+  }
+
+  const primary = brand?.primarySpecialization?.trim()
+  if (!primary) {
+    await setCalendar(null)
+    return { calendarId: null, hemisphere: null, reason: 'no_primary' }
+  }
+  const hemisphere = effectiveHemisphere(brand?.organizationCountryCode, brand?.hemisphereOverride)
+  if (!hemisphere) {
+    await setCalendar(null)
+    return { calendarId: null, hemisphere: null, reason: 'no_country' }
+  }
+
+  const calendar = await prisma.articleCalendar.findFirst({
+    where: { specializationKey: primary, hemisphere },
+    select: { id: true },
+  })
+  await setCalendar(calendar?.id ?? null)
+  if (!calendar) {
+    logger.info({ userId, primary, hemisphere }, '[calendar-routing] no matching article calendar — account left unassigned')
+    return { calendarId: null, hemisphere, reason: 'no_calendar' }
+  }
+  return { calendarId: calendar.id, hemisphere, reason: 'ok' }
+}
+
+/** Re-resolve every account whose primary specialization matches — used after an article calendar is created/uploaded. */
+export async function reresolveArticleForSpecialization(specializationKey: string): Promise<number> {
+  const clients = await prisma.brandSettings.findMany({
+    where: { primarySpecialization: specializationKey },
+    select: { userId: true },
+  })
+  for (const c of clients) await resolveArticleCalendar(c.userId)
   return clients.length
 }

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { Prisma } from '@prisma/client'
-import { prisma, hemisphereForCountry, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
+import {
+  prisma,
+  hemisphereForCountry,
+  brandSettingsForUser,
+  canonicalAccountUserId,
+  accountIdForUser,
+} from '@socioply/shared'
 
 const SPECIALIZATIONS_FIELD = 'specializations'
 
@@ -31,6 +37,25 @@ async function routeNewsletterCalendar(userId: string) {
     calendarId = cal?.id ?? null
   }
   await prisma.user.update({ where: { id: ownerUserId }, data: { newsletterCalendarId: calendarId } })
+}
+
+/** Auto-route the account's article calendar (same inputs; set on the Account). */
+async function routeArticleCalendar(userId: string) {
+  const [bs, accountId] = await Promise.all([brandSettingsForUser(userId), accountIdForUser(userId)])
+  if (!accountId) return
+  const primary = bs?.primarySpecialization?.trim()
+  let calendarId: string | null = null
+  if (primary && bs?.organizationCountryCode?.trim()) {
+    const { hemisphere, edge } = hemisphereForCountry(bs.organizationCountryCode)
+    const override = bs.hemisphereOverride
+    const effective = edge && (override === 'north' || override === 'south') ? override : hemisphere
+    const cal = await prisma.articleCalendar.findFirst({
+      where: { specializationKey: primary, hemisphere: effective },
+      select: { id: true },
+    })
+    calendarId = cal?.id ?? null
+  }
+  await prisma.account.update({ where: { id: accountId }, data: { articleCalendarId: calendarId } })
 }
 
 async function getUserId(clerkId: string): Promise<string | null> {
@@ -243,6 +268,7 @@ export async function PATCH(request: NextRequest) {
       'hemisphereOverride' in body
     ) {
       await routeNewsletterCalendar(userId)
+      await routeArticleCalendar(userId)
     }
 
     return NextResponse.json(settings)

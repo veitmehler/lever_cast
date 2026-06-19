@@ -24,11 +24,15 @@ model Account {
   // Default "assistant" recipient for collaborative edit requests (Phase 7);
   // overridable per send. Usually one of the account's members.
   assistantEmail String?
+  // Auto-routed admin-curated article calendar (specialization × hemisphere).
+  articleCalendarId String?
+  articleCalendar   ArticleCalendar? @relation(fields: [articleCalendarId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   members User[] @relation("AccountMembers")
 
+  @@index([articleCalendarId])
   @@map("accounts")
 }
 
@@ -973,6 +977,43 @@ model NewsletterTopic {
   @@unique([calendarId, date])
   @@index([calendarId])
   @@map("newsletter_topics")
+}
+
+// Admin-curated article content calendar — same specialization × hemisphere
+// routing as newsletters, but SEPARATE (article cadence/fields differ). Accounts
+// are auto-routed via Account.articleCalendarId. Topics uploaded via CSV.
+model ArticleCalendar {
+  id                String                 @id @default(cuid())
+  name              String
+  industry          String
+  specializationKey String? // → Specialization.key
+  hemisphere        String? // 'north' | 'south'
+  topics            ArticleCalendarTopic[]
+  accounts          Account[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@unique([specializationKey, hemisphere])
+  @@map("article_calendars")
+}
+
+// One dated, pre-planned article topic (one CSV row). Article-shaped fields.
+model ArticleCalendarTopic {
+  id                     String          @id @default(cuid())
+  calendarId             String
+  calendar               ArticleCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  date                   DateTime
+  topic                  String // the article angle / working title
+  angle                  String?         @db.Text // optional fuller brief / sub-angles
+  keywords               String[]        @default([]) // optional target keywords
+  outlineFrameworkNumber Int? // optional preferred outline framework
+  category               String? // optional WP category hint
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  @@unique([calendarId, date])
+  @@index([calendarId])
+  @@map("article_calendar_topics")
 }
 
 // Per-customer voiced newsletter for one topic. JSON per section so a

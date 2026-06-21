@@ -32,7 +32,7 @@ export async function qualityGateHandler(jobs: PgBoss.Job<QualityGateJobData>[])
       continue
     }
     // Only gate jobs that finished Phase A and aren't already past the gate.
-    if (!['completed', 'needs_review'].includes(articleJob.status)) {
+    if (!['reviewing', 'completed', 'needs_review'].includes(articleJob.status)) {
       logger.info({ jobId, status: articleJob.status }, '[quality-gate] not in a gateable state — skipping')
       continue
     }
@@ -96,7 +96,7 @@ export async function qualityGateHandler(jobs: PgBoss.Job<QualityGateJobData>[])
     const rewritten = await rewriteArticleBody(jobId, verdict.reasons)
     await prisma.articleJob.update({
       where: { id: jobId },
-      data: { qualityAttempts: attempts, status: 'completed' },
+      data: { qualityAttempts: attempts, status: 'reviewing' },
     })
     if (!rewritten) {
       // Couldn't rewrite — go straight to human review.

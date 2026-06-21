@@ -210,7 +210,7 @@ export function useWorkflowJob() {
   useEffect(() => {
     const prev = prevStatusForCitationsRef.current
     prevStatusForCitationsRef.current = job?.status
-    if (prev === 'in_progress' && job?.status === 'completed') {
+    if (prev === 'in_progress' && (job?.status === 'completed' || job?.status === 'reviewing')) {
       fetchJob()
     }
   }, [job?.status, fetchJob])

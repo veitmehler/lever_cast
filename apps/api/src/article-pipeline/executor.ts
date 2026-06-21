@@ -159,22 +159,26 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     logger.info({ jobId, count: ctx.researchSources.length }, '[executor] persisted research sources as step 120')
   }
 
-  // All steps complete
+  // Phase A complete → hand off to the automated quality gate. The job sits in a
+  // dedicated 'reviewing' status (not 'completed') so the UI never shows it as
+  // "awaiting manual approval" while the gate evaluates / rewrites / re-gates.
   await prisma.articleJob.update({
     where: { id: jobId },
-    data: { status: 'completed', currentStep: 12 },
+    data: { status: 'reviewing', currentStep: 12 },
   })
-  logger.info({ jobId }, '[executor] Phase A complete — job status set to completed')
+  logger.info({ jobId }, '[executor] Phase A complete — handing off to quality gate (status=reviewing)')
 
-  // Hand off to the automated quality gate (evaluates → auto-approves on pass,
-  // or rewrites / flags for human review). Non-fatal if enqueue fails — the job
-  // stays 'completed' and can be approved manually.
   try {
     const boss = await getBoss()
     await boss.send(QUEUES.ARTICLE_QUALITY_GATE, { jobId })
     logger.info({ jobId }, '[executor] enqueued quality gate')
   } catch (err) {
-    logger.error({ jobId, err }, '[executor] failed to enqueue quality gate — job left completed for manual approval')
+    // Fallback only: if we can't enqueue the gate, drop to 'completed' so the
+    // article can still be approved manually.
+    logger.error({ jobId, err }, '[executor] failed to enqueue quality gate — falling back to manual approval (status=completed)')
+    await prisma.articleJob
+      .update({ where: { id: jobId }, data: { status: 'completed' } })
+      .catch(() => {})
   }
 }
 

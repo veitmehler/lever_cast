@@ -14,7 +14,10 @@ import { prisma } from '@socioply/shared'
 import { getLLMAdapter } from './llm/factory'
 import { logger } from '../lib/logger'
 
-const GEMINI_MODEL = 'gemini-3.1-pro'
+// The available "Gemini 3.1 Pro" model id on the generativelanguage API is the
+// preview alias (plain `gemini-3.1-pro` 404s); it's the same model the article
+// prompts use.
+const GEMINI_MODEL = 'gemini-3.1-pro-preview'
 const JUDGE_MODEL = 'gpt-4o-mini'
 
 export type Verdict = 'pass' | 'revise' | 'fail'

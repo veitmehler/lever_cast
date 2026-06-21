@@ -5,6 +5,7 @@ const COST_TABLE: Record<string, { input: number; output: number }> = {
   'gemini-2.5-pro': { input: 1.25, output: 5.00 },
   'gemini-3-flash': { input: 0.50, output: 3.00 },
   'gemini-3.1-pro': { input: 2.00, output: 12.00 },
+  'gemini-3.1-pro-preview': { input: 2.00, output: 12.00 },
   'gemini-pro': { input: 0.50, output: 1.50 },
 
   // Anthropic

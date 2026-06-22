@@ -34,13 +34,9 @@ export async function POST() {
       ? `${clerkUser.firstName}${clerkUser.lastName ? ' ' + clerkUser.lastName : ''}`
       : email.split('@')[0]
 
-    // Find-or-create the user together with its Account (tenant), honoring an
-    // invitation's target account, then keep name/email fresh from Clerk.
-    const invitedAccountId =
-      typeof clerkUser.publicMetadata?.accountId === 'string'
-        ? clerkUser.publicMetadata.accountId
-        : undefined
-    const created = await getOrCreateUserWithAccount({ clerkId, email, name }, invitedAccountId)
+    // Find-or-create the user + Account (team membership resolved by email roster),
+    // then keep name/email fresh from Clerk.
+    const created = await getOrCreateUserWithAccount({ clerkId, email, name })
     const user = await prisma.user.update({
       where: { id: created.id },
       data: { name, email },
@@ -115,11 +111,7 @@ export async function GET() {
         ? `${clerkUser.firstName}${clerkUser.lastName ? ' ' + clerkUser.lastName : ''}`
         : email.split('@')[0]
 
-      const invitedAccountId =
-        typeof clerkUser.publicMetadata?.accountId === 'string'
-          ? clerkUser.publicMetadata.accountId
-          : undefined
-      const created = await getOrCreateUserWithAccount({ clerkId, email, name }, invitedAccountId)
+      const created = await getOrCreateUserWithAccount({ clerkId, email, name })
       await prisma.settings.upsert({
         where: { userId: created.id },
         update: {},

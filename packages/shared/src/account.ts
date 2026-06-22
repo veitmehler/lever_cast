@@ -36,28 +36,63 @@ export async function ensureAccount(user: Pick<User, 'id' | 'accountId' | 'name'
 }
 
 /**
- * Find a user by clerkId, creating the user AND a fresh Account if they don't
- * exist yet. Always returns a user guaranteed to have an accountId.
- *
- * `accountIdForNewUser` lets an invite flow drop the new user into an existing
- * account instead of creating one (seat-cap enforcement is the caller's job).
+ * If the user's email is on a team roster (AccountMember) for a DIFFERENT account
+ * than their current one, move them into that account (with a free seat) and
+ * clean up their now-empty solo account. Returns the effective accountId.
+ * This is how owner-added teammates join — no invitation needed.
  */
-export async function getOrCreateUserWithAccount(
-  identity: UserIdentity,
-  accountIdForNewUser?: string,
-): Promise<User> {
+export async function ensureRosterMembership(
+  user: { id: string; email: string; accountId: string | null },
+): Promise<string | null> {
+  const roster = await prisma.accountMember.findUnique({
+    where: { email: user.email.toLowerCase() },
+    select: { accountId: true },
+  })
+  if (!roster || roster.accountId === user.accountId) return user.accountId
+
+  const seats = await prisma.user.count({ where: { accountId: roster.accountId } })
+  if (seats >= ACCOUNT_SEAT_LIMIT) return user.accountId
+
+  const oldAccountId = user.accountId
+  await prisma.user.update({ where: { id: user.id }, data: { accountId: roster.accountId } })
+
+  // Drop the user's old solo account if it's now empty and was theirs.
+  if (oldAccountId && oldAccountId !== roster.accountId) {
+    const remaining = await prisma.user.count({ where: { accountId: oldAccountId } })
+    if (remaining === 0) {
+      const old = await prisma.account.findUnique({ where: { id: oldAccountId }, select: { ownerUserId: true } })
+      if (old?.ownerUserId === user.id) {
+        await prisma.account.delete({ where: { id: oldAccountId } }).catch(() => {})
+      }
+    }
+  }
+  return roster.accountId
+}
+
+/**
+ * Find a user by clerkId, creating the user AND an Account if they don't exist.
+ * A new user whose email is on a team roster joins that account; an existing
+ * user is moved onto their rostered account on sign-in. Always returns a user
+ * guaranteed to have an accountId.
+ */
+export async function getOrCreateUserWithAccount(identity: UserIdentity): Promise<User> {
   const existing = await prisma.user.findUnique({ where: { clerkId: identity.clerkId } })
   if (existing) {
     if (!existing.accountId) await ensureAccount(existing)
-    return prisma.user.findUniqueOrThrow({ where: { id: existing.id } })
+    const fresh = await prisma.user.findUniqueOrThrow({ where: { id: existing.id } })
+    await ensureRosterMembership({ id: fresh.id, email: fresh.email, accountId: fresh.accountId })
+    return prisma.user.findUniqueOrThrow({ where: { id: fresh.id } })
   }
 
-  // Only honour an invite's target account if it still has a free seat;
-  // otherwise the new user gets their own account.
+  // New user: join a rostered account (if email matches + free seat), else solo.
+  const roster = await prisma.accountMember.findUnique({
+    where: { email: identity.email.toLowerCase() },
+    select: { accountId: true },
+  })
   let joinAccountId: string | undefined
-  if (accountIdForNewUser) {
-    const seatsUsed = await prisma.user.count({ where: { accountId: accountIdForNewUser } })
-    if (seatsUsed < ACCOUNT_SEAT_LIMIT) joinAccountId = accountIdForNewUser
+  if (roster) {
+    const seats = await prisma.user.count({ where: { accountId: roster.accountId } })
+    if (seats < ACCOUNT_SEAT_LIMIT) joinAccountId = roster.accountId
   }
 
   const user = await prisma.user.create({
@@ -68,7 +103,6 @@ export async function getOrCreateUserWithAccount(
       ...(joinAccountId ? { accountId: joinAccountId } : {}),
     },
   })
-
   if (!joinAccountId) await createAccountForUser(user.id, user.name)
 
   return prisma.user.findUniqueOrThrow({ where: { id: user.id } })
@@ -150,10 +184,12 @@ export async function accountMemberIds(accountId: string): Promise<string[]> {
 export async function resolveAccountForClerkId(clerkId: string): Promise<ResolvedAccount | null> {
   const user = await prisma.user.findUnique({
     where: { clerkId },
-    select: { id: true, accountId: true, name: true },
+    select: { id: true, accountId: true, name: true, email: true },
   })
   if (!user) return null
-  const accountId = user.accountId ?? (await ensureAccount(user))
+  // Honor roster moves (owner-added teammates) on every resolve.
+  const rosterAccountId = await ensureRosterMembership({ id: user.id, email: user.email, accountId: user.accountId })
+  const accountId = rosterAccountId ?? user.accountId ?? (await ensureAccount(user))
   const [memberUserIds, account] = await Promise.all([
     accountMemberIds(accountId),
     prisma.account.findUnique({ where: { id: accountId }, select: { ownerUserId: true } }),

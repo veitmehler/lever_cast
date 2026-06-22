@@ -187,6 +187,21 @@ export async function contentPlanRoutes(app: FastifyInstance) {
       }),
     ])
 
+    // Articles with an open edit request assigned to the CURRENT user (the teammate).
+    const myEditReqs = await prisma.articleEditRequest.findMany({
+      where: { assigneeUserId: account.userId, status: 'open' },
+      select: { sitePage: { select: { jobId: true, title: true } } },
+    })
+    const assignedSeen = new Set<string>()
+    const assignedToMe: Array<{ jobId: string; title: string }> = []
+    for (const r of myEditReqs) {
+      const jobId = r.sitePage?.jobId
+      if (jobId && !assignedSeen.has(jobId)) {
+        assignedSeen.add(jobId)
+        assignedToMe.push({ jobId, title: r.sitePage?.title ?? 'Article' })
+      }
+    }
+
     return reply.send({
       articles: readyArticles.map((a) => ({
         jobId: a.id,
@@ -204,6 +219,7 @@ export async function contentPlanRoutes(app: FastifyInstance) {
         reasons: (a.qualityVerdict as { reasons?: string[] } | null)?.reasons ?? [],
         at: a.createdAt,
       })),
+      assignedToMe,
     })
   })
 }

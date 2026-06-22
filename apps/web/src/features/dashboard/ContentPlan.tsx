@@ -35,7 +35,13 @@ interface Inbox {
   articles: { jobId: string; title: string }[]
   newsletters: { newsletterId: string; title: string }[]
   flagged: { jobId: string; title: string; reasons: string[] }[]
+  assignedToMe?: { jobId: string; title: string }[]
 }
+
+// Cadence: articles Tue/Thu, newsletters Mon/Wed/Fri/Sat, Sunday nothing.
+const ARTICLE_DOW = new Set([2, 4])
+const NEWSLETTER_DOW = new Set([1, 3, 5, 6])
+const dow = (date: string) => new Date(date + 'T00:00:00').getDay()
 
 export function ContentPlan() {
   const [data, setData] = useState<PlanData | null>(null)
@@ -75,6 +81,7 @@ export function ContentPlan() {
 
   const readyArticleIds = new Set((inbox?.articles ?? []).map((a) => a.jobId))
   const readyNewsletterIds = new Set((inbox?.newsletters ?? []).map((n) => n.newsletterId))
+  const assignedToMeIds = new Set((inbox?.assignedToMe ?? []).map((a) => a.jobId))
   const readyQueue: ReviewItem[] = [
     ...(inbox?.articles ?? []).map((a) => ({ kind: 'article' as const, id: a.jobId, title: a.title })),
     ...(inbox?.newsletters ?? []).map((n) => ({ kind: 'newsletter' as const, id: n.newsletterId, title: n.title })),
@@ -139,7 +146,9 @@ export function ContentPlan() {
     } finally { setGenerating(false) }
   }
 
-  const selectableDates = (data?.days ?? []).filter((d) => d.article.primary || d.newsletter).map((d) => d.date)
+  // Only show content days (article = Tue/Thu, newsletter = Mon/Wed/Fri/Sat); skip Sundays.
+  const visibleDays = (data?.days ?? []).filter((d) => ARTICLE_DOW.has(dow(d.date)) || NEWSLETTER_DOW.has(dow(d.date)))
+  const selectableDates = visibleDays.filter((d) => d.article.primary || d.newsletter).map((d) => d.date)
   const toggleSelect = (date: string) =>
     setSelected((prev) => { const n = new Set(prev); if (n.has(date)) n.delete(date); else n.add(date); return n })
   const fmt = (date: string) => format(new Date(date + 'T00:00:00'), 'EEE, MMM d')
@@ -154,69 +163,98 @@ export function ContentPlan() {
     )
   }
 
-  // The whole right-hand "Review" column for a day (article and/or newsletter actions).
+  // Materialize a calendar suggestion into a real topic, then open the options editor.
+  async function materializeAndEdit(d: Day) {
+    const p = d.article.primary
+    if (p?.topicId) { setEditTopic({ id: p.topicId, topic: p.topic }); return }
+    if (!p?.calendarTopicId) return
+    setBusyDate(d.date)
+    try {
+      const res = await fetch('/api/topics/plan', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: p.topic, scheduledDate: `${d.date}T00:00:00.000Z`, source: 'article_calendar' }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) return toast.error('Failed to open editor')
+      await load()
+      if (body.topic?.id) setEditTopic({ id: body.topic.id, topic: p.topic })
+    } finally { setBusyDate(null) }
+  }
+
+  // The right-hand "Review" column for a day: assigned-edit > review > flagged.
   function ReviewActions({ d }: { d: Day }) {
     const a = d.article.primary
     const nl = d.newsletter
+    const assignedToMe = a?.jobId && assignedToMeIds.has(a.jobId)
     const articleReady = a?.jobId && readyArticleIds.has(a.jobId)
     const articleFlagged = a?.jobStatus === 'needs_review' && a.jobId
     const nlReady = nl?.newsletterId && readyNewsletterIds.has(nl.newsletterId)
-    if (!articleReady && !articleFlagged && !nlReady) return <span className="text-xs text-muted-foreground">—</span>
+    if (!assignedToMe && !articleReady && !articleFlagged && !nlReady) return <span className="text-xs text-muted-foreground">—</span>
     return (
       <div className="flex flex-col items-end gap-1">
-        {articleReady && <ReviewBtn kind="article" id={a!.jobId!} />}
-        {articleFlagged && (
+        {assignedToMe ? (
+          <Link href={`/review/${a!.jobId}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+            <Pencil className="h-3.5 w-3.5" /> Edit requested
+          </Link>
+        ) : articleReady ? (
+          <ReviewBtn kind="article" id={a!.jobId!} />
+        ) : articleFlagged ? (
           <Link href={`/workflow/${a!.jobId}/preview`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
             <AlertTriangle className="h-3.5 w-3.5" /> Needs review
           </Link>
-        )}
+        ) : null}
         {nlReady && <ReviewBtn kind="newsletter" id={nl!.newsletterId!} />}
       </div>
     )
   }
 
   function ArticleCell({ d }: { d: Day }) {
+    if (!ARTICLE_DOW.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
     const p = d.article.primary
-    if (!p) {
+    // Once generation has started, it's read-only here (review happens at right).
+    if (p?.jobId) {
       return (
-        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-          <button onClick={() => { setPickerDate(d.date); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
-            <Lightbulb className="h-3.5 w-3.5" /> Use idea
-          </button>
-          <button onClick={() => { setAddDate(d.date); setAddText('') }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
-            <Plus className="h-3.5 w-3.5" /> Add topic
-          </button>
+        <div>
+          <div className="text-sm text-foreground">{p.topic}</div>
+          {p.jobStatus && <span className="mt-0.5 inline-block rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{p.jobStatus}</span>}
         </div>
       )
     }
-    // A planned topic with no job yet → editable (framework/advanced via modal).
-    const editable = !!p.topicId && !p.jobId
+    // Replaceable: empty, a calendar suggestion, or a planned topic (no job yet).
+    const replaceBtns = (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={() => { setPickerDate(d.date); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
+          <Lightbulb className="h-3.5 w-3.5" /> Use idea
+        </button>
+        <button onClick={() => { setAddDate(d.date); setAddText('') }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
+          <Plus className="h-3.5 w-3.5" /> Add topic
+        </button>
+        {p && (
+          <button onClick={() => materializeAndEdit(d)} disabled={busyDate === d.date} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-muted">
+            <Pencil className="h-3.5 w-3.5" /> Edit options
+          </button>
+        )}
+        {p?.topicId && (
+          <button onClick={() => unschedule(p.topicId!, d.date)} disabled={busyDate === d.date} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600" title="Clear (back to idea bank)"><CalendarX className="h-3.5 w-3.5" /></button>
+        )}
+      </div>
+    )
+    if (!p) return <div className="text-muted-foreground">{replaceBtns}</div>
     return (
-      <div className="group flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-sm text-foreground">{p.topic}</div>
-          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-            {p.source === 'article_calendar'
-              ? <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-blue-700">suggested</span>
-              : <span className="rounded-full bg-muted px-1.5 py-0.5">scheduled</span>}
-            {p.jobStatus && <span className="rounded-full bg-muted px-1.5 py-0.5">{p.jobStatus}</span>}
-          </div>
+      <div className="space-y-1">
+        <div className="text-sm text-foreground">{p.topic}</div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          {p.source === 'article_calendar'
+            ? <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-blue-700">suggested</span>
+            : <span className="rounded-full bg-muted px-1.5 py-0.5">scheduled</span>}
         </div>
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          {p.source === 'article_calendar' && p.calendarTopicId ? (
-            <button onClick={() => planTopic(d.date, p.topic, 'article_calendar')} disabled={busyDate === d.date} className="rounded p-1 text-xs text-primary hover:bg-muted" title="Add this suggestion to your plan">Use</button>
-          ) : editable ? (
-            <>
-              <button onClick={() => setEditTopic({ id: p.topicId!, topic: p.topic })} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Edit topic & options"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => unschedule(p.topicId!, d.date)} disabled={busyDate === d.date} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600" title="Unschedule (back to idea bank)"><CalendarX className="h-3.5 w-3.5" /></button>
-            </>
-          ) : null}
-        </div>
+        {replaceBtns}
       </div>
     )
   }
 
   function NewsletterCell({ d }: { d: Day }) {
+    if (!NEWSLETTER_DOW.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
     const nl = d.newsletter
     if (!nl) return <span className="text-xs text-muted-foreground">—</span>
     return (
@@ -277,7 +315,7 @@ export function ContentPlan() {
               </tr>
             </thead>
             <tbody>
-              {data.days.map((d) => {
+              {visibleDays.map((d) => {
                 const selectable = !!(d.article.primary || d.newsletter)
                 return (
                   <tr key={d.date} className="border-t border-border align-middle">
@@ -294,7 +332,7 @@ export function ContentPlan() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {data.days.map((d) => (
+          {visibleDays.map((d) => (
             <div key={d.date} className="rounded-xl border border-border bg-card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">{fmt(d.date)}</span>
@@ -313,6 +351,23 @@ export function ContentPlan() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {(inbox?.assignedToMe ?? []).filter((a) => !visibleArticleIds.has(a.jobId)).length > 0 && (
+        <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Edits requested for you</div>
+          <div className="space-y-2">
+            {(inbox?.assignedToMe ?? []).filter((a) => !visibleArticleIds.has(a.jobId)).map((a) => (
+              <div key={a.jobId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{a.title}</span>
+                <Link href={`/review/${a.jobId}`} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

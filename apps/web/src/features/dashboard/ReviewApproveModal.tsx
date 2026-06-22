@@ -59,6 +59,7 @@ export function ReviewApproveModal({
   const [noteText, setNoteText] = useState('')
   const [pending, setPending] = useState<PendingEdit[]>([])
   const [assignee, setAssignee] = useState('')
+  const [members, setMembers] = useState<{ email: string; name: string | null }[]>([])
   const [sending, setSending] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -83,7 +84,12 @@ export function ReviewApproveModal({
             setHtml(job?.sitePage?.bodyHtml ?? '<p>(No content found.)</p>')
           }
           if (erRes.ok && !cancelled) setOpenRequests((await erRes.json()).openCount ?? 0)
-          if (acctRes.ok && !cancelled) setAssignee((await acctRes.json()).account?.assistantEmail ?? '')
+          if (acctRes.ok && !cancelled) {
+            const acct = await acctRes.json()
+            const list: { email: string; name: string | null }[] = (acct.members ?? []).map((m: { email: string; name: string | null }) => ({ email: m.email, name: m.name }))
+            setMembers(list)
+            if (list.length) setAssignee(list[0].email)
+          }
         } else {
           const res = await fetch(`/api/newsletters/${item.id}`, { cache: 'no-store' })
           if (res.ok && !cancelled) setHtml((await res.json()).newsletter?.renderedHtml ?? '<p>(No content found.)</p>')
@@ -257,13 +263,20 @@ export function ReviewApproveModal({
                 </div>
               </div>
               <div className="space-y-2 border-t border-border p-3">
-                <input
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  placeholder="teammate@example.com"
-                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                />
-                <Button onClick={sendEdits} disabled={pending.length === 0 || sending} className="w-full">
+                {members.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Add a teammate in Settings → Team to assign edits.</p>
+                ) : (
+                  <select
+                    value={assignee}
+                    onChange={(e) => setAssignee(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                  >
+                    {members.map((m) => (
+                      <option key={m.email} value={m.email}>{m.name ? `${m.name} — ${m.email}` : m.email}</option>
+                    ))}
+                  </select>
+                )}
+                <Button onClick={sendEdits} disabled={pending.length === 0 || sending || members.length === 0} className="w-full">
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   Send {pending.length || ''} to teammate
                 </Button>

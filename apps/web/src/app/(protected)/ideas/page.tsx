@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Lightbulb, Loader2, Trash2, Pencil, Upload } from 'lucide-react'
+import { Lightbulb, Loader2, Trash2, Pencil, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { TopicEditModal, type EditableTopic } from '@/features/dashboard/TopicEditModal'
-import { CsvImportModal } from '@/features/dashboard/CsvImportModal'
+import { CsvImportModal, downloadIdeasTemplate } from '@/features/dashboard/CsvImportModal'
 
 interface Idea {
   id: string
@@ -74,9 +74,21 @@ export default function IdeasBankPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => setImporting(true)} className="flex-shrink-0">
-          <Upload className="h-4 w-4" /> Import CSV
-        </Button>
+        <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+          <Button
+            variant="outline"
+            onClick={() => setImporting(true)}
+            className="border-primary text-foreground hover:border-primary hover:bg-primary/15 hover:text-foreground"
+          >
+            <Upload className="h-4 w-4" /> Import CSV
+          </Button>
+          <button
+            onClick={downloadIdeasTemplate}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            <Download className="h-3.5 w-3.5" /> Download example template
+          </button>
+        </div>
       </div>
 
       {loading ? (

@@ -25,6 +25,17 @@ const TEMPLATE = [
   '"Migraine relief without medication",,,,,,article_first',
 ].join('\n')
 
+// Shared so the Ideas Bank page can offer the same download next to its button.
+export function downloadIdeasTemplate() {
+  const blob = new Blob([TEMPLATE], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'ideas-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function parseCsvText(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim())
   if (lines.length < 2) return { headers: [], rows: [] }
@@ -55,16 +66,6 @@ export function CsvImportModal({ onClose, onImported }: { onClose: () => void; o
     const reader = new FileReader()
     reader.onload = (ev) => setPreview(parseCsvText(ev.target?.result as string))
     reader.readAsText(f)
-  }
-
-  function downloadTemplate() {
-    const blob = new Blob([TEMPLATE], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'ideas-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   async function doImport() {
@@ -108,7 +109,7 @@ export function CsvImportModal({ onClose, onImported }: { onClose: () => void; o
                 <span key={c} className="rounded bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground">{c}</span>
               ))}
             </div>
-            <button onClick={downloadTemplate} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+            <button onClick={downloadIdeasTemplate} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
               <Download className="h-3.5 w-3.5" /> Download template
             </button>
           </div>

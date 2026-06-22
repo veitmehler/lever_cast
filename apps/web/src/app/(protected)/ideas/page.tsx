@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Lightbulb, Loader2, Trash2, Pencil } from 'lucide-react'
+import { Lightbulb, Loader2, Trash2, Pencil, Upload } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { TopicEditModal, type EditableTopic } from '@/features/dashboard/TopicEditModal'
+import { CsvImportModal } from '@/features/dashboard/CsvImportModal'
 
 interface Idea {
   id: string
@@ -19,6 +21,7 @@ export default function IdeasBankPage() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editing, setEditing] = useState<EditableTopic | null>(null)
+  const [importing, setImporting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -60,15 +63,20 @@ export default function IdeasBankPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6 flex items-center gap-2">
-        <Lightbulb className="h-6 w-6 text-amber-500" />
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Ideas Bank</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Your captured article ideas that haven&apos;t been scheduled yet. Add a framework and
-            advanced options to personalize each one; schedule them from the Content Plan.
-          </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-6 w-6 text-amber-500" />
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Ideas Bank</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Your captured article ideas that haven&apos;t been scheduled yet. Add a framework and
+              advanced options to personalize each one; schedule them from the Content Plan.
+            </p>
+          </div>
         </div>
+        <Button variant="outline" onClick={() => setImporting(true)} className="flex-shrink-0">
+          <Upload className="h-4 w-4" /> Import CSV
+        </Button>
       </div>
 
       {loading ? (
@@ -105,6 +113,10 @@ export default function IdeasBankPage() {
 
       {editing && (
         <TopicEditModal topic={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load() }} />
+      )}
+
+      {importing && (
+        <CsvImportModal onClose={() => setImporting(false)} onImported={() => void load()} />
       )}
     </div>
   )

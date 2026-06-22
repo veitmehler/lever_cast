@@ -172,9 +172,13 @@ export async function topicRoutes(app: FastifyInstance) {
       const topicText = row.topic?.trim()
       if (!topicText) { results.push({ row: i + 1, error: 'Missing topic' }); continue }
 
+      // A row without a date is captured as an unscheduled idea (no job). Dateless
+      // idea rows default to article_first (the Ideas Bank is for article ideas);
+      // dated rows keep the social_only default for back-compat.
+      const hasDate = !!row.scheduledDate
       const mode = (['social_only', 'article_first', 'article_only'].includes(row.mode ?? '')
         ? row.mode
-        : 'social_only') as 'social_only' | 'article_first' | 'article_only'
+        : hasDate ? 'social_only' : 'article_first') as 'social_only' | 'article_first' | 'article_only'
 
       const excludedKeywords = row.excludedKeywords
         ? row.excludedKeywords.split(/[,;]/).map((k) => k.trim()).filter(Boolean)
@@ -190,8 +194,6 @@ export async function topicRoutes(app: FastifyInstance) {
           : null
         const hasExplicitFramework = csvOutlineNumber != null && !isNaN(csvOutlineNumber)
 
-        // A row without a date is captured as an unscheduled idea (no job).
-        const hasDate = !!row.scheduledDate
         const topicRow = await prisma.topic.create({
           data: {
             userId: user.id,

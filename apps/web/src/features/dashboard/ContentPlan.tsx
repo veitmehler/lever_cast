@@ -4,12 +4,13 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import {
-  Loader2, CalendarRange, Table as TableIcon, LayoutGrid, Pencil, Check, X,
+  Loader2, CalendarRange, Table as TableIcon, LayoutGrid, Pencil, X,
   Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { ReviewApproveModal, type ReviewItem } from './ReviewApproveModal'
+import { TopicEditModal, type EditableTopic } from './TopicEditModal'
 
 interface ArticleEntry {
   source: 'scheduled' | 'article_calendar'
@@ -26,7 +27,10 @@ interface Day {
   newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string } | null
 }
 interface PlanData { from: string; to: string; days: Day[]; ideaCount: number }
-interface Idea { id: string; topic: string; notes: string | null }
+interface Idea {
+  id: string; topic: string; mode?: string | null
+  outlineFrameworkNumber?: number | null; outlineSpecialInstructions?: string | null; realCaseStudies?: string | null
+}
 interface Inbox {
   articles: { jobId: string; title: string }[]
   newsletters: { newsletterId: string; title: string }[]
@@ -42,13 +46,11 @@ export function ContentPlan() {
   const [busyDate, setBusyDate] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const [editKey, setEditKey] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
   const [pickerDate, setPickerDate] = useState<string | null>(null)
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [addDate, setAddDate] = useState<string | null>(null)
   const [addText, setAddText] = useState('')
-  // review modal: index into the ready queue
+  const [editTopic, setEditTopic] = useState<EditableTopic | null>(null)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const load = useCallback(async () => {
@@ -64,7 +66,6 @@ export function ContentPlan() {
       setLoading(false)
     }
   }, [])
-
   useEffect(() => { load() }, [load])
 
   async function loadIdeas() {
@@ -72,48 +73,24 @@ export function ContentPlan() {
     if (res.ok) setIdeas((await res.json()).ideas ?? [])
   }
 
-  // ── Ready-to-review queue (all account-wide, drives the modal + inline buttons)
   const readyArticleIds = new Set((inbox?.articles ?? []).map((a) => a.jobId))
   const readyNewsletterIds = new Set((inbox?.newsletters ?? []).map((n) => n.newsletterId))
   const readyQueue: ReviewItem[] = [
     ...(inbox?.articles ?? []).map((a) => ({ kind: 'article' as const, id: a.jobId, title: a.title })),
     ...(inbox?.newsletters ?? []).map((n) => ({ kind: 'newsletter' as const, id: n.newsletterId, title: n.title })),
   ]
-  const queueIndexFor = (kind: 'article' | 'newsletter', id: string) =>
-    readyQueue.findIndex((q) => q.kind === kind && q.id === id)
+  const queueIndexFor = (kind: 'article' | 'newsletter', id: string) => readyQueue.findIndex((q) => q.kind === kind && q.id === id)
 
-  // items shown on a visible plan day → so the "also ready" strip excludes them
-  const visibleArticleIds = new Set(
-    (data?.days ?? []).map((d) => d.article.primary?.jobId).filter(Boolean) as string[],
-  )
-  const visibleNewsletterIds = new Set(
-    (data?.days ?? []).map((d) => d.newsletter?.newsletterId).filter(Boolean) as string[],
-  )
+  const visibleArticleIds = new Set((data?.days ?? []).map((d) => d.article.primary?.jobId).filter(Boolean) as string[])
+  const visibleNewsletterIds = new Set((data?.days ?? []).map((d) => d.newsletter?.newsletterId).filter(Boolean) as string[])
   const outOfWindow: ReviewItem[] = readyQueue.filter((q) =>
-    q.kind === 'article' ? !visibleArticleIds.has(q.id) : !visibleNewsletterIds.has(q.id),
-  )
+    q.kind === 'article' ? !visibleArticleIds.has(q.id) : !visibleNewsletterIds.has(q.id))
 
   function onApproved() {
-    setOpenIndex((idx) => {
-      if (idx == null) return null
-      return idx + 1 < readyQueue.length ? idx + 1 : null
-    })
+    setOpenIndex((idx) => (idx == null ? null : idx + 1 < readyQueue.length ? idx + 1 : null))
     void load()
   }
 
-  // ── topic actions ───────────────────────────────────────────────────────────
-  async function saveEdit(topicId: string) {
-    if (!editText.trim()) return
-    setBusyDate(editKey)
-    try {
-      const res = await fetch(`/api/topics/${topicId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: editText.trim() }),
-      })
-      if (!res.ok) return toast.error('Failed to save')
-      setEditKey(null); await load()
-    } finally { setBusyDate(null) }
-  }
   async function planTopic(date: string, topic: string, source: 'manual' | 'article_calendar') {
     setBusyDate(date)
     try {
@@ -164,60 +141,45 @@ export function ContentPlan() {
 
   const selectableDates = (data?.days ?? []).filter((d) => d.article.primary || d.newsletter).map((d) => d.date)
   const toggleSelect = (date: string) =>
-    setSelected((prev) => {
-      const n = new Set(prev)
-      if (n.has(date)) n.delete(date)
-      else n.add(date)
-      return n
-    })
+    setSelected((prev) => { const n = new Set(prev); if (n.has(date)) n.delete(date); else n.add(date); return n })
   const fmt = (date: string) => format(new Date(date + 'T00:00:00'), 'EEE, MMM d')
 
   function ReviewBtn({ kind, id }: { kind: 'article' | 'newsletter'; id: string }) {
     const idx = queueIndexFor(kind, id)
     return (
-      <button
-        onClick={() => idx >= 0 && setOpenIndex(idx)}
-        className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700"
-      >
+      <button onClick={() => idx >= 0 && setOpenIndex(idx)}
+        className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
         <CheckCircle2 className="h-3.5 w-3.5" /> Review &amp; Approve
       </button>
     )
   }
 
-  function ArticleCell({ d }: { d: Day }) {
-    const p = d.article.primary
-    // Ready to review?
-    if (p?.jobId && readyArticleIds.has(p.jobId)) {
-      return (
-        <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{p.topic}</span>
-          <ReviewBtn kind="article" id={p.jobId} />
-        </div>
-      )
-    }
-    if (p?.jobStatus === 'needs_review' && p.jobId) {
-      return (
-        <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{p.topic}</span>
-          <Link href={`/workflow/${p.jobId}/preview`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
+  // The whole right-hand "Review" column for a day (article and/or newsletter actions).
+  function ReviewActions({ d }: { d: Day }) {
+    const a = d.article.primary
+    const nl = d.newsletter
+    const articleReady = a?.jobId && readyArticleIds.has(a.jobId)
+    const articleFlagged = a?.jobStatus === 'needs_review' && a.jobId
+    const nlReady = nl?.newsletterId && readyNewsletterIds.has(nl.newsletterId)
+    if (!articleReady && !articleFlagged && !nlReady) return <span className="text-xs text-muted-foreground">—</span>
+    return (
+      <div className="flex flex-col items-end gap-1">
+        {articleReady && <ReviewBtn kind="article" id={a!.jobId!} />}
+        {articleFlagged && (
+          <Link href={`/workflow/${a!.jobId}/preview`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
             <AlertTriangle className="h-3.5 w-3.5" /> Needs review
           </Link>
-        </div>
-      )
-    }
-    if (editKey === d.date && p?.topicId) {
-      return (
-        <div className="flex items-center gap-1.5">
-          <input value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit(p.topicId!)} autoFocus
-            className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm" />
-          <button onClick={() => saveEdit(p.topicId!)} className="rounded p-1 text-green-600 hover:bg-muted"><Check className="h-4 w-4" /></button>
-          <button onClick={() => setEditKey(null)} className="rounded p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
-        </div>
-      )
-    }
+        )}
+        {nlReady && <ReviewBtn kind="newsletter" id={nl!.newsletterId!} />}
+      </div>
+    )
+  }
+
+  function ArticleCell({ d }: { d: Day }) {
+    const p = d.article.primary
     if (!p) {
       return (
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <button onClick={() => { setPickerDate(d.date); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
             <Lightbulb className="h-3.5 w-3.5" /> Use idea
           </button>
@@ -227,6 +189,8 @@ export function ContentPlan() {
         </div>
       )
     }
+    // A planned topic with no job yet → editable (framework/advanced via modal).
+    const editable = !!p.topicId && !p.jobId
     return (
       <div className="group flex items-start gap-2">
         <div className="min-w-0 flex-1">
@@ -241,9 +205,9 @@ export function ContentPlan() {
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           {p.source === 'article_calendar' && p.calendarTopicId ? (
             <button onClick={() => planTopic(d.date, p.topic, 'article_calendar')} disabled={busyDate === d.date} className="rounded p-1 text-xs text-primary hover:bg-muted" title="Add this suggestion to your plan">Use</button>
-          ) : p.topicId ? (
+          ) : editable ? (
             <>
-              <button onClick={() => { setEditKey(d.date); setEditText(p.topic) }} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setEditTopic({ id: p.topicId!, topic: p.topic })} className="rounded p-1 text-muted-foreground hover:bg-muted" title="Edit topic & options"><Pencil className="h-3.5 w-3.5" /></button>
               <button onClick={() => unschedule(p.topicId!, d.date)} disabled={busyDate === d.date} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600" title="Unschedule (back to idea bank)"><CalendarX className="h-3.5 w-3.5" /></button>
             </>
           ) : null}
@@ -255,14 +219,6 @@ export function ContentPlan() {
   function NewsletterCell({ d }: { d: Day }) {
     const nl = d.newsletter
     if (!nl) return <span className="text-xs text-muted-foreground">—</span>
-    if (nl.newsletterId && readyNewsletterIds.has(nl.newsletterId)) {
-      return (
-        <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{nl.topic}</span>
-          <ReviewBtn kind="newsletter" id={nl.newsletterId} />
-        </div>
-      )
-    }
     return (
       <div>
         <div className="text-sm text-foreground">{nl.topic}</div>
@@ -314,20 +270,22 @@ export function ContentPlan() {
                   <input type="checkbox" checked={selected.size > 0 && selected.size === selectableDates.length}
                     onChange={(e) => setSelected(e.target.checked ? new Set(selectableDates) : new Set())} className="h-4 w-4 rounded border-input" />
                 </th>
-                <th className="px-3 py-2">Date</th>
+                <th className="w-32 px-3 py-2">Date</th>
                 <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Article</span></th>
                 <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Newsletter</span></th>
+                <th className="w-44 px-3 py-2 text-right">Review</th>
               </tr>
             </thead>
             <tbody>
               {data.days.map((d) => {
                 const selectable = !!(d.article.primary || d.newsletter)
                 return (
-                  <tr key={d.date} className="border-t border-border align-top">
+                  <tr key={d.date} className="border-t border-border align-middle">
                     <td className="px-3 py-2.5">{selectable && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">{fmt(d.date)}</td>
                     <td className="px-3 py-2.5"><ArticleCell d={d} /></td>
                     <td className="px-3 py-2.5"><NewsletterCell d={d} /></td>
+                    <td className="px-3 py-2.5"><ReviewActions d={d} /></td>
                   </tr>
                 )
               })}
@@ -351,16 +309,16 @@ export function ContentPlan() {
                   <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><Mail className="h-3 w-3" /> Newsletter</div>
                   <NewsletterCell d={d} />
                 </div>
+                <div className="flex justify-end"><ReviewActions d={d} /></div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Ready items not on a visible day */}
       {outOfWindow.length > 0 && (
-        <div className="mt-4 rounded-xl border border-green-200 bg-green-50/50 p-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-green-800">Also ready to review</div>
+        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Also ready to review</div>
           <div className="space-y-2">
             {outOfWindow.map((it) => (
               <div key={`${it.kind}-${it.id}`} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
@@ -373,7 +331,6 @@ export function ContentPlan() {
         </div>
       )}
 
-      {/* Flagged (needs review) */}
       {(inbox?.flagged?.length ?? 0) > 0 && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">Flagged by quality check</div>
@@ -389,12 +346,14 @@ export function ContentPlan() {
         </div>
       )}
 
-      {/* Review modal */}
       {openIndex != null && readyQueue[openIndex] && (
         <ReviewApproveModal item={readyQueue[openIndex]} hasNext={openIndex < readyQueue.length - 1} onClose={() => setOpenIndex(null)} onApproved={onApproved} />
       )}
 
-      {/* Idea picker */}
+      {editTopic && (
+        <TopicEditModal topic={editTopic} onClose={() => setEditTopic(null)} onSaved={() => { setEditTopic(null); void load() }} />
+      )}
+
       {pickerDate && (
         <Modal title={`Use an idea for ${fmt(pickerDate)}`} onClose={() => setPickerDate(null)}>
           {ideas.length === 0 ? (
@@ -413,7 +372,6 @@ export function ContentPlan() {
         </Modal>
       )}
 
-      {/* Add topic */}
       {addDate && (
         <Modal title={`Add an article topic for ${fmt(addDate)}`} onClose={() => setAddDate(null)}>
           <div className="flex flex-col gap-3">

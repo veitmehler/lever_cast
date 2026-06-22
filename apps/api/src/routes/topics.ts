@@ -359,14 +359,49 @@ export async function topicRoutes(app: FastifyInstance) {
     const ideas = await prisma.topic.findMany({
       where: { userId: user.id, status: 'idea' }, // extension scopes to account members
       orderBy: { createdAt: 'desc' },
-      select: { id: true, topic: true, notes: true, source: true, createdAt: true },
+      select: {
+        id: true, topic: true, notes: true, source: true, createdAt: true,
+        mode: true, outlineFrameworkNumber: true, outlineSpecialInstructions: true,
+        realCaseStudies: true, excludedKeywords: true, category: true,
+      },
     })
     return reply.send({ ideas })
   })
 
+  // GET /api/topics/:id — single topic with its editable config (account-scoped)
+  app.get<{ Params: { id: string } }>('/topics/:id', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const topic = await prisma.topic.findFirst({
+      where: { id: request.params.id, userId: user.id }, // extension → account members
+      select: {
+        id: true, topic: true, notes: true, mode: true, outlineFrameworkNumber: true,
+        outlineSpecialInstructions: true, realCaseStudies: true, excludedKeywords: true, category: true,
+      },
+    })
+    if (!topic) return reply.status(404).send({ error: 'Topic not found' })
+    return reply.send({ topic })
+  })
+
   // PATCH /api/topics/:id — edit text/notes and (un)schedule. Scheduling an idea
   // makes it the primary article topic for that date (status → pending).
-  app.patch<{ Params: { id: string }; Body: { topic?: string; notes?: string | null; scheduledDate?: string | null } }>(
+  app.patch<{
+    Params: { id: string }
+    Body: {
+      topic?: string
+      notes?: string | null
+      scheduledDate?: string | null
+      mode?: 'social_only' | 'article_first' | 'article_only'
+      outlineFrameworkNumber?: number | null
+      outlineSpecialInstructions?: string | null
+      realCaseStudies?: string | null
+      excludedKeywords?: string[]
+      category?: string | null
+    }
+  }>(
     '/topics/:id',
     async (request, reply) => {
       const clerkId = await requireAuth(request, reply)
@@ -385,6 +420,17 @@ export async function topicRoutes(app: FastifyInstance) {
         data.topic = body.topic.trim()
       }
       if (body.notes !== undefined) data.notes = body.notes?.trim() || null
+      if (body.mode !== undefined && ['social_only', 'article_first', 'article_only'].includes(body.mode)) {
+        data.mode = body.mode
+      }
+      if (body.outlineFrameworkNumber !== undefined) {
+        data.outlineFrameworkNumber = body.outlineFrameworkNumber
+        data.outlineFrameworkSource = body.outlineFrameworkNumber != null ? 'user' : null
+      }
+      if (body.outlineSpecialInstructions !== undefined) data.outlineSpecialInstructions = body.outlineSpecialInstructions?.trim() || null
+      if (body.realCaseStudies !== undefined) data.realCaseStudies = body.realCaseStudies?.trim() || null
+      if (body.excludedKeywords !== undefined) data.excludedKeywords = body.excludedKeywords
+      if (body.category !== undefined) data.category = body.category?.trim() || null
       if (body.scheduledDate !== undefined) {
         if (body.scheduledDate) {
           data.scheduledDate = new Date(body.scheduledDate)

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Loader2, X, Check, Save, FileText, Mail, ArrowRight, MessageSquarePlus, Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import '@/app/article-typography.css'
 
 export interface ReviewItem {
   kind: 'article' | 'newsletter'
@@ -178,7 +179,7 @@ export function ReviewApproveModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="flex h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -207,7 +208,7 @@ export function ReviewApproveModal({
                 suppressContentEditableWarning
                 onInput={() => setDirty(true)}
                 onMouseUp={() => { if (requestMode && bodyRef.current) setSelDraft(captureSelection(bodyRef.current)) }}
-                className="prose prose-sm max-w-none rounded-lg bg-card p-6 text-foreground focus:outline-none [&_a]:text-primary [&_a]:underline [&_h2]:font-semibold"
+                className="article-body max-w-none rounded-lg bg-card p-6 text-foreground focus:outline-none"
                 dangerouslySetInnerHTML={{ __html: html ?? '' }}
               />
             ) : (

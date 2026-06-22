@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
-  FileText, Plus, Loader2, RefreshCw, ChevronRight, X,
+  FileText, Loader2, RefreshCw, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { NewArticleForm } from '@/components/article/NewArticleForm'
 import { TOTAL_PIPELINE_STEPS } from '@/features/workflow/constants'
 import { useAuthedFetch } from '@/lib/use-authed-fetch'
 
@@ -91,12 +89,10 @@ function ProgressBar({ currentStep }: { currentStep: number }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function WorkflowPage() {
-  const router = useRouter()
   const { authedFetch } = useAuthedFetch()
   const [jobs, setJobs]             = useState<ArticleJob[]>([])
   const [isLoading, setIsLoading]   = useState(true)
   const [filter, setFilter]         = useState<string>('all')
-  const [showForm, setShowForm]     = useState(false)
 
   // Stable ref so fetch callbacks can check if data already exists without
   // stale closure issues — avoids showing error toasts on transient auth blips.
@@ -144,10 +140,6 @@ export default function WorkflowPage() {
     return () => clearInterval(id)
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCreated = (jobId: string) => {
-    router.push(`/workflow/${jobId}`)
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -170,27 +162,8 @@ export default function WorkflowPage() {
               <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowForm((v) => !v)}
-              variant={showForm ? 'secondary' : 'default'}
-            >
-              {showForm
-                ? <><X className="h-4 w-4 mr-1.5" />Cancel</>
-                : <><Plus className="h-4 w-4 mr-1.5" />New Article</>}
-            </Button>
           </div>
         </div>
-
-        {/* Inline new-article form */}
-        {showForm && (
-          <NewArticleForm
-            mode="article_only"
-            variant="panel"
-            onClose={() => setShowForm(false)}
-            onCreated={handleCreated}
-          />
-        )}
 
         {/* Filter tabs */}
         <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
@@ -219,12 +192,9 @@ export default function WorkflowPage() {
             <FileText className="h-12 w-12 text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">No article jobs yet</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Click &ldquo;New Article&rdquo; above to generate your first AI article.
+              Capture an idea and generate it from your{' '}
+              <Link href="/dashboard" className="font-medium text-primary hover:underline">dashboard Content Plan</Link>.
             </p>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Create Article
-            </Button>
           </div>
         ) : (
           <div className="space-y-3">

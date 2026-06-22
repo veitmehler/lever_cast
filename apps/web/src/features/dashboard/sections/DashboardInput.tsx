@@ -6,7 +6,6 @@ import type { DashboardView } from '../useDashboard'
 export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
   const {
     activeTab,
-    router,
     prefillIdea,
     postType,
     setPostType,
@@ -22,14 +21,15 @@ export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
 
   return (
     <>
-      {/* ── Start Workflow: article (+ optional social) ─────────────────── */}
+      {/* ── Capture an Article Idea (saves an idea; no instant generation) ─ */}
       {activeTab === 'workflow' && (
         <div className="mb-8 bg-card rounded-2xl border border-border p-6">
           <NewArticleForm
             mode="article_first"
             allowSocialToggle
             variant="inline"
-            onCreated={(jobId) => router.push(`/workflow/${jobId}`)}
+            captureAsIdea
+            onCreated={() => { /* capture mode: no navigation */ }}
           />
         </div>
       )}

@@ -10,8 +10,8 @@ export function ModeToggle({ dashboard }: { dashboard: DashboardView }) {
       {/* ── Tab toggle ──────────────────────────────────────────────────── */}
       <div className="mb-5 flex gap-2 flex-wrap">
         {([
-          { value: 'workflow', label: 'Start Workflow', icon: Newspaper,     desc: 'Article, with optional social posts' },
-          { value: 'social',   label: 'Social posts',   icon: MessageSquare, desc: 'Instant multi-platform drafts' },
+          { value: 'workflow', label: 'Capture an Article Idea', icon: Newspaper,     desc: 'Save an idea for later' },
+          { value: 'social',   label: 'Social posts',            icon: MessageSquare, desc: 'Instant multi-platform drafts' },
         ] as { value: DashboardTab; label: string; icon: React.ComponentType<{className?: string}>; desc: string }[]).map(({ value, label, icon: Icon, desc }) => (
           <button
             key={value}

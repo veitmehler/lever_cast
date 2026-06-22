@@ -295,25 +295,55 @@ export async function topicRoutes(app: FastifyInstance) {
 
   // ── Idea bank ─────────────────────────────────────────────────────────────
 
-  // POST /api/topics/idea — capture an unscheduled article idea (no job)
-  app.post<{ Body: { topic?: string; notes?: string } }>('/topics/idea', async (request, reply) => {
+  // POST /api/topics/idea — capture an unscheduled article idea (no job). Stores
+  // the full article config so it carries through when the idea is later
+  // scheduled + generated from the content plan.
+  app.post<{
+    Body: {
+      topic?: string
+      notes?: string | null
+      mode?: 'social_only' | 'article_first' | 'article_only'
+      publishingDate?: string | null
+      outlineFrameworkNumber?: number | null
+      outlineSpecialInstructions?: string | null
+      realCaseStudies?: string | null
+      excludedKeywords?: string[]
+      defaultOutputTargets?: string[]
+      wordPressConnectionId?: string | null
+      category?: string | null
+    }
+  }>('/topics/idea', async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
     const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const topic = request.body?.topic?.trim()
+    const b = request.body ?? {}
+    const topic = b.topic?.trim()
     if (!topic) return reply.status(400).send({ error: 'topic is required' })
+
+    const mode = ['social_only', 'article_first', 'article_only'].includes(b.mode ?? '')
+      ? b.mode!
+      : 'article_first'
 
     const idea = await prisma.topic.create({
       data: {
         userId: user.id,
         topic,
-        notes: request.body?.notes?.trim() || null,
+        notes: b.notes?.trim() || null,
         scheduledDate: null,
         status: 'idea',
         source: 'idea',
-        mode: 'article_first',
+        mode,
+        publishingDate: b.publishingDate ? new Date(b.publishingDate) : null,
+        outlineFrameworkNumber: b.outlineFrameworkNumber ?? null,
+        outlineFrameworkSource: b.outlineFrameworkNumber != null ? 'user' : null,
+        outlineSpecialInstructions: b.outlineSpecialInstructions?.trim() || null,
+        realCaseStudies: b.realCaseStudies?.trim() || null,
+        excludedKeywords: b.excludedKeywords ?? [],
+        defaultOutputTargets: b.defaultOutputTargets ?? [],
+        wordPressConnectionId: b.wordPressConnectionId ?? null,
+        category: b.category?.trim() || null,
       },
     })
     return reply.status(201).send({ idea })

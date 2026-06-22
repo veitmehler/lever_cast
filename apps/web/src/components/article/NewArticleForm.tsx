@@ -37,6 +37,12 @@ export interface NewArticleFormProps {
    * callers keep their fixed `mode`.
    */
   allowSocialToggle?: boolean
+  /**
+   * When true, the form SAVES the entry as an unscheduled idea (no generation,
+   * no navigation) instead of starting the pipeline. Used on the dashboard's
+   * "Capture an Article Idea" tab. `onCreated` is not called in this mode.
+   */
+  captureAsIdea?: boolean
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -46,7 +52,7 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', allowSocialToggle = false }: NewArticleFormProps) {
+export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', allowSocialToggle = false, captureAsIdea = false }: NewArticleFormProps) {
   const [topic, setTopic]                     = useState('')
   const [isSubmitting, setIsSubmitting]       = useState(false)
   const [frameworks, setFrameworks]           = useState<OutlineFrameworkOption[]>([])
@@ -66,13 +72,15 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', al
     ? (articleOnly ? 'article_only' : 'article_first')
     : mode
 
-  const heading =
-    effectiveMode === 'article_first'
+  const heading = captureAsIdea
+    ? 'Capture an Article Idea'
+    : effectiveMode === 'article_first'
       ? 'Create an Article (+ social posts when ready)'
       : 'New Article'
 
-  const subheading =
-    effectiveMode === 'article_first'
+  const subheading = captureAsIdea
+    ? 'Save this idea to your bank. Schedule and generate it later from your Content Plan.'
+    : effectiveMode === 'article_first'
       ? 'A full article will be generated first. Once approved, you can generate social posts from it.'
       : 'Enter a topic and the AI pipeline will generate a full article (steps 1–12, ~10 min).'
 
@@ -92,17 +100,40 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', al
 
     setIsSubmitting(true)
     try {
+      const payload = {
+        topic: trimmed,
+        mode: effectiveMode,
+        publishingDate:             publishingDate || todayDateString(),
+        outlineFrameworkNumber:     selectedFramework ?? null,
+        outlineSpecialInstructions: specialInstructions.trim() || null,
+        realCaseStudies:            realCaseStudies.trim() || null,
+      }
+
+      // Capture mode: save as an unscheduled idea, no generation/navigation.
+      if (captureAsIdea) {
+        const res = await fetch('/api/topics/idea', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error((data as { error?: string }).error ?? `Server error ${res.status}`)
+        }
+        toast.success('Saved to your ideas')
+        // Reset for the next capture; stay on the dashboard.
+        setTopic('')
+        setSpecialInst('')
+        setRealCaseStudies('')
+        setSelectedFw(null)
+        setShowAdvanced(false)
+        return
+      }
+
       const res = await fetch('/api/topics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: trimmed,
-          mode: effectiveMode,
-          publishingDate:             publishingDate || todayDateString(),
-          outlineFrameworkNumber:     selectedFramework ?? null,
-          outlineSpecialInstructions: specialInstructions.trim() || null,
-          realCaseStudies:            realCaseStudies.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -256,8 +287,8 @@ export function NewArticleForm({ mode, onCreated, onClose, variant = 'panel', al
           className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {isSubmitting
-            ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Starting pipeline…</>
-            : <><Sparkles className="h-4 w-4 mr-1.5" />Generate Article</>}
+            ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />{captureAsIdea ? 'Saving…' : 'Starting pipeline…'}</>
+            : <><Sparkles className="h-4 w-4 mr-1.5" />{captureAsIdea ? 'Save idea' : 'Generate Article'}</>}
         </Button>
         {onClose && (
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>

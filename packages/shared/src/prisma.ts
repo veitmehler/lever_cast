@@ -38,6 +38,7 @@ const ACCOUNT_SCOPED_MODELS = new Set([
   'TwitterApiRequest',
   'Topic',
   'ArticleJob',
+  'SitePage',
   'LLMUsage',
   'WordPressConnection',
   'ErrorLog',

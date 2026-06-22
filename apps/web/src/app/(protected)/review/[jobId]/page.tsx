@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Loader2, ArrowLeft, Save, Check, RotateCcw, Crosshair, SendHorizonal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import '@/app/article-typography.css'
 
 interface EditRequest {
   id: string
@@ -48,9 +49,60 @@ export default function AssistantReviewPage({ params }: { params: Promise<{ jobI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId])
 
+  // Build a Range spanning exactly `quote` within the editable body, even when
+  // it crosses inline elements (e.g. a sentence with a <strong> in it).
+  function findQuoteRange(container: HTMLElement, quote: string): Range | null {
+    const nodes: { node: Text; start: number }[] = []
+    let full = ''
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    let n: Node | null
+    while ((n = walker.nextNode())) {
+      nodes.push({ node: n as Text, start: full.length })
+      full += n.textContent ?? ''
+    }
+    if (!nodes.length) return null
+
+    let idx = full.indexOf(quote)
+    let len = quote.length
+    if (idx === -1) {
+      const probe = quote.slice(0, 60) // resilience if the tail was edited
+      idx = full.indexOf(probe)
+      len = probe.length
+    }
+    if (idx === -1) return null
+
+    const locate = (pos: number) => {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        if (nodes[i].start <= pos) return { node: nodes[i].node, offset: pos - nodes[i].start }
+      }
+      return { node: nodes[0].node, offset: 0 }
+    }
+    const s = locate(idx)
+    const e = locate(idx + len)
+    const range = document.createRange()
+    range.setStart(s.node, Math.min(s.offset, s.node.length))
+    range.setEnd(e.node, Math.min(e.offset, e.node.length))
+    return range
+  }
+
   function jumpTo(quote: string) {
     const container = bodyRef.current
     if (!container) return
+
+    const range = findQuoteRange(container, quote)
+    if (range) {
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      const anchor =
+        range.startContainer.nodeType === Node.TEXT_NODE
+          ? range.startContainer.parentElement
+          : (range.startContainer as HTMLElement)
+      anchor?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
+    // Fallback: highlight the containing paragraph if exact text isn't found.
     const needle = quote.slice(0, 60)
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
     let node: Node | null
@@ -155,7 +207,7 @@ export default function AssistantReviewPage({ params }: { params: Promise<{ jobI
             contentEditable
             suppressContentEditableWarning
             onInput={() => setDirty(true)}
-            className="prose prose-sm max-w-none rounded-xl border border-border bg-card p-6 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 [&_a]:text-primary [&_a]:underline [&_h2]:font-semibold"
+            className="article-body max-w-none rounded-xl border border-border bg-card p-6 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
             dangerouslySetInnerHTML={{ __html: html ?? '' }}
           />
         </div>

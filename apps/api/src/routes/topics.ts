@@ -17,15 +17,11 @@ const CSV_ALIASES: Record<string, string> = {
   publishingdate: 'publishingDate',
   publishing_date: 'publishingDate',
   slug: 'slug',
-  category: 'category',
-  mode: 'mode',
   'output targets': 'defaultOutputTargets',
   outputtargets: 'defaultOutputTargets',
   'wordpress connection': 'wordPressConnectionId',
   wordpressconnection: 'wordPressConnectionId',
   wordpressconnectionid: 'wordPressConnectionId',
-  'excluded keywords': 'excludedKeywords',
-  excludedkeywords: 'excludedKeywords',
   'outline framework': 'outlineFrameworkNumber',
   outlineframework: 'outlineFrameworkNumber',
   outline_framework: 'outlineFrameworkNumber',
@@ -174,15 +170,9 @@ export async function topicRoutes(app: FastifyInstance) {
 
       // A row without a date is captured as an unscheduled idea (no job). Dateless
       // idea rows default to article_first (the Ideas Bank is for article ideas);
-      // dated rows keep the social_only default for back-compat.
+      // dated rows default to social_only for back-compat. Mode is no longer a CSV column.
       const hasDate = !!row.scheduledDate
-      const mode = (['social_only', 'article_first', 'article_only'].includes(row.mode ?? '')
-        ? row.mode
-        : hasDate ? 'social_only' : 'article_first') as 'social_only' | 'article_first' | 'article_only'
-
-      const excludedKeywords = row.excludedKeywords
-        ? row.excludedKeywords.split(/[,;]/).map((k) => k.trim()).filter(Boolean)
-        : []
+      const mode: 'social_only' | 'article_first' | 'article_only' = hasDate ? 'social_only' : 'article_first'
 
       const defaultOutputTargets = row.defaultOutputTargets
         ? row.defaultOutputTargets.split(/[,;]/).map((t) => t.trim()).filter(Boolean)
@@ -203,8 +193,7 @@ export async function topicRoutes(app: FastifyInstance) {
             source: 'csv',
             mode,
             slug: row.slug || null,
-            category: row.category || null,
-            excludedKeywords,
+            excludedKeywords: [],
             defaultOutputTargets,
             wordPressConnectionId: row.wordPressConnectionId || null,
             outlineFrameworkNumber: hasExplicitFramework ? csvOutlineNumber : null,

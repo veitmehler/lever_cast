@@ -14,15 +14,12 @@ const OPTIONAL_COLUMNS = [
   'outline framework',
   'special instructions',
   'real case studies',
-  'excluded keywords',
-  'category',
-  'mode (article_first | article_only | social_only)',
 ]
 
 const TEMPLATE = [
-  'topic,outline framework,special instructions,real case studies,excluded keywords,category,mode',
-  '"Why posture matters for desk workers",3,"Lead with a patient story","Acme Clinic 2024","cheap;discount","ergonomics",article_first',
-  '"Migraine relief without medication",,,,,,article_first',
+  'topic,outline framework,special instructions,real case studies',
+  '"Why posture matters for desk workers",3,"Lead with a patient story","Acme Clinic 2024"',
+  '"Migraine relief without medication",,,',
 ].join('\n')
 
 // Shared so the Ideas Bank page can offer the same download next to its button.

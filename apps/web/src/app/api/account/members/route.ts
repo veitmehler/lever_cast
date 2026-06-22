@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma, ACCOUNT_SEAT_LIMIT } from '@socioply/shared'
 import { getOrCreateUser } from '@/lib/user'
+import { sendTeamSetupEmail } from '@/lib/email'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
@@ -44,6 +45,11 @@ export async function POST(request: NextRequest) {
       const remaining = await prisma.user.count({ where: { accountId: old } })
       if (remaining === 0) await prisma.account.delete({ where: { id: old } }).catch(() => {})
     }
+  } else if (!existingUser) {
+    // Brand-new teammate: best-effort email with a pre-filled sign-up link.
+    const origin = new URL(request.url).origin
+    const signUpUrl = `${origin}/sign-up?email=${encodeURIComponent(email)}`
+    await sendTeamSetupEmail({ to: email, name, inviterName: me.name, signUpUrl }).catch(() => {})
   }
 
   return NextResponse.json({ member })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, UserPlus, X, Users, Crown, Pencil, Check } from 'lucide-react'
+import { Loader2, UserPlus, X, Users, Crown, Pencil, Check, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -63,6 +63,16 @@ export function TeamSection() {
       if (!res.ok) { toast.error(body.error ?? 'Failed to save'); return }
       setEditId(null); await load()
     } finally { setBusy(false) }
+  }
+
+  async function copyLink(m: Member) {
+    const url = `${window.location.origin}/sign-up?email=${encodeURIComponent(m.email)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Sign-up link copied — send it to your teammate')
+    } catch {
+      toast.error(url) // clipboard blocked; show the link to copy manually
+    }
   }
 
   async function remove(m: Member) {
@@ -131,6 +141,9 @@ export function TeamSection() {
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${m.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                       {m.status === 'active' ? 'Active' : 'Pending sign-up'}
                     </span>
+                    {m.status === 'pending' && (
+                      <button onClick={() => copyLink(m)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Copy sign-up link"><Link2 className="h-4 w-4" /></button>
+                    )}
                     <button onClick={() => { setEditId(m.id); setEditName(m.name ?? ''); setEditEmail(m.email) }} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Edit"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => remove(m)} disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-red-600 disabled:opacity-50" title="Remove"><X className="h-4 w-4" /></button>
                   </>

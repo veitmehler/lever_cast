@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma } from '@socioply/shared'
 import { getOrCreateUser } from '@/lib/user'
 
@@ -46,6 +46,11 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
   if (!member || member.accountId !== me.accountId) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
 
   await prisma.accountMember.delete({ where: { id } })
+
+  // Revoke the pending Clerk invitation, if any.
+  if (member.clerkInvitationId) {
+    await (await clerkClient()).invitations.revokeInvitation(member.clerkInvitationId).catch(() => {})
+  }
 
   // If the member had signed up, move them to a fresh solo account.
   const user = await prisma.user.findFirst({ where: { email: member.email, accountId: me.accountId }, select: { id: true, name: true } })

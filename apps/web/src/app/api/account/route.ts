@@ -27,6 +27,7 @@ export async function GET() {
       email: r.email,
       name: r.name,
       status: activeEmails.has(r.email.toLowerCase()) ? 'active' : 'pending',
+      inviteUrl: r.inviteUrl,
     })),
     seatLimit: ACCOUNT_SEAT_LIMIT,
     seatsUsed: 1 + roster.length, // owner + roster

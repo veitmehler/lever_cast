@@ -40,13 +40,15 @@ model Account {
 // Owner-managed roster of teammate emails (no invitations). A user whose email
 // matches a roster entry is auto-joined to that account on sign-in.
 model AccountMember {
-  id        String   @id @default(cuid())
-  accountId String
-  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  email     String   @unique // lowercased; an email belongs to at most one team
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  accountId       String
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  email           String   @unique // lowercased; an email belongs to at most one team
+  name            String?
+  clerkInvitationId String? // Clerk invitation (closed sign-ups → invite-only)
+  inviteUrl       String?  @db.Text // copyable invitation link for the owner to share
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([accountId])
   @@map("account_members")

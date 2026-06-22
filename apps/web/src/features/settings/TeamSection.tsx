@@ -5,7 +5,7 @@ import { Loader2, UserPlus, X, Users, Crown, Pencil, Check, Link2 } from 'lucide
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
-interface Member { id: string; name: string | null; email: string; status: 'active' | 'pending' }
+interface Member { id: string; name: string | null; email: string; status: 'active' | 'pending'; inviteUrl: string | null }
 interface AccountData {
   account: { id: string; name: string | null }
   owner: { email: string; name: string | null } | null
@@ -66,12 +66,15 @@ export function TeamSection() {
   }
 
   async function copyLink(m: Member) {
-    const url = `${window.location.origin}/sign-up?email=${encodeURIComponent(m.email)}`
+    if (!m.inviteUrl) {
+      toast.error('No invite link available — Clerk emailed the invitation instead.')
+      return
+    }
     try {
-      await navigator.clipboard.writeText(url)
-      toast.success('Sign-up link copied — send it to your teammate')
+      await navigator.clipboard.writeText(m.inviteUrl)
+      toast.success('Invite link copied — send it to your teammate')
     } catch {
-      toast.error(url) // clipboard blocked; show the link to copy manually
+      toast.error(m.inviteUrl) // clipboard blocked; show the link to copy manually
     }
   }
 
@@ -92,9 +95,9 @@ export function TeamSection() {
         <h2 className="text-xl font-semibold text-card-foreground">Team</h2>
       </div>
       <p className="mb-6 text-sm text-muted-foreground">
-        Add up to {data ? data.seatLimit - 1 : 2} teammates by email — no invitation needed. They sign up at{' '}
-        <code className="rounded bg-muted px-1">/sign-up</code> with that email and set their own password; they then
-        share this account with equal access.
+        Add up to {data ? data.seatLimit - 1 : 2} teammates by email. They get an invitation email with a link to set
+        their own password (use the <span className="inline-flex"><Link2 className="h-3.5 w-3.5" /></span> copy-link to
+        share it directly too). Once they accept, they share this account with equal access.
       </p>
 
       {loading ? (
@@ -141,8 +144,8 @@ export function TeamSection() {
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${m.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                       {m.status === 'active' ? 'Active' : 'Pending sign-up'}
                     </span>
-                    {m.status === 'pending' && (
-                      <button onClick={() => copyLink(m)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Copy sign-up link"><Link2 className="h-4 w-4" /></button>
+                    {m.status === 'pending' && m.inviteUrl && (
+                      <button onClick={() => copyLink(m)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Copy invite link"><Link2 className="h-4 w-4" /></button>
                     )}
                     <button onClick={() => { setEditId(m.id); setEditName(m.name ?? ''); setEditEmail(m.email) }} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="Edit"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => remove(m)} disabled={busy} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-red-600 disabled:opacity-50" title="Remove"><X className="h-4 w-4" /></button>

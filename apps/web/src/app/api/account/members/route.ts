@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { prisma, ACCOUNT_SEAT_LIMIT } from '@socioply/shared'
 import { getOrCreateUser } from '@/lib/user'
-import { sendTeamSetupEmail } from '@/lib/email'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
-// POST /api/account/members { email, name? } — add a teammate to the roster.
-// No invitation: when they sign up / sign in with this email they join the account.
+// POST /api/account/members { email, name? } — add a teammate.
+// Public sign-ups are closed, so we create a Clerk invitation for the email
+// (Clerk emails a set-password link; we also keep the link for the owner to
+// copy). On accept, the roster email-match joins them to this account.
 export async function POST(request: NextRequest) {
   const { userId: clerkId } = await auth()
   if (!clerkId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,7 +26,6 @@ export async function POST(request: NextRequest) {
   if (rosterCount >= ACCOUNT_SEAT_LIMIT - 1) {
     return NextResponse.json({ error: `Your account is limited to ${ACCOUNT_SEAT_LIMIT} users.` }, { status: 409 })
   }
-
   const existingRoster = await prisma.accountMember.findUnique({ where: { email } })
   if (existingRoster) {
     return NextResponse.json(
@@ -34,10 +34,33 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const member = await prisma.accountMember.create({ data: { accountId: me.accountId, email, name } })
+  const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true, accountId: true } })
+
+  let clerkInvitationId: string | null = null
+  let inviteUrl: string | null = null
+  // Only invite people who don't already have an account.
+  if (!existingUser) {
+    const origin = new URL(request.url).origin
+    try {
+      const inv = await (await clerkClient()).invitations.createInvitation({
+        emailAddress: email,
+        redirectUrl: `${origin}/sign-up`,
+        publicMetadata: { accountId: me.accountId },
+        ignoreExisting: true,
+      })
+      clerkInvitationId = inv.id
+      inviteUrl = (inv as { url?: string }).url ?? null
+    } catch (err) {
+      console.error('[account/members] createInvitation failed:', err)
+      return NextResponse.json({ error: 'Failed to create the invitation. Try again.' }, { status: 502 })
+    }
+  }
+
+  const member = await prisma.accountMember.create({
+    data: { accountId: me.accountId, email, name, clerkInvitationId, inviteUrl },
+  })
 
   // If they already have a user, move them into this account right away.
-  const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true, accountId: true } })
   if (existingUser && existingUser.accountId !== me.accountId) {
     const old = existingUser.accountId
     await prisma.user.update({ where: { id: existingUser.id }, data: { accountId: me.accountId } })
@@ -45,11 +68,6 @@ export async function POST(request: NextRequest) {
       const remaining = await prisma.user.count({ where: { accountId: old } })
       if (remaining === 0) await prisma.account.delete({ where: { id: old } }).catch(() => {})
     }
-  } else if (!existingUser) {
-    // Brand-new teammate: best-effort email with a pre-filled sign-up link.
-    const origin = new URL(request.url).origin
-    const signUpUrl = `${origin}/sign-up?email=${encodeURIComponent(email)}`
-    await sendTeamSetupEmail({ to: email, name, inviterName: me.name, signUpUrl }).catch(() => {})
   }
 
   return NextResponse.json({ member })

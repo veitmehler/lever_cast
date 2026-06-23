@@ -8,11 +8,14 @@
  * 5) Optional WP tags (up to 4) when topic has wordPressConnectionId
  */
 
+import sharp from 'sharp'
 import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
 import { decrypt } from '@socioply/shared'
-import { uploadBufferWithKey, deleteS3Prefix } from '@socioply/shared'
+import { uploadBufferWithKey, deleteS3Prefix, downloadImageFromUrl } from '@socioply/shared'
+import { getSystemApiKey } from '../../lib/system-keys'
+import { specializationLabel } from '../../newsletter/calendar-routing'
 import {
   extractH2Sections,
   buildEnrichedHtml,
@@ -43,6 +46,8 @@ import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
 import { selectWordPressTags } from './wp-tag-selector'
 import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
+import { buildRestylePrompt, restyleDiagram } from './diagram-restyle'
+import { overlayLogo } from './diagram-logo'
 
 const CDN_BASE = process.env.CDN_BASE ?? ''
 
@@ -386,6 +391,11 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   const diagramInitDirective = buildDiagramInitDirective(theme)
   const darkDiagramInitDirective = buildDarkDiagramInitDirective(theme)
 
+  // AI restyle (Nano Banana): redesign each diagram into a branded, 1:1 image.
+  // Resolved once per job; null disables restyling (no Gemini key) and the
+  // pipeline keeps the plain Mermaid SVG. Any per-diagram failure also falls back.
+  const restyleCfg = await buildDiagramRestyleConfig(jobId, brandStyle)
+
   const usedDiagramTypes: string[] = []
   // Rolling window of concept labels from the last 2 successful diagrams.
   const priorConceptWindows: string[] = []
@@ -536,6 +546,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
             darkDiagramInitDirective,
             altText: captionResult2.altText,
             caption: captionResult2.caption,
+            restyle: restyleCfg,
           })
           usedDiagramTypes.push(diagramType)
           priorConceptWindows.push(extractMermaidConcepts(gen2.mermaidSyntax))
@@ -566,6 +577,7 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           darkDiagramInitDirective,
           altText: captionResult1.altText,
           caption: captionResult1.caption,
+          restyle: restyleCfg,
         })
         usedDiagramTypes.push(diagramType)
         priorConceptWindows.push(extractMermaidConcepts(gen1.mermaidSyntax))
@@ -747,6 +759,57 @@ async function maybeWpTags(jobId: string): Promise<void> {
   }
 }
 
+/** Resolved once per job; passed to every diagram save. */
+interface DiagramRestyleConfig {
+  geminiKey: string
+  prompt: string
+  logoBuffer: Buffer | null
+}
+
+/**
+ * Build the per-job AI restyle config: resolve the Gemini key, assemble the
+ * industry/specialization-aware prompt + style guide, and pre-download the brand
+ * logo once. Returns null when restyling can't run (no key) so the pipeline
+ * falls back to the plain Mermaid SVG.
+ */
+async function buildDiagramRestyleConfig(
+  jobId: string,
+  brandStyle: Awaited<ReturnType<typeof brandSettingsForUser>>,
+): Promise<DiagramRestyleConfig | null> {
+  const geminiKey = await getSystemApiKey('gemini')
+  if (!geminiKey) {
+    logger.info({ jobId }, '[enrichment] no Gemini key — skipping diagram AI restyle')
+    return null
+  }
+  const specLabel =
+    (await specializationLabel(brandStyle?.primarySpecialization)) || brandStyle?.specialization || null
+  const prompt = buildRestylePrompt({
+    industry: brandStyle?.industry,
+    specialization: specLabel,
+    styleGuide: brandStyle?.diagramStyleGuide,
+  })
+  let logoBuffer: Buffer | null = null
+  const logoUrl = brandStyle?.organizationLogoUrl || brandStyle?.socialLogoUrl
+  if (logoUrl) {
+    try {
+      logoBuffer = await downloadImageFromUrl(logoUrl)
+    } catch (err) {
+      logger.warn({ jobId, err }, '[enrichment] diagram logo download failed — proceeding without watermark')
+    }
+  }
+  return { geminiKey, prompt, logoBuffer }
+}
+
+/** Guarantee an exact 1:1 image (Gemini image-to-image returns ~square; this is the guard). */
+async function ensureSquare(buf: Buffer): Promise<Buffer> {
+  const m = await sharp(buf).metadata()
+  const w = m.width ?? 0
+  const h = m.height ?? 0
+  if (!w || !h || w === h) return buf
+  const side = Math.min(w, h)
+  return sharp(buf).resize(side, side, { fit: 'cover', position: 'centre' }).png().toBuffer()
+}
+
 interface SaveDiagramOpts {
   jobId: string
   sitePage: { id: string; userId: string }
@@ -758,6 +821,7 @@ interface SaveDiagramOpts {
   darkDiagramInitDirective: string
   altText: string  // concise visual description for img alt= and SVG <title>
   caption: string  // meaning-focused sentence shown as visible <figcaption>
+  restyle: DiagramRestyleConfig | null  // AI restyle config (null → SVG only)
 }
 
 /** Match screenshot + crop background (mmdc `-b white`). */
@@ -781,7 +845,7 @@ function extractSvgViewBoxDimensions(svg: string): { width: number; height: numb
 }
 
 async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
-  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, altText, caption } =
+  const { jobId, sitePage, section, mermaidSyntax, svgContent, gen, figuresToInsert, darkDiagramInitDirective, altText, caption, restyle } =
     opts
 
   const cleanSvg = addSvgAccessibility(
@@ -802,20 +866,48 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
   const pngKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}.png`
   await uploadBufferWithKey(pngKey, light.png, 'image/png')
 
+  // AI restyle → branded, exact-1:1 image. On any failure we keep null and fall
+  // back to the Mermaid SVG below.
+  let stylizedKey: string | null = null
+  let stylizedW: number | null = null
+  let stylizedH: number | null = null
+  if (restyle?.geminiKey) {
+    const restyled = await restyleDiagram({
+      squarePng: light.png,
+      prompt: restyle.prompt,
+      geminiKey: restyle.geminiKey,
+      userId: sitePage.userId,
+      jobId,
+    })
+    if (restyled) {
+      const square = await ensureSquare(restyled.png)
+      const branded = await overlayLogo(square, restyle.logoBuffer)
+      const sdims = await sharp(branded).metadata()
+      stylizedKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}-stylized.png`
+      await uploadBufferWithKey(stylizedKey, branded, 'image/png')
+      stylizedW = sdims.width ?? null
+      stylizedH = sdims.height ?? null
+    }
+  }
+
+  // Dark PNG is only used as a Mermaid fallback variant; skip it when the
+  // stylized image (its own designed background) is the in-article figure.
   let pngDarkKey: string | null = null
   let darkW: number | null = null
   let darkH: number | null = null
-  try {
-    const darkSvg = await renderMermaidToSvg(mermaidSyntax, darkDiagramInitDirective, DIAGRAM_DARK_BACKGROUND)
-    const darkClean = sanitizeSvg(darkSvg)
-    const rawDark = await rasterizeSvg(darkClean, 1200, DIAGRAM_DARK_BACKGROUND)
-    const dark = await postprocessDiagramPng(rawDark.png, DIAGRAM_DARK_BACKGROUND)
-    pngDarkKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}-dark.png`
-    await uploadBufferWithKey(pngDarkKey, dark.png, 'image/png')
-    darkW = dark.width
-    darkH = dark.height
-  } catch (err) {
-    logger.warn({ jobId, position: section.position, err }, '[enrichment] dark PNG render failed — skipping')
+  if (!stylizedKey) {
+    try {
+      const darkSvg = await renderMermaidToSvg(mermaidSyntax, darkDiagramInitDirective, DIAGRAM_DARK_BACKGROUND)
+      const darkClean = sanitizeSvg(darkSvg)
+      const rawDark = await rasterizeSvg(darkClean, 1200, DIAGRAM_DARK_BACKGROUND)
+      const dark = await postprocessDiagramPng(rawDark.png, DIAGRAM_DARK_BACKGROUND)
+      pngDarkKey = `articles/${sitePage.userId}/${jobId}/diagrams/${section.position}-dark.png`
+      await uploadBufferWithKey(pngDarkKey, dark.png, 'image/png')
+      darkW = dark.width
+      darkH = dark.height
+    } catch (err) {
+      logger.warn({ jobId, position: section.position, err }, '[enrichment] dark PNG render failed — skipping')
+    }
   }
 
   await prisma.articleDiagram.upsert({
@@ -835,6 +927,9 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       pngDarkS3Key: pngDarkKey,
       pngDarkWidth: darkW,
       pngDarkHeight: darkH,
+      stylizedPngS3Key: stylizedKey,
+      stylizedPngWidth: stylizedW,
+      stylizedPngHeight: stylizedH,
       pngGeneratedAt: new Date(),
       llmProvider: gen.provider,
       llmModel: gen.model,
@@ -853,6 +948,9 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
       pngDarkS3Key: pngDarkKey,
       pngDarkWidth: darkW,
       pngDarkHeight: darkH,
+      stylizedPngS3Key: stylizedKey,
+      stylizedPngWidth: stylizedW,
+      stylizedPngHeight: stylizedH,
       pngGeneratedAt: new Date(),
       llmProvider: gen.provider,
       llmModel: gen.model,
@@ -898,23 +996,27 @@ async function saveDiagramAndInsert(opts: SaveDiagramOpts): Promise<void> {
     }).catch(() => {/* non-fatal */})
   }
 
-  // Article HTML references the SVG — browsers render it natively and it's
-  // AI-crawlable text. PNG is kept for bundle/email fallback only.
+  // Prefer the branded, AI-restyled 1:1 image; fall back to the SVG (browsers
+  // render it natively and it's AI-crawlable text). PNG is kept for bundle/email.
   const svgDims = extractSvgViewBoxDimensions(cleanSvg)
+  const useStylized = !!stylizedKey
+  const figureImgUrl = useStylized ? getCdnUrl(stylizedKey!) : svgUrl
+  const figureWidth = useStylized ? stylizedW ?? undefined : svgDims?.width
+  const figureHeight = useStylized ? stylizedH ?? undefined : svgDims?.height
   figuresToInsert.push({
     afterH2Offset: section.afterH2Offset,
     figureHtml: buildFigureHtml({
-      imgUrl: svgUrl,
+      imgUrl: figureImgUrl,
       diagramId: `${jobId.slice(0, 8)}-${section.position}`,
       alt: section.heading,
       altText,
       caption,
-      width: svgDims?.width,
-      height: svgDims?.height,
+      width: figureWidth,
+      height: figureHeight,
     }),
   })
 
-  logger.info({ jobId, position: section.position, svgUrl }, '[enrichment] diagram saved')
+  logger.info({ jobId, position: section.position, figureImgUrl, stylized: useStylized }, '[enrichment] diagram saved')
 }
 
 async function finishEnrichment(

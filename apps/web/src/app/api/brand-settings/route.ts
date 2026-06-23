@@ -7,6 +7,7 @@ import {
   brandSettingsForUser,
   canonicalAccountUserId,
   accountIdForUser,
+  DEFAULT_DIAGRAM_STYLE_GUIDE,
 } from '@socioply/shared'
 
 const SPECIALIZATIONS_FIELD = 'specializations'
@@ -77,9 +78,11 @@ export async function GET() {
 
     const settings = await brandSettingsForUser(userId)
 
-    // Return empty-but-shaped object if no row exists yet
-    return NextResponse.json(
-      settings ?? {
+    // Return empty-but-shaped object if no row exists yet. `diagramStyleGuideDefault`
+    // travels alongside so the settings page can prefill the textarea without
+    // bundling the shared constant into the client.
+    return NextResponse.json({
+      ...(settings ?? {
         geolocation: null,
         industry: null,
         specialization: null,
@@ -121,11 +124,13 @@ export async function GET() {
         diagramSecondaryColor: null,
         diagramLineColor: null,
         diagramFontFamily: null,
+        diagramStyleGuide: null,
         articleFontFamily: null,
         articleFontWeight: null,
         articleFontSizeBase: null,
-      },
-    )
+      }),
+      diagramStyleGuideDefault: DEFAULT_DIAGRAM_STYLE_GUIDE,
+    })
   } catch (err) {
     console.error('[brand-settings] GET error:', err)
     return NextResponse.json({ error: 'Failed to fetch brand settings' }, { status: 500 })
@@ -184,6 +189,7 @@ export async function PATCH(request: NextRequest) {
       'diagramSecondaryColor',
       'diagramLineColor',
       'diagramFontFamily',
+      'diagramStyleGuide',
       'articleFontFamily',
       'articleFontWeight',
       'articleFontSizeBase',

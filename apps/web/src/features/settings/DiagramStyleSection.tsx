@@ -11,6 +11,8 @@ export function DiagramStyleSection({ settings }: { settings: SettingsData }) {
     diagramSecondaryColor, setDiagramSecondaryColor,
     diagramLineColor, setDiagramLineColor,
     diagramFontFamily, setDiagramFontFamily,
+    diagramStyleGuide, setDiagramStyleGuide,
+    diagramStyleGuideDefault,
     isSavingDiagramStyle,
     handleSaveDiagramStyle,
   } = settings
@@ -104,6 +106,36 @@ export function DiagramStyleSection({ settings }: { settings: SettingsData }) {
             Choose &quot;Server default&quot; to use the built-in font.
           </p>
         </div>
+
+        {/* AI restyle — Nano Banana style guide */}
+        <div className="border-t border-border pt-5">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="block text-sm font-medium text-card-foreground">AI diagram style guide</label>
+            {diagramStyleGuideDefault && diagramStyleGuide.trim() !== diagramStyleGuideDefault.trim() && (
+              <button
+                type="button"
+                onClick={() => setDiagramStyleGuide(diagramStyleGuideDefault)}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Reset to default
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mb-2">
+            After each diagram is generated, it&apos;s redesigned into a polished, on-brand image for your
+            industry. This style guide controls that look — edit it to match your brand. Leave it as the
+            default to use our recommended style.
+          </p>
+          <textarea
+            value={diagramStyleGuide}
+            onChange={(e) => setDiagramStyleGuide(e.target.value)}
+            rows={16}
+            spellCheck={false}
+            placeholder={diagramStyleGuideDefault}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground"
+          />
+        </div>
+
         <Button onClick={handleSaveDiagramStyle} disabled={isSavingDiagramStyle}>
           {isSavingDiagramStyle ? (
             <>

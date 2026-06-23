@@ -80,6 +80,8 @@ export function useSettingsData() {
   const [diagramSecondaryColor, setDiagramSecondaryColor]   = useState('')
   const [diagramLineColor, setDiagramLineColor]             = useState('')
   const [diagramFontFamily, setDiagramFontFamily]           = useState('')
+  const [diagramStyleGuide, setDiagramStyleGuide]           = useState('')
+  const [diagramStyleGuideDefault, setDiagramStyleGuideDefault] = useState('')
   const [isSavingDiagramStyle, setIsSavingDiagramStyle]     = useState(false)
 
   const [articleFontFamily, setArticleFontFamily] = useState('')
@@ -163,6 +165,12 @@ export function useSettingsData() {
           setDiagramSecondaryColor(brand.diagramSecondaryColor ?? '')
           setDiagramLineColor(brand.diagramLineColor ?? '')
           setDiagramFontFamily(brand.diagramFontFamily ?? '')
+          // Seed the style-guide textarea with the saved value, or the server
+          // default when the business hasn't customized it yet.
+          setDiagramStyleGuideDefault(brand.diagramStyleGuideDefault ?? '')
+          setDiagramStyleGuide(
+            brand.diagramStyleGuide?.trim() ? brand.diagramStyleGuide : (brand.diagramStyleGuideDefault ?? ''),
+          )
           setArticleFontFamily(brand.articleFontFamily ?? '')
           setArticleFontWeight(brand.articleFontWeight ?? '400')
           setArticleFontSizeBase(brand.articleFontSizeBase ?? '16px')
@@ -372,6 +380,12 @@ export function useSettingsData() {
           diagramSecondaryColor: diagramSecondaryColor.trim() || null,
           diagramLineColor: diagramLineColor.trim() || null,
           diagramFontFamily: diagramFontFamily.trim() || null,
+          // Store null when the guide is empty or unchanged from the default, so
+          // those businesses keep using the server default at render time.
+          diagramStyleGuide:
+            diagramStyleGuide.trim() && diagramStyleGuide.trim() !== diagramStyleGuideDefault.trim()
+              ? diagramStyleGuide.trim()
+              : null,
         }),
       })
       if (res.ok) {
@@ -398,6 +412,12 @@ export function useSettingsData() {
           diagramSecondaryColor: diagramSecondaryColor.trim() || null,
           diagramLineColor: diagramLineColor.trim() || null,
           diagramFontFamily: diagramFontFamily.trim() || null,
+          // Store null when the guide is empty or unchanged from the default, so
+          // those businesses keep using the server default at render time.
+          diagramStyleGuide:
+            diagramStyleGuide.trim() && diagramStyleGuide.trim() !== diagramStyleGuideDefault.trim()
+              ? diagramStyleGuide.trim()
+              : null,
         }),
       })
       if (res.ok) {
@@ -510,6 +530,8 @@ export function useSettingsData() {
     diagramSecondaryColor, setDiagramSecondaryColor,
     diagramLineColor, setDiagramLineColor,
     diagramFontFamily, setDiagramFontFamily,
+    diagramStyleGuide, setDiagramStyleGuide,
+    diagramStyleGuideDefault,
     isSavingDiagramStyle,
     handleSaveDiagramStyle,
     // Article typography

@@ -1,0 +1,111 @@
+/**
+ * AI diagram restyle ("Nano Banana") — Phase 1
+ *
+ * Turns a rendered (square) Mermaid diagram PNG into a polished, on-brand image
+ * via Gemini image-to-image. Pure prompt assembly + a single image call with a
+ * defensive validation step; on ANY failure it returns null so the caller falls
+ * back to the plain Mermaid render. No diagram is ever lost to this step.
+ */
+
+import sharp from 'sharp'
+import { generateWithGeminiImage, prisma, DEFAULT_DIAGRAM_STYLE_GUIDE } from '@socioply/shared'
+import { logger } from '../../lib/logger'
+
+export const RESTYLE_MODEL = 'gemini-3.1-flash-image'
+
+// Gemini image models bill per generated image (~1290 output tokens). We log a
+// flat per-image estimate to LLMUsage so diagram restyling shows up in cost
+// rollups; it is an estimate, not a metered token count.
+export const RESTYLE_COST_USD = 0.039
+
+export interface RestyleContext {
+  industry?: string | null
+  /** Resolved specialization *label* (e.g. "Family Care"), not the key. */
+  specialization?: string | null
+  /** Per-business override; falls back to DEFAULT_DIAGRAM_STYLE_GUIDE when empty. */
+  styleGuide?: string | null
+}
+
+/**
+ * Assemble the redesign prompt. `{industry}`/`{specialization}` are interpolated
+ * into the task line; a missing specialization simply drops that clause, and a
+ * missing industry falls back to a generic "business".
+ */
+export function buildRestylePrompt(ctx: RestyleContext): string {
+  const industry = ctx.industry?.trim()
+  const specialization = ctx.specialization?.trim()
+  const styleGuide = ctx.styleGuide?.trim() || DEFAULT_DIAGRAM_STYLE_GUIDE
+
+  const audience = industry ? `${industry} business` : 'business'
+  const specClause = specialization ? ` specializing in: ${specialization}` : ''
+
+  return `# TASK:
+please redesign this diagram more stylish for a ${audience}${specClause}. Design appropriately for that audience WITHOUT any branding. Keep it professional, NOT cartoonish.
+
+Reproduce EVERY node, label, and connection from the original diagram exactly — keep all text verbatim and perfectly legible. Do not add, remove, rename, or merge anything. Output a clean 1:1 square composition.
+
+${styleGuide}`
+}
+
+export interface RestyleDiagramInput {
+  /** The square, padded diagram PNG (Gemini input + canvas reference). */
+  squarePng: Buffer
+  prompt: string
+  geminiKey: string
+  model?: string
+  /** For LLMUsage attribution. */
+  userId: string
+  jobId?: string
+}
+
+/**
+ * Restyle one diagram. Returns the stylized PNG buffer, or null when the model
+ * refuses / errors / returns something undecodable — caller then keeps the
+ * Mermaid render.
+ */
+export async function restyleDiagram(input: RestyleDiagramInput): Promise<{ png: Buffer } | null> {
+  const model = input.model ?? RESTYLE_MODEL
+  try {
+    const raw = await generateWithGeminiImage(
+      input.geminiKey,
+      input.prompt,
+      model,
+      '1:1',
+      { mimeType: 'image/png', data: input.squarePng.toString('base64') },
+    )
+
+    // Defensive: ensure it's a real, decodable raster before we trust it.
+    if (!raw || raw.length === 0) {
+      logger.warn({ jobId: input.jobId }, '[diagram-restyle] empty buffer — falling back to Mermaid')
+      return null
+    }
+    const meta = await sharp(raw).metadata()
+    if (!meta.width || !meta.height) {
+      logger.warn({ jobId: input.jobId }, '[diagram-restyle] undecodable image — falling back to Mermaid')
+      return null
+    }
+
+    // Log cost (best-effort; never block the diagram on a usage-write failure).
+    try {
+      await prisma.lLMUsage.create({
+        data: {
+          userId: input.userId,
+          source: 'article_diagram_restyle',
+          provider: 'gemini',
+          model,
+          inputTokens: 0,
+          outputTokens: 0,
+          cost: RESTYLE_COST_USD,
+        },
+      })
+    } catch (usageErr) {
+      logger.warn({ jobId: input.jobId, usageErr }, '[diagram-restyle] LLMUsage write failed (non-fatal)')
+    }
+
+    return { png: raw }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.warn({ jobId: input.jobId, msg }, '[diagram-restyle] generation failed — falling back to Mermaid')
+    return null
+  }
+}

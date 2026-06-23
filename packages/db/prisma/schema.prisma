@@ -751,6 +751,11 @@ model ArticleDiagram {
   pngDarkS3Key   String?
   pngDarkWidth   Int?
   pngDarkHeight  Int?
+  // AI-restyled, branded 1:1 image (Nano Banana). When set, it's the in-article
+  // figure; the SVG remains the fallback.
+  stylizedPngS3Key  String?
+  stylizedPngWidth  Int?
+  stylizedPngHeight Int?
   pngGeneratedAt DateTime?
   llmProvider    String
   llmModel       String
@@ -932,6 +937,8 @@ model BrandSettings {
   diagramLineColor        String?
   diagramTextColor        String?
   diagramFontFamily       String?
+  // AI diagram restyle (Nano Banana): per-business style guide. Empty → server default.
+  diagramStyleGuide       String? @db.Text
 
   // Article typography (standalone HTML export only — not WordPress)
   articleFontFamily   String?

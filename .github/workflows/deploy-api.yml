@@ -83,16 +83,43 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           # Reach the droplet by its Tailscale MagicDNS name, not the public IP.
           TS_HOST=socioply-api-01
-          ssh-keyscan -H "$TS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          echo "Host droplet" >> ~/.ssh/config
-          echo "  HostName $TS_HOST" >> ~/.ssh/config
-          echo "  User socioply" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
-          echo "  IdentitiesOnly yes" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          {
+            echo "Host droplet"
+            echo "  HostName $TS_HOST"
+            echo "  User socioply"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+            echo "  ConnectTimeout 15"
+          } >> ~/.ssh/config
+          # known_hosts pre-population is best-effort only: StrictHostKeyChecking
+          # accept-new records the key on first connect anyway. The runner just
+          # joined the tailnet, so the route to the droplet can take a few seconds
+          # to settle — retry, but NEVER fail the step on keyscan alone (the real
+          # connectivity gate is the smoke test below).
+          for i in 1 2 3 4 5 6; do
+            if ssh-keyscan -T 10 -H "$TS_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            echo "ssh-keyscan attempt $i failed; tailnet route not ready, retrying in 5s..."
+            sleep 5
+          done
+          echo "Configure SSH complete (keyscan best-effort)."
 
       - name: Smoke-test SSH connection
-        run: ssh droplet 'echo "SSH OK from $(hostname) as $(whoami)"'
+        run: |
+          # Retry to absorb the brief window while the freshly-joined tailnet
+          # route to the droplet settles.
+          for i in 1 2 3 4 5 6; do
+            if ssh droplet 'echo "SSH OK from $(hostname) as $(whoami)"'; then
+              exit 0
+            fi
+            echo "SSH attempt $i failed; retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Could not reach droplet over Tailscale after retries"
+          exit 1
 
       - name: Deploy to droplet
         run: |

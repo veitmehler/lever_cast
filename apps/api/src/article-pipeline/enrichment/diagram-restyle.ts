@@ -42,7 +42,7 @@ export function buildRestylePrompt(ctx: RestyleContext): string {
   return `# TASK:
 please redesign this diagram more stylish for a ${audience}${specClause}. Design appropriately for that audience WITHOUT any branding. Keep it professional, NOT cartoonish.
 
-Reproduce EVERY node, label, and connection from the original diagram exactly — keep all text verbatim and perfectly legible. Do not add, remove, rename, or merge anything. Output a clean 1:1 square composition.
+Output a clean 1:1 SQUARE composition. You MAY rearrange the spatial layout — reflow long horizontal or vertical chains into a balanced arrangement (e.g. grid or radial) that fills the entire square canvas edge-to-edge, with generous, even use of space. But preserve the EXACT informational flow: every node, every label, every connection, the direction of each arrow, and the overall hierarchy/sequence must remain identical and clearly readable. Never add, remove, rename, or merge anything; reproduce all text verbatim.
 
 ${styleGuide}`
 }

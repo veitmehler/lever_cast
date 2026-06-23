@@ -125,6 +125,7 @@ export async function GET() {
         diagramLineColor: null,
         diagramFontFamily: null,
         diagramStyleGuide: null,
+        diagramLogoVariant: null,
         articleFontFamily: null,
         articleFontWeight: null,
         articleFontSizeBase: null,
@@ -190,6 +191,7 @@ export async function PATCH(request: NextRequest) {
       'diagramLineColor',
       'diagramFontFamily',
       'diagramStyleGuide',
+      'diagramLogoVariant',
       'articleFontFamily',
       'articleFontWeight',
       'articleFontSizeBase',
@@ -227,6 +229,14 @@ export async function PATCH(request: NextRequest) {
       data.hemisphereOverride =
         data.hemisphereOverride === 'north' || data.hemisphereOverride === 'south'
           ? data.hemisphereOverride
+          : null
+    }
+
+    // diagramLogoVariant must be 'light' | 'dark' | null (null → default light)
+    if (data.diagramLogoVariant != null && typeof data.diagramLogoVariant === 'string') {
+      data.diagramLogoVariant =
+        data.diagramLogoVariant === 'light' || data.diagramLogoVariant === 'dark'
+          ? data.diagramLogoVariant
           : null
     }
 

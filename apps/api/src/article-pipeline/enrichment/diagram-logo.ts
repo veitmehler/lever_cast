@@ -20,7 +20,7 @@ export interface LogoOverlayOptions {
 
 const DEFAULTS: Required<LogoOverlayOptions> = {
   widthRatio: 0.22,
-  opacity: 0.4,
+  opacity: 0.3,
   marginRatio: 0.03,
 }
 

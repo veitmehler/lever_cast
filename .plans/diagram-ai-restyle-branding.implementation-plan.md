@@ -135,3 +135,41 @@ on-brand 1:1 images**, while never losing a diagram if the AI step fails:
 - `apps/web/src/features/settings/DiagramStyleSection.tsx` + `useSettingsData.ts` + settings PATCH route: `diagramStyleGuide` textarea seeded from default.
 - `apps/web/src/app/admin/articles/[jobId]/page.tsx`: QA view (optional).
 - Tests across prompt, restyle fallback, overlay, figure HTML, settings persistence.
+
+---
+
+## Status (2026-06-22)
+Phases 0–3 implemented, committed (`ba4a13f`), deployed to staging (both migrations applied, healthy).
+
+**Staging aspect-ratio test** (4 real diagrams, source ratios 0.27 / 1.12 / 2.29 / 5.04):
+- 1:1 output **confirmed** — Gemini returns 1024×1024 for every input ratio; `ensureSquare` is a no-op guard.
+- Smart reflow: wide chains re-composed into radial/grid layouts that fill the square; the jewel-box/plasma style + bottom-right watermark render correctly.
+- Near-square diagrams look excellent + legible; very dense (ultra-wide/tall, many nodes) shrink text at the 1024px output cap.
+- Watermark used the **raw** `organizationLogoUrl` (full-color, with baked-in text) → too heavy on the dark background.
+
+---
+
+## Phase 5 — Light/dark watermark + reflow prompt (refinements)
+
+**Decisions (from 2026-06-22 discussion):**
+- Watermark uses **light/dark transparent logo variants** (same ones `processLogo` makes for newsletters), selected by a new per-business toggle; default **light** (the default style guide is a dark background).
+- When a business has no newsletter variants, **auto-generate** light/dark from `organizationLogoUrl` via `processLogo`, cached so it runs at most once per logo change.
+- Prompt explicitly **permits spatial re-layout to fill the square** while preserving the exact informational flow.
+
+**Logo resolution (per job, in `buildDiagramRestyleConfig`):**
+1. Newsletter variants: `nlLogoLightUrl` / `nlLogoDarkUrl`.
+2. Else auto-generate from `organizationLogoUrl` via `processLogo(ownerUserId, organizationLogoUrl)` → cache into new `diagramLogoLightUrl` / `diagramLogoDarkUrl` (+ `diagramLogoSourceUrl` to detect staleness; regenerate only when the org logo changes).
+3. Else raw `organizationLogoUrl` → `socialLogoUrl` → no watermark.
+Variant chosen by `BrandSettings.diagramLogoVariant` (`'light' | 'dark'`, default `light`).
+
+**Data model:** `BrandSettings.diagramLogoVariant`, `diagramLogoLightUrl`, `diagramLogoDarkUrl`, `diagramLogoSourceUrl` (+ migration).
+
+**Overlay:** default opacity 0.40 → **0.30** (clean transparent marks read better subtle).
+
+**Prompt:**
+- Fixed task line (`buildRestylePrompt`, always applies): *"You MAY rearrange the spatial layout — reflow long horizontal/vertical chains into a balanced composition that fills the entire square canvas edge-to-edge. Preserve the exact informational flow: every node, label, connection, arrow direction, and the hierarchy/sequence stays identical and clearly readable. Never add, remove, rename, or merge anything; reproduce all text verbatim."*
+- Soften `DEFAULT_DIAGRAM_STYLE_GUIDE`'s "Layout stays faithful to the source diagram's structure" → "preserve the informational structure; you may re-arrange spatial placement to best fill the square."
+
+**Settings UI:** light/dark toggle in the Diagram style card (`useSettingsData` + `DiagramStyleSection` + brand-settings route).
+
+**Deferred (optional, not in this pass):** density/extreme-ratio threshold that keeps the SVG when a diagram is too dense to restyle legibly — the reflow-to-fill-square change may largely address this; revisit after seeing real output. Admin QA view (Phase 4) also still open.

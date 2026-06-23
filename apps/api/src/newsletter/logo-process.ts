@@ -138,6 +138,10 @@ export async function processLogo(
   userId: string,
   sourceUrl: string,
   darkHex = '#011328',
+  // Storage key prefix. Defaults to the newsletter location; callers that store
+  // variants elsewhere (e.g. diagram watermarks) pass a distinct base so
+  // deleteOldVersions never prunes another feature's logo objects.
+  keyBase = `newsletter/logos/${userId}`,
 ): Promise<ProcessedLogo> {
   const srcBuf = await downloadImageFromUrl(sourceUrl)
   const mask = await buildMask(srcBuf, sourceUrl)
@@ -146,7 +150,7 @@ export async function processLogo(
   const lightBuf = await recolor(mask, { r: 255, g: 255, b: 255 }, bbox)
   const darkBuf = await recolor(mask, hexToRgb(darkHex), bbox)
 
-  const base = `newsletter/logos/${userId}`
+  const base = keyBase
   const lightKey = `${base}-light-${vtoken()}.png`
   const darkKey = `${base}-dark-${vtoken()}.png`
   const [{ url: lightUrl }, { url: darkUrl }] = await Promise.all([

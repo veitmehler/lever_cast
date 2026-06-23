@@ -48,6 +48,7 @@ import { selectWordPressTags } from './wp-tag-selector'
 import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
 import { buildRestylePrompt, restyleDiagram } from './diagram-restyle'
 import { overlayLogo } from './diagram-logo'
+import { processLogo } from '../../newsletter/logo-process'
 
 const CDN_BASE = process.env.CDN_BASE ?? ''
 
@@ -789,7 +790,7 @@ async function buildDiagramRestyleConfig(
     styleGuide: brandStyle?.diagramStyleGuide,
   })
   let logoBuffer: Buffer | null = null
-  const logoUrl = brandStyle?.organizationLogoUrl || brandStyle?.socialLogoUrl
+  const logoUrl = await resolveDiagramLogoUrl(jobId, brandStyle)
   if (logoUrl) {
     try {
       logoBuffer = await downloadImageFromUrl(logoUrl)
@@ -798,6 +799,51 @@ async function buildDiagramRestyleConfig(
     }
   }
   return { geminiKey, prompt, logoBuffer }
+}
+
+/**
+ * Resolve the watermark logo URL for the chosen light/dark variant:
+ *  1. Newsletter variants (nlLogoLightUrl / nlLogoDarkUrl).
+ *  2. Auto-generated-from-org-logo variants, cached on BrandSettings (regenerated
+ *     only when organizationLogoUrl changes).
+ *  3. Raw organizationLogoUrl → socialLogoUrl → none.
+ */
+async function resolveDiagramLogoUrl(
+  jobId: string,
+  brand: Awaited<ReturnType<typeof brandSettingsForUser>>,
+): Promise<string | null> {
+  if (!brand) return null
+  const variant = brand.diagramLogoVariant === 'dark' ? 'dark' : 'light'
+
+  // 1. Newsletter light/dark variants.
+  const nlUrl = variant === 'dark' ? brand.nlLogoDarkUrl : brand.nlLogoLightUrl
+  if (nlUrl) return nlUrl
+
+  // 2. Auto-generate (and cache) from the org logo when no newsletter variants exist.
+  const org = brand.organizationLogoUrl
+  if (org) {
+    let lightUrl = brand.diagramLogoLightUrl
+    let darkUrl = brand.diagramLogoDarkUrl
+    const stale = brand.diagramLogoSourceUrl !== org || !lightUrl || !darkUrl
+    if (stale) {
+      try {
+        const generated = await processLogo(brand.userId, org, '#011328', `brand-assets/${brand.userId}/diagram-logo`)
+        lightUrl = generated.lightUrl
+        darkUrl = generated.darkUrl
+        await prisma.brandSettings.update({
+          where: { userId: brand.userId },
+          data: { diagramLogoSourceUrl: org, diagramLogoLightUrl: lightUrl, diagramLogoDarkUrl: darkUrl },
+        })
+      } catch (err) {
+        logger.warn({ jobId, err }, '[enrichment] diagram logo variant generation failed — using raw logo')
+      }
+    }
+    const gen = variant === 'dark' ? darkUrl : lightUrl
+    if (gen) return gen
+  }
+
+  // 3. Last-ditch raw logo.
+  return brand.organizationLogoUrl || brand.socialLogoUrl || null
 }
 
 /** Guarantee an exact 1:1 image (Gemini image-to-image returns ~square; this is the guard). */

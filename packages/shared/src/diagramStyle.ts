@@ -45,9 +45,11 @@ stroke weight. No mascots, no emoji, no cartoon faces.
   depth/shadow; content sits clearly inside.
 - Connections → luminous gradient "plasma" currents with soft glow and clear
   direction; spacing is generous and the composition breathes.
-- Layout stays faithful to the source diagram's structure: keep EVERY node, EVERY
-  label, and EVERY connection exactly as in the original. Do not add, remove,
-  rename, or merge anything. Reproduce all text verbatim and keep it legible.
+- Preserve the informational structure exactly: keep EVERY node, EVERY label, and
+  EVERY connection, and the direction of every arrow / the overall flow. Do not
+  add, remove, rename, or merge anything; reproduce all text verbatim and keep it
+  legible. You MAY re-arrange the spatial placement of nodes (e.g. reflow a long
+  chain into a balanced grid or radial layout) to make full use of the square.
 
 ## CRUCIAL EXCLUSIONS
 - **NO GLOBAL BLACK BORDER.** The entire composition must be borderless, or

@@ -24,8 +24,10 @@ describe('buildRestylePrompt', () => {
     const p = buildRestylePrompt({ industry: 'Chiropractic', specialization: 'Family Care', styleGuide: 'MY-GUIDE' })
     expect(p).toContain('Chiropractic business specializing in: Family Care')
     expect(p).toContain('MY-GUIDE')
-    expect(p).toContain('1:1 square')
+    expect(p).toMatch(/1:1 square/i)
     expect(p).toMatch(/verbatim/i)
+    expect(p).toMatch(/rearrange the spatial layout/i) // re-layout permission
+    expect(p).toMatch(/preserve the exact informational flow/i) // fidelity guard
   })
 
   it('drops the specialization clause when missing', () => {

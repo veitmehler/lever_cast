@@ -13,6 +13,7 @@ export function DiagramStyleSection({ settings }: { settings: SettingsData }) {
     diagramFontFamily, setDiagramFontFamily,
     diagramStyleGuide, setDiagramStyleGuide,
     diagramStyleGuideDefault,
+    diagramLogoVariant, setDiagramLogoVariant,
     isSavingDiagramStyle,
     handleSaveDiagramStyle,
   } = settings
@@ -134,6 +135,24 @@ export function DiagramStyleSection({ settings }: { settings: SettingsData }) {
             placeholder={diagramStyleGuideDefault}
             className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground"
           />
+
+          {/* Watermark logo variant */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-card-foreground mb-1">Watermark logo</label>
+            <select
+              value={diagramLogoVariant}
+              onChange={(e) => setDiagramLogoVariant(e.target.value)}
+              className="w-full max-w-lg rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="light">Light — for dark diagram backgrounds</option>
+              <option value="dark">Dark — for light diagram backgrounds</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Your logo is overlaid (semi-transparent, bottom-right) on each diagram. Pick the variant that
+              contrasts with the background your style guide produces. Light/dark variants are generated
+              automatically from your logo.
+            </p>
+          </div>
         </div>
 
         <Button onClick={handleSaveDiagramStyle} disabled={isSavingDiagramStyle}>

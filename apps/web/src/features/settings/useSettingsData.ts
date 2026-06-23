@@ -82,6 +82,7 @@ export function useSettingsData() {
   const [diagramFontFamily, setDiagramFontFamily]           = useState('')
   const [diagramStyleGuide, setDiagramStyleGuide]           = useState('')
   const [diagramStyleGuideDefault, setDiagramStyleGuideDefault] = useState('')
+  const [diagramLogoVariant, setDiagramLogoVariant]         = useState('light')
   const [isSavingDiagramStyle, setIsSavingDiagramStyle]     = useState(false)
 
   const [articleFontFamily, setArticleFontFamily] = useState('')
@@ -171,6 +172,7 @@ export function useSettingsData() {
           setDiagramStyleGuide(
             brand.diagramStyleGuide?.trim() ? brand.diagramStyleGuide : (brand.diagramStyleGuideDefault ?? ''),
           )
+          setDiagramLogoVariant(brand.diagramLogoVariant === 'dark' ? 'dark' : 'light')
           setArticleFontFamily(brand.articleFontFamily ?? '')
           setArticleFontWeight(brand.articleFontWeight ?? '400')
           setArticleFontSizeBase(brand.articleFontSizeBase ?? '16px')
@@ -386,6 +388,7 @@ export function useSettingsData() {
             diagramStyleGuide.trim() && diagramStyleGuide.trim() !== diagramStyleGuideDefault.trim()
               ? diagramStyleGuide.trim()
               : null,
+          diagramLogoVariant,
         }),
       })
       if (res.ok) {
@@ -418,6 +421,7 @@ export function useSettingsData() {
             diagramStyleGuide.trim() && diagramStyleGuide.trim() !== diagramStyleGuideDefault.trim()
               ? diagramStyleGuide.trim()
               : null,
+          diagramLogoVariant,
         }),
       })
       if (res.ok) {
@@ -532,6 +536,7 @@ export function useSettingsData() {
     diagramFontFamily, setDiagramFontFamily,
     diagramStyleGuide, setDiagramStyleGuide,
     diagramStyleGuideDefault,
+    diagramLogoVariant, setDiagramLogoVariant,
     isSavingDiagramStyle,
     handleSaveDiagramStyle,
     // Article typography

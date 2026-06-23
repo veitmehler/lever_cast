@@ -16,15 +16,17 @@ import {
   Workflow,
   Images,
   Mail,
+  Lightbulb,
 } from 'lucide-react'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Posts', href: '/posts', icon: FileText },
-  { label: 'Workflow', href: '/workflow', icon: Workflow },
-  { label: 'Image Library', href: '/images', icon: Images },
+  { label: 'Ideas Bank', href: '/ideas', icon: Lightbulb },
+  { label: 'Articles', href: '/workflow', icon: Workflow },
+  { label: 'Newsletters', href: '/newsletter', icon: Mail },
+  { label: 'Social Posts', href: '/posts', icon: FileText },
   { label: 'Calendar', href: '/calendar', icon: Calendar },
-  { label: 'Newsletter', href: '/newsletter', icon: Mail },
+  { label: 'Image Library', href: '/images', icon: Images },
   { label: 'Templates', href: '/templates', icon: Sparkles },
   { label: 'Settings', href: '/settings', icon: Settings },
   { label: 'Account', href: '/account', icon: User },

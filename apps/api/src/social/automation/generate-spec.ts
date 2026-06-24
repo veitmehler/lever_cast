@@ -14,7 +14,7 @@ import {
 import type { ArticleContentContext, SlotContent } from './content'
 import { resolveSlotContent, H2_SLOT_SECTION_INDEX } from './content'
 import type { AutomationLogContext } from './log-context'
-import { prisma, readS3Object } from '@socioply/shared'
+import { prisma, readS3Object, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 
 /**
@@ -85,8 +85,10 @@ export async function generateSpecAssets(opts: {
 
     case 'carousel': {
       // F4: use the stylized article diagram as the background for every slide
-      // (+ an inserted "explain the diagram" slide). Null → AI backgrounds.
+      // (+ an inserted "explore the diagram" slide). Null → AI backgrounds.
       const diagramBackground = await loadStylizedDiagramForSlot(jobId, slotKey)
+      const brand = diagramBackground ? await brandSettingsForUser(userId) : null
+      const diagramLogoVariant: 'light' | 'dark' = brand?.diagramLogoVariant === 'dark' ? 'dark' : 'light'
       const carousel = await generateCarouselAssets({
         userId,
         content: content.text,
@@ -95,6 +97,7 @@ export async function generateSpecAssets(opts: {
         slideCount,
         jobId: assetJobId,
         diagramBackground,
+        diagramLogoVariant,
       })
       return {
         postType: 'carousel',

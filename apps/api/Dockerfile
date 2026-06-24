@@ -58,6 +58,8 @@ COPY --from=build /app/packages/db ./packages/db
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/apps/api/puppeteer-config.json ./puppeteer-config.json
 COPY --from=build /app/apps/api/mermaid-config.json ./mermaid-config.json
+# Static social-compositor assets (carousel continuation-arrow glyphs)
+COPY --from=build /app/apps/api/assets ./assets
 
 # Non-root user for security
 RUN addgroup -S socioply && adduser -S socioply -G socioply

@@ -1,3 +1,5 @@
+import path from 'path'
+import { readFile } from 'fs/promises'
 import sharp from 'sharp'
 import { fal } from '@fal-ai/client'
 import { getSystemApiKey } from '../../lib/system-keys'
@@ -21,9 +23,28 @@ export interface CarouselSlideInput {
   totalSlides: number
   brand: SocialBrandTheme
   logoBuffer?: Buffer | null
+  /** F4 diagram-background mode: more opaque title box + a carousel arrow on the hook. */
+  diagramMode?: boolean
+  /** Pre-loaded continuation-arrow glyph (color already chosen) for the hook slide. */
+  arrowBuffer?: Buffer | null
 }
 
 const SLIDE_SIZE = 1080
+
+/**
+ * Load the bundled continuation-arrow glyph in the color that contrasts the
+ * diagram background. `light` (light watermark = dark bg) → white arrows;
+ * `dark` → black arrows. Best-effort: returns null if the asset is missing.
+ */
+export async function loadContinuationArrow(variant: 'light' | 'dark'): Promise<Buffer | null> {
+  const file = variant === 'dark' ? 'continue-arrows-black.png' : 'continue-arrows-white.png'
+  try {
+    return await readFile(path.join(process.cwd(), 'assets', file))
+  } catch (err) {
+    logger.warn({ err, file }, '[carousel] continuation-arrow asset missing')
+    return null
+  }
+}
 
 // Patched per-weight Helvetica Neue family names (registered with fontconfig).
 const FONT_MEDIUM = 'HelveticaNeue Medium'
@@ -58,9 +79,11 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 
   const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, textStartY, lineHeight)
 
-  // Don't render a box if there's genuinely nothing to show
+  // Don't render a box if there's genuinely nothing to show. F4 (diagramMode)
+  // uses a slightly more opaque box (0.75) so the title reads over the diagram.
+  const boxOpacity = input.diagramMode ? 0.75 : 0.65
   const boxSvg = displayText
-    ? `<rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="0.65"/>`
+    ? `<rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="${boxOpacity}"/>`
     : ''
   const textElement = displayText
     ? `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">\n    ${textSvg}\n  </text>`
@@ -320,10 +343,23 @@ export async function renderCarouselSlide(
     .png()
     .toBuffer()
 
-  return sharp(resizedBg)
-    .composite([{ input: overlayPng, top: 0, left: 0 }])
-    .png()
-    .toBuffer()
+  const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
+
+  // F4 hook slide: add the continuation-arrow swipe indicator, bottom-right.
+  if (input.slide.type === 'hook' && input.diagramMode && input.arrowBuffer) {
+    const ARROW_W = 150
+    const meta = await sharp(input.arrowBuffer).metadata()
+    const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
+    const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
+    const margin = 48
+    composites.push({
+      input: arrowPng,
+      left: SLIDE_SIZE - ARROW_W - margin,
+      top: SLIDE_SIZE - arrowH - 70, // lifted clear of the corner watermark
+    })
+  }
+
+  return sharp(resizedBg).composite(composites).png().toBuffer()
 }
 
 export function carouselSlideDimensions(): { width: number; height: number } {
@@ -332,38 +368,71 @@ export function carouselSlideDimensions(): { width: number; height: number } {
 
 // ── Diagram-explainer slide ────────────────────────────────────────────────────
 // Used by F4 (diagram-background carousels): the stylized diagram fills the slide
-// with a dark, rounded, generously-padded banner pinned to the bottom carrying a
-// large white "Let's explain the diagram >>>" prompt.
-export const DIAGRAM_EXPLAINER_TEXT = "Let's explain the diagram >>>"
+// with a full-width dark banner centered exactly 2/3 down, carrying the phrase
+// plus the continuation-arrow glyph.
+export const DIAGRAM_EXPLAINER_TEXT = "Let's explore the diagram"
 
-function buildDiagramExplainerOverlaySvg(text: string): string {
-  const fontSize     = 60
-  const marginH      = 60
-  const bottomMargin = 90
-  const padV         = 44
-  const bannerW = SLIDE_SIZE - 2 * marginH
-  const bannerH = fontSize + 2 * padV
-  const bannerX = marginH
-  const bannerY = SLIDE_SIZE - bannerH - bottomMargin
-  const textY   = bannerY + padV + fontSize // drawtext baseline
-
-  return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="${bannerX}" y="${bannerY}" width="${bannerW}" height="${bannerH}" rx="16" fill="#000000" fill-opacity="0.65"/>
-  <text x="${SLIDE_SIZE / 2}" y="${textY}" text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">${escapeXml(text)}</text>
-</svg>`
+/** Render text to a tight, transparent white PNG (trimmed to the glyphs) so we can measure + center it. */
+async function renderTextGlyphPng(text: string, fontSize: number): Promise<{ buf: Buffer; width: number; height: number }> {
+  const canvasW = SLIDE_SIZE * 2
+  const canvasH = Math.ceil(fontSize * 2)
+  const svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg"><text x="20" y="${Math.round(fontSize * 1.3)}" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">${escapeXml(text)}</text></svg>`
+  const png = await sharp(Buffer.from(svg)).png().toBuffer()
+  const { data, info } = await sharp(png).trim().png().toBuffer({ resolveWithObject: true })
+  return { buf: data, width: info.width, height: info.height }
 }
 
-/** Render the diagram background (cover-fit to the square slide) with the bottom explainer banner. */
+/**
+ * Render the diagram background (cover-fit) with a full-width dark banner whose
+ * content (phrase + continuation-arrow glyph, centered as one group) sits exactly
+ * 2/3 down the slide, with symmetric top/bottom padding.
+ */
 export async function renderDiagramExplainerSlide(
   backgroundBuffer: Buffer,
+  arrowBuffer?: Buffer | null,
   text: string = DIAGRAM_EXPLAINER_TEXT,
 ): Promise<Buffer> {
-  const overlayPng = await sharp(Buffer.from(buildDiagramExplainerOverlaySvg(text))).png().toBuffer()
+  const fontSize = 56
+  const padV     = 48
+  const gap      = 28
+  const centerY  = Math.round((SLIDE_SIZE * 2) / 3) // exactly 2/3 down
+
+  const { buf: textBuf, width: textW, height: textH } = await renderTextGlyphPng(text, fontSize)
+
+  let arrowPng: Buffer | null = null
+  let arrowW = 0
+  let arrowH = 0
+  if (arrowBuffer) {
+    arrowH = Math.round(fontSize * 0.85)
+    const meta = await sharp(arrowBuffer).metadata()
+    arrowW = Math.round((arrowH * (meta.width ?? 87)) / (meta.height ?? 55))
+    arrowPng = await sharp(arrowBuffer).resize({ height: arrowH }).png().toBuffer()
+  }
+
+  const contentH = Math.max(textH, arrowH)
+  const bannerH  = contentH + 2 * padV
+  const bannerY  = Math.round(centerY - bannerH / 2)
+  const groupW   = textW + (arrowPng ? gap + arrowW : 0)
+  const startX   = Math.round((SLIDE_SIZE - groupW) / 2)
+
+  const bannerSvg = `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="#000000" fill-opacity="0.65"/>
+</svg>`
+
   const resizedBg = await sharp(backgroundBuffer)
     .resize(SLIDE_SIZE, SLIDE_SIZE, { fit: 'cover', position: 'centre' })
     .png()
     .toBuffer()
-  return sharp(resizedBg).composite([{ input: overlayPng, top: 0, left: 0 }]).png().toBuffer()
+
+  const composites: sharp.OverlayOptions[] = [
+    { input: await sharp(Buffer.from(bannerSvg)).png().toBuffer(), top: 0, left: 0 },
+    { input: textBuf, left: startX, top: Math.round(centerY - textH / 2) },
+  ]
+  if (arrowPng) {
+    composites.push({ input: arrowPng, left: startX + textW + gap, top: Math.round(centerY - arrowH / 2) })
+  }
+
+  return sharp(resizedBg).composite(composites).png().toBuffer()
 }
 
 const STORY_W = 1080

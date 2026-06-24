@@ -6,6 +6,7 @@ import {
   generateCarouselBackground,
   renderCarouselSlide,
   renderDiagramExplainerSlide,
+  loadContinuationArrow,
   DIAGRAM_EXPLAINER_TEXT,
   type CarouselSlidePlan,
 } from './compositors/carousel'
@@ -114,6 +115,8 @@ export async function generateCarouselAssets(opts: {
    * diagram >>>" slide is inserted right after the hook.
    */
   diagramBackground?: Buffer | null
+  /** Watermark/arrow variant for diagram mode: 'light' (dark bg) → white arrows. */
+  diagramLogoVariant?: 'light' | 'dark'
 }): Promise<GeneratedCarousel> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
@@ -125,6 +128,11 @@ export async function generateCarouselAssets(opts: {
   // Reserve one slot for the inserted explainer slide so the total stays within
   // the platform slide cap.
   const planCount = useDiagram ? Math.max(2, slideCount - 1) : slideCount
+
+  // Continuation-arrow glyph (color matches the watermark variant) for the hook +
+  // explainer slides in diagram mode.
+  const arrowVariant: 'light' | 'dark' = opts.diagramLogoVariant === 'dark' ? 'dark' : 'light'
+  const arrowBuffer = useDiagram ? await loadContinuationArrow(arrowVariant) : null
 
   const slidePlans = await planCarouselSlides({
     content: opts.content,
@@ -187,6 +195,8 @@ export async function generateCarouselAssets(opts: {
       totalSlides: slidePlans.length,
       brand,
       logoBuffer,
+      diagramMode: useDiagram,
+      arrowBuffer,
     })
 
     const registered = await registerSocialMedia({
@@ -208,7 +218,7 @@ export async function generateCarouselAssets(opts: {
 
   // Insert the "Let's explain the diagram >>>" slide right after the hook (slide 1).
   if (useDiagram && slides.length >= 1) {
-    const explainerBuf = await renderDiagramExplainerSlide(opts.diagramBackground!)
+    const explainerBuf = await renderDiagramExplainerSlide(opts.diagramBackground!, arrowBuffer)
     const explainerReg = await registerSocialMedia({
       userId: opts.userId,
       buffer: explainerBuf,

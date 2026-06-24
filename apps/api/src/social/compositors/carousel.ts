@@ -55,7 +55,8 @@ const FONT_LIGHT  = 'HelveticaNeue Light'
 // the headline. Headline centered, HelveticaNeue Medium 52px, 22 chars/line.
 function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, brand } = input
-  const watermark = escapeXml(brand.organizationName)
+  // F4 (diagram mode) bakes the logo into the diagram, so skip the name watermark.
+  const watermark = input.diagramMode ? '' : escapeXml(brand.organizationName)
 
   const fontSize   = 52
   const lineHeight = 68
@@ -104,7 +105,8 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 // Body text: HelveticaNeue Light 28px, 29 chars/line; paragraphs split on \n.
 function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, slideIndex, brand } = input
-  const watermark = escapeXml(brand.organizationName)
+  // F4 (diagram mode) bakes the logo into the diagram, so skip the name watermark.
+  const watermark = input.diagramMode ? '' : escapeXml(brand.organizationName)
 
   // Alternate: odd slideIndex = left panel, even = right panel.
   // (slideIndex 0 is the hook, so first content slide is index 1 → left.)
@@ -172,7 +174,8 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
 // 22 chars/line. Body text HelveticaNeue Light 28px, 35 chars/line.
 function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, brand } = input
-  const watermark = escapeXml(brand.organizationName)
+  // F4 (diagram mode) bakes the logo into the diagram, so skip the name watermark.
+  const watermark = input.diagramMode ? '' : escapeXml(brand.organizationName)
 
   const textX          = 80
   const headlineFontSz = 48

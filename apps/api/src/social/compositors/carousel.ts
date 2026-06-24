@@ -56,7 +56,9 @@ const FONT_LIGHT  = 'HelveticaNeue Light'
 const F4_PANEL_BG = '#FFFFFF'
 const F4_TEXT = '#011328' // brand navy
 const F4_TEXT_RGB = { r: 1, g: 19, b: 40 } // #011328
-const F4_PANEL_OPACITY = 0.85
+const F4_PANEL_OPACITY = 0.85   // title + explainer white banners
+const F4_CONTENT_OPACITY = 0.9  // content half-panel (slightly more opaque)
+const F4_CTA_OPACITY = 0.85     // CTA stays dark full-frame, just more opaque
 
 /** Recolor a transparent glyph PNG to a solid RGB, preserving its alpha. */
 async function tintGlyph(buf: Buffer, rgb: { r: number; g: number; b: number }): Promise<Buffer> {
@@ -133,7 +135,7 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   // F4: white translucent panel + navy text (same scheme/opacity as the title).
   const isF4 = !!input.diagramMode
   const panelFill = isF4 ? F4_PANEL_BG : '#000000'
-  const panelOpacity = isF4 ? F4_PANEL_OPACITY : 0.65
+  const panelOpacity = isF4 ? F4_CONTENT_OPACITY : 0.65
   const textFill = isF4 ? F4_TEXT : '#FFFFFF'
 
   // Alternate: odd slideIndex = left panel, even = right panel.
@@ -259,8 +261,12 @@ function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
     )
   }
 
+  // CTA stays a dark full-frame overlay (intentionally different from the white
+  // F4 panels); F4 just uses a slightly more opaque scrim.
+  const ctaOpacity = input.diagramMode ? F4_CTA_OPACITY : 0.70
+
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.70"/>
+  <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="${ctaOpacity}"/>
   ${elements.join('\n  ')}
   <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
 </svg>`

@@ -5,6 +5,8 @@ import { selectQuoteForCard } from './generators/quote-selection'
 import {
   generateCarouselBackground,
   renderCarouselSlide,
+  renderDiagramExplainerSlide,
+  DIAGRAM_EXPLAINER_TEXT,
   type CarouselSlidePlan,
 } from './compositors/carousel'
 import { planCarouselSlides } from './generators/carousel-plan'
@@ -106,12 +108,23 @@ export async function generateCarouselAssets(opts: {
   platforms?: string[]
   slideCount?: number
   jobId?: string
+  /**
+   * When set (F4), this stylized article diagram is used as the background for
+   * EVERY slide (instead of per-slide AI backgrounds), and a "Let's explain the
+   * diagram >>>" slide is inserted right after the hook.
+   */
+  diagramBackground?: Buffer | null
 }): Promise<GeneratedCarousel> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
   const slideCount = opts.slideCount ?? maxSlidesForPlatforms(opts.platforms ?? [])
   const genId = generationId()
   const jobId = opts.jobId ?? genId
+
+  const useDiagram = !!opts.diagramBackground
+  // Reserve one slot for the inserted explainer slide so the total stays within
+  // the platform slide cap.
+  const planCount = useDiagram ? Math.max(2, slideCount - 1) : slideCount
 
   const slidePlans = await planCarouselSlides({
     content: opts.content,
@@ -120,7 +133,7 @@ export async function generateCarouselAssets(opts: {
     industry: brand.industry || undefined,
     writingStyle: brand.writingStyle || undefined,
     callToAction: brand.socialCallToAction || undefined,
-    slideCount,
+    slideCount: planCount,
     articleUrl: opts.articleUrl ?? '',
     specialInstructions: brand.videoSpecialInstructions || undefined,
   })
@@ -128,21 +141,45 @@ export async function generateCarouselAssets(opts: {
   const slides: GeneratedCarousel['slides'] = []
   const backgroundImageUrls: string[] = []
 
-  for (let i = 0; i < slidePlans.length; i++) {
-    const plan = slidePlans[i]
-    const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
-
-    // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
-    const bgRegistered = await registerSocialMedia({
+  // When using the diagram, register it once and reuse the URL for every slide
+  // (S4/S6 read backgroundImageUrls for their pitch slides).
+  let diagramBgUrl: string | null = null
+  if (useDiagram) {
+    const reg = await registerSocialMedia({
       userId: opts.userId,
-      buffer: bg,
-      s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${i + 1}-${genId}.png`,
-      title: `Carousel background ${i + 1}`,
-      altText: `Background for slide ${i + 1}`,
+      buffer: opts.diagramBackground!,
+      s3Key: `social/${opts.userId}/${jobId}/carousel-diagram-bg-${genId}.png`,
+      title: 'Diagram background',
+      altText: 'Article diagram',
       source: 'carousel_slide',
       jobId,
     })
-    backgroundImageUrls.push(bgRegistered.url)
+    diagramBgUrl = reg.url
+  }
+
+  for (let i = 0; i < slidePlans.length; i++) {
+    const plan = slidePlans[i]
+    const bg = useDiagram
+      ? opts.diagramBackground!
+      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
+
+    // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
+    let bgUrl: string
+    if (useDiagram) {
+      bgUrl = diagramBgUrl!
+    } else {
+      const bgRegistered = await registerSocialMedia({
+        userId: opts.userId,
+        buffer: bg,
+        s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${i + 1}-${genId}.png`,
+        title: `Carousel background ${i + 1}`,
+        altText: `Background for slide ${i + 1}`,
+        source: 'carousel_slide',
+        jobId,
+      })
+      bgUrl = bgRegistered.url
+    }
+    backgroundImageUrls.push(bgUrl)
 
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,
@@ -166,6 +203,32 @@ export async function generateCarouselAssets(opts: {
       imageUrl: registered.url,
       mediaId: registered.mediaId,
       headline: plan.headlineText ?? plan.bodyText?.split('\n')[0] ?? `Slide ${i + 1}`,
+    })
+  }
+
+  // Insert the "Let's explain the diagram >>>" slide right after the hook (slide 1).
+  if (useDiagram && slides.length >= 1) {
+    const explainerBuf = await renderDiagramExplainerSlide(opts.diagramBackground!)
+    const explainerReg = await registerSocialMedia({
+      userId: opts.userId,
+      buffer: explainerBuf,
+      s3Key: `social/${opts.userId}/${jobId}/carousel-explainer-${genId}.png`,
+      title: 'Carousel slide — explain the diagram',
+      altText: DIAGRAM_EXPLAINER_TEXT,
+      source: 'carousel_slide',
+      jobId,
+    })
+    slides.splice(1, 0, {
+      imageUrl: explainerReg.url,
+      mediaId: explainerReg.mediaId,
+      headline: DIAGRAM_EXPLAINER_TEXT,
+    })
+    backgroundImageUrls.splice(1, 0, diagramBgUrl!)
+    slidePlans.splice(1, 0, {
+      type: 'content',
+      headlineText: DIAGRAM_EXPLAINER_TEXT,
+      bodyText: null,
+      imagePrompt: '',
     })
   }
 

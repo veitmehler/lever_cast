@@ -12,8 +12,35 @@ import {
   generateStoryHookVideo,
 } from '../generate-video-assets'
 import type { ArticleContentContext, SlotContent } from './content'
-import { resolveSlotContent } from './content'
+import { resolveSlotContent, H2_SLOT_SECTION_INDEX } from './content'
 import type { AutomationLogContext } from './log-context'
+import { prisma, readS3Object } from '@socioply/shared'
+import { logger } from '../../lib/logger'
+
+/**
+ * Load the stylized (Nano Banana) diagram for a slot's section to use as the F4
+ * carousel background. Picks the diagram for the slot's H2 section, falling back
+ * to the article's first stylized diagram. Returns null (→ AI backgrounds) when
+ * the article has no stylized diagram.
+ */
+async function loadStylizedDiagramForSlot(articleJobId: string, slotKey: string): Promise<Buffer | null> {
+  try {
+    const diagrams = await prisma.articleDiagram.findMany({
+      where: { sitePage: { jobId: articleJobId }, stylizedPngS3Key: { not: null } },
+      orderBy: { position: 'asc' },
+      select: { stylizedPngS3Key: true },
+    })
+    if (!diagrams.length) return null
+    const idx = H2_SLOT_SECTION_INDEX[slotKey] ?? 0
+    const key = (diagrams[idx] ?? diagrams[0]).stylizedPngS3Key
+    if (!key) return null
+    const { body } = await readS3Object(key)
+    return body
+  } catch (err) {
+    logger.warn({ articleJobId, slotKey, err }, '[generate-spec] stylized diagram load failed — using AI backgrounds')
+    return null
+  }
+}
 
 export interface SpecAssets {
   postType: string
@@ -57,6 +84,9 @@ export async function generateSpecAssets(opts: {
     }
 
     case 'carousel': {
+      // F4: use the stylized article diagram as the background for every slide
+      // (+ an inserted "explain the diagram" slide). Null → AI backgrounds.
+      const diagramBackground = await loadStylizedDiagramForSlot(jobId, slotKey)
       const carousel = await generateCarouselAssets({
         userId,
         content: content.text,
@@ -64,6 +94,7 @@ export async function generateSpecAssets(opts: {
         articleUrl: '',
         slideCount,
         jobId: assetJobId,
+        diagramBackground,
       })
       return {
         postType: 'carousel',

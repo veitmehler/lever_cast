@@ -21,7 +21,7 @@ export interface ArticleContentContext {
  * Indices are resolved with modulo so shorter articles wrap around.
  * F1 = intro, F2 = keyTakeaways — neither appears here.
  */
-const H2_SLOT_SECTION_INDEX: Record<string, number> = {
+export const H2_SLOT_SECTION_INDEX: Record<string, number> = {
   F3: 0,
   F4: 1,
   F5: 2,

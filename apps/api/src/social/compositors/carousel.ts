@@ -330,6 +330,42 @@ export function carouselSlideDimensions(): { width: number; height: number } {
   return { width: SLIDE_SIZE, height: SLIDE_SIZE }
 }
 
+// ── Diagram-explainer slide ────────────────────────────────────────────────────
+// Used by F4 (diagram-background carousels): the stylized diagram fills the slide
+// with a dark, rounded, generously-padded banner pinned to the bottom carrying a
+// large white "Let's explain the diagram >>>" prompt.
+export const DIAGRAM_EXPLAINER_TEXT = "Let's explain the diagram >>>"
+
+function buildDiagramExplainerOverlaySvg(text: string): string {
+  const fontSize     = 60
+  const marginH      = 60
+  const bottomMargin = 90
+  const padV         = 44
+  const bannerW = SLIDE_SIZE - 2 * marginH
+  const bannerH = fontSize + 2 * padV
+  const bannerX = marginH
+  const bannerY = SLIDE_SIZE - bannerH - bottomMargin
+  const textY   = bannerY + padV + fontSize // drawtext baseline
+
+  return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="${bannerX}" y="${bannerY}" width="${bannerW}" height="${bannerH}" rx="16" fill="#000000" fill-opacity="0.65"/>
+  <text x="${SLIDE_SIZE / 2}" y="${textY}" text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">${escapeXml(text)}</text>
+</svg>`
+}
+
+/** Render the diagram background (cover-fit to the square slide) with the bottom explainer banner. */
+export async function renderDiagramExplainerSlide(
+  backgroundBuffer: Buffer,
+  text: string = DIAGRAM_EXPLAINER_TEXT,
+): Promise<Buffer> {
+  const overlayPng = await sharp(Buffer.from(buildDiagramExplainerOverlaySvg(text))).png().toBuffer()
+  const resizedBg = await sharp(backgroundBuffer)
+    .resize(SLIDE_SIZE, SLIDE_SIZE, { fit: 'cover', position: 'centre' })
+    .png()
+    .toBuffer()
+  return sharp(resizedBg).composite([{ input: overlayPng, top: 0, left: 0 }]).png().toBuffer()
+}
+
 const STORY_W = 1080
 const STORY_H = 1920
 

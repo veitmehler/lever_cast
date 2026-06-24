@@ -43,7 +43,7 @@ export interface HookVideoResult {
 const MAX_INTRO_SECS = 5
 const FEED_DIMS = slideshowDimensions('feed')
 
-/** F6: Seedance intro clip with title fade-in + content slideshow with optional voiceover.
+/** F6: Seedance intro clip with title overlay (visible from the first frame) + content slideshow with optional voiceover.
  *
  * Single-pass assembly: the caller has already produced the narration and the
  * per-slide durations from the ElevenLabs timestamps, so everything that is
@@ -51,7 +51,7 @@ const FEED_DIMS = slideshowDimensions('feed')
  * start offset) is laid out in ONE filter graph and encoded exactly once:
  *
  *  - intro: trimmed in-graph when Seedance overshoots, scaled/padded, title
- *    box blended in with the fade-in ramp
+ *    box overlaid (fully visible from the first frame)
  *  - slides: image inputs with per-slide `-t` durations, scaled/padded
  *  - video: concat of intro + slides
  *  - audio: narration delayed by the intro duration (silent intro lead-in);
@@ -107,8 +107,9 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
 
   // Title overlay laid out at the output resolution (text is rendered at
   // 1080p instead of being upscaled from the 720p Seedance frame).
+  // fadeStart=0, fadeDuration=0 → title is visible from the first frame (no fade-in).
   const { overlayChain, blendExpr } = await buildTitleFadeFilters(
-    opts.tmpDir, opts.title, width, height, defaultFontPath(),
+    opts.tmpDir, opts.title, width, height, defaultFontPath(), 0, 0,
   )
 
   const introTrim = needsTrim ? `trim=duration=${MAX_INTRO_SECS},setpts=PTS-STARTPTS,` : ''

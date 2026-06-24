@@ -487,8 +487,14 @@ export async function buildTitleFadeFilters(
     ...textFilters,
   ].join(',')
 
-  const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
-  const blendExpr = `A*(1-${ramp})+B*${ramp}`
+  // fadeDuration <= 0 → title fully visible from the first frame (no fade-in).
+  let blendExpr: string
+  if (fadeDuration <= 0) {
+    blendExpr = 'B'
+  } else {
+    const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
+    blendExpr = `A*(1-${ramp})+B*${ramp}`
+  }
 
   return { overlayChain, blendExpr }
 }

@@ -50,6 +50,22 @@ export async function loadContinuationArrow(variant: 'light' | 'dark'): Promise<
 const FONT_MEDIUM = 'HelveticaNeue Medium'
 const FONT_LIGHT  = 'HelveticaNeue Light'
 
+// F4 (diagram-background) panel scheme: white translucent panel + brand-navy
+// text/arrows, with one shared opacity across the title, content, and explainer
+// slides so they read consistently over the diagram.
+const F4_PANEL_BG = '#FFFFFF'
+const F4_TEXT = '#011328' // brand navy
+const F4_TEXT_RGB = { r: 1, g: 19, b: 40 } // #011328
+const F4_PANEL_OPACITY = 0.85
+
+/** Recolor a transparent glyph PNG to a solid RGB, preserving its alpha. */
+async function tintGlyph(buf: Buffer, rgb: { r: number; g: number; b: number }): Promise<Buffer> {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const out = Buffer.from(data)
+  for (let i = 0; i < out.length; i += 4) { out[i] = rgb.r; out[i + 1] = rgb.g; out[i + 2] = rgb.b }
+  return sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer()
+}
+
 // ── Hook slide ───────────────────────────────────────────────────────────────
 // Full background visible. Dark semi-transparent rounded box sits only behind
 // the headline. Headline centered, HelveticaNeue Medium 52px, 22 chars/line.
@@ -80,14 +96,20 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 
   const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, textStartY, lineHeight)
 
-  // Don't render a box if there's genuinely nothing to show. F4 (diagramMode)
-  // uses a slightly more opaque box (0.75) so the title reads over the diagram.
-  const boxOpacity = input.diagramMode ? 0.75 : 0.65
+  // F4 (diagram mode): a full-width white translucent banner with navy text that
+  // pops over the diagram. Other carousels keep the padded dark box + white text.
+  const isF4 = !!input.diagramMode
+  const boxFill    = isF4 ? F4_PANEL_BG : '#000000'
+  const boxOpacity = isF4 ? F4_PANEL_OPACITY : 0.65
+  const textFill   = isF4 ? F4_TEXT : '#FFFFFF'
+  const rectX  = isF4 ? 0 : boxX
+  const rectW  = isF4 ? SLIDE_SIZE : boxW
+  const rectRx = isF4 ? 0 : 6
   const boxSvg = displayText
-    ? `<rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="6" fill="#000000" fill-opacity="${boxOpacity}"/>`
+    ? `<rect x="${rectX}" y="${boxY}" width="${rectW}" height="${boxH}" rx="${rectRx}" fill="${boxFill}" fill-opacity="${boxOpacity}"/>`
     : ''
   const textElement = displayText
-    ? `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">\n    ${textSvg}\n  </text>`
+    ? `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="${textFill}">\n    ${textSvg}\n  </text>`
     : ''
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
@@ -107,6 +129,12 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const { slide, slideIndex, brand } = input
   // F4 (diagram mode) bakes the logo into the diagram, so skip the name watermark.
   const watermark = input.diagramMode ? '' : escapeXml(brand.organizationName)
+
+  // F4: white translucent panel + navy text (same scheme/opacity as the title).
+  const isF4 = !!input.diagramMode
+  const panelFill = isF4 ? F4_PANEL_BG : '#000000'
+  const panelOpacity = isF4 ? F4_PANEL_OPACITY : 0.65
+  const textFill = isF4 ? F4_TEXT : '#FFFFFF'
 
   // Alternate: odd slideIndex = left panel, even = right panel.
   // (slideIndex 0 is the hook, so first content slide is index 1 → left.)
@@ -137,7 +165,7 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   if (slide.headlineText) {
     const headLines = wrapText(slide.headlineText, headlineMaxC, headlineMaxL)
     tspans.push(
-      `<text font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="#FFFFFF">` +
+      `<text font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${textFill}">` +
       leftAlignedTextLines(headLines, textX, currentY + headlineFontSz, headlineLineH) +
       `</text>`,
     )
@@ -158,11 +186,11 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   }
 
   const bodyBlock = bodyTspans.length > 0
-    ? `<text font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="#FFFFFF">${bodyTspans.join('')}</text>`
+    ? `<text font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${textFill}">${bodyTspans.join('')}</text>`
     : ''
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="${panelX}" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="#000000" fill-opacity="0.65"/>
+  <rect x="${panelX}" y="0" width="${SLIDE_SIZE / 2}" height="${SLIDE_SIZE}" fill="${panelFill}" fill-opacity="${panelOpacity}"/>
   ${tspans.join('\n  ')}
   ${bodyBlock}
   <text x="${SLIDE_SIZE - 32}" y="${SLIDE_SIZE - 28}" text-anchor="end" font-family="${FONT_LIGHT}" font-size="20" fill="#FFFFFF" opacity="0.6">${watermark}</text>
@@ -348,17 +376,19 @@ export async function renderCarouselSlide(
 
   const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
 
-  // F4 hook slide: add the continuation-arrow swipe indicator, bottom-right.
+  // F4 hook slide: add the continuation-arrow swipe indicator, bottom-right,
+  // sized small and lifted to clear the logo baked into the diagram's corner.
   if (input.slide.type === 'hook' && input.diagramMode && input.arrowBuffer) {
-    const ARROW_W = 150
+    const ARROW_W = 100
     const meta = await sharp(input.arrowBuffer).metadata()
     const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
     const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
     const margin = 48
+    const arrowBottom = Math.round(SLIDE_SIZE * 0.74) // sit above the baked-in corner logo
     composites.push({
       input: arrowPng,
       left: SLIDE_SIZE - ARROW_W - margin,
-      top: SLIDE_SIZE - arrowH - 70, // lifted clear of the corner watermark
+      top: arrowBottom - arrowH,
     })
   }
 
@@ -371,24 +401,24 @@ export function carouselSlideDimensions(): { width: number; height: number } {
 
 // ── Diagram-explainer slide ────────────────────────────────────────────────────
 // Used by F4 (diagram-background carousels): the stylized diagram fills the slide
-// with a full-width dark banner centered exactly 2/3 down, carrying the phrase
-// plus the continuation-arrow glyph.
+// with a full-width white translucent banner (same scheme/opacity as the title)
+// centered exactly 2/3 down, carrying the navy phrase plus the navy arrow glyph.
 export const DIAGRAM_EXPLAINER_TEXT = "Let's explore the diagram"
 
-/** Render text to a tight, transparent white PNG (trimmed to the glyphs) so we can measure + center it. */
-async function renderTextGlyphPng(text: string, fontSize: number): Promise<{ buf: Buffer; width: number; height: number }> {
+/** Render text to a tight, transparent PNG (trimmed to the glyphs) so we can measure + center it. */
+async function renderTextGlyphPng(text: string, fontSize: number, color = '#FFFFFF'): Promise<{ buf: Buffer; width: number; height: number }> {
   const canvasW = SLIDE_SIZE * 2
   const canvasH = Math.ceil(fontSize * 2)
-  const svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg"><text x="20" y="${Math.round(fontSize * 1.3)}" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="#FFFFFF">${escapeXml(text)}</text></svg>`
+  const svg = `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg"><text x="20" y="${Math.round(fontSize * 1.3)}" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="${color}">${escapeXml(text)}</text></svg>`
   const png = await sharp(Buffer.from(svg)).png().toBuffer()
   const { data, info } = await sharp(png).trim().png().toBuffer({ resolveWithObject: true })
   return { buf: data, width: info.width, height: info.height }
 }
 
 /**
- * Render the diagram background (cover-fit) with a full-width dark banner whose
- * content (phrase + continuation-arrow glyph, centered as one group) sits exactly
- * 2/3 down the slide, with symmetric top/bottom padding.
+ * Render the diagram background (cover-fit) with a full-width white translucent
+ * banner whose content (navy phrase + navy continuation-arrow glyph, centered as
+ * one group) sits exactly 2/3 down the slide, with symmetric top/bottom padding.
  */
 export async function renderDiagramExplainerSlide(
   backgroundBuffer: Buffer,
@@ -400,7 +430,7 @@ export async function renderDiagramExplainerSlide(
   const gap      = 28
   const centerY  = Math.round((SLIDE_SIZE * 2) / 3) // exactly 2/3 down
 
-  const { buf: textBuf, width: textW, height: textH } = await renderTextGlyphPng(text, fontSize)
+  const { buf: textBuf, width: textW, height: textH } = await renderTextGlyphPng(text, fontSize, F4_TEXT)
 
   let arrowPng: Buffer | null = null
   let arrowW = 0
@@ -409,7 +439,9 @@ export async function renderDiagramExplainerSlide(
     arrowH = Math.round(fontSize * 0.85)
     const meta = await sharp(arrowBuffer).metadata()
     arrowW = Math.round((arrowH * (meta.width ?? 87)) / (meta.height ?? 55))
-    arrowPng = await sharp(arrowBuffer).resize({ height: arrowH }).png().toBuffer()
+    // Banner is white, so the arrows must be navy regardless of the diagram-bg variant.
+    const navyArrow = await tintGlyph(arrowBuffer, F4_TEXT_RGB)
+    arrowPng = await sharp(navyArrow).resize({ height: arrowH }).png().toBuffer()
   }
 
   const contentH = Math.max(textH, arrowH)
@@ -419,7 +451,7 @@ export async function renderDiagramExplainerSlide(
   const startX   = Math.round((SLIDE_SIZE - groupW) / 2)
 
   const bannerSvg = `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="#000000" fill-opacity="0.65"/>
+  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="${F4_PANEL_BG}" fill-opacity="${F4_PANEL_OPACITY}"/>
 </svg>`
 
   const resizedBg = await sharp(backgroundBuffer)

@@ -197,6 +197,7 @@ export async function generateCarouselAssets(opts: {
       logoBuffer,
       diagramMode: useDiagram,
       arrowBuffer,
+      diagramVariant: useDiagram ? arrowVariant : undefined,
     })
 
     const registered = await registerSocialMedia({
@@ -218,7 +219,7 @@ export async function generateCarouselAssets(opts: {
 
   // Insert the "Let's explain the diagram >>>" slide right after the hook (slide 1).
   if (useDiagram && slides.length >= 1) {
-    const explainerBuf = await renderDiagramExplainerSlide(opts.diagramBackground!, arrowBuffer)
+    const explainerBuf = await renderDiagramExplainerSlide(opts.diagramBackground!, arrowBuffer, arrowVariant)
     const explainerReg = await registerSocialMedia({
       userId: opts.userId,
       buffer: explainerBuf,

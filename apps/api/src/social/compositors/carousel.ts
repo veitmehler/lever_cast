@@ -27,6 +27,8 @@ export interface CarouselSlideInput {
   diagramMode?: boolean
   /** Pre-loaded continuation-arrow glyph (color already chosen) for the hook slide. */
   arrowBuffer?: Buffer | null
+  /** F4 panel scheme: 'light' (dark diagram) → white panel/navy text; 'dark' → navy panel/white text. */
+  diagramVariant?: 'light' | 'dark'
 }
 
 const SLIDE_SIZE = 1080
@@ -59,6 +61,23 @@ const F4_TEXT_RGB = { r: 1, g: 19, b: 40 } // #011328
 const F4_PANEL_OPACITY = 0.85   // title + explainer white banners
 const F4_CONTENT_OPACITY = 0.9  // content half-panel (slightly more opaque)
 const F4_CTA_OPACITY = 0.85     // CTA stays dark full-frame, just more opaque
+
+/**
+ * F4 panel color scheme by logo variant — the panel always contrasts the diagram:
+ *  - 'light' (light logo → dark diagram): white panel + navy text.
+ *  - 'dark'  (dark logo → light diagram): navy panel + white text.
+ * It's the two brand colors (#FFFFFF / #011328) swapping roles.
+ */
+function f4Scheme(variant: 'light' | 'dark' | undefined): {
+  panelBg: string
+  text: string
+  textRgb: { r: number; g: number; b: number }
+} {
+  if (variant === 'dark') {
+    return { panelBg: F4_TEXT, text: F4_PANEL_BG, textRgb: { r: 255, g: 255, b: 255 } }
+  }
+  return { panelBg: F4_PANEL_BG, text: F4_TEXT, textRgb: F4_TEXT_RGB }
+}
 
 /** Recolor a transparent glyph PNG to a solid RGB, preserving its alpha. */
 async function tintGlyph(buf: Buffer, rgb: { r: number; g: number; b: number }): Promise<Buffer> {
@@ -98,12 +117,14 @@ function buildHookSlideOverlaySvg(input: CarouselSlideInput): string {
 
   const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, textStartY, lineHeight)
 
-  // F4 (diagram mode): a full-width white translucent banner with navy text that
-  // pops over the diagram. Other carousels keep the padded dark box + white text.
+  // F4 (diagram mode): a full-width translucent banner whose colors contrast the
+  // diagram (light variant → white/navy, dark variant → navy/white). Other
+  // carousels keep the padded dark box + white text.
   const isF4 = !!input.diagramMode
-  const boxFill    = isF4 ? F4_PANEL_BG : '#000000'
+  const scheme = f4Scheme(input.diagramVariant)
+  const boxFill    = isF4 ? scheme.panelBg : '#000000'
   const boxOpacity = isF4 ? F4_PANEL_OPACITY : 0.65
-  const textFill   = isF4 ? F4_TEXT : '#FFFFFF'
+  const textFill   = isF4 ? scheme.text : '#FFFFFF'
   const rectX  = isF4 ? 0 : boxX
   const rectW  = isF4 ? SLIDE_SIZE : boxW
   const rectRx = isF4 ? 0 : 6
@@ -132,11 +153,12 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   // F4 (diagram mode) bakes the logo into the diagram, so skip the name watermark.
   const watermark = input.diagramMode ? '' : escapeXml(brand.organizationName)
 
-  // F4: white translucent panel + navy text (same scheme/opacity as the title).
+  // F4: translucent panel whose colors contrast the diagram (same scheme as the title).
   const isF4 = !!input.diagramMode
-  const panelFill = isF4 ? F4_PANEL_BG : '#000000'
+  const scheme = f4Scheme(input.diagramVariant)
+  const panelFill = isF4 ? scheme.panelBg : '#000000'
   const panelOpacity = isF4 ? F4_CONTENT_OPACITY : 0.65
-  const textFill = isF4 ? F4_TEXT : '#FFFFFF'
+  const textFill = isF4 ? scheme.text : '#FFFFFF'
 
   // Alternate: odd slideIndex = left panel, even = right panel.
   // (slideIndex 0 is the hook, so first content slide is index 1 → left.)
@@ -429,14 +451,16 @@ async function renderTextGlyphPng(text: string, fontSize: number, color = '#FFFF
 export async function renderDiagramExplainerSlide(
   backgroundBuffer: Buffer,
   arrowBuffer?: Buffer | null,
+  variant?: 'light' | 'dark',
   text: string = DIAGRAM_EXPLAINER_TEXT,
 ): Promise<Buffer> {
   const fontSize = 56
   const padV     = 48
   const gap      = 28
   const centerY  = Math.round((SLIDE_SIZE * 2) / 3) // exactly 2/3 down
+  const scheme   = f4Scheme(variant)
 
-  const { buf: textBuf, width: textW, height: textH } = await renderTextGlyphPng(text, fontSize, F4_TEXT)
+  const { buf: textBuf, width: textW, height: textH } = await renderTextGlyphPng(text, fontSize, scheme.text)
 
   let arrowPng: Buffer | null = null
   let arrowW = 0
@@ -445,9 +469,9 @@ export async function renderDiagramExplainerSlide(
     arrowH = Math.round(fontSize * 0.85)
     const meta = await sharp(arrowBuffer).metadata()
     arrowW = Math.round((arrowH * (meta.width ?? 87)) / (meta.height ?? 55))
-    // Banner is white, so the arrows must be navy regardless of the diagram-bg variant.
-    const navyArrow = await tintGlyph(arrowBuffer, F4_TEXT_RGB)
-    arrowPng = await sharp(navyArrow).resize({ height: arrowH }).png().toBuffer()
+    // Arrows sit on the panel → tint them to the panel's text color (navy or white).
+    const tinted = await tintGlyph(arrowBuffer, scheme.textRgb)
+    arrowPng = await sharp(tinted).resize({ height: arrowH }).png().toBuffer()
   }
 
   const contentH = Math.max(textH, arrowH)
@@ -457,7 +481,7 @@ export async function renderDiagramExplainerSlide(
   const startX   = Math.round((SLIDE_SIZE - groupW) / 2)
 
   const bannerSvg = `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="${F4_PANEL_BG}" fill-opacity="${F4_PANEL_OPACITY}"/>
+  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="${scheme.panelBg}" fill-opacity="${F4_PANEL_OPACITY}"/>
 </svg>`
 
   const resizedBg = await sharp(backgroundBuffer)

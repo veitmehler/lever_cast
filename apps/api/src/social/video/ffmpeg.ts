@@ -126,6 +126,32 @@ export async function concatVideos(segmentPaths: string[], outputPath: string): 
   await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath])
 }
 
+/**
+ * Mux a voiceover track onto a (silent) video, starting at `offsetSec` and
+ * padded with silence to the full video length so downstream music mixing
+ * (amix duration=first / -shortest) keeps the whole clip. Video is stream-copied.
+ */
+export async function muxVoiceover(
+  videoPath: string,
+  audioPath: string,
+  offsetSec: number,
+  outputPath: string,
+): Promise<void> {
+  const { duration } = await probeVideo(videoPath)
+  const ms = Math.max(0, Math.round(offsetSec * 1000))
+  await runFfmpeg([
+    '-i', videoPath,
+    '-i', audioPath,
+    '-filter_complex',
+    `[1:a]adelay=${ms}|${ms},apad,atrim=0:${duration.toFixed(3)},aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+    '-map', '0:v',
+    '-map', '[a]',
+    '-c:v', 'copy',
+    '-c:a', 'aac', '-b:a', '192k',
+    outputPath,
+  ])
+}
+
 export async function hasAudioStream(filePath: string): Promise<boolean> {
   const { stdout } = await execFileAsync(ffprobeBin(), [
     '-v', 'error',

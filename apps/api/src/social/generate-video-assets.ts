@@ -13,6 +13,7 @@ import {
   rescaleVideo,
   probeVideo,
   concatVideos,
+  muxVoiceover,
   runFfmpeg,
   defaultFontPath,
 } from './video/ffmpeg'
@@ -536,11 +537,12 @@ export async function generateStoryCarouselVideo(opts: {
   if (!titleBgUrl) throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
   if (!pitchBgUrl) throw new Error('generateStoryCarouselVideo: no backgroundImageUrls provided')
 
-  // Fetch both backgrounds in parallel, and generate the pitch text
-  const [titleBgResp, pitchBgResp, pitchCopy] = await Promise.all([
+  // Fetch both backgrounds in parallel, and generate the pitch text + voice settings
+  const [titleBgResp, pitchBgResp, pitchCopy, voice] = await Promise.all([
     fetch(titleBgUrl),
     fetch(pitchBgUrl),
     generatePitchSlideText({ topic: opts.topic, content: opts.content, pitchType: 'carousel' }),
+    getVoiceSettings(opts.userId),
   ])
 
   const [titleBgBuffer, pitchBgBuffer] = await Promise.all([
@@ -568,9 +570,33 @@ export async function generateStoryCarouselVideo(opts: {
   })
 
   const titleDur = 4 + Math.floor(Math.random() * 4)
-  const pitchDur = 10 + Math.floor(Math.random() * 5)
 
   return withTempDir('story-carousel-', async (tmpDir) => {
+    // --- Optional voiceover for the pitch slide (slide 2) ---
+    // Narrate the pitch copy when voiceover is enabled; the slide then holds for
+    // the narration's length instead of a random duration.
+    let pitchDur = 10 + Math.floor(Math.random() * 5)
+    let narrationAudioPath: string | undefined
+    const pitchNarrationText = pitchCopy.pitch?.trim()
+    if (voice.voiceoverEnabled && voice.apiKey && voice.voiceId && pitchNarrationText) {
+      try {
+        const narration = await buildPerSlideNarration({
+          apiKey: voice.apiKey,
+          voiceId: voice.voiceId,
+          modelId: voice.modelId,
+          stability: voice.stability,
+          similarity: voice.similarity,
+          speed: voice.speed,
+          slideTexts: [pitchNarrationText],
+          tmpDir,
+        })
+        pitchDur = narration.slideDurations[0] + 1.0 // small tail after speech
+        narrationAudioPath = narration.audioPath
+      } catch (err) {
+        logger.error({ err }, 'generateStoryCarouselVideo: pitch narration failed — silent pitch slide')
+      }
+    }
+
     // --- Slide 1: title screen ---
     const titleBgPng    = path.join(tmpDir, 'title-bg.png')
     const titleVideoRaw = path.join(tmpDir, 'title-raw.mp4')
@@ -593,13 +619,23 @@ export async function generateStoryCarouselVideo(opts: {
       secondsPerSlide: pitchDur,
     })
 
-    // --- Concat ---
-    const outputPath = path.join(tmpDir, 'story-carousel.mp4')
-    await concatVideos([titleVideoOut, pitchVideoPath], outputPath)
+    // --- Concat (silent) ---
+    const concatPath = path.join(tmpDir, 'story-carousel.mp4')
+    await concatVideos([titleVideoOut, pitchVideoPath], concatPath)
+
+    // Mux the pitch narration so it starts when the pitch slide begins (after the title).
+    let outputPath = concatPath
+    if (narrationAudioPath) {
+      const voicedPath = path.join(tmpDir, 'story-carousel-voiced.mp4')
+      await muxVoiceover(concatPath, narrationAudioPath, titleDur, voicedPath)
+      outputPath = voicedPath
+    }
+
     const probe = await probeVideo(outputPath)
 
     const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
       videoDuration: probe.duration,
+      duckAtSec: narrationAudioPath ? titleDur : undefined,
     })
 
     const uploaded = await uploadVideoFile({
@@ -643,11 +679,14 @@ export async function generateStoryHookVideo(opts: {
   const jobId = opts.jobId ?? genId
 
   // Generate pitch text while we prepare the video assets
-  const pitchCopy = await generatePitchSlideText({
-    topic: opts.topic,
-    content: opts.content,
-    pitchType: 'hook',
-  })
+  const [pitchCopy, voice] = await Promise.all([
+    generatePitchSlideText({
+      topic: opts.topic,
+      content: opts.content,
+      pitchType: 'hook',
+    }),
+    getVoiceSettings(opts.userId),
+  ])
 
   // Download raw background and composite the 9:16 pitch slide PNG
   const bgResp   = await fetch(opts.backgroundImageUrl)
@@ -667,16 +706,13 @@ export async function generateStoryHookVideo(opts: {
     height: 1920,
   })
 
-  // Random 10–14 s for the pitch slide
-  const secondsPerSlide = 10 + Math.floor(Math.random() * 5)
-
   return withTempDir('story-hook-', async (tmpDir) => {
     const hookDownloaded = path.join(tmpDir, 'hook-raw.mp4')
     const hookCropped    = path.join(tmpDir, 'hook-cropped.mp4')
     const hookScaled     = path.join(tmpDir, 'hook-scaled.mp4')
     const hookTitled     = path.join(tmpDir, 'hook-titled.mp4')
     const bodyPath       = path.join(tmpDir, 'hook-body.mp4')
-    const outputPath     = path.join(tmpDir, 'story-hook.mp4')
+    const concatPath     = path.join(tmpDir, 'story-hook.mp4')
 
     // Step 1 — Download F6's raw hook clip (reuse, no new Fal.ai cost)
     await downloadToFile(opts.hookRawVideoUrl, hookDownloaded)
@@ -688,6 +724,33 @@ export async function generateStoryHookVideo(opts: {
     // Step 3 — Overlay title as a full-width strip with fade-in (9:16 strip design)
     await overlayTitleOnVideoStripFadeIn(hookScaled, hookTitled, opts.title, defaultFontPath())
 
+    // The intro clip length is where the pitch slide (and its narration) begins.
+    const introDur = (await probeVideo(hookTitled)).duration
+
+    // Optional voiceover for the pitch slide: narrate the pitch copy when enabled;
+    // the slide holds for the narration's length instead of a random duration.
+    let secondsPerSlide = 10 + Math.floor(Math.random() * 5)
+    let narrationAudioPath: string | undefined
+    const pitchNarrationText = pitchCopy.pitch?.trim()
+    if (voice.voiceoverEnabled && voice.apiKey && voice.voiceId && pitchNarrationText) {
+      try {
+        const narration = await buildPerSlideNarration({
+          apiKey: voice.apiKey,
+          voiceId: voice.voiceId,
+          modelId: voice.modelId,
+          stability: voice.stability,
+          similarity: voice.similarity,
+          speed: voice.speed,
+          slideTexts: [pitchNarrationText],
+          tmpDir,
+        })
+        secondsPerSlide = narration.slideDurations[0] + 1.0 // small tail after speech
+        narrationAudioPath = narration.audioPath
+      } catch (err) {
+        logger.error({ err }, 'generateStoryHookVideo: pitch narration failed — silent pitch slide')
+      }
+    }
+
     // Step 4 — Pitch slide as a timed clip (already 1080×1920)
     await buildSlideshowVideo({
       imageUrls: [pitchRegistered.url],
@@ -696,12 +759,22 @@ export async function generateStoryHookVideo(opts: {
       secondsPerSlide,
     })
 
-    // Step 5 — Concat intro clip + pitch slide
-    await concatVideos([hookTitled, bodyPath], outputPath)
+    // Step 5 — Concat intro clip + pitch slide (silent)
+    await concatVideos([hookTitled, bodyPath], concatPath)
+
+    // Mux the pitch narration so it starts when the pitch slide begins (after the intro).
+    let outputPath = concatPath
+    if (narrationAudioPath) {
+      const voicedPath = path.join(tmpDir, 'story-hook-voiced.mp4')
+      await muxVoiceover(concatPath, narrationAudioPath, introDur, voicedPath)
+      outputPath = voicedPath
+    }
+
     const probe = await probeVideo(outputPath)
 
     const musicPath = await addBackgroundMusic(outputPath, tmpDir, {
       videoDuration: probe.duration,
+      duckAtSec: narrationAudioPath ? introDur : undefined,
     })
 
     const uploaded = await uploadVideoFile({

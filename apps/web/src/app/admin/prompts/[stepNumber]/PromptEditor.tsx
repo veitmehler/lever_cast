@@ -168,10 +168,12 @@ const STEP_LABELS: Record<number, string> = {
   206: 'Social · Step 6 — Video Reel Prompt (LLM)',
   207: 'Social · Step 7 — Video Reel — Fal.ai Model',
   208: 'Social · Step 8 — Story Pitch Slide Text',
+  217: 'Social · Step 9 — Hook Video (F6) — Fal.ai Model',
+  218: 'Social · Step 10 — Hook Images (F6) — Fal.ai Model',
 }
 
 /** Steps that only configure a model, not a prompt. */
-const MODEL_ONLY_STEPS = new Set([150, 207])
+const MODEL_ONLY_STEPS = new Set([150, 207, 217, 218])
 
 const PROVIDER_OPTIONS = [
   { value: 'gemini',     label: 'Gemini (Google)' },

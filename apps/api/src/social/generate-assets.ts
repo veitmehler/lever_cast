@@ -117,6 +117,8 @@ export async function generateCarouselAssets(opts: {
   diagramBackground?: Buffer | null
   /** Watermark/arrow variant for diagram mode: 'light' (dark bg) → white arrows. */
   diagramLogoVariant?: 'light' | 'dark'
+  /** Fal.ai image model for AI slide backgrounds (admin-configurable). */
+  imageModel?: string
 }): Promise<GeneratedCarousel> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
@@ -169,7 +171,7 @@ export async function generateCarouselAssets(opts: {
     const plan = slidePlans[i]
     const bg = useDiagram
       ? opts.diagramBackground!
-      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
+      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId, opts.imageModel)
 
     // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
     let bgUrl: string

@@ -322,6 +322,7 @@ async function isNearlyBlack(buffer: Buffer): Promise<boolean> {
 export async function generateCarouselBackground(
   imagePrompt: string,
   jobId: string,
+  model: string = 'fal-ai/flux/schnell',
 ): Promise<Buffer> {
   const apiKey = await getSystemApiKey('fal-ai')
   if (!apiKey) throw new Error('No Fal.ai system API key configured')
@@ -331,7 +332,7 @@ export async function generateCarouselBackground(
   // An empty prompt makes flux emit a black frame — always send something.
   const prompt = (imagePrompt || '').trim().slice(0, 2000) || FALLBACK_BG_PROMPT
 
-  const result = await fal.subscribe('fal-ai/flux/schnell', {
+  const result = await fal.subscribe(model, {
     input: {
       prompt,
       image_size: 'square_hd',

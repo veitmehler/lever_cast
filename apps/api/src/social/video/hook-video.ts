@@ -30,6 +30,8 @@ export interface HookVideoOptions {
   /** Contiguous body-narration track (length == sum of slide durations). Muxed
    *  directly onto the slideshow body so narration starts on the first content slide. */
   voiceAudioPath?: string
+  /** Override the Fal.ai video model for the intro clip (admin Step 217). Defaults to Seedance T2V. */
+  falModel?: string
 }
 
 export interface HookVideoResult {
@@ -68,6 +70,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     duration: opts.hookDuration ?? '5',
     resolution: '720p',
     aspectRatio: '1:1',
+    model: opts.falModel,
   })
   logger.info({ hookUrl }, 'buildHookVideo: Seedance clip generated')
 

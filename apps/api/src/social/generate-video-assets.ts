@@ -276,12 +276,18 @@ export async function generateHookVideoAsset(opts: {
 
   logger.info({ userId: opts.userId, jobId, slideCount, genId }, 'generateHookVideoAsset: start')
 
+  // Admin-configurable F6 models (Step 217 = intro video, Step 218 = slideshow images).
+  const [videoTpl, imageTpl] = await Promise.all([loadPromptTemplate(217), loadPromptTemplate(218)])
+  const hookVideoModel = videoTpl?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
+  const hookImageModel = imageTpl?.defaultModel ?? 'fal-ai/flux/schnell'
+
   const [carousel, brand, voice] = await Promise.all([
     generateCarouselAssets({
       userId: opts.userId,
       content: opts.content,
       slideCount,
       jobId,
+      imageModel: hookImageModel,
     }),
     loadSocialBrandTheme(opts.userId),
     getVoiceSettings(opts.userId),
@@ -314,7 +320,7 @@ export async function generateHookVideoAsset(opts: {
     topic,
     details,
     specialInstructions: brand.videoSpecialInstructions,
-    videoModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+    videoModel: hookVideoModel,
   })
 
   return withTempDir('hook-video-', async (tmpDir) => {
@@ -372,6 +378,7 @@ export async function generateHookVideoAsset(opts: {
     const { probe, hookRawPath, introDuration } = await buildHookVideo({
       title,
       hookPrompt: hookVideoPrompt,
+      falModel: hookVideoModel,
       // Pure T2V — no image input so Seedance has a clean background without
       // any baked-in text from the carousel hook slide.
       hookImageUrl: undefined,

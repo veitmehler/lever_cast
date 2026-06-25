@@ -1660,6 +1660,24 @@ Rules:
 - No hashtags, emojis, or markdown`,
     isActive: true,
   },
+  {
+    stepNumber: 217,
+    stepName: 'social_hook_video_model',
+    defaultProvider: 'fal-ai',
+    defaultModel: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
+    systemPrompt: null,
+    userPrompt: '(No prompt — F6 hook video. Only the Fal.ai model selected above controls which text-to-video model renders the intro clip.)',
+    isActive: true,
+  },
+  {
+    stepNumber: 218,
+    stepName: 'social_hook_image_model',
+    defaultProvider: 'fal-ai',
+    defaultModel: 'fal-ai/flux/schnell',
+    systemPrompt: null,
+    userPrompt: '(No prompt — F6 hook video. Only the Fal.ai model selected above controls which image model renders the slideshow backgrounds.)',
+    isActive: true,
+  },
 ]
 
 async function main() {

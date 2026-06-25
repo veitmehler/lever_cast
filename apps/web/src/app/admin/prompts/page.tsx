@@ -84,6 +84,8 @@ const STEP_LABELS: Record<string, string> = {
   social_video_reel_prompt:       '6. Video Reel Prompt (LLM)',
   social_video_reel_model:        '7. Video Reel — Fal.ai Model',
   social_story_pitch_slide:       '8. Story pitch slide',
+  social_hook_video_model:        '9. Hook Video (F6) — Fal.ai Model',
+  social_hook_image_model:        '10. Hook Images (F6) — Fal.ai Model',
 }
 
 /** Maps DB stepNumber → visual display number shown in the badge. */
@@ -99,7 +101,7 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
   // Platform syndication
   30: '1', 31: '2',
   // Social media posts
-  201: '1', 202: '2', 203: '3', 204: '4', 205: '5', 206: '6', 207: '7', 208: '8',
+  201: '1', 202: '2', 203: '3', 204: '4', 205: '5', 206: '6', 207: '7', 208: '8', 217: '9', 218: '10',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
@@ -128,7 +130,7 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   },
   {
     label: 'Social Media Posts',
-    steps: [201, 202, 203, 204, 205, 206, 207, 208],
+    steps: [201, 202, 203, 204, 205, 206, 207, 208, 217, 218],
   },
 ]
 

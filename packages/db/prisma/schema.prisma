@@ -181,9 +181,13 @@ model SocialAutomationRun {
   job            ArticleJob?                  @relation(fields: [jobId], references: [id], onDelete: SetNull)
   sitePageId     String?
   sitePage       SitePage?                    @relation(fields: [sitePageId], references: [id], onDelete: SetNull)
+  // Newsletter-sourced runs (weekly cadence Mon/Wed/Fri/Sat). A run is sourced by
+  // EITHER an article (jobId/sitePageId) OR a newsletter (newsletterId).
+  newsletterId   String?
+  newsletter     Newsletter?                  @relation(fields: [newsletterId], references: [id], onDelete: SetNull)
   scheduledDate  String // YYYY-MM-DD in user's social timezone
   status         String                       @default("pending") // pending | processing | ready | scheduling | completed | failed | cancelled
-  totalSpecs     Int                          @default(12)
+  totalSpecs     Int                          @default(3)
   completedSpecs Int                          @default(0)
   failedSpecs    Int                          @default(0)
   currentSpec    String?
@@ -1153,6 +1157,7 @@ model Newsletter {
   outputTokens     Int             @default(0)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  socialRuns       SocialAutomationRun[]
 
   @@unique([userId, topicId])
   @@index([userId, status])

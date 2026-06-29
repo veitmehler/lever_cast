@@ -250,6 +250,7 @@ export async function finalizeGenerationCounts(runId: string): Promise<void> {
   })
   const completed = counts.find((c) => c.status === 'completed')?._count ?? 0
   const failed = counts.find((c) => c.status === 'failed')?._count ?? 0
+  const total = completed + failed
   const allFailed = completed === 0 && failed > 0
 
   await prisma.socialAutomationRun.update({
@@ -259,8 +260,8 @@ export async function finalizeGenerationCounts(runId: string): Promise<void> {
       currentSpec: null,
       completedSpecs: completed,
       failedSpecs: failed,
-      totalSpecs: SPEC_PROCESS_ORDER.length,
-      error: failed > 0 ? `${failed} of ${SPEC_PROCESS_ORDER.length} spec(s) failed` : null,
+      totalSpecs: total,
+      error: failed > 0 ? `${failed} of ${total} spec(s) failed` : null,
     },
   })
 

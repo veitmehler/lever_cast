@@ -1,17 +1,28 @@
-import { prisma } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../../lib/logger'
-import { SPEC_PROCESS_ORDER } from './default-specs'
-import { ensureDefaultSocialPostSpecs } from './ensure-specs'
-import { buildArticleContentContext } from './content'
 import type { AutomationLogContext } from './log-context'
-import {
-  finalizeGenerationCounts,
-  loadPriorAssets,
-  processAutomationSpec,
-  slotsToProcess,
-  updateGenerationProgress,
-} from './spec-processor'
 import { ensureRunSlideCount } from './slide-count'
+import { matrixForDay, type DaySlot } from './weekly-matrix'
+import { buildMatrixRunContext, processMatrixSlot } from './matrix-processor'
+import { finalizeGenerationCounts, updateGenerationProgress } from './spec-processor'
+
+/** scheduledDate (YYYY-MM-DD, user tz) → ISO weekday (1=Mon … 7=Sun). */
+function isoWeekdayOf(scheduledDate: string): number {
+  const [y, m, d] = scheduledDate.split('-').map(Number)
+  const dow = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay() // 0=Sun..6=Sat
+  return dow === 0 ? 7 : dow
+}
+
+interface SlotEntry {
+  slotKey: string
+  daySlot: DaySlot
+}
+
+/** The 3 matrix slots for a run, keyed P1/P2/P3 in time order. */
+function slotEntriesForRun(kind: 'article' | 'newsletter', scheduledDate: string): SlotEntry[] {
+  const slots = matrixForDay(kind, isoWeekdayOf(scheduledDate))
+  return slots.map((daySlot, i) => ({ slotKey: `P${i + 1}`, daySlot }))
+}
 
 export async function runSocialAutomation(
   runId: string,
@@ -19,14 +30,11 @@ export async function runSocialAutomation(
 ): Promise<void> {
   const run = await prisma.socialAutomationRun.findUnique({
     where: { id: runId },
-    include: {
-      job: { include: { topic: true } },
-      sitePage: true,
-    },
+    include: { sitePage: true },
   })
 
-  if (!run?.jobId || !run.sitePage) {
-    throw new Error(`Social automation run missing article context: ${runId}`)
+  if (!run || (!run.jobId && !run.newsletterId)) {
+    throw new Error(`Social automation run missing content source: ${runId}`)
   }
 
   if (opts?.onlySlot) {
@@ -49,34 +57,24 @@ export async function runSocialAutomation(
     }
   }
 
-  await ensureDefaultSocialPostSpecs(run.userId)
-
-  const specs = await prisma.socialPostSpec.findMany({
-    where: { userId: run.userId, enabled: true },
-  })
-  const specBySlot = new Map(specs.map((s) => [s.slotKey, s]))
-
   const settings = await prisma.settings.findUnique({ where: { userId: run.userId } })
   const timeZone = settings?.socialTimezone ?? 'America/New_York'
-  const articleCtx = buildArticleContentContext(run.sitePage)
-  const priorAssets = opts?.onlySlot ? await loadPriorAssets(runId) : new Map()
+  const kind: 'article' | 'newsletter' = run.newsletterId ? 'newsletter' : 'article'
 
-  const slots = slotsToProcess(opts?.onlySlot)
-  const slideCount = await ensureRunSlideCount(runId, { reset: !opts?.onlySlot })
-  const baseCtx: AutomationLogContext = {
-    runId,
-    userId: run.userId,
-    jobId: run.jobId,
+  let entries = slotEntriesForRun(kind, run.scheduledDate)
+  if (opts?.onlySlot) {
+    entries = entries.filter((e) => e.slotKey === opts.onlySlot)
+    if (entries.length === 0) throw new Error(`Invalid slot key: ${opts.onlySlot}`)
   }
 
+  const ctx = await buildMatrixRunContext(run)
+  const brand = await brandSettingsForUser(run.userId)
+  const diagramLogoVariant: 'light' | 'dark' = brand?.diagramLogoVariant === 'dark' ? 'dark' : 'light'
+  const slideCount = await ensureRunSlideCount(runId, { reset: !opts?.onlySlot })
+
+  const baseCtx: AutomationLogContext = { runId, userId: run.userId, jobId: run.jobId ?? undefined }
   logger.info(
-    {
-      ...baseCtx,
-      scheduledDate: run.scheduledDate,
-      totalSlots: slots.length,
-      onlySlot: opts?.onlySlot,
-      slideCount,
-    },
+    { ...baseCtx, kind, scheduledDate: run.scheduledDate, slots: entries.length, onlySlot: opts?.onlySlot },
     '[social-automation] run started',
   )
 
@@ -85,43 +83,30 @@ export async function runSocialAutomation(
     await prisma.post.deleteMany({ where: { automationRunId: runId, status: 'ready' } })
     await prisma.socialAutomationRun.update({
       where: { id: runId },
-      data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: SPEC_PROCESS_ORDER.length },
+      data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: entries.length },
     })
   } else {
-    const slots = slotsToProcess(opts.onlySlot)
     await prisma.post.deleteMany({
-      where: { automationRunId: runId, slotKey: { in: slots }, status: 'ready' },
+      where: { automationRunId: runId, slotKey: opts.onlySlot, status: 'ready' },
     })
   }
 
-  for (const slotKey of slots) {
-    const spec = specBySlot.get(slotKey)
-    if (!spec) {
-      await prisma.socialAutomationSpecResult.upsert({
-        where: { runId_slotKey: { runId, slotKey } },
-        create: { runId, slotKey, status: 'failed', error: 'Spec disabled or missing' },
-        update: { status: 'failed', error: 'Spec disabled or missing' },
-      })
-      continue
-    }
-
+  for (const entry of entries) {
     await prisma.socialAutomationRun.update({
       where: { id: runId },
-      data: { currentSpec: slotKey },
+      data: { currentSpec: entry.slotKey },
     })
 
-    const result = await processAutomationSpec({
-      run: { ...run, jobId: run.jobId },
-      slotKey,
-      spec,
-      articleCtx,
-      priorAssets,
+    await processMatrixSlot({
+      run,
+      slotKey: entry.slotKey,
+      daySlot: entry.daySlot,
+      ctx,
       timeZone,
       slideCount,
+      diagramLogoVariant,
       logCtx: baseCtx,
     })
-
-    if (result.assets) priorAssets.set(slotKey, result.assets)
 
     await updateGenerationProgress(runId)
   }
@@ -129,7 +114,19 @@ export async function runSocialAutomation(
   await finalizeGenerationCounts(runId)
 }
 
-export { retryAutomationSpec } from './spec-processor'
+/** Re-run a single matrix slot (P1/P2/P3) — used by the admin "retry slot" action. */
+export async function retryAutomationSpec(runId: string, slotKey: string): Promise<void> {
+  await prisma.socialAutomationRun.update({
+    where: { id: runId },
+    data: { status: 'processing', currentSpec: slotKey },
+  })
+  await runSocialAutomation(runId, { onlySlot: slotKey })
+  const result = await prisma.socialAutomationSpecResult.findUnique({
+    where: { runId_slotKey: { runId, slotKey } },
+  })
+  if (result?.status === 'failed') throw new Error(result.error ?? 'Spec retry failed')
+}
+
 export {
   dispatchSocialAutomationRun,
   dispatchSocialAutomationSlot,

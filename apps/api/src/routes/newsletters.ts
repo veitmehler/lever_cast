@@ -12,6 +12,7 @@ import {
 import { getNewsletterEmailConfig, type NewsletterEmailConfig } from '../lib/ghl/settings'
 import { renderNewsletterHtml, type RenderBrand, type RenderInput } from '../newsletter/render'
 import { processLogo } from '../newsletter/logo-process'
+import { maybeEnqueueNewsletterSocialAutomation } from '../social/automation/enqueue'
 import { generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions, deleteS3Keys } from '@socioply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { vtoken } from '../newsletter/image-overlay'
@@ -176,6 +177,12 @@ async function approveOne(
     where: { id: newsletterId },
     data: { status: 'scheduled', ghlCampaignId: campaignId, scheduledFor: sendAtUtc, approvedAt: new Date() },
   })
+
+  // Fan out the weekly-cadence social posts for this newsletter (best-effort).
+  await maybeEnqueueNewsletterSocialAutomation(newsletterId).catch((err: unknown) =>
+    logger.warn({ newsletterId, err }, '[newsletters] social automation enqueue failed (non-fatal)'),
+  )
+
   return { campaignId, scheduledFor: sendAtUtc }
 }
 

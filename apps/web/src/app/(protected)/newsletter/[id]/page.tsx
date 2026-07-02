@@ -304,9 +304,10 @@ export default function NewsletterEditionPage({ params }: { params: Promise<{ id
             </div>
           )}
         </div>
-
-        <NewsletterSocialPreview newsletterId={id} />
       </div>
+
+      {/* Full-width: social posts generated from this newsletter */}
+      <NewsletterSocialPreview newsletterId={id} />
     </div>
   )
 }

@@ -15,11 +15,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
-const SLOT_DISPLAY_ORDER = [
-  'F1', 'F2', 'F3', 'F4', 'F5', 'F6',
-  'S1', 'S2', 'S3', 'S4', 'S5', 'S6',
-] as const
-
 const POST_TYPE_LABELS: Record<string, string> = {
   quote: 'Quote card',
   video_reel: 'Video reel',
@@ -321,7 +316,8 @@ function slotBadge(
 }
 
 type SocialPreviewPanelProps = {
-  jobId: string
+  /** Optional — legacy article context. Approve-all now uses a source-agnostic runId endpoint. */
+  jobId?: string
   runs: SocialAutomationRunRow[]
   onRefresh: () => Promise<void>
   onRetryFailed: (runId: string, slotKey: string) => Promise<void>
@@ -329,7 +325,6 @@ type SocialPreviewPanelProps = {
 }
 
 export function SocialPreviewPanel({
-  jobId,
   runs,
   onRefresh,
   onRetryFailed,
@@ -356,7 +351,7 @@ export function SocialPreviewPanel({
     try {
       const token = await getToken()
       const res = await fetch(
-        `/api/articles/${jobId}/social-automation/${runId}/approve`,
+        `/api/social-automation/${runId}/approve`,
         {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -439,6 +434,9 @@ export function SocialPreviewPanel({
         const specBySlot = new Map(
           (run.specResults ?? []).map((s) => [s.slotKey, s]),
         )
+        // Render the run's actual slots (weekly cadence = P1..P3; legacy = F1..S6),
+        // ordered by slot key, instead of a fixed slot list.
+        const slotKeys = [...(run.specResults ?? [])].map((s) => s.slotKey).sort()
         const readySlots =
           run.specResults?.filter(
             (s) => s.status === 'completed' && !s.approvedAt,
@@ -497,7 +495,7 @@ export function SocialPreviewPanel({
 
             {(run.status === 'pending' || run.status === 'processing') && (
               <div className="flex flex-wrap gap-1.5">
-                {SLOT_DISPLAY_ORDER.map((slotKey) => {
+                {slotKeys.map((slotKey) => {
                   const spec = specBySlot.get(slotKey)
                   return (
                     <span
@@ -519,7 +517,7 @@ export function SocialPreviewPanel({
 
             {showPreview && (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {SLOT_DISPLAY_ORDER.map((slotKey) => {
+                {slotKeys.map((slotKey) => {
                   const spec = specBySlot.get(slotKey)
                   if (!spec) return null
                   const preview = parsePreview(spec.previewJson)

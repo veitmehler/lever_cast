@@ -27,6 +27,26 @@ export async function socialAutomationRoutes(app: FastifyInstance) {
     return reply.send({ run })
   })
 
+  // POST /api/social-automation/:runId/approve — approve + schedule the whole run
+  // (source-agnostic: article or newsletter).
+  app.post<{ Params: { runId: string } }>('/social-automation/:runId/approve', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const { runId } = request.params
+    const run = await prisma.socialAutomationRun.findFirst({ where: { id: runId, userId: user.id } })
+    if (!run) return reply.status(404).send({ error: 'Automation run not found' })
+
+    const result = await enqueueSocialDispatch(runId)
+    if (!result.enqueued) {
+      return reply.status(400).send({ error: result.message ?? 'Dispatch not enqueued' })
+    }
+    return reply.status(202).send({ ok: true, enqueued: true })
+  })
+
   // POST /api/social-automation/:runId/approve/:slotKey
   app.post<{ Params: { runId: string; slotKey: string } }>(
     '/social-automation/:runId/approve/:slotKey',

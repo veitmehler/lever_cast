@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Save,
 } from 'lucide-react'
+import { NewsletterSocialPreview } from '@/features/social/NewsletterSocialPreview'
 
 interface Newsletter {
   id: string
@@ -303,6 +304,8 @@ export default function NewsletterEditionPage({ params }: { params: Promise<{ id
             </div>
           )}
         </div>
+
+        <NewsletterSocialPreview newsletterId={id} />
       </div>
     </div>
   )

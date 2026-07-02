@@ -211,6 +211,29 @@ export async function newsletterRoutes(app: FastifyInstance) {
     return reply.send({ newsletters: rows })
   })
 
+  // GET /newsletters/:id/social-automation — the newsletter's social run(s) for preview/approval
+  app.get<{ Params: { id: string } }>('/newsletters/:id/social-automation', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const userId = await resolveUserId(clerkId)
+    if (!userId) return reply.status(404).send({ error: 'User not found' })
+
+    const { id } = request.params
+    const nl = await prisma.newsletter.findFirst({ where: { id, userId }, select: { id: true } })
+    if (!nl) return reply.status(404).send({ error: 'Newsletter not found' })
+
+    const runs = await prisma.socialAutomationRun.findMany({
+      where: { newsletterId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: {
+        specResults: { orderBy: { slotKey: 'asc' } },
+        _count: { select: { posts: true } },
+      },
+    })
+    return reply.send({ runs })
+  })
+
   // GET /newsletters/:id
   app.get<{ Params: { id: string } }>('/newsletters/:id', async (request, reply) => {
     const clerkId = await requireAuth(request, reply)

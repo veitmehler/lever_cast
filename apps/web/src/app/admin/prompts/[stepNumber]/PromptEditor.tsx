@@ -169,7 +169,7 @@ const STEP_LABELS: Record<number, string> = {
   207: 'Social · Step 7 — Video Reel — Fal.ai Model',
   208: 'Social · Step 8 — Story Pitch Slide Text',
   217: 'Social · Step 9 — Hook Video (F6) — Fal.ai Model',
-  218: 'Social · Step 10 — Hook Images (F6) — Fal.ai Model',
+  218: 'Social · Step 10 — Social Images (carousels + F6 slides) — Fal.ai Model',
 }
 
 /** Steps that only configure a model, not a prompt. */

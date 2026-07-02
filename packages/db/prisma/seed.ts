@@ -1671,11 +1671,11 @@ Rules:
   },
   {
     stepNumber: 218,
-    stepName: 'social_hook_image_model',
+    stepName: 'social_image_model',
     defaultProvider: 'fal-ai',
     defaultModel: 'fal-ai/flux/schnell',
     systemPrompt: null,
-    userPrompt: '(No prompt — F6 hook video. Only the Fal.ai model selected above controls which image model renders the slideshow backgrounds.)',
+    userPrompt: '(No prompt — the Fal.ai model selected above renders the AI background images for ALL social carousels/slideshows: image carousels (article F4 + newsletter feature) and F6 hook-video slides.)',
     isActive: true,
   },
 ]

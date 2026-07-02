@@ -16,6 +16,12 @@ import {
 } from './newsletter-content'
 import { generateQuoteCardAsset, generateCarouselAssets } from '../generate-assets'
 import { generateVideoReelAsset, generateHookVideoAsset } from '../generate-video-assets'
+import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+
+/** Shared admin-configurable Fal.ai image model for social carousels/slideshows (Step 218). */
+async function socialImageModel(): Promise<string | undefined> {
+  return (await loadPromptTemplate(218))?.defaultModel
+}
 import type { AutomationLogContext } from './log-context'
 import { withSlotKey } from './log-context'
 
@@ -87,6 +93,9 @@ async function generateMatrixAsset(opts: {
         jobId: assetJobId,
         diagramBackground: resolved.diagramBackground ?? undefined,
         diagramLogoVariant,
+        // Image-carousel backgrounds honor the shared social image model (Step 218).
+        // Ignored when diagramBackground is set (diagram is the background).
+        imageModel: await socialImageModel(),
       })
       return {
         postType: 'carousel',

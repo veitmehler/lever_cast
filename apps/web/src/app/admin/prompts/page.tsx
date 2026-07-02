@@ -85,7 +85,8 @@ const STEP_LABELS: Record<string, string> = {
   social_video_reel_model:        '7. Video Reel — Fal.ai Model',
   social_story_pitch_slide:       '8. Story pitch slide',
   social_hook_video_model:        '9. Hook Video (F6) — Fal.ai Model',
-  social_hook_image_model:        '10. Hook Images (F6) — Fal.ai Model',
+  social_image_model:             '10. Social Images (carousels + F6 slides) — Fal.ai Model',
+  social_hook_image_model:        '10. Social Images (carousels + F6 slides) — Fal.ai Model', // legacy stepName
 }
 
 /** Maps DB stepNumber → visual display number shown in the badge. */

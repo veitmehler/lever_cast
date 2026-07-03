@@ -46,6 +46,16 @@ export function formatScheduledDate(date: Date, timeZone: string): string {
   }).format(date)
 }
 
+/**
+ * UTC calendar day (YYYY-MM-DD) of a date. Used for date-only content dates
+ * (topic.scheduledDate is stored at UTC midnight) so the social run day matches
+ * the dashboard content plan (which also buckets by UTC date) — avoids the
+ * one-day shift a timezone conversion of UTC-midnight would cause.
+ */
+export function utcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
 /** GHL rejects schedule dates in the past; require at least this much lead time. */
 export const GHL_MIN_SCHEDULE_LEAD_MS = 10 * 60 * 1000
 

@@ -1,6 +1,6 @@
 import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
-import { formatScheduledDate } from './schedule'
+import { formatScheduledDate, utcDateKey } from './schedule'
 
 export interface EnqueueSocialAutomationOpts {
   userId: string
@@ -13,8 +13,10 @@ export interface EnqueueSocialAutomationOpts {
 export async function enqueueSocialAutomation(
   opts: EnqueueSocialAutomationOpts,
 ): Promise<{ runId: string; enqueued: boolean; message?: string }> {
-  const timeZone = opts.timeZone ?? 'America/New_York'
-  const scheduledDate = formatScheduledDate(opts.publishingDate, timeZone)
+  // Article content dates are date-only (UTC midnight); use the UTC calendar day
+  // so the social run day matches the dashboard content plan (and the correct
+  // weekday matrix). Post times still apply the user's timezone via slotToUtc.
+  const scheduledDate = utcDateKey(opts.publishingDate)
 
   const inProgress = await prisma.socialAutomationRun.findFirst({
     where: {

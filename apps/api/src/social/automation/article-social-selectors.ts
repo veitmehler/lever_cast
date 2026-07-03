@@ -1,7 +1,20 @@
 import { prisma, readS3Object } from '@socioply/shared'
 import { logger } from '../../lib/logger'
-import type { ArticleContentContext, SlotContent } from './content'
+import type { ArticleContentContext, H2Section, SlotContent } from './content'
 import type { PostSource } from './weekly-matrix'
+
+/**
+ * Non-content H2s injected by enrichment (Key Takeaways / TOC / FAQ / etc.). These
+ * must never be chosen as a section for a social post. Superset of enrichment's
+ * GEO_EXCLUDE so the hook/image-carousel slots only use real article sections.
+ */
+const NON_CONTENT_HEADING =
+  /^(faq|frequently asked questions|conclusion|key takeaways|introduction|intro|references|sources|table of contents)\b/i
+
+/** Real content H2 sections (excludes Key Takeaways / FAQ / Conclusion / etc.). */
+function contentSections(ctx: ArticleContentContext): H2Section[] {
+  return ctx.h2Sections.filter((s) => !NON_CONTENT_HEADING.test(s.heading.trim()))
+}
 
 export interface ArticleSlotResult {
   slot: SlotContent
@@ -32,8 +45,9 @@ function sectionTextByHeading(ctx: ArticleContentContext, heading: string): Slot
 }
 
 function sectionAtIndex(ctx: ArticleContentContext, index: number): SlotContent {
-  if (ctx.h2Sections.length === 0) return { text: ctx.h2SectionText, title: ctx.h2Title }
-  const sec = ctx.h2Sections[index % ctx.h2Sections.length]
+  const secs = contentSections(ctx)
+  if (secs.length === 0) return { text: ctx.h2SectionText, title: ctx.h2Title }
+  const sec = secs[index % secs.length]
   return { text: sec.text, title: sec.heading }
 }
 
@@ -80,10 +94,11 @@ export async function resolveArticleSlot(
     return { slot, diagramBackground: null } // hook video uses Seedance, not the diagram image
   }
 
-  // art_hook_other — a section that is NOT the day's diagram-carousel section (diagram[0]).
+  // art_hook_other — a real content section that is NOT the day's diagram-carousel
+  // section (diagram[0]); never a non-content section like "Key Takeaways".
   const diagramHeading = diagrams[0]?.sectionTitle?.trim()
-  const other =
-    ctx.h2Sections.find((s) => s.heading.trim() !== diagramHeading) ?? ctx.h2Sections[1] ?? ctx.h2Sections[0]
+  const secs = contentSections(ctx)
+  const other = secs.find((s) => s.heading.trim() !== diagramHeading) ?? secs[0]
   const slot: SlotContent = other
     ? { text: other.text, title: other.heading }
     : { text: ctx.h2SectionText, title: ctx.h2Title }

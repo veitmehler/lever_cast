@@ -23,6 +23,7 @@ const POST_TYPE_LABELS: Record<string, string> = {
   quote_video: 'Quote video',
   pitch_carousel: 'Pitch carousel',
   pitch_hook: 'Pitch hook',
+  tips_story: 'Tips story',
 }
 
 export type SpecPreviewPlatform = {

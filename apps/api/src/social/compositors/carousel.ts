@@ -631,3 +631,94 @@ export async function buildPitchSlidePng(
     .png()
     .toBuffer()
 }
+
+const BULLET_TITLE_Y      = 220
+const BULLET_TITLE_FONT   = 66
+const BULLET_LIST_TOP     = 440
+const BULLET_LIST_BOTTOM  = STORY_H - 180
+const BULLET_MARGIN_X     = 90
+
+/**
+ * Static 9:16 tips story: center-crop the background (the newsletter's overview
+ * cover), apply a dark overlay, render a title near the top and a left-aligned
+ * bulleted list below it. Font auto-fits so every bullet fits the safe region.
+ */
+export async function buildBulletStoryPng(
+  backgroundBuffer: Buffer,
+  title: string,
+  bullets: string[],
+): Promise<Buffer> {
+  const bg = await sharp(backgroundBuffer)
+    .resize(STORY_W, STORY_H, { fit: 'cover', position: 'centre' })
+    .png()
+    .toBuffer()
+
+  const items = bullets.map((b) => b.trim()).filter(Boolean)
+  const listHeight = BULLET_LIST_BOTTOM - BULLET_LIST_TOP
+
+  // Auto-fit: shrink font until every wrapped bullet fits the list region.
+  let fontSize = 46
+  let lineH = 62
+  let bulletGap = 26
+  let renderedBullets: string[][] = []
+  for (let fs = 46; fs >= 28; fs -= 2) {
+    const lh = Math.round(fs * 1.35)
+    const gap = Math.round(fs * 0.55)
+    const maxChars = Math.max(22, Math.round(34 * (fs / 46)))
+    const wrapped = items.map((b) => wrapText(b, maxChars, 4))
+    const total = wrapped.reduce((sum, lines) => sum + lines.length * lh + gap, 0)
+    if (total <= listHeight || fs === 28) {
+      fontSize = fs
+      lineH = lh
+      bulletGap = gap
+      renderedBullets = wrapped
+      break
+    }
+  }
+
+  // Build bullet tspans, tracking the running Y so multi-line bullets stack.
+  let y = BULLET_LIST_TOP + fontSize
+  const bulletSvg = renderedBullets
+    .map((lines) => {
+      const parts = lines.map((line, i) => {
+        const x = BULLET_MARGIN_X + (i === 0 ? 0 : 44)
+        const prefix = i === 0 ? '•  ' : ''
+        const tspan = `<tspan x="${x}" y="${y}">${escapeXml(`${prefix}${line}`)}</tspan>`
+        y += lineH
+        return tspan
+      })
+      y += bulletGap
+      return parts.join('')
+    })
+    .join('')
+
+  const titleLines = wrapText(title, 26, 2)
+  const titleTspans = titleLines
+    .map((line, i) => `<tspan x="${BULLET_MARGIN_X}" y="${BULLET_TITLE_Y + i * (BULLET_TITLE_FONT + 8)}">${escapeXml(line)}</tspan>`)
+    .join('')
+
+  const overlaySvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${STORY_W}" height="${STORY_H}">
+  <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.68)"/>
+  <text
+    font-family="${FONT_MEDIUM}"
+    font-size="${BULLET_TITLE_FONT}"
+    font-weight="bold"
+    fill="#FFFFFF"
+    text-anchor="start"
+  >${titleTspans}</text>
+  <text
+    font-family="${FONT_LIGHT}"
+    font-size="${fontSize}"
+    fill="#FFFFFF"
+    text-anchor="start"
+  >${bulletSvg}</text>
+</svg>`
+
+  const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()
+
+  return sharp(bg)
+    .composite([{ input: overlayPng, top: 0, left: 0 }])
+    .png()
+    .toBuffer()
+}

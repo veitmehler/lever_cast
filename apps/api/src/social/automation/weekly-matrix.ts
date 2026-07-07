@@ -88,6 +88,66 @@ export function sourceKind(source: PostSource): SourceKind {
 export const DEFAULT_ARTICLE_WEEKDAY: Weekday = 2
 export const DEFAULT_NEWSLETTER_WEEKDAY: Weekday = 1
 
+// ── Story posts (9:16, IG + FB, one companion story per feed slot) ──
+//
+// The Content Publishing API can't add link stickers to stories, so stories
+// promote the on-profile feed post (pitch types reuse the feed asset) or carry
+// standalone content (quote / newsletter tips). See Phase 8 in the plan.
+
+/** Story companion type for a feed slot. */
+export type StoryType =
+  | 'pitch_carousel' // promote the day's carousel feed post (reuses its asset)
+  | 'pitch_hook' // promote the day's hook-video feed post (reuses its asset)
+  | 'quote' // standalone quote story
+  | 'tips_bullets' // newsletter days: static tips bullets over the overview cover
+
+export interface StorySlot {
+  /** S1/S2/S3 — parallel to the feed P1/P2/P3 it trails. */
+  slotKey: string
+  storyType: StoryType
+  /** Feed slot hour this story trails (a small random offset is added at schedule time). */
+  anchorHour: number
+  /** Feed slotKey whose generated asset a pitch story reuses. */
+  promotesFeedKey?: string
+  /** Content source for pitch/quote resolution (mirrors the companion feed slot). */
+  source?: PostSource
+}
+
+export interface FeedEntry {
+  slotKey: string
+  daySlot: DaySlot
+}
+
+/**
+ * Derive the day's 3 companion story slots from its feed slots. Each feed post
+ * gets exactly one story that posts shortly after it:
+ *   - carousel  → pitch_carousel (reuses the carousel)
+ *   - hook_video → pitch_hook (reuses the hook clip)
+ *   - video_reel/quote → tips_bullets or quote (newsletter) / quote (article)
+ */
+export function storySlotsForDay(kind: SourceKind, feedEntries: FeedEntry[]): StorySlot[] {
+  return feedEntries.map((fe, i) => {
+    const slotKey = `S${i + 1}`
+    const { postType, hour, source } = fe.daySlot
+    if (postType === 'carousel') {
+      return { slotKey, storyType: 'pitch_carousel', anchorHour: hour, promotesFeedKey: fe.slotKey, source }
+    }
+    if (postType === 'hook_video') {
+      return { slotKey, storyType: 'pitch_hook', anchorHour: hour, promotesFeedKey: fe.slotKey, source }
+    }
+    if (kind === 'newsletter') {
+      // nl_overview (video_reel) → tips-bullets story; nl_tips (quote) → a
+      // distinct quote story sourced from the feature (avoids duplicating tips).
+      if (postType === 'video_reel') {
+        return { slotKey, storyType: 'tips_bullets', anchorHour: hour, source: 'nl_tips' }
+      }
+      return { slotKey, storyType: 'quote', anchorHour: hour, source: 'nl_feature' }
+    }
+    // Article day: the remaining slot (video_reel/key-takeaways) → a pull-quote story.
+    return { slotKey, storyType: 'quote', anchorHour: hour, source }
+  })
+}
+
 /** Resolve the slot list for a given source kind + ISO weekday, with sensible defaults. */
 export function matrixForDay(kind: SourceKind, isoWeekday: number): DaySlot[] {
   const wd = (isoWeekday >= 1 && isoWeekday <= 6 ? isoWeekday : null) as Weekday | null

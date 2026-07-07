@@ -7,6 +7,7 @@ import {
   renderCarouselSlide,
   renderDiagramExplainerSlide,
   loadContinuationArrow,
+  buildBulletStoryPng,
   DIAGRAM_EXPLAINER_TEXT,
   type CarouselSlidePlan,
 } from './compositors/carousel'
@@ -295,6 +296,61 @@ export async function regenerateCarouselSlide(opts: {
   })
 
   return { imageUrl: registered.url, mediaId: registered.mediaId }
+}
+
+export interface GeneratedTipsBulletStory {
+  postType: 'tips_story'
+  imageUrl: string
+  mediaId: string
+}
+
+/**
+ * Newsletter tips-bullet story (static 9:16). Uses the newsletter's overview
+ * cover image as the background with the Tips-of-the-Day bullets overlaid —
+ * no video, no AI generation.
+ */
+export async function generateTipsBulletStoryAsset(opts: {
+  userId: string
+  title: string
+  bullets: string[]
+  backgroundUrl?: string | null
+  jobId?: string
+}): Promise<GeneratedTipsBulletStory> {
+  const brand = await loadSocialBrandTheme(opts.userId)
+
+  // Background: the newsletter overview cover if available, else the brand logo
+  // on a neutral field (fallback via a solid dark canvas).
+  let bgBuffer: Buffer
+  if (opts.backgroundUrl) {
+    const resp = await fetch(opts.backgroundUrl)
+    bgBuffer = Buffer.from(await resp.arrayBuffer())
+  } else {
+    // Solid navy fallback so bullets always render on something.
+    const { default: sharp } = await import('sharp')
+    bgBuffer = await sharp({
+      create: { width: 1080, height: 1920, channels: 3, background: brand.primaryColor || '#011328' },
+    })
+      .png()
+      .toBuffer()
+  }
+
+  const buffer = await buildBulletStoryPng(bgBuffer, opts.title, opts.bullets)
+
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+  const registered = await registerSocialMedia({
+    userId: opts.userId,
+    buffer,
+    s3Key: `social/${opts.userId}/${jobId}/tips-story-${genId}.png`,
+    title: `Tips story — ${opts.title.slice(0, 40)}`,
+    altText: opts.bullets.join(' • ').slice(0, 200),
+    source: 'tips_story',
+    jobId,
+    width: 1080,
+    height: 1920,
+  })
+
+  return { postType: 'tips_story', imageUrl: registered.url, mediaId: registered.mediaId }
 }
 
 export async function generatePitchStoryAssets(opts: {

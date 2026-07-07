@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { uploadBufferWithKey } from '@socioply/shared'
 import { prisma } from '@socioply/shared'
 
-export type SocialMediaSource = 'quote_card' | 'carousel_slide' | 'pitch_story' | 'social_video'
+export type SocialMediaSource = 'quote_card' | 'carousel_slide' | 'pitch_story' | 'tips_story' | 'social_video'
 
 export interface RegisteredMedia {
   mediaId: string

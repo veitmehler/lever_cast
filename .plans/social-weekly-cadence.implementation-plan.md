@@ -115,3 +115,117 @@ Fallback rule baked in: when `diagramSection(n)` is null, the carousel slot beco
 - `apps/api/src/routes/newsletters.ts`: trigger newsletter social on approval.
 - `apps/api/src/social/automation/default-specs.ts` / `ensure-specs.ts`: deprecate flat 12-slot.
 - Tests across matrix, newsletter context, article selectors, run branching, triggers.
+
+---
+
+## Phase 8 — Story posts (IMPLEMENTED 2026-07-07)
+
+**Status: shipped.** Derived story matrix + processor added; 387 API tests pass.
+Files: `weekly-matrix.ts` (`StorySlot`, `storySlotsForDay`), `story-processor.ts` (new —
+`processStorySlot`, `storyOffsetMinutes`, pitch/quote/tips resolution), `generate-assets.ts`
+(`generateTipsBulletStoryAsset`), `compositors/carousel.ts` (`buildBulletStoryPng`),
+`media-register.ts` (`tips_story` source), `run.ts` (feed→story ordering, `priorAssets`
+hand-off, S1/S2/S3 keys, per-story retry), `SocialPreviewPanel.tsx` (`tips_story` label).
+Story slots derive 1:1 from feed slots; pitch stories reuse the companion feed asset via
+`loadPriorAssets`; each story schedules at its feed hour + a random 2–8 min offset.
+
+_Original discussion below._
+
+
+
+**Constraint that shapes everything:** the Instagram/Facebook Content Publishing API
+**cannot add link stickers** (or any interactive stickers) to stories. So stories can't
+link out — they **promote the full post on the profile** ("see the full carousel/video
+on our profile"), exactly like the existing S4 (`pitch_carousel`) / S6 (`pitch_hook`).
+
+**Platforms:** IG + FB stories only (`STORY_PLATFORMS`). **Format:** 9:16.
+
+**Timing:** each story posts a **randomized 2–8 minutes after** its related feed post
+(a per-story random offset), so it points followers to the fresh on-profile post.
+
+### Per-day story lineup (3/day)
+| Day | Story 1 | Story 2 | Story 3 |
+|---|---|---|---|
+| **Tue/Thu (article)** | Promote **diagram carousel** — S4 `pitch_carousel` (9:16 pitch over the carousel) | Promote **hook video** — S6 `pitch_hook` (hook clip 9:16 + pitch) | **Quote** story |
+| **Mon/Wed/Fri/Sat (newsletter)** | Promote **image carousel** — S4 `pitch_carousel` | **Tips bullet-point** story — *static* 9:16 with the newsletter **overview diagram** (cover/summary image) as the background (not a video), bullets = **Tips of the Day** | **Quote** story |
+
+Notes:
+- **Quote story every day** (Item 1): article days = a pull-quote from the article; newsletter
+  days = a quote (source TBD — pick a distinct source so it doesn't duplicate the feed "tips
+  quote" or the tips-bullet story, e.g. a feature-article pull-quote or fun-fact).
+- **Newsletter tips-bullet story** (Item 2): new compositor — a **static image background**
+  (the newsletter's overview/cover image, e.g. `summaryImageUrl`) with the Tips-of-the-Day
+  bullets overlaid (9:16), *instead of* a Fal video background. Reuse the reel bullet layout.
+
+### Implementation notes
+- Stories **reuse the day's feed asset** (carousel backgrounds / hook clip), like S4↔F4 and
+  S6↔F6 — so the run must generate the feed post first, then the story (dependency ordering +
+  passing `priorAssets` between slots; the legacy 12-slot flow did this via `SPEC_PROCESS_ORDER`).
+  The matrix run needs a feed→story ordering + asset hand-off.
+- New generator: **static bullet-point story** (image bg + bullet overlay) for the newsletter tips story.
+- Story slots extend the weekday matrix (or a parallel story matrix) with their own scheduled
+  offset (feed time + random 2–8 min) and `isStory: true`.
+
+### Open decisions
+- Quote-story source on **newsletter** days (avoid duplicating the tips content).
+- Whether the overview-diagram background is the newsletter **cover** (`summaryImageUrl`) or a
+  dedicated "topics overview" visual — confirm the exact asset.
+- Story CTA copy (see the Call-to-Action discussion — link-in-bio strategy).
+
+---
+
+## Phase 9 — Call-to-Action / link-in-bio (planned, 2026-07-07 discussion)
+
+**The constraint that decides the architecture:** individual feed posts can't carry a
+clickable link (except limited LinkedIn text), and — per the story constraint above — the
+API **cannot add link stickers to stories**. So the **only reliable clickable destination on
+every platform is the single profile bio link.** Every CTA, on every post and story, funnels
+through that one link. The job is therefore: (1) give each business one good bio destination,
+and (2) make our post/story copy drive people to it.
+
+### Where the bio page lives — GoHighLevel (decided)
+Build the bio page **inside the business's whitelabel GHL account**, not as our own hosted page.
+Rationale:
+- **Data already lives in GHL.** The newsletter audience is GHL contacts (tagged); booking is
+  GHL calendars. A GHL bio-page signup form → **tagged contact → the same audience our newsletter
+  campaigns already target** → the "social → subscribe → newsletter nurtures → books" flywheel is
+  automatic. No new plumbing.
+- **Domains/CNAME + SSL are native in GHL.** Per-business **custom domain** (better social branding)
+  with GHL handling SSL — avoids building per-tenant domain + cert infra ourselves.
+- **Consistent** with the GHL-centric stack (Omniply social + GHL email campaigns).
+
+**Key limitation that shapes the split:** GHL **funnels/pages are NOT creatable/editable via the
+public API** (only email/contacts/calendars are, which is all our current integration uses:
+`/emails/public/v2/locations/{locationId}/campaigns/...`). So the page is distributed as a
+**whitelabel snapshot** funnel loaded into each sub-account, and businesses tweak it in GHL.
+**Our app does not own the page content.**
+
+### App-side scope (small; independent of the snapshot — can build in parallel)
+1. **"Link in bio" URL** setting on `BrandSettings` — the business's bio-page URL.
+   - v1: **manual paste** (trivial, zero risk).
+   - later polish: **auto-fetch via GHL v2 Funnels API** (list funnels/pages → URL + custom domain).
+     Requires expanding our GHL integration beyond the email endpoints to the v2 funnels scope.
+   - Caveat either way: we can't set the IG/FB **profile** bio link via API — the business pastes
+     the URL into their profile manually. Auto-fetch only saves pasting into *our* settings.
+2. **Purposeful CTA copy** — extend the existing `socialCallToAction` (`{{call_to_action}}`) so every
+   post/story ends with a verbal "link in bio" CTA aligned to the business's **primary goal**
+   (default: **newsletter signup** = lead-gen flywheel; secondary: **book appointment**). Educational
+   posts get a soft "free weekly tips → link in bio"; occasional harder "ready to feel better? book → link in bio".
+
+### GHL-side / snapshot (the business + their GHL account own this — NOT app code)
+- Bio-page **funnel in the whitelabel snapshot** (Item 2 of the discussion) — the snapshot doesn't
+  exist yet; **not a blocker**, the app tracks can proceed and the page slots in when ready.
+- **Signup form tag = the newsletter audience tag** our campaigns already target (so signups auto-join
+  the newsletter). Provide the exact tag value when building the snapshot.
+- **Per-business custom domain** (CNAME + SSL handled by GHL).
+
+### Deferred (own features, don't block the bio page)
+- **Lead magnets on Google Drive** → visitor requests access → platform **auto-captures them as a GHL
+  lead**. Separate upcoming feature.
+- **Bookings** — give users different bio-page options (embed GHL calendar vs external link vs multiple);
+  user still deciding the model. Not a blocker.
+
+### Open decisions
+- Primary-CTA default + whether it's a single per-business setting or rotates by funnel stage.
+- Auto-fetch bio URL (GHL v2 Funnels API) now vs manual-paste-only for v1.
+- Story CTA copy wording (ties back to Phase 8).

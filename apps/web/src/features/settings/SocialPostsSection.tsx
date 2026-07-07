@@ -16,6 +16,8 @@ export function SocialPostsSection({ settings }: { settings: SettingsData }) {
     instagramVerified, setInstagramVerified,
     videoSpecialInstructions, setVideoSpecialInstructions,
     socialCallToAction, setSocialCallToAction,
+    socialPrimaryGoal, setSocialPrimaryGoal,
+    socialBioUrl, setSocialBioUrl,
     isUploadingSocialLogo,
     socialLogoFileInputRef,
     handleSocialLogoUpload,
@@ -154,21 +156,83 @@ export function SocialPostsSection({ settings }: { settings: SettingsData }) {
           )}
         </div>
 
-        {/* Call to Action */}
+        {/* Call to Action — link-in-bio strategy */}
         <div>
           <label className="block text-sm font-medium text-card-foreground mb-1">
             Call to Action
           </label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Describe what you want your social media posts to promote or drive people toward.
-            <br />Example: <span className="italic">&ldquo;Book a free consultation at acme.com&rdquo;</span> or <span className="italic">&ldquo;Download our free AI productivity guide&rdquo;</span>.
+          <p className="text-xs text-muted-foreground mb-3">
+            Posts and stories can&apos;t carry a clickable link, so every CTA drives people to the
+            link in your profile bio. Choose the goal your posts should push toward.
           </p>
-          <textarea
-            value={socialCallToAction}
-            onChange={(e) => setSocialCallToAction(e.target.value)}
-            rows={3}
-            placeholder="e.g. Book a free strategy call at acme.com/call"
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+
+          {/* Primary goal selector */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {([
+              { value: 'newsletter', label: 'Newsletter signup', hint: 'Grow your email list' },
+              { value: 'booking',    label: 'Book appointment',  hint: 'Drive bookings' },
+              { value: 'custom',     label: 'Custom',            hint: 'Write your own' },
+            ] as const).map((opt) => {
+              const active = socialPrimaryGoal === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSocialPrimaryGoal(opt.value)}
+                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                    active
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                      : 'border-input bg-background hover:border-primary/50'
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-card-foreground">{opt.label}</span>
+                  <span className="block text-xs text-muted-foreground">{opt.hint}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {socialPrimaryGoal === 'custom' || socialPrimaryGoal === '' ? (
+            <>
+              <p className="text-xs text-muted-foreground mb-2">
+                Describe what you want your posts to promote. It will be phrased as a
+                &ldquo;link in bio&rdquo; call to action.
+                <br />Example: <span className="italic">&ldquo;Download our free posture guide&rdquo;</span>.
+              </p>
+              <textarea
+                value={socialCallToAction}
+                onChange={(e) => setSocialCallToAction(e.target.value)}
+                rows={3}
+                placeholder="e.g. Grab our free 5-minute morning mobility routine"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
+              />
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              Your posts will invite followers to{' '}
+              <span className="font-medium text-card-foreground">
+                {socialPrimaryGoal === 'newsletter' ? 'subscribe to your newsletter' : 'book an appointment'}
+              </span>{' '}
+              via the link in your bio.
+            </p>
+          )}
+        </div>
+
+        {/* Link-in-bio URL */}
+        <div>
+          <label className="block text-sm font-medium text-card-foreground mb-1">
+            Link-in-bio URL
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">
+            Your link-in-bio page (e.g. your GoHighLevel page). Paste this URL into your Instagram &amp;
+            Facebook profile bio so the &ldquo;link in bio&rdquo; CTA works. Stored for reference.
+          </p>
+          <input
+            type="url"
+            value={socialBioUrl}
+            onChange={(e) => setSocialBioUrl(e.target.value)}
+            placeholder="https://links.yourbrand.com"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
 

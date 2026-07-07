@@ -59,6 +59,8 @@ export function useSettingsData() {
   const [instagramVerified, setInstagramVerified]       = useState(false)
   const [videoSpecialInstructions, setVideoSpecialInstructions] = useState('')
   const [socialCallToAction, setSocialCallToAction]             = useState('')
+  const [socialPrimaryGoal, setSocialPrimaryGoal]               = useState('')
+  const [socialBioUrl, setSocialBioUrl]                         = useState('')
   const [isUploadingLogo, setIsUploadingLogo]           = useState(false)
   const [isUploadingSocialLogo, setIsUploadingSocialLogo] = useState(false)
   const logoFileInputRef                                = useRef<HTMLInputElement>(null)
@@ -150,6 +152,8 @@ export function useSettingsData() {
           if (brand.instagramVerified != null) setInstagramVerified(Boolean(brand.instagramVerified))
           if (brand.videoSpecialInstructions) setVideoSpecialInstructions(brand.videoSpecialInstructions)
           if (brand.socialCallToAction)       setSocialCallToAction(brand.socialCallToAction)
+          if (brand.socialPrimaryGoal)        setSocialPrimaryGoal(brand.socialPrimaryGoal)
+          if (brand.socialBioUrl)             setSocialBioUrl(brand.socialBioUrl)
           // Structured address sub-fields
           if (brand.addressLine1)       setAddressLine1(brand.addressLine1)
           if (brand.addressLine2)       setAddressLine2(brand.addressLine2)
@@ -369,6 +373,8 @@ export function useSettingsData() {
           instagramVerified,
           videoSpecialInstructions: videoSpecialInstructions.trim() || null,
           socialCallToAction: socialCallToAction.trim() || null,
+          socialPrimaryGoal: socialPrimaryGoal || null,
+          socialBioUrl: socialBioUrl.trim() || null,
           addressLine1: addressLine1.trim() || null,
           addressLine2: addressLine2.trim() || null,
           addressLocality: addressLocality.trim() || null,
@@ -509,6 +515,8 @@ export function useSettingsData() {
     instagramVerified, setInstagramVerified,
     videoSpecialInstructions, setVideoSpecialInstructions,
     socialCallToAction, setSocialCallToAction,
+    socialPrimaryGoal, setSocialPrimaryGoal,
+    socialBioUrl, setSocialBioUrl,
     isUploadingLogo,
     isUploadingSocialLogo,
     logoFileInputRef,

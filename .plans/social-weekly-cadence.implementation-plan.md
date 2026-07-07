@@ -174,7 +174,22 @@ Notes:
 
 ---
 
-## Phase 9 — Call-to-Action / link-in-bio (planned, 2026-07-07 discussion)
+## Phase 9 — Call-to-Action / link-in-bio (app-side IMPLEMENTED 2026-07-07)
+
+**Status: app-side shipped.** NO prompt templates were modified — the existing
+`{{call_to_action}}` placeholder mechanism is reused; only the *value* injected into
+it changed (computed in `brand-theme.ts`).
+Files: `schema.prisma` + migration `20260707200000_social_bio_cta` (`socialPrimaryGoal`,
+`socialBioUrl` on BrandSettings), `brand-theme.ts` (`resolveSocialCta` — newsletter/booking
+presets emit "link in our bio" guidance; null/custom = legacy verbatim, backward-compatible),
+`brand-settings/route.ts` (allowed fields), `SocialPostsSection.tsx` (goal selector + bio-URL
+input), `useSettingsData.ts` (state/load/save). 391 API tests pass.
+Still GHL-side / deferred: the snapshot bio page, tag alignment, custom domain, bio-URL
+auto-fetch (GHL v2 Funnels API), Google-Drive lead magnets, booking options.
+
+_Original discussion below._
+
+
 
 **The constraint that decides the architecture:** individual feed posts can't carry a
 clickable link (except limited LinkedIn text), and — per the story constraint above — the

@@ -15,13 +15,43 @@ export interface SocialBrandTheme {
   logoUrl: string | null
   /** Client-specific instructions injected into the Fal.ai video reel prompt (e.g. style, restrictions). */
   videoSpecialInstructions: string
-  /** What the social posts should promote or drive toward — injected as {{call_to_action}}. */
+  /**
+   * The effective call-to-action injected as {{call_to_action}}. Derived from the
+   * business's primary goal (link-in-bio strategy) — see resolveSocialCta. Falls
+   * back to the raw custom text for backward compatibility.
+   */
   socialCallToAction: string
+  /** The business's link-in-bio page URL (reference — posts verbally say "link in bio"). */
+  socialBioUrl: string
   /** Brand voice fields — injected into caption and carousel prompts. */
   writingStyle: string
   businessDescription: string
   who: string
   industry: string
+}
+
+/**
+ * Resolve the effective {{call_to_action}} from the business's link-in-bio goal.
+ * Because feed posts and stories can't carry a clickable link, every CTA drives
+ * to the profile bio link. Presets emit LLM guidance that says "link in bio";
+ * a null/absent goal preserves the legacy behavior (raw custom text verbatim).
+ */
+export function resolveSocialCta(
+  goal: string | null | undefined,
+  customText: string,
+): string {
+  const linkPhrase = 'via the link in our bio'
+  switch (goal) {
+    case 'newsletter':
+      return `Encourage readers to subscribe to our free newsletter ${linkPhrase}.`
+    case 'booking':
+      return `Encourage readers to book an appointment with us ${linkPhrase}.`
+    case 'custom':
+      return customText
+    default:
+      // Legacy / unset — inject the raw custom text exactly as before.
+      return customText
+  }
 }
 
 export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandTheme> {
@@ -46,7 +76,8 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     instagramVerified: brand?.instagramVerified ?? false,
     logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
     videoSpecialInstructions: brand?.videoSpecialInstructions?.trim() ?? '',
-    socialCallToAction: brand?.socialCallToAction?.trim() ?? '',
+    socialCallToAction: resolveSocialCta(brand?.socialPrimaryGoal, brand?.socialCallToAction?.trim() ?? ''),
+    socialBioUrl: brand?.socialBioUrl?.trim() ?? '',
     writingStyle: settings?.writingStyle?.trim() ?? '',
     businessDescription: brand?.businessDescription?.trim() ?? '',
     who: brand?.who?.trim() ?? '',

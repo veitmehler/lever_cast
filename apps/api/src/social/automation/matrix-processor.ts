@@ -24,6 +24,14 @@ async function socialImageModel(): Promise<string | undefined> {
 }
 import type { AutomationLogContext } from './log-context'
 import { withSlotKey } from './log-context'
+import { withTimeout } from '../../lib/net/with-timeout'
+
+/**
+ * Hard deadline for one feed slot's full pipeline (resolve → generate →
+ * schedule → build posts). Backstop only — every external call inside is
+ * already individually timed out (Phase 1); this catches anything missed.
+ */
+const SLOT_DEADLINE_MS = 20 * 60 * 1000
 
 export interface ResolvedSlot {
   slot: SlotContent
@@ -178,33 +186,46 @@ export async function processMatrixSlot(opts: {
   })
 
   try {
-    const resolved = await resolveSlot(daySlot.source, ctx, run.jobId)
-    const assetJobId = `${run.jobId ?? run.newsletterId}-${slotKey}`
+    // Hard deadline backstop: every external call inside this pipeline is now
+    // individually timed out (Phase 1), but this catches anything we missed
+    // or a future call site that forgets to — no single slot can wedge the
+    // run past this ceiling. Sized generously above the worst-case legitimate
+    // chain (image gen retries + video gen retries + narration + ffmpeg).
+    const { assets, buildResult } = await withTimeout(
+      async () => {
+        const resolved = await resolveSlot(daySlot.source, ctx, run.jobId)
+        const assetJobId = `${run.jobId ?? run.newsletterId}-${slotKey}`
 
-    const assets = await generateMatrixAsset({
-      userId: run.userId,
-      assetJobId,
-      postType: daySlot.postType,
-      resolved,
-      contextTitle: ctx.contextTitle,
-      slideCount,
-      diagramLogoVariant,
-    })
+        const assets = await generateMatrixAsset({
+          userId: run.userId,
+          assetJobId,
+          postType: daySlot.postType,
+          resolved,
+          contextTitle: ctx.contextTitle,
+          slideCount,
+          diagramLogoVariant,
+        })
 
-    const scheduledAt = ensureFutureScheduleDate(slotToUtc(run.scheduledDate, daySlot.hour, 0, timeZone))
-    const syntheticSpec = { isStory: false, postType: daySlot.postType, slotKey } as unknown as SocialPostSpec
+        const scheduledAt = ensureFutureScheduleDate(slotToUtc(run.scheduledDate, daySlot.hour, 0, timeZone))
+        const syntheticSpec = { isStory: false, postType: daySlot.postType, slotKey } as unknown as SocialPostSpec
 
-    const buildResult = await buildPostsForSpec({
-      logCtx: specCtx,
-      spec: syntheticSpec,
-      assets,
-      scheduledAt,
-      articleCtx: captionCtxForSlot(resolved.slot, ctx.contextTitle),
-    })
+        const buildResult = await buildPostsForSpec({
+          logCtx: specCtx,
+          spec: syntheticSpec,
+          assets,
+          scheduledAt,
+          articleCtx: captionCtxForSlot(resolved.slot, ctx.contextTitle),
+        })
 
-    if (buildResult.failed > 0 && buildResult.built === 0) {
-      throw new Error(`All ${buildResult.failed} platform build(s) failed`)
-    }
+        if (buildResult.failed > 0 && buildResult.built === 0) {
+          throw new Error(`All ${buildResult.failed} platform build(s) failed`)
+        }
+
+        return { assets, buildResult }
+      },
+      SLOT_DEADLINE_MS,
+      `matrix-slot:${slotKey}`,
+    )
 
     await prisma.socialAutomationSpecResult.update({
       where: { runId_slotKey: { runId: run.id, slotKey } },

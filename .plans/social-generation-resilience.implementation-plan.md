@@ -71,7 +71,7 @@ Kills the root cause. A hang becomes a caught error, so the existing per-slot ha
 - 17 new tests (`lib/net/__tests__/with-timeout.test.ts`, `retry.test.ts`); full suite 408/408 passing.
 - **Not done in this pass** (deferred, not required to fix the incident): idempotency keys for retries (Fal calls are only retried on timeout/5xx before any charge is confirmed, so double-charge risk is low but not eliminated), LLM adapters don't get an additional external `withRetry` wrapper (the SDKs' own built-in retry already covers 429/5xx/timeout — stacking our retry on top risked retry storms).
 
-## Phase 2 — Contain the blast radius (concurrency & queue isolation)
+## Phase 2 — Contain the blast radius (concurrency & queue isolation) — IMPLEMENTED (2026-07-08)
 
 So one client's slow/hung run never blocks others.
 
@@ -80,6 +80,13 @@ So one client's slow/hung run never blocks others.
 - **Per-slot hard deadline** (`Promise.race`) as a backstop even if a call lacks its own timeout.
 - (Later) **per-tenant fairness** so one client can't monopolize the queue.
 - Touch: `worker.ts`, `queues/index.ts`, `matrix-processor.ts`/`story-processor.ts` (deadline wrapper).
+
+**Done:**
+- **Concurrency, not `batchSize`.** Investigated pg-boss v10 source directly: `socialGenerateHandler` (and every handler in this codebase) processes its `jobs` array with a sequential `for...of` — so raising `batchSize` alone would NOT let two runs process in parallel, it would just fetch more jobs into the same serial loop. pg-boss v10 also has **no `teamSize`/`teamConcurrency` option** (removed vs v9) — each `boss.work()` call spawns exactly one polling `Worker` instance (confirmed in `manager.js`'s `watch()`/`Worker.start()`). The documented-by-source pattern for N-way concurrency on one queue is **N independent `.work()` registrations** (each gets its own `worker.id`, polls and claims jobs independently — pg-boss's job-claim SQL already handles concurrent claims safely). `worker.ts` now registers `SOCIAL_GENERATE` **3 times** in a loop (`SOCIAL_GENERATE_CONCURRENCY = 3`) — this is the actual fix for "one client's hung run held the only slot and blocked everyone."
+  - **Not done:** the weighted-queue split (heavy media vs. light local-render slots as physically separate queues). This would require decomposing `runSocialAutomation`'s single-job-per-run for-loop into a per-slot job fan-out (each slot its own pg-boss job, with a coordinator aggregating completion) — a real architecture change, not a config change. Deferred as a distinct future phase given the risk of destabilizing the just-shipped Phase 8/9 story/CTA work; the 3-way concurrency bump already gives most of the practical benefit (3 different clients' runs no longer queue behind each other) without that risk.
+- **Per-slot hard deadline backstop** (`withTimeout` wrapping the full resolve→generate→build pipeline): `SLOT_DEADLINE_MS = 20 min` in `matrix-processor.ts` (feed slots — may include fresh Fal image/video generation with retries), `STORY_SLOT_DEADLINE_MS = 15 min` in `story-processor.ts` (stories mostly reuse an already-generated feed asset). Funnels into the existing per-slot catch → marks the slot failed → run continues, same as any other error.
+- **Closed a real gap the backstop's design was meant to catch**: `runFfmpeg`/`probeVideo` (`video/ffmpeg.ts`) used `execFile` with **no timeout** — a stuck/runaway ffmpeg process had no natural end. Added `timeout: 5 min` (ffmpeg) / `60s` (ffprobe). `downloadToFile` (used to reuse F2/F6 raw video for S2/S6) was also a bare `fetch()` with no timeout — added `AbortSignal.timeout(3 min)`.
+- No new unit tests added for the wiring itself (`worker.ts`/`matrix-processor.ts`/`story-processor.ts` have no existing unit tests — they're DB-orchestrating, not pure logic, consistent with this codebase's existing test coverage pattern); verified via `tsc` + full suite (408/408, no regressions) + a live staging regeneration smoke test after deploy.
 
 ## Phase 3 — Detect & auto-recover (sweeper + pg-boss config)
 

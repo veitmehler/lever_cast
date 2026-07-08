@@ -13,6 +13,16 @@ import { generateStoryCarouselVideo, generateStoryHookVideo } from '../generate-
 import type { MatrixRunContext } from './matrix-processor'
 import type { AutomationLogContext } from './log-context'
 import { withSlotKey } from './log-context'
+import { withTimeout } from '../../lib/net/with-timeout'
+
+/**
+ * Hard deadline for one story slot's full pipeline. Backstop only — every
+ * external call inside is already individually timed out (Phase 1). Shorter
+ * than the feed-slot deadline since pitch stories reuse an already-generated
+ * feed asset (no fresh Fal image/video generation) and tips/quote stories are
+ * local composites.
+ */
+const STORY_SLOT_DEADLINE_MS = 15 * 60 * 1000
 
 /** Story companion posts trail their feed post by a randomized 2–8 minutes. */
 export function storyOffsetMinutes(): number {
@@ -143,33 +153,41 @@ export async function processStorySlot(opts: {
   })
 
   try {
-    const assetJobId = `${run.jobId ?? run.newsletterId}-${story.slotKey}`
-    const assets = await generateStoryAsset({ run, story, ctx, priorAssets, assetJobId })
+    const { assets, buildResult } = await withTimeout(
+      async () => {
+        const assetJobId = `${run.jobId ?? run.newsletterId}-${story.slotKey}`
+        const assets = await generateStoryAsset({ run, story, ctx, priorAssets, assetJobId })
 
-    const scheduledAt = ensureFutureScheduleDate(
-      slotToUtc(run.scheduledDate, story.anchorHour, storyOffsetMinutes(), timeZone),
-    )
-    const syntheticSpec = { isStory: true, postType: assets.postType, slotKey: story.slotKey } as unknown as SocialPostSpec
+        const scheduledAt = ensureFutureScheduleDate(
+          slotToUtc(run.scheduledDate, story.anchorHour, storyOffsetMinutes(), timeZone),
+        )
+        const syntheticSpec = { isStory: true, postType: assets.postType, slotKey: story.slotKey } as unknown as SocialPostSpec
 
-    const captionText = resolveStoryContent(story, ctx)
-    const buildResult = await buildPostsForSpec({
-      logCtx: specCtx,
-      spec: syntheticSpec,
-      assets,
-      scheduledAt,
-      articleCtx: {
-        title: captionText.title ?? ctx.contextTitle,
-        introText: captionText.text,
-        keyTakeawaysText: captionText.text,
-        h2Sections: [{ heading: captionText.title ?? ctx.contextTitle, text: captionText.text }],
-        h2Title: captionText.title ?? ctx.contextTitle,
-        h2SectionText: captionText.text,
+        const captionText = resolveStoryContent(story, ctx)
+        const buildResult = await buildPostsForSpec({
+          logCtx: specCtx,
+          spec: syntheticSpec,
+          assets,
+          scheduledAt,
+          articleCtx: {
+            title: captionText.title ?? ctx.contextTitle,
+            introText: captionText.text,
+            keyTakeawaysText: captionText.text,
+            h2Sections: [{ heading: captionText.title ?? ctx.contextTitle, text: captionText.text }],
+            h2Title: captionText.title ?? ctx.contextTitle,
+            h2SectionText: captionText.text,
+          },
+        })
+
+        if (buildResult.failed > 0 && buildResult.built === 0) {
+          throw new Error(`All ${buildResult.failed} platform build(s) failed`)
+        }
+
+        return { assets, buildResult }
       },
-    })
-
-    if (buildResult.failed > 0 && buildResult.built === 0) {
-      throw new Error(`All ${buildResult.failed} platform build(s) failed`)
-    }
+      STORY_SLOT_DEADLINE_MS,
+      `story-slot:${story.slotKey}`,
+    )
 
     await prisma.socialAutomationSpecResult.update({
       where: { runId_slotKey: { runId: run.id, slotKey: story.slotKey } },

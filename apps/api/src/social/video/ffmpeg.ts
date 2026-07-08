@@ -51,9 +51,16 @@ export function dejaVuSansFontPath(): string {
   )
 }
 
+// A stuck/runaway ffmpeg process (corrupt input, filter hang) has no natural
+// end — bound it like every network call (Phase 1 of the resilience plan).
+// Generous: legitimate single operations (concat, overlay, crop) run in
+// seconds; only pathological input should ever approach this.
+const FFMPEG_TIMEOUT_MS = 5 * 60 * 1000
+
 export async function runFfmpeg(args: string[]): Promise<void> {
   await execFileAsync(ffmpegBin(), ['-y', ...args], {
     maxBuffer: 64 * 1024 * 1024,
+    timeout: FFMPEG_TIMEOUT_MS,
   })
 }
 
@@ -76,7 +83,7 @@ export async function probeVideo(filePath: string): Promise<VideoProbe> {
     '-of',
     'json',
     filePath,
-  ])
+  ], { timeout: 60_000 })
   const parsed = JSON.parse(stdout) as {
     streams?: Array<{ width?: number; height?: number; duration?: string }>
     format?: { duration?: string }
@@ -100,7 +107,7 @@ export async function withTempDir<T>(prefix: string, fn: (dir: string) => Promis
 }
 
 export async function downloadToFile(url: string, dest: string): Promise<void> {
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(3 * 60 * 1000) })
   if (!res.ok) throw new Error(`Failed to download ${url}: ${res.status}`)
   await fs.writeFile(dest, Buffer.from(await res.arrayBuffer()))
 }

@@ -35,6 +35,13 @@ import { newsletterSafetyHandler } from './handlers/newsletter-safety'
 import { newsletterNotifyHandler, NewsletterNotifyJobData } from './handlers/newsletter-notify'
 import type { NewsletterGenerateJobData } from './newsletter/enqueue'
 
+/**
+ * Number of concurrent social-generation runs across ALL clients. Bounded to
+ * respect droplet CPU/memory during ffmpeg-heavy video encoding — see the
+ * SOCIAL_GENERATE registration below for why this can't just be `batchSize`.
+ */
+const SOCIAL_GENERATE_CONCURRENCY = 3
+
 /** Wrap a pg-boss handler so uncaught errors are captured by Sentry. */
 function withSentry<T>(
   name: string,
@@ -173,11 +180,22 @@ async function main() {
     withSentry('generate-social-from-article', generateSocialFromArticleHandler),
   )
 
-  await boss.work<SocialGenerateJobData>(
-    QUEUES.SOCIAL_GENERATE,
-    { batchSize: 1 },
-    withSentry('social-generate', socialGenerateHandler),
-  )
+  // Concurrency, not batchSize: socialGenerateHandler processes its jobs array
+  // sequentially (for...of), so raising batchSize here would NOT let two runs
+  // process in parallel — pg-boss v10 has no teamSize/teamConcurrency option;
+  // the documented way to get N concurrent handler invocations for one queue
+  // is N independent `.work()` registrations (each spawns its own polling
+  // Worker). This is the fix for the 2026-07-08 incident: with batchSize:1 and
+  // a single registration, one client's hung/slow run held the only slot and
+  // blocked every other client's run. Bounded (not unbounded) so a burst of
+  // heavy video runs can't exhaust droplet CPU/memory.
+  for (let i = 0; i < SOCIAL_GENERATE_CONCURRENCY; i++) {
+    await boss.work<SocialGenerateJobData>(
+      QUEUES.SOCIAL_GENERATE,
+      { batchSize: 1 },
+      withSentry('social-generate', socialGenerateHandler),
+    )
+  }
 
   await boss.work<SocialDispatchJobData>(
     QUEUES.SOCIAL_DISPATCH,

@@ -218,7 +218,7 @@ show, and (b) new Sentry alerts for conditions nothing currently watches.
   `outcome`/`durationMs` fields these logs now emit — no further code change required to get
   there, just building the saved search/dashboard in Better Stack's UI.
 
-## Phase 5 — Graceful degradation (product-level)
+## Phase 5 — Graceful degradation (product-level) — IMPLEMENTED (2026-07-08)
 
 Deliver something useful during a provider outage.
 
@@ -226,6 +226,38 @@ Deliver something useful during a provider outage.
 - **Partial delivery** (already supported): surface failed slots in the preview with one-click retry (retry endpoint already exists) once the provider recovers.
 - **Provider/model failover**: secondary video/image provider or model when the primary degrades.
 - Touch: `matrix-processor.ts` (video→image fallback), preview UI (surface failed + retry — mostly present), model config.
+
+**Done:**
+- **`video_reel` → quote card fallback**, **`hook_video` → image carousel fallback**
+  (`matrix-processor.ts`'s `generateMatrixAsset`, now exported for testing): both video
+  post types depend entirely on Fal.ai (Seedance) — on failure, generate a plain image post
+  from the same slot content instead of losing the whole slot. Logged at `warn` so a fallback
+  firing stays visible even though the slot no longer "fails".
+  - If the fallback *also* fails (e.g. Fal is entirely down, not just video-specific), the
+    original video error is preserved as `.cause` on a combined error — a total-outage failure
+    reads as "video_reel fallback (quote card) also failed: <fallback error>", not an
+    unrelated-looking quote-card bug.
+  - **Cascading behavior verified correct with no extra code**: `pitch_carousel`/`pitch_hook`
+    story slots don't call Fal themselves — they reuse the feed slot's raw video via
+    `priorAssets`. If `hook_video` falls back to a carousel (no `hookRawVideoUrl` produced),
+    S6 (`pitch_hook`) still correctly fails with its existing "Feed hook clip required before
+    S6" dependency guard — a clean, informative failure rather than a crash. No changes needed
+    in `story-processor.ts`.
+  - 6 new unit tests (`matrix-processor-fallback.test.ts`) — the first tests written for this
+    file; unlike Phases 2/3's pure wiring, this is genuine new branching logic worth locking in.
+- **Partial delivery + one-click retry — confirmed already solid, no new code.** Verified
+  `SocialPreviewPanel.tsx` already shows a per-slot "Retry" button hitting
+  `/api/social-automation/:runId/regenerate/:slotKey` (the same `enqueueSocialRegenerate` path
+  tightened in Phase 3 — realistic `expireInSeconds`, corrected singletonKey-doesn't-dedupe
+  comment).
+- **Not done — provider/model failover, deliberately deferred.** A second, different AI
+  video/image provider is a real feature (new API integration, new system-key management UI,
+  new admin model-config plumbing, its own testing) — not a resilience patch that fits this
+  effort's scope or risk budget. The Fal 403 "Exhausted balance" incident was account-wide
+  (would affect a same-provider fallback model too), so the two fallbacks above (different
+  post *type*, same provider) are the meaningful near-term mitigation; true cross-provider
+  failover is a separate, deliberate future project if warranted.
+- 422 tests pass (6 new). api tsc clean.
 
 ## Phase 6 — Circuit breaker + backpressure
 

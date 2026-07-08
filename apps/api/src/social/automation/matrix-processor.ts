@@ -39,7 +39,7 @@ export interface ResolvedSlot {
 }
 
 /** Generate the asset for one matrix slot from already-resolved content. */
-async function generateMatrixAsset(opts: {
+export async function generateMatrixAsset(opts: {
   userId: string
   assetJobId: string
   postType: string
@@ -64,30 +64,98 @@ async function generateMatrixAsset(opts: {
       return { postType: 'quote', imageUrl: card.imageUrl }
     }
     case 'video_reel': {
-      const reel = await generateVideoReelAsset({
-        userId,
-        content: slot.text,
-        topic,
-        h2Content: slot.text,
-        jobId: assetJobId,
-      })
-      return { postType: 'video_reel', videoUrl: reel.videoUrl, rawVideoUrl: reel.rawVideoUrl }
+      try {
+        const reel = await generateVideoReelAsset({
+          userId,
+          content: slot.text,
+          topic,
+          h2Content: slot.text,
+          jobId: assetJobId,
+        })
+        return { postType: 'video_reel', videoUrl: reel.videoUrl, rawVideoUrl: reel.rawVideoUrl }
+      } catch (err) {
+        // Graceful degradation: video generation depends entirely on Fal.ai
+        // (Seedance). Rather than losing the whole slot to a video-specific
+        // outage/quota/bug, deliver a quote card from the same content —
+        // something posts instead of nothing. See Phase 5,
+        // .plans/social-generation-resilience.implementation-plan.md.
+        logger.warn(
+          { assetJobId, err },
+          '[matrix-processor] video_reel generation failed — falling back to quote card',
+        )
+        try {
+          const card = await generateQuoteCardAsset({
+            userId,
+            content: slot.text,
+            variant: 'feed',
+            quoteText: slot.quoteText,
+            jobId: assetJobId,
+          })
+          return { postType: 'quote', imageUrl: card.imageUrl }
+        } catch (fallbackErr) {
+          // Both paths failed (e.g. Fal is entirely down) — surface the
+          // fallback's error with the original video failure attached, so a
+          // total-outage failure doesn't read as an unrelated quote-card bug.
+          const combined = new Error(
+            `video_reel fallback (quote card) also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
+          )
+          combined.cause = err
+          throw combined
+        }
+      }
     }
     case 'hook_video': {
-      const hook = await generateHookVideoAsset({
-        userId,
-        content: slot.text,
-        title: topic,
-        slideCount,
-        jobId: assetJobId,
-      })
-      return {
-        postType: 'hook_video',
-        videoUrl: hook.videoUrl,
-        title: hook.title,
-        mediaUrls: hook.carouselImageUrls,
-        backgroundImageUrls: hook.carouselBackgroundImageUrls,
-        hookRawVideoUrl: hook.hookRawVideoUrl,
+      try {
+        const hook = await generateHookVideoAsset({
+          userId,
+          content: slot.text,
+          title: topic,
+          slideCount,
+          jobId: assetJobId,
+        })
+        return {
+          postType: 'hook_video',
+          videoUrl: hook.videoUrl,
+          title: hook.title,
+          mediaUrls: hook.carouselImageUrls,
+          backgroundImageUrls: hook.carouselBackgroundImageUrls,
+          hookRawVideoUrl: hook.hookRawVideoUrl,
+        }
+      } catch (err) {
+        // Same rationale as video_reel above: hook_video's Seedance intro is
+        // the most Fal-outage-prone part of the pipeline. Fall back to a plain
+        // image carousel from the same content. Any story slot that promotes
+        // THIS feed slot (S6/pitch_hook needs hookRawVideoUrl) will correctly
+        // fail with its existing "Feed hook clip required" dependency guard —
+        // no special-casing needed there.
+        logger.warn(
+          { assetJobId, err },
+          '[matrix-processor] hook_video generation failed — falling back to image carousel',
+        )
+        try {
+          const carousel = await generateCarouselAssets({
+            userId,
+            content: slot.text,
+            topic,
+            articleUrl: '',
+            slideCount,
+            jobId: assetJobId,
+            imageModel: await socialImageModel(),
+          })
+          return {
+            postType: 'carousel',
+            mediaUrls: carousel.imageUrls,
+            imageUrl: carousel.imageUrls[0],
+            title: carousel.slides[0]?.headline ?? topic,
+            backgroundImageUrls: carousel.backgroundImageUrls,
+          }
+        } catch (fallbackErr) {
+          const combined = new Error(
+            `hook_video fallback (image carousel) also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
+          )
+          combined.cause = err
+          throw combined
+        }
       }
     }
     case 'carousel':

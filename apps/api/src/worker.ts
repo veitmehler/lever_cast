@@ -26,6 +26,7 @@ import { socialGenerateHandler, SocialGenerateJobData } from './handlers/social-
 import { socialDispatchHandler, SocialDispatchJobData } from './handlers/social-dispatch'
 import { socialVideoGenerateHandler, SocialVideoGenerateJobData } from './handlers/social-video-generate'
 import { socialAutomationSafetyHandler } from './handlers/social-automation-safety'
+import { socialGenerationHealthHandler } from './handlers/social-generation-health'
 import { syndicationGenerateHandler, SyndicationGenerateJobData } from './handlers/syndication-generate'
 import { syndicationSafetyHandler } from './handlers/syndication-safety'
 import { promoEmailGenerateHandler, PromoEmailGenerateJobData } from './handlers/promo-email-generate'
@@ -87,6 +88,7 @@ async function main() {
   await boss.schedule(QUEUES.DB_BACKUP, '0 3 * * 0', {})              // Sunday 03:00 UTC
   await boss.schedule(QUEUES.PG_CONN_MONITOR, '*/15 * * * *', {})     // every 15 min
   await boss.schedule(QUEUES.SOCIAL_AUTOMATION_SAFETY, '*/5 * * * *', {}) // every 5 min
+  await boss.schedule(QUEUES.SOCIAL_GENERATION_HEALTH, '*/10 * * * *', {}) // every 10 min
   await boss.schedule(QUEUES.SYNDICATION_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.PROMO_EMAIL_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.NEWSLETTER_SAFETY, '*/10 * * * *', {})       // every 10 min
@@ -216,6 +218,14 @@ async function main() {
     { batchSize: 1 },
     withSentry('social-automation-safety', async () => {
       await socialAutomationSafetyHandler()
+    }),
+  )
+
+  await boss.work(
+    QUEUES.SOCIAL_GENERATION_HEALTH,
+    { batchSize: 1 },
+    withSentry('social-generation-health', async () => {
+      await socialGenerationHealthHandler()
     }),
   )
 

@@ -3,6 +3,7 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { calculateCost } from './cost-table'
 import type { LLMAdapter, LLMCallOptions, LLMResponse } from './adapter'
 import { LLMError } from './adapter'
+import { instrumentCall } from '../../lib/net/instrument'
 
 const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'
 
@@ -49,13 +50,15 @@ export class AnthropicAdapter implements LLMAdapter {
 
     try {
       const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS })
-      const response = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        ...(options.systemPrompt ? { system: options.systemPrompt } : {}),
-        messages: [{ role: 'user', content: options.userPrompt }],
-      })
+      const response = await instrumentCall({ provider: 'anthropic', op: `messages.create:${model}` }, () =>
+        client.messages.create({
+          model,
+          max_tokens: maxTokens,
+          temperature,
+          ...(options.systemPrompt ? { system: options.systemPrompt } : {}),
+          messages: [{ role: 'user', content: options.userPrompt }],
+        }),
+      )
 
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',

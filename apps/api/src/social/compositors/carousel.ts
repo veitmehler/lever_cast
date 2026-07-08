@@ -9,6 +9,7 @@ import type { SocialBrandTheme } from '../brand-theme'
 import { centeredTextLines, escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
 import { withTimeout } from '../../lib/net/with-timeout'
 import { withRetry } from '../../lib/net/retry'
+import { instrumentCall } from '../../lib/net/instrument'
 
 /** Bound Fal image calls so a hang can't wedge a run (see with-timeout.ts). */
 const FAL_IMAGE_TIMEOUT_MS = 3 * 60 * 1000
@@ -337,30 +338,32 @@ export async function generateCarouselBackground(
   // An empty prompt makes flux emit a black frame — always send something.
   const prompt = (imagePrompt || '').trim().slice(0, 2000) || FALLBACK_BG_PROMPT
 
-  const result = await withRetry(
-    () =>
-      withTimeout(
-        (signal) =>
-          fal.subscribe(model, {
-            input: {
-              prompt,
-              image_size: 'square_hd',
-              num_inference_steps: 4,
-              // These are benign on-brand marketing backgrounds; the safety checker
-              // false-positives on ordinary scene prompts and returns a black image.
-              enable_safety_checker: false,
-            },
-            pollInterval: 2000,
-            logs: false,
-            abortSignal: signal,
-          }),
-        FAL_IMAGE_TIMEOUT_MS,
-        `fal-image:${model}`,
-      ),
-    {
-      attempts: 2,
-      onRetry: (err) => logger.warn({ jobId, model, err }, '[carousel] fal image retrying after failure'),
-    },
+  const result = await instrumentCall({ provider: 'fal-ai', op: `image:${model}` }, () =>
+    withRetry(
+      () =>
+        withTimeout(
+          (signal) =>
+            fal.subscribe(model, {
+              input: {
+                prompt,
+                image_size: 'square_hd',
+                num_inference_steps: 4,
+                // These are benign on-brand marketing backgrounds; the safety checker
+                // false-positives on ordinary scene prompts and returns a black image.
+                enable_safety_checker: false,
+              },
+              pollInterval: 2000,
+              logs: false,
+              abortSignal: signal,
+            }),
+          FAL_IMAGE_TIMEOUT_MS,
+          `fal-image:${model}`,
+        ),
+      {
+        attempts: 2,
+        onRetry: (err) => logger.warn({ jobId, model, err }, '[carousel] fal image retrying after failure'),
+      },
+    ),
   )
 
   const data = result.data as { images?: Array<{ url: string }> }

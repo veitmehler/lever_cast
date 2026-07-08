@@ -3,6 +3,7 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { calculateCost } from './cost-table'
 import type { LLMAdapter, LLMCallOptions, LLMResponse } from './adapter'
 import { LLMError } from './adapter'
+import { instrumentCall } from '../../lib/net/instrument'
 
 const DEFAULT_MODEL = 'gemini-2.5-flash'
 
@@ -101,7 +102,9 @@ export class GeminiAdapter implements LLMAdapter {
       generationConfig: generationConfig as Parameters<GoogleGenerativeAI['getGenerativeModel']>[0]['generationConfig'],
     })
 
-    const result = await genModel.generateContent(options.userPrompt, { timeout: GEMINI_FETCH_TIMEOUT_MS })
+    const result = await instrumentCall({ provider: 'gemini', op: `generateContent:${model}` }, () =>
+      genModel.generateContent(options.userPrompt, { timeout: GEMINI_FETCH_TIMEOUT_MS }),
+    )
     const response = result.response
 
     if (response.promptFeedback?.blockReason) {
@@ -155,18 +158,20 @@ export class GeminiAdapter implements LLMAdapter {
       },
     }
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(GEMINI_FETCH_TIMEOUT_MS),
+    const res = await instrumentCall({ provider: 'gemini', op: `search:${model}` }, async () => {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(GEMINI_FETCH_TIMEOUT_MS),
+      })
+      if (!r.ok) {
+        const errBody = await r.json().catch(() => ({}))
+        const msg = errBody?.error?.message || `Gemini search API error ${r.status}`
+        throw Object.assign(new Error(msg), { status: r.status })
+      }
+      return r
     })
-
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}))
-      const msg = errBody?.error?.message || `Gemini search API error ${res.status}`
-      throw parseGeminiError(new Error(msg))
-    }
 
     const data = await res.json()
     const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''

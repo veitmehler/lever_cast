@@ -10,7 +10,7 @@ import { sendFailureAlert } from '../lib/alerts'
 // working through a slow slot must never look "stuck" to this sweeper before its
 // own internal deadline would have failed it first. Was 15 min, which sat BELOW
 // the 20-min feed backstop and risked the sweeper firing on a still-healthy run.
-const PROCESSING_STUCK_MS = 25 * 60 * 1000
+export const PROCESSING_STUCK_MS = 25 * 60 * 1000
 // Phase 2 raised SOCIAL_GENERATE to 3-way concurrency — a burst of legitimate
 // runs can now leave a healthy run queued in 'pending' for longer than before
 // this was tuned. Was 5 min (pre-dates the concurrency change).
@@ -18,7 +18,7 @@ const PENDING_STUCK_MS = 15 * 60 * 1000
 const SCHEDULING_STUCK_MS = 15 * 60 * 1000
 
 /** Bounded auto-recovery: give up and alert for manual review rather than retry forever. */
-const MAX_AUTO_RECOVER_ATTEMPTS = 2
+export const MAX_AUTO_RECOVER_ATTEMPTS = 2
 
 /**
  * Delete any orphaned SOCIAL_GENERATE pg-boss job(s) still referencing this run

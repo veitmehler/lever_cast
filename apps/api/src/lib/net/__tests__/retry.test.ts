@@ -32,6 +32,24 @@ describe('isRetryableNetworkError', () => {
     expect(isRetryableNetworkError(new Error('Forbidden'))).toBe(false)
     expect(isRetryableNetworkError(new Error('validation failed'))).toBe(false)
   })
+
+  it('sees through .cause — instrumentCall wraps a TimeoutError in a plain Error', () => {
+    // Regression: instrumentCall (lib/net/instrument.ts) re-throws a `new
+    // Error(...)` with the original attached via `.cause` so the message can
+    // be enriched. Without cause-traversal, a wrapped TimeoutError would be
+    // misclassified as non-retryable and break e.g. image-generation.ts's
+    // outer retry loop.
+    const wrapped = new Error('fal-ai image failed after 180000ms: op timed out after 180000ms')
+    wrapped.cause = new TimeoutError('op', 180000)
+    expect(isRetryableNetworkError(wrapped)).toBe(true)
+  })
+
+  it('sees through .cause for a wrapped status-bearing error too', () => {
+    const original = Object.assign(new Error('Forbidden'), { status: 403 })
+    const wrapped = new Error('fal-ai image (403) failed after 50ms: Forbidden')
+    wrapped.cause = original
+    expect(isRetryableNetworkError(wrapped)).toBe(false) // 403 stays non-retryable through the wrapper
+  })
 })
 
 describe('withRetry', () => {

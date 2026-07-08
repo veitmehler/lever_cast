@@ -1,3 +1,5 @@
+import { instrumentCall } from '../net/instrument'
+
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1'
 
 // Bare fetch() has no default timeout — a hung ElevenLabs request would hang
@@ -23,27 +25,29 @@ async function elevenFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${ELEVENLABS_BASE}${path}`, {
-    signal: AbortSignal.timeout(ADMIN_TIMEOUT_MS),
-    ...init,
-    headers: {
-      'xi-api-key': apiKey,
-      ...(init?.headers ?? {}),
-    },
-  })
+  return instrumentCall({ provider: 'elevenlabs', op: path }, async () => {
+    const res = await fetch(`${ELEVENLABS_BASE}${path}`, {
+      signal: AbortSignal.timeout(ADMIN_TIMEOUT_MS),
+      ...init,
+      headers: {
+        'xi-api-key': apiKey,
+        ...(init?.headers ?? {}),
+      },
+    })
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    if (res.status === 401) throw new Error(`ElevenLabs auth failed (401): ${body.slice(0, 200) || 'no details'}`)
-    if (res.status === 403) {
-      throw new Error(
-        'ElevenLabs denied this request. Instant Voice Cloning requires a paid ElevenLabs plan.',
-      )
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      if (res.status === 401) throw new Error(`ElevenLabs auth failed (401): ${body.slice(0, 200) || 'no details'}`)
+      if (res.status === 403) {
+        throw new Error(
+          'ElevenLabs denied this request. Instant Voice Cloning requires a paid ElevenLabs plan.',
+        )
+      }
+      throw new Error(`ElevenLabs API error (${res.status}): ${body.slice(0, 200)}`)
     }
-    throw new Error(`ElevenLabs API error (${res.status}): ${body.slice(0, 200)}`)
-  }
 
-  return res.json() as Promise<T>
+    return res.json() as Promise<T>
+  })
 }
 
 export async function verifyElevenLabsKey(apiKey: string): Promise<{ ok: true; subscription?: string }> {
@@ -66,24 +70,26 @@ export async function cloneElevenLabsVoice(opts: {
   form.append('name', opts.name)
   form.append('files', new Blob([opts.sampleBuffer]), opts.filename)
 
-  const res = await fetch(`${ELEVENLABS_BASE}/voices/add`, {
-    method: 'POST',
-    headers: { 'xi-api-key': opts.apiKey },
-    body: form,
-    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-  })
+  return instrumentCall({ provider: 'elevenlabs', op: 'voices/add' }, async () => {
+    const res = await fetch(`${ELEVENLABS_BASE}/voices/add`, {
+      method: 'POST',
+      headers: { 'xi-api-key': opts.apiKey },
+      body: form,
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+    })
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    if (res.status === 403) {
-      throw new Error(
-        'Voice cloning requires a paid ElevenLabs plan (IVC). Upgrade your account or select an existing voice.',
-      )
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      if (res.status === 403) {
+        throw new Error(
+          'Voice cloning requires a paid ElevenLabs plan (IVC). Upgrade your account or select an existing voice.',
+        )
+      }
+      throw new Error(`ElevenLabs clone failed (${res.status}): ${body.slice(0, 200)}`)
     }
-    throw new Error(`ElevenLabs clone failed (${res.status}): ${body.slice(0, 200)}`)
-  }
 
-  return res.json() as Promise<CloneVoiceResult>
+    return res.json() as Promise<CloneVoiceResult>
+  })
 }
 
 export async function synthesizeSpeech(opts: {
@@ -95,31 +101,33 @@ export async function synthesizeSpeech(opts: {
   similarityBoost?: number
   speed?: number
 }): Promise<Buffer> {
-  const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': opts.apiKey,
-      'Content-Type': 'application/json',
-      Accept: 'audio/mpeg',
-    },
-    body: JSON.stringify({
-      text: opts.text.slice(0, 5000),
-      model_id: opts.modelId ?? 'eleven_multilingual_v2',
-      voice_settings: {
-        stability: opts.stability ?? 0.5,
-        similarity_boost: opts.similarityBoost ?? 0.75,
-        speed: opts.speed ?? 1.0,
+  return instrumentCall({ provider: 'elevenlabs', op: 'tts' }, async () => {
+    const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': opts.apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
       },
-    }),
-    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+      body: JSON.stringify({
+        text: opts.text.slice(0, 5000),
+        model_id: opts.modelId ?? 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: opts.stability ?? 0.5,
+          similarity_boost: opts.similarityBoost ?? 0.75,
+          speed: opts.speed ?? 1.0,
+        },
+      }),
+      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    })
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`ElevenLabs TTS failed (${res.status}): ${body.slice(0, 200)}`)
+    }
+
+    return Buffer.from(await res.arrayBuffer())
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`ElevenLabs TTS failed (${res.status}): ${body.slice(0, 200)}`)
-  }
-
-  return Buffer.from(await res.arrayBuffer())
 }
 
 export interface CharacterAlignment {
@@ -147,43 +155,45 @@ export async function synthesizeSpeechWithTimestamps(opts: {
   similarityBoost?: number
   speed?: number
 }): Promise<TimestampedSpeechResult> {
-  const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}/with-timestamps`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': opts.apiKey,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      text: opts.text.slice(0, 5000),
-      model_id: opts.modelId ?? 'eleven_multilingual_v2',
-      voice_settings: {
-        stability: opts.stability ?? 0.5,
-        similarity_boost: opts.similarityBoost ?? 0.75,
-        speed: opts.speed ?? 1.0,
+  return instrumentCall({ provider: 'elevenlabs', op: 'tts-timestamps' }, async () => {
+    const res = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${opts.voiceId}/with-timestamps`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': opts.apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-    }),
-    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+      body: JSON.stringify({
+        text: opts.text.slice(0, 5000),
+        model_id: opts.modelId ?? 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: opts.stability ?? 0.5,
+          similarity_boost: opts.similarityBoost ?? 0.75,
+          speed: opts.speed ?? 1.0,
+        },
+      }),
+      signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+    })
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`ElevenLabs TTS with timestamps failed (${res.status}): ${body.slice(0, 200)}`)
+    }
+
+    const data = (await res.json()) as AudioWithTimestampsResponse
+    if (!data.audio_base64) {
+      throw new Error('ElevenLabs TTS with timestamps returned no audio')
+    }
+    if (
+      !data.alignment?.characters?.length ||
+      !data.alignment.character_end_times_seconds?.length
+    ) {
+      throw new Error('ElevenLabs TTS with timestamps returned no alignment data')
+    }
+
+    return {
+      audio: Buffer.from(data.audio_base64, 'base64'),
+      alignment: data.alignment,
+    }
   })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`ElevenLabs TTS with timestamps failed (${res.status}): ${body.slice(0, 200)}`)
-  }
-
-  const data = (await res.json()) as AudioWithTimestampsResponse
-  if (!data.audio_base64) {
-    throw new Error('ElevenLabs TTS with timestamps returned no audio')
-  }
-  if (
-    !data.alignment?.characters?.length ||
-    !data.alignment.character_end_times_seconds?.length
-  ) {
-    throw new Error('ElevenLabs TTS with timestamps returned no alignment data')
-  }
-
-  return {
-    audio: Buffer.from(data.audio_base64, 'base64'),
-    alignment: data.alignment,
-  }
 }

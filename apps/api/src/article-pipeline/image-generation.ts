@@ -10,6 +10,7 @@ import { logger } from '../lib/logger'
 import { loadPromptTemplate } from './enrichment/prompt-template'
 import { withTimeout } from '../lib/net/with-timeout'
 import { isRetryableNetworkError } from '../lib/net/retry'
+import { instrumentCall } from '../lib/net/instrument'
 
 const DEFAULT_FAL_MODEL = 'fal-ai/flux-pro'
 const MAX_RETRIES = 3
@@ -66,21 +67,23 @@ export async function generateFeaturedImage(
     try {
       fal.config({ credentials: apiKey })
 
-      const result = await withTimeout(
-        (signal) =>
-          fal.subscribe(falModel, {
-            input: {
-              prompt,
-              image_size: 'landscape_16_9',
-              num_inference_steps: 28,
-              guidance_scale: 3.5,
-            },
-            pollInterval: 3_000,
-            logs: false,
-            abortSignal: signal,
-          }),
-        FAL_IMAGE_TIMEOUT_MS,
-        `fal-image:${falModel}`,
+      const result = await instrumentCall({ provider: 'fal-ai', op: `image:${falModel}` }, () =>
+        withTimeout(
+          (signal) =>
+            fal.subscribe(falModel, {
+              input: {
+                prompt,
+                image_size: 'landscape_16_9',
+                num_inference_steps: 28,
+                guidance_scale: 3.5,
+              },
+              pollInterval: 3_000,
+              logs: false,
+              abortSignal: signal,
+            }),
+          FAL_IMAGE_TIMEOUT_MS,
+          `fal-image:${falModel}`,
+        ),
       )
 
       const imageUrl = extractImageUrl(result as FalResult)

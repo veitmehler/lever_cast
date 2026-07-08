@@ -3,6 +3,7 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { calculateCost } from './cost-table'
 import type { LLMAdapter, LLMCallOptions, LLMResponse } from './adapter'
 import { LLMError } from './adapter'
+import { instrumentCall } from '../../lib/net/instrument'
 
 const DEFAULT_MODEL = 'gpt-4o-mini'
 
@@ -48,12 +49,14 @@ export class OpenAIAdapter implements LLMAdapter {
       }
       messages.push({ role: 'user', content: options.userPrompt })
 
-      const response = await client.chat.completions.create({
-        model,
-        messages,
-        temperature,
-        ...(maxTokens ? { max_tokens: maxTokens } : {}),
-      })
+      const response = await instrumentCall({ provider: 'openai', op: `chat.completions.create:${model}` }, () =>
+        client.chat.completions.create({
+          model,
+          messages,
+          temperature,
+          ...(maxTokens ? { max_tokens: maxTokens } : {}),
+        }),
+      )
 
       const choice = response.choices[0]
       const text = choice?.message?.content ?? ''

@@ -3,6 +3,7 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { logger } from '../../lib/logger'
 import { withTimeout } from '../../lib/net/with-timeout'
 import { withRetry } from '../../lib/net/retry'
+import { instrumentCall } from '../../lib/net/instrument'
 
 /** Default Seedance v1 lite image-to-video at 720p (~$0.18–0.34 per 5s clip). */
 export const DEFAULT_SEEDANCE_I2V_MODEL = 'fal-ai/bytedance/seedance/v1/lite/image-to-video'
@@ -56,24 +57,26 @@ export async function generateSeedanceClip(opts: SeedanceOptions): Promise<strin
     ...(opts.imageUrl ? { image_url: opts.imageUrl } : {}),
   }
 
-  const result = await withRetry(
-    () =>
-      withTimeout(
-        (signal) =>
-          fal.subscribe(model, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            input: input as any,
-            pollInterval: 4000,
-            logs: false,
-            abortSignal: signal,
-          }),
-        SEEDANCE_TIMEOUT_MS,
-        `seedance:${model}`,
-      ),
-    {
-      attempts: 2, // one retry — video generation is expensive; cap the blast radius
-      onRetry: (err) => logger.warn({ jobId: opts.jobId, model, err }, '[seedance] retrying after failure'),
-    },
+  const result = await instrumentCall({ provider: 'fal-ai', op: `seedance:${model}` }, () =>
+    withRetry(
+      () =>
+        withTimeout(
+          (signal) =>
+            fal.subscribe(model, {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              input: input as any,
+              pollInterval: 4000,
+              logs: false,
+              abortSignal: signal,
+            }),
+          SEEDANCE_TIMEOUT_MS,
+          `seedance:${model}`,
+        ),
+      {
+        attempts: 2, // one retry — video generation is expensive; cap the blast radius
+        onRetry: (err) => logger.warn({ jobId: opts.jobId, model, err }, '[seedance] retrying after failure'),
+      },
+    ),
   )
 
   const url = extractVideoUrl(result as SeedanceResult)

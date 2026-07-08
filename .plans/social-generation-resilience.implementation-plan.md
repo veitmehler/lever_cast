@@ -158,7 +158,7 @@ singletonKey prevents duplicate insertion" — corrected in place; not fixed fur
   verified via `tsc` (api + web) + full suite (408/408) + a live staging smoke test using
   `resumeIncomplete` against a real partially-completed run.
 
-## Phase 4 — Observability & alerting
+## Phase 4 — Observability & alerting — IMPLEMENTED (2026-07-08)
 
 Know before the client does.
 
@@ -167,6 +167,56 @@ Know before the client does.
 - **Metrics/dashboards**: per-provider latency/error/timeout rate, queue depth, oldest-active-job age, stuck-run count.
 - **New alerts**: stuck/stalled run, provider degradation (timeout/error spike), growing backlog. Reuse `sendFailureAlert` plumbing.
 - Touch: external call wrappers (timing), `run.ts`/processors (heartbeat), `lib/alerts.ts`, sweeper (stall alert).
+
+**Existing infra confirmed on staging first** (not assumed): `SENTRY_DSN` and `LOGTAIL_TOKEN`
+are both set. `Sentry.captureMessage`/`captureException` calls are live (`pgMonitorHandler`
+already uses this exact pattern), and every structured `logger.*` call already ships to
+Better Stack (Logtail) via `lib/logger.ts`'s transport config. So Phase 4 did **not** need a
+new dashboard UI — it needed (a) genuinely useful structured log lines for Better Stack to
+show, and (b) new Sentry alerts for conditions nothing currently watches.
+
+**Done:**
+- **`lib/net/instrument.ts`** (`instrumentCall(meta, fn)`) — wraps a call with timing +
+  structured success/failure logging, AND **enriches the thrown error's message** with
+  `provider op (status) failed after Nms: <original message>` before re-throwing. This was
+  the key design decision: `SocialAutomationSpecResult.error` (what the admin UI, DB, and
+  `sendFailureAlert` emails actually show) only ever stores `err.message` — a structured log
+  line alone wouldn't have turned the 403 incident's bare `"Forbidden"` into something
+  diagnosable. Enriching the message at the source means every downstream consumer gets the
+  context for free with zero changes elsewhere. The original message is preserved verbatim as
+  a suffix so `parseAnthropicError`/`parseOpenAIError`/`parseGeminiError`'s keyword-matching
+  classification (429/quota/etc.) keeps working unmodified.
+- **Correctness fix found while wiring this up**: `instrumentCall`'s enriched error is a
+  plain `Error`, so `err instanceof TimeoutError` and a provider's `.status` property would
+  be invisible to anything checking the *enriched* error (e.g. `image-generation.ts`'s outer
+  retry loop calls `isRetryableNetworkError` on whatever `instrumentCall` throws). Fixed by
+  giving `statusOf`/`isRetryableNetworkError` (`lib/net/retry.ts`) a `causeOf()` traversal —
+  they now look through `.cause` (which `instrumentCall` always sets to the original error) —
+  so a wrapped `TimeoutError` or a wrapped `{status: 403}` is still classified correctly two
+  layers of wrapping later. Covered by 2 new regression tests.
+- **Applied `instrumentCall` at every Phase-1 external-call site**: `seedance.ts` (Fal video),
+  `carousel.ts` + `image-generation.ts` (Fal image), all 4 `lib/elevenlabs/client.ts` fetches,
+  and the Anthropic/OpenAI/Gemini adapters' actual provider calls (both Gemini paths —
+  standard + search).
+- **New periodic health monitor** (`handlers/social-generation-health.ts`, cron
+  `*/10 * * * *`, mirrors `pg-monitor.ts`'s exact snapshot-log + threshold-alert shape):
+  logs `{queueDepth, oldestJobAgeSec, stuckRunCount, exhaustedLast24h}` every run, and fires
+  `Sentry.captureMessage` on SOCIAL_GENERATE backlog depth (warn ≥5, crit ≥15), oldest
+  job age relative to the 30-min expiry window (warn ≥20min, crit ≥30min — past-expiry
+  signals the expire mechanism itself may be failing), and **≥3 simultaneously stuck runs**
+  (deliberately higher than 1 — a single stuck run is already alerted per-run by the Phase 3
+  sweeper; this escalates specifically when it looks systemic, not one flaky run). Exported
+  `PROCESSING_STUCK_MS` / `MAX_AUTO_RECOVER_ATTEMPTS` from `social-automation-safety.ts` so
+  the two don't drift out of sync.
+- 8 new tests (`instrument.test.ts` + 2 cause-traversal cases in `retry.test.ts`); full suite
+  416/416 (api tsc clean, web tsc clean).
+- **Not done**: a true per-provider aggregated latency/error-rate metrics pipeline
+  (Prometheus/Grafana-style). Given this app's current scale and infra (one droplet, no
+  existing metrics stack), that's a disproportionate build; Sentry + Better Stack + the new
+  structured per-call logs are the pragmatic level here. If per-provider rate dashboards
+  become genuinely needed, Better Stack can already build them from the `provider`/`op`/
+  `outcome`/`durationMs` fields these logs now emit — no further code change required to get
+  there, just building the saved search/dashboard in Better Stack's UI.
 
 ## Phase 5 — Graceful degradation (product-level)
 

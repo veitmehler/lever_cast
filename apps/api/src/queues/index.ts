@@ -92,6 +92,7 @@ export const QUEUES = {
   SOCIAL_VIDEO_GENERATE: 'social-video-generate',
   SOCIAL_DISPATCH: 'social-dispatch',
   SOCIAL_AUTOMATION_SAFETY: 'social-automation-safety',
+  SOCIAL_GENERATION_HEALTH: 'social-generation-health',
   SYNDICATION_GENERATE: 'syndication-generate',
   SYNDICATION_SAFETY: 'syndication-safety',
   PROMO_EMAIL_GENERATE: 'promo-email-generate',

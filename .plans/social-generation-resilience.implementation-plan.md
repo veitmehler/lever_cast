@@ -1,6 +1,6 @@
 # Social Generation Resilience — Implementation Plan
 
-Status: **planned** (2026-07-08). Not started.
+Status: **all 6 phases implemented and deployed to staging** (2026-07-08).
 
 ## Why
 
@@ -259,13 +259,50 @@ Deliver something useful during a provider outage.
   failover is a separate, deliberate future project if warranted.
 - 422 tests pass (6 new). api tsc clean.
 
-## Phase 6 — Circuit breaker + backpressure
+## Phase 6 — Circuit breaker + backpressure — IMPLEMENTED (2026-07-08)
 
 Handle sustained provider outages (like the 403 credits incident).
 
 - **Per-provider circuit breaker**: after N consecutive timeouts/failures, open → fail fast + alert instead of hanging every job on a down provider; half-open probes to recover.
 - **Backpressure / queue caps** so an outage doesn't build an unbounded backlog.
 - Touch: new `lib/net/circuit-breaker.ts`, wrap provider clients.
+
+**Done:**
+- **`lib/net/circuit-breaker.ts`**: classic Fowler circuit breaker (`closed → open → half-open →
+  closed`/`open`). Per-provider (keyed by `provider` name — `fal-ai`, `elevenlabs`, `anthropic`,
+  `openai`, `gemini` — not per-model, matching the real incident: the 403 was account-wide,
+  affecting both Fal video and image). Defaults: opens after **5 consecutive failures**, **3 min**
+  cooldown before a half-open probe; a successful call (or probe) fully closes and resets the
+  streak; a failed probe reopens with a fresh cooldown. Injectable clock for deterministic tests.
+- **Wired into `instrumentCall`** (not each of the 7+ Phase-1/4 call sites individually): since
+  every external call already goes through `instrumentCall`, adding the breaker check there
+  automatically covers Fal video/image, all 4 ElevenLabs calls, and Anthropic/OpenAI/Gemini with
+  **zero additional per-call-site changes**. `assertClosed()` runs before `fn()` even starts —
+  an open circuit skips the underlying `withRetry`/`withTimeout`/outer-retry-loop machinery
+  entirely rather than paying any part of their cost.
+- **Why this adds real value on top of Phases 1-5**: those bound and gracefully handle any ONE
+  call's failure, but during a SUSTAINED outage (the 403 incident lasted far longer than any
+  single call's retry/timeout budget) every call still pays its full cost before failing. Once
+  open, subsequent calls fail in microseconds instead of minutes — under Phase 2's 3-way
+  concurrency, this means all 3 workers free up almost immediately during an outage instead of
+  each burning a full timeout, and Phase 5's fallback-to-image path (which also calls Fal) now
+  fails fast too instead of trying and re-discovering the same outage.
+- **`CircuitOpenError` classified as non-retryable** — confirmed via a regression test that the
+  existing conservative `isRetryableNetworkError` default (deny unless positively matched)
+  already handles this correctly with no code change; explicit test locks it in so a future
+  change to that function's defaults can't silently reintroduce retry-storms against an open
+  breaker.
+- 14 new tests (10 for the breaker's state machine, 3 integration tests in `instrument.test.ts`,
+  1 regression in `retry.test.ts`). 436 tests pass, tsc clean.
+- **Backpressure / queue caps — deliberately not implemented as a hard cap.** Evaluated and
+  decided against: `SOCIAL_GENERATE`'s enqueue pattern is inherently bounded (triggered by
+  content approval — a handful of articles/newsletters per user per day — or Phase 3's sweeper,
+  itself capped by `MAX_AUTO_RECOVER_ATTEMPTS`), not by unbounded external/user-request volume,
+  so there's no realistic path to the runaway backlog a hard cap would be guarding against at
+  this app's scale. Phase 4's `social-generation-health` cron already watches and alerts on queue
+  depth (`QUEUE_DEPTH_WARN`/`QUEUE_DEPTH_CRIT`) — the observability half of "backpressure" is
+  covered; enforcement (rejecting new enqueues) would be premature engineering without evidence
+  this queue can actually run away. Revisit if the health monitor's alerts ever actually fire.
 
 ---
 

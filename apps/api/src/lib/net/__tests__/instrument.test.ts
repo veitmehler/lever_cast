@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { instrumentCall } from '../instrument'
+import { getCircuitBreaker, resetAllCircuitBreakers } from '../circuit-breaker'
+
+beforeEach(() => resetAllCircuitBreakers())
 
 describe('instrumentCall', () => {
   it('resolves with the underlying result on success', async () => {
@@ -55,5 +58,65 @@ describe('instrumentCall', () => {
         throw 'a string failure'
       }),
     ).rejects.toThrow(/p o failed after \d+ms: a string failure/)
+  })
+})
+
+describe('instrumentCall — circuit breaker integration (Phase 6)', () => {
+  it('opens the provider circuit after 5 consecutive failures and short-circuits without calling fn', async () => {
+    const fn = async () => {
+      throw new Error('down')
+    }
+    for (let i = 0; i < 5; i++) {
+      await expect(instrumentCall({ provider: 'circuit-test', op: 'x' }, fn)).rejects.toThrow()
+    }
+    expect(getCircuitBreaker('circuit-test').getState()).toBe('open')
+
+    let called = false
+    await expect(
+      instrumentCall({ provider: 'circuit-test', op: 'x' }, async () => {
+        called = true
+        return 'should never get here'
+      }),
+    ).rejects.toThrow(/circuit-test circuit is open/)
+    expect(called).toBe(false)
+  })
+
+  it('a success resets the failure count so an open circuit requires a fresh streak', async () => {
+    const provider = 'circuit-test-2'
+    for (let i = 0; i < 4; i++) {
+      await expect(
+        instrumentCall({ provider, op: 'x' }, async () => {
+          throw new Error('down')
+        }),
+      ).rejects.toThrow()
+    }
+    expect(getCircuitBreaker(provider).getState()).toBe('closed') // 4 < threshold of 5
+
+    await instrumentCall({ provider, op: 'x' }, async () => 'ok') // resets the streak
+    expect(getCircuitBreaker(provider).getState()).toBe('closed')
+
+    for (let i = 0; i < 4; i++) {
+      await expect(
+        instrumentCall({ provider, op: 'x' }, async () => {
+          throw new Error('down')
+        }),
+      ).rejects.toThrow()
+    }
+    // Still only 4 in a row since the reset — still closed.
+    expect(getCircuitBreaker(provider).getState()).toBe('closed')
+  })
+
+  it('the circuit-open rejection carries a clear message, not the generic provider-op-duration enrichment', async () => {
+    const provider = 'circuit-test-3'
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        instrumentCall({ provider, op: 'x' }, async () => {
+          throw new Error('down')
+        }),
+      ).rejects.toThrow()
+    }
+    await expect(instrumentCall({ provider, op: 'x' }, async () => 'ok')).rejects.toThrow(
+      /circuit-test-3 circuit is open \(too many recent failures\)/,
+    )
   })
 })

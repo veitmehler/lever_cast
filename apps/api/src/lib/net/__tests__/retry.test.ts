@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { withRetry, isRetryableNetworkError } from '../retry'
 import { TimeoutError } from '../with-timeout'
+import { CircuitOpenError } from '../circuit-breaker'
 
 describe('isRetryableNetworkError', () => {
   it('treats TimeoutError as retryable', () => {
@@ -31,6 +32,10 @@ describe('isRetryableNetworkError', () => {
   it('defaults unknown errors to non-retryable', () => {
     expect(isRetryableNetworkError(new Error('Forbidden'))).toBe(false)
     expect(isRetryableNetworkError(new Error('validation failed'))).toBe(false)
+  })
+
+  it('treats CircuitOpenError as non-retryable (Phase 6) — an outer retry loop must not hammer an open circuit', () => {
+    expect(isRetryableNetworkError(new CircuitOpenError('fal-ai', 60_000))).toBe(false)
   })
 
   it('sees through .cause — instrumentCall wraps a TimeoutError in a plain Error', () => {

@@ -1,9 +1,11 @@
 import { logger } from '../logger'
 import { statusOf } from './retry'
+import { getCircuitBreaker } from './circuit-breaker'
 
 /**
- * Wrap an external call with structured timing/outcome logging AND enrich a
- * failure's message with provider/op/status/duration before re-throwing.
+ * Wrap an external call with structured timing/outcome logging, a per-provider
+ * circuit breaker, AND enrich a failure's message with provider/op/status/
+ * duration before re-throwing.
  *
  * Why enrich the message rather than just log: the 2026-07-08 Fal 403 incident
  * surfaced as a bare "Forbidden" in SocialAutomationSpecResult.error — no
@@ -17,20 +19,38 @@ import { statusOf } from './retry'
  * The original message is preserved verbatim as a suffix so callers that
  * pattern-match on it (parseAnthropicError/parseOpenAIError/parseGeminiError
  * keyword-match for 429/quota/etc.) keep working unmodified.
+ *
+ * Why a circuit breaker here specifically: Phases 1-5 bound and gracefully
+ * handle any ONE call's failure, but during a SUSTAINED outage (the 403
+ * incident lasted far longer than any single call's timeout budget) every
+ * call still pays its full timeout/retry cost before failing. Once a
+ * provider has failed `failureThreshold` times in a row, skip straight to
+ * failure — frees worker capacity immediately instead of one multi-minute
+ * timeout at a time. See lib/net/circuit-breaker.ts.
  */
 export async function instrumentCall<T>(
   meta: { provider: string; op: string },
   fn: () => Promise<T>,
 ): Promise<T> {
+  const breaker = getCircuitBreaker(meta.provider)
+  try {
+    breaker.assertClosed()
+  } catch (err) {
+    logger.warn({ provider: meta.provider, op: meta.op, outcome: 'circuit-open' }, '[net] call skipped — circuit open')
+    throw err
+  }
+
   const start = Date.now()
   try {
     const result = await fn()
+    breaker.onSuccess()
     logger.info(
       { provider: meta.provider, op: meta.op, durationMs: Date.now() - start, outcome: 'success' },
       '[net] call succeeded',
     )
     return result
   } catch (err) {
+    breaker.onFailure()
     const durationMs = Date.now() - start
     const status = statusOf(err)
     const rawMessage = err instanceof Error ? err.message : String(err)

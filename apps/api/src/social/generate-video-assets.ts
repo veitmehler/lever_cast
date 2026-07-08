@@ -577,7 +577,12 @@ export async function generateStoryCarouselVideo(opts: {
     // the narration's length instead of a random duration.
     let pitchDur = 10 + Math.floor(Math.random() * 5)
     let narrationAudioPath: string | undefined
-    const pitchNarrationText = pitchCopy.pitch?.trim()
+    // Narrate the pitch AND the CTA line ("watch the full video / view the full
+    // carousel on our profile") so the voiceover speaks the call to action too.
+    const pitchNarrationText = [pitchCopy.pitch, pitchCopy.cta]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(' ')
     if (voice.voiceoverEnabled && voice.apiKey && voice.voiceId && pitchNarrationText) {
       try {
         const narration = await buildPerSlideNarration({
@@ -731,7 +736,12 @@ export async function generateStoryHookVideo(opts: {
     // the slide holds for the narration's length instead of a random duration.
     let secondsPerSlide = 10 + Math.floor(Math.random() * 5)
     let narrationAudioPath: string | undefined
-    const pitchNarrationText = pitchCopy.pitch?.trim()
+    // Narrate the pitch AND the CTA line ("watch the full video / view the full
+    // carousel on our profile") so the voiceover speaks the call to action too.
+    const pitchNarrationText = [pitchCopy.pitch, pitchCopy.cta]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(' ')
     if (voice.voiceoverEnabled && voice.apiKey && voice.voiceId && pitchNarrationText) {
       try {
         const narration = await buildPerSlideNarration({

@@ -176,7 +176,7 @@ export default function NewsletterQueuePage() {
                           {r.subjectLine || r.topic.topic}
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          {new Date(r.topic.date).toLocaleDateString()}
+                          {new Date(r.topic.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                           {r.topic.calendar ? ` · ${r.topic.calendar.name}` : ''}
                         </div>
                       </div>

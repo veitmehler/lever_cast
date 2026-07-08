@@ -699,7 +699,7 @@ export async function buildBulletStoryPng(
 
   const overlaySvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${STORY_W}" height="${STORY_H}">
-  <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.68)"/>
+  <rect width="${STORY_W}" height="${STORY_H}" fill="rgba(0,0,0,0.82)"/>
   <text
     font-family="${FONT_MEDIUM}"
     font-size="${BULLET_TITLE_FONT}"

@@ -190,7 +190,7 @@ export default function NewsletterEditionPage({ params }: { params: Promise<{ id
             {nl.subjectLine || nl.topic.topic}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {new Date(nl.topic.date).toLocaleDateString()}
+            {new Date(nl.topic.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
             {nl.topic.calendar ? ` · ${nl.topic.calendar.name}` : ''} ·{' '}
             <span className="capitalize">{nl.status.replace(/_/g, ' ')}</span>
             {typeof completion === 'number' ? ` · ${completion}% complete` : ''}

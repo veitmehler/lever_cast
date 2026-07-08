@@ -1,5 +1,11 @@
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1'
 
+// Bare fetch() has no default timeout — a hung ElevenLabs request would hang
+// the calling slot forever (same class of bug as the 2026-07-08 Fal incident).
+const ADMIN_TIMEOUT_MS = 30_000 // verify/list voices
+const UPLOAD_TIMEOUT_MS = 60_000 // voice cloning (audio upload)
+const TTS_TIMEOUT_MS = 90_000 // narration synthesis (generation hot path)
+
 export interface ElevenLabsVoice {
   voice_id: string
   name: string
@@ -18,6 +24,7 @@ async function elevenFetch<T>(
   init?: RequestInit,
 ): Promise<T> {
   const res = await fetch(`${ELEVENLABS_BASE}${path}`, {
+    signal: AbortSignal.timeout(ADMIN_TIMEOUT_MS),
     ...init,
     headers: {
       'xi-api-key': apiKey,
@@ -63,6 +70,7 @@ export async function cloneElevenLabsVoice(opts: {
     method: 'POST',
     headers: { 'xi-api-key': opts.apiKey },
     body: form,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -103,6 +111,7 @@ export async function synthesizeSpeech(opts: {
         speed: opts.speed ?? 1.0,
       },
     }),
+    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -154,6 +163,7 @@ export async function synthesizeSpeechWithTimestamps(opts: {
         speed: opts.speed ?? 1.0,
       },
     }),
+    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
   })
 
   if (!res.ok) {

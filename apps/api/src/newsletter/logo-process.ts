@@ -45,6 +45,7 @@ async function birefnetCutout(sourceUrl: string): Promise<Buffer> {
     method: 'POST',
     headers: { Authorization: `Key ${falKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ image_url: sourceUrl }),
+    signal: AbortSignal.timeout(60_000),
   })
   if (!res.ok) throw new Error(`birefnet ${res.status}: ${(await res.text()).slice(0, 200)}`)
   const data = (await res.json()) as { image?: { url?: string } }

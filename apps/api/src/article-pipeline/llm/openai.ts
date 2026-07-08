@@ -6,6 +6,10 @@ import { LLMError } from './adapter'
 
 const DEFAULT_MODEL = 'gpt-4o-mini'
 
+// The SDK's own default is 10 minutes with 2 built-in retries — far too long
+// to hold a worker slot. See .plans/social-generation-resilience.implementation-plan.md.
+const OPENAI_TIMEOUT_MS = 120_000
+
 function parseOpenAIError(err: unknown): LLMError {
   const msg = err instanceof Error ? err.message : String(err)
   const lower = msg.toLowerCase()
@@ -37,7 +41,7 @@ export class OpenAIAdapter implements LLMAdapter {
     const maxTokens = options.maxTokens
 
     try {
-      const client = new OpenAI({ apiKey })
+      const client = new OpenAI({ apiKey, timeout: OPENAI_TIMEOUT_MS })
       const messages: OpenAI.ChatCompletionMessageParam[] = []
       if (options.systemPrompt) {
         messages.push({ role: 'system', content: options.systemPrompt })

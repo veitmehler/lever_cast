@@ -1,10 +1,19 @@
 import { fal } from '@fal-ai/client'
 import { getSystemApiKey } from '../../lib/system-keys'
 import { logger } from '../../lib/logger'
+import { withTimeout } from '../../lib/net/with-timeout'
+import { withRetry } from '../../lib/net/retry'
 
 /** Default Seedance v1 lite image-to-video at 720p (~$0.18–0.34 per 5s clip). */
 export const DEFAULT_SEEDANCE_I2V_MODEL = 'fal-ai/bytedance/seedance/v1/lite/image-to-video'
 export const DEFAULT_SEEDANCE_T2V_MODEL = 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
+
+/**
+ * Bound each Seedance call — the 2026-07-08 incident was exactly this call
+ * hanging with no timeout, wedging the worker's single social-generate slot
+ * for every client. 8 minutes covers legitimate video generation time.
+ */
+const SEEDANCE_TIMEOUT_MS = 8 * 60 * 1000
 
 export interface SeedanceOptions {
   prompt: string
@@ -47,12 +56,25 @@ export async function generateSeedanceClip(opts: SeedanceOptions): Promise<strin
     ...(opts.imageUrl ? { image_url: opts.imageUrl } : {}),
   }
 
-  const result = await fal.subscribe(model, {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    input: input as any,
-    pollInterval: 4000,
-    logs: false,
-  })
+  const result = await withRetry(
+    () =>
+      withTimeout(
+        (signal) =>
+          fal.subscribe(model, {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            input: input as any,
+            pollInterval: 4000,
+            logs: false,
+            abortSignal: signal,
+          }),
+        SEEDANCE_TIMEOUT_MS,
+        `seedance:${model}`,
+      ),
+    {
+      attempts: 2, // one retry — video generation is expensive; cap the blast radius
+      onRetry: (err) => logger.warn({ jobId: opts.jobId, model, err }, '[seedance] retrying after failure'),
+    },
+  )
 
   const url = extractVideoUrl(result as SeedanceResult)
   if (!url) throw new Error('Seedance returned no video URL')

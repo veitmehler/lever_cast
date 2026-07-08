@@ -6,6 +6,12 @@ import { LLMError } from './adapter'
 
 const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'
 
+// The SDK's own default is 10 minutes with 2 built-in retries (retried
+// automatically on timeout/429/5xx) — far too long to hold a worker slot for
+// a text call. 2 min covers the largest completions used here (maxTokens up
+// to 8000). See .plans/social-generation-resilience.implementation-plan.md.
+const ANTHROPIC_TIMEOUT_MS = 120_000
+
 function parseAnthropicError(err: unknown): LLMError {
   const msg = err instanceof Error ? err.message : String(err)
   const lower = msg.toLowerCase()
@@ -42,7 +48,7 @@ export class AnthropicAdapter implements LLMAdapter {
     const maxTokens = options.maxTokens ?? 8192
 
     try {
-      const client = new Anthropic({ apiKey })
+      const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS })
       const response = await client.messages.create({
         model,
         max_tokens: maxTokens,

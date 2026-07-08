@@ -27,7 +27,7 @@ function slotEntriesForRun(kind: 'article' | 'newsletter', scheduledDate: string
 
 export async function runSocialAutomation(
   runId: string,
-  opts?: { onlySlot?: string },
+  opts?: { onlySlot?: string; resumeIncomplete?: boolean },
 ): Promise<void> {
   const run = await prisma.socialAutomationRun.findUnique({
     where: { id: runId },
@@ -79,12 +79,24 @@ export async function runSocialAutomation(
     feedToRun = []
     storiesToRun = storySlots.filter((s) => s.slotKey === onlyStory)
     if (storiesToRun.length === 0) throw new Error(`Invalid slot key: ${onlyStory}`)
+  } else if (opts?.resumeIncomplete) {
+    // Auto-recovery from the stale-run sweeper: skip slots that already
+    // completed rather than throwing away their (Fal-billed) work and
+    // regenerating from scratch. Only 'completed' rows are skipped — 'failed'
+    // or missing rows are reprocessed.
+    const completed = await prisma.socialAutomationSpecResult.findMany({
+      where: { runId, status: 'completed' },
+      select: { slotKey: true },
+    })
+    const completedKeys = new Set(completed.map((c) => c.slotKey))
+    feedToRun = feedEntries.filter((e) => !completedKeys.has(e.slotKey))
+    storiesToRun = storySlots.filter((s) => !completedKeys.has(s.slotKey))
   }
 
   const ctx = await buildMatrixRunContext(run)
   const brand = await brandSettingsForUser(run.userId)
   const diagramLogoVariant: 'light' | 'dark' = brand?.diagramLogoVariant === 'dark' ? 'dark' : 'light'
-  const slideCount = await ensureRunSlideCount(runId, { reset: !opts?.onlySlot })
+  const slideCount = await ensureRunSlideCount(runId, { reset: !opts?.onlySlot && !opts?.resumeIncomplete })
 
   const baseCtx: AutomationLogContext = { runId, userId: run.userId, jobId: run.jobId ?? undefined }
   logger.info(
@@ -95,20 +107,34 @@ export async function runSocialAutomation(
       feed: feedToRun.length,
       stories: storiesToRun.length,
       onlySlot: opts?.onlySlot,
+      resumeIncomplete: opts?.resumeIncomplete,
     },
     '[social-automation] run started',
   )
 
-  if (!opts?.onlySlot) {
+  if (opts?.onlySlot) {
+    await prisma.post.deleteMany({
+      where: { automationRunId: runId, slotKey: opts.onlySlot, status: 'ready' },
+    })
+  } else if (opts?.resumeIncomplete) {
+    // Targeted cleanup: only wipe 'ready' posts for the slots being
+    // reprocessed — completed slots (and their posts) are left untouched.
+    const slotsToReprocess = [...feedToRun.map((e) => e.slotKey), ...storiesToRun.map((s) => s.slotKey)]
+    if (slotsToReprocess.length > 0) {
+      await prisma.post.deleteMany({
+        where: { automationRunId: runId, slotKey: { in: slotsToReprocess }, status: 'ready' },
+      })
+    }
+    await prisma.socialAutomationRun.update({
+      where: { id: runId },
+      data: { totalSpecs: feedEntries.length + storySlots.length },
+    })
+  } else {
     await prisma.socialAutomationSpecResult.deleteMany({ where: { runId } })
     await prisma.post.deleteMany({ where: { automationRunId: runId, status: 'ready' } })
     await prisma.socialAutomationRun.update({
       where: { id: runId },
       data: { completedSpecs: 0, failedSpecs: 0, totalSpecs: feedEntries.length + storySlots.length },
-    })
-  } else {
-    await prisma.post.deleteMany({
-      where: { automationRunId: runId, slotKey: opts.onlySlot, status: 'ready' },
     })
   }
 

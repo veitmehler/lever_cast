@@ -194,6 +194,9 @@ model SocialAutomationRun {
   error          String?                      @db.Text
   groupId        String?
   slideCount     Int? // shared F4/F6 carousel + hook slide count (6–12), set once per run
+  // Auto-recovery (social-automation-safety sweeper): bounded retry count for a
+  // stalled run before giving up and alerting for manual review.
+  autoRecoverAttempts Int                     @default(0)
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
   posts          Post[]

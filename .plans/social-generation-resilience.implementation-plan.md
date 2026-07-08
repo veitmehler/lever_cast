@@ -88,7 +88,7 @@ So one client's slow/hung run never blocks others.
 - **Closed a real gap the backstop's design was meant to catch**: `runFfmpeg`/`probeVideo` (`video/ffmpeg.ts`) used `execFile` with **no timeout** — a stuck/runaway ffmpeg process had no natural end. Added `timeout: 5 min` (ffmpeg) / `60s` (ffprobe). `downloadToFile` (used to reuse F2/F6 raw video for S2/S6) was also a bare `fetch()` with no timeout — added `AbortSignal.timeout(3 min)`.
 - No new unit tests added for the wiring itself (`worker.ts`/`matrix-processor.ts`/`story-processor.ts` have no existing unit tests — they're DB-orchestrating, not pure logic, consistent with this codebase's existing test coverage pattern); verified via `tsc` + full suite (408/408, no regressions) + a live staging regeneration smoke test after deploy.
 
-## Phase 3 — Detect & auto-recover (sweeper + pg-boss config)
+## Phase 3 — Detect & auto-recover (sweeper + pg-boss config) — IMPLEMENTED (2026-07-08)
 
 Automates the manual recovery done during the incidents.
 
@@ -96,6 +96,67 @@ Automates the manual recovery done during the incidents.
 - **Stale-run sweeper cron**: find runs `processing` with `updatedAt` older than N min → reset to `pending` + re-enqueue (bounded auto-retries, e.g. max 2) and reclaim orphaned jobs. **Must dedupe** — the hang incident piled 5 redundant `created` jobs; the sweeper must not blindly re-enqueue.
 - **Resumable retry**: on re-enqueue, skip already-`completed` slots instead of full regen (cost/time saver).
 - Touch: `enqueue.ts` (expireInSeconds), new `social/automation/sweeper.ts` + cron registration in `worker.ts`, `run.ts` (resume-incomplete-slots mode).
+
+**Key discovery: a sweeper already existed** — `handlers/social-automation-safety.ts`
+(`socialAutomationSafetyHandler`, cron `*/5 * * * *`, pre-dating this plan) already resets
+stuck `processing`/`pending` runs and re-enqueues. It almost certainly caused the "5 duplicate
+`created` jobs" symptom observed during the hang incident: it re-enqueued every 5 minutes
+without ever canceling the still-referenced stuck job, and (see below) `singletonKey`
+provides **no actual protection** against this under the queue's default policy. Phase 3
+became **fixing this existing sweeper**, not building a parallel one.
+
+**Root-caused via pg-boss v10 source (not assumed):** `singletonKey` only de-duplicates on
+queues created with `policy: 'short' | 'singleton' | 'stately'` (verified: `plans.js`'s
+`insertJob` is a bare `INSERT ... ON CONFLICT DO NOTHING`, and the only unique indexes that
+give that `ON CONFLICT` something to conflict against are `job_i1/i2/i3`, each `WHERE policy =
+'<that policy>'`). This codebase's queues are all created via a plain `boss.createQueue(name)`
+loop in `worker.ts` → default `'standard'` policy → `singletonKey` is inert. This directly
+contradicts a comment in `enqueue-dispatch.ts` claiming `boss.send()` "returns null when
+singletonKey prevents duplicate insertion" — corrected in place; not fixed further (see below).
+
+**Done:**
+- **Realistic `expireInSeconds`**: new `SOCIAL_GENERATE_EXPIRE_SECONDS = 30 min` (exported
+  from `enqueue.ts`), replacing 3 hours in both `enqueueSocialAutomation` /
+  `enqueueNewsletterSocialAutomation`, the safety handler's retry sends, and
+  `enqueue-dispatch.ts`'s single-slot regenerate send.
+- **`autoRecoverAttempts`** column on `SocialAutomationRun` (migration
+  `20260708210000_social_run_auto_recover`) — bounded at `MAX_AUTO_RECOVER_ATTEMPTS = 2`;
+  beyond that the sweeper marks the run `failed` + alerts for manual review instead of
+  retrying forever.
+- **Fixed the dedup gap** (`reclaimOrphanedSocialGenerateJob` in the safety handler):
+  before every reset+re-enqueue, explicitly `DELETE FROM pgboss.job WHERE name=... AND
+  state IN ('active','created') AND data->>'runId'=...` — the same manual step used during
+  live incident recovery, now automatic. Applied to both the `stuckProcessing` and
+  `stuckPending` branches; re-enqueues now reuse the **original** singleton key
+  (`social-generate-${jobId}` / `social-generate-nl-${newsletterId}`) instead of a
+  per-retry key, keeping the run's job identity stable across attempts.
+- **Resumable retry**: `runSocialAutomation` gains a `resumeIncomplete` mode — skips slots
+  with an existing `'completed'` `SocialAutomationSpecResult` row, only wipes `'ready'` posts
+  for the slots being reprocessed (not the whole run), and doesn't reset the slide count or
+  zero the progress counters. Threaded through `SocialGenerateJobData.resumeIncomplete` →
+  `socialGenerateHandler` → `runSocialAutomation`. The sweeper always sends
+  `resumeIncomplete: true`.
+- **Re-tuned thresholds for consistency with Phase 2**: `PROCESSING_STUCK_MS` 15→**25 min**
+  (must sit comfortably above the 20-min feed-slot hard-deadline backstop from Phase 2, or
+  the sweeper could fire on a run still legitimately inside its own bounded window).
+  `PENDING_STUCK_MS` 5→**15 min** (Phase 2's 3-way concurrency means a burst of legitimate
+  runs can now leave a healthy run queued longer before this was tuned).
+- **Fixed a cross-branch double-recovery bug this change surfaced**: `stuckPending` filtered
+  on `createdAt`, not `updatedAt`. A run reset to `'pending'` by the `stuckProcessing` branch
+  gets a fresh `updatedAt` but an unchanged (old) `createdAt` — so on the very next 5-minute
+  tick, before its freshly re-enqueued job could even be picked up, it would immediately
+  re-qualify as `stuckPending` too, double-incrementing `autoRecoverAttempts` and sending a
+  redundant duplicate job. Changed to `updatedAt`, matching the other two branches.
+- **Not done** (deliberately out of scope): adopting `policy: 'stately'` queue-wide (the more
+  robust DB-level fix for the singletonKey gap — would need testing `ON CONFLICT` return
+  semantics against every existing `send()` call site before rolling out); the same dedup
+  fix for `enqueue-dispatch.ts`'s single-slot regenerate (comment corrected, no code fix —
+  low-risk, user-initiated, single slot, narrow blast radius vs. the sweeper's multi-run
+  impact); the `stuckScheduling`/`SOCIAL_DISPATCH` branch (different subsystem, out of this
+  phase's SOCIAL_GENERATE-focused scope).
+- No new unit tests (this is DB/pg-boss-orchestrating code, same rationale as Phase 2);
+  verified via `tsc` (api + web) + full suite (408/408) + a live staging smoke test using
+  `resumeIncomplete` against a real partially-completed run.
 
 ## Phase 4 — Observability & alerting
 

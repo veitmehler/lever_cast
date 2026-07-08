@@ -7,20 +7,22 @@ import { runSocialAutomation } from '../social/automation/run'
 export interface SocialGenerateJobData {
   runId: string
   onlySlot?: string
+  /** Set by the stale-run sweeper: skip already-completed slots instead of a full regen. */
+  resumeIncomplete?: boolean
 }
 
 export async function socialGenerateHandler(
   jobs: PgBoss.Job<SocialGenerateJobData>[],
 ): Promise<void> {
   for (const job of jobs) {
-    const { runId, onlySlot } = job.data
+    const { runId, onlySlot, resumeIncomplete } = job.data
     logger.info(
-      { runId, onlySlot, pgBossJobId: job.id },
+      { runId, onlySlot, resumeIncomplete, pgBossJobId: job.id },
       '[social-generate] starting automation run',
     )
 
     try {
-      await runSocialAutomation(runId, onlySlot ? { onlySlot } : undefined)
+      await runSocialAutomation(runId, onlySlot ? { onlySlot } : { resumeIncomplete: !!resumeIncomplete })
     } catch (err) {
       logger.error({ runId, err }, '[social-generate] automation run failed')
 

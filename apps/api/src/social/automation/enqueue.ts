@@ -2,6 +2,17 @@ import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { formatScheduledDate, utcDateKey } from './schedule'
 
+/**
+ * How long pg-boss lets a SOCIAL_GENERATE job sit `active` before expiring it.
+ * Was 3 hours — the 2026-07-08 hang incident's job sat wedged for 13+ minutes
+ * before manual intervention; at 3h, pg-boss's own expire-and-retry safety net
+ * would never have fired within any reasonable window. 30 min comfortably
+ * covers a full 6-slot run (observed ~8 min typical; Phase 2's per-slot hard
+ * deadlines cap the worst case at 20 min feed / 15 min story) while still
+ * being realistic, not a multi-hour blind spot.
+ */
+export const SOCIAL_GENERATE_EXPIRE_SECONDS = 30 * 60
+
 export interface EnqueueSocialAutomationOpts {
   userId: string
   jobId: string
@@ -63,7 +74,7 @@ export async function enqueueSocialAutomation(
     { runId: run.id },
     {
       singletonKey: `social-generate-${opts.jobId}`,
-      expireInSeconds: 60 * 60 * 3,
+      expireInSeconds: SOCIAL_GENERATE_EXPIRE_SECONDS,
     },
   )
 
@@ -108,7 +119,7 @@ export async function enqueueNewsletterSocialAutomation(
   await boss.send(
     QUEUES.SOCIAL_GENERATE,
     { runId: run.id },
-    { singletonKey: `social-generate-nl-${opts.newsletterId}`, expireInSeconds: 60 * 60 * 3 },
+    { singletonKey: `social-generate-nl-${opts.newsletterId}`, expireInSeconds: SOCIAL_GENERATE_EXPIRE_SECONDS },
   )
 
   return { runId: run.id, enqueued: true }

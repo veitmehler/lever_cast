@@ -1,5 +1,6 @@
 import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
+import { SOCIAL_GENERATE_EXPIRE_SECONDS } from './enqueue'
 
 export async function enqueueSocialDispatch(
   runId: string,
@@ -65,14 +66,20 @@ export async function enqueueSocialRegenerate(
   }
 
   const boss = await getBoss()
-  // boss.send() returns null when singletonKey prevents duplicate insertion.
-  // Treat that as already-enqueued rather than a silent no-op.
+  // NOTE: singletonKey only de-duplicates on queues created with a
+  // 'short'/'singleton'/'stately' policy (verified against pg-boss v10
+  // source — see .plans/social-generation-resilience.implementation-plan.md
+  // Phase 3). SOCIAL_GENERATE uses the default 'standard' policy, so
+  // singletonKey here does NOT currently prevent a double-click from
+  // enqueueing two overlapping regenerations of the same slot. Low-risk
+  // (user-initiated, single slot) — left as a known gap rather than widening
+  // Phase 3's scope; candidate for the queue-policy hardening noted there.
   const jobId = await boss.send(
     QUEUES.SOCIAL_GENERATE,
     { runId, onlySlot: normalized },
     {
       singletonKey: `social-generate-${runId}-${normalized}`,
-      expireInSeconds: 60 * 60 * 3,
+      expireInSeconds: SOCIAL_GENERATE_EXPIRE_SECONDS,
     },
   )
 

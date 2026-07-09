@@ -47,6 +47,8 @@ export async function generateMatrixAsset(opts: {
   contextTitle: string
   slideCount: number
   diagramLogoVariant: 'light' | 'dark'
+  /** Wed/Sat brand-tinted carousel design (from the matrix DaySlot). */
+  designVariant?: 'brand_tint'
 }): Promise<SpecAssets> {
   const { userId, assetJobId, postType, resolved, contextTitle, slideCount, diagramLogoVariant } = opts
   const { slot } = resolved
@@ -169,6 +171,9 @@ export async function generateMatrixAsset(opts: {
         jobId: assetJobId,
         diagramBackground: resolved.diagramBackground ?? undefined,
         diagramLogoVariant,
+        // Wed/Sat only, from the matrix — the hook_video fallback carousel above
+        // deliberately does NOT pass this (Tue/Thu fallbacks stay classic).
+        designVariant: opts.designVariant,
         // Image-carousel backgrounds honor the shared social image model (Step 218).
         // Ignored when diagramBackground is set (diagram is the background).
         imageModel: await socialImageModel(),
@@ -272,6 +277,7 @@ export async function processMatrixSlot(opts: {
           contextTitle: ctx.contextTitle,
           slideCount,
           diagramLogoVariant,
+          designVariant: daySlot.designVariant,
         })
 
         const scheduledAt = ensureFutureScheduleDate(slotToUtc(run.scheduledDate, daySlot.hour, 0, timeZone))

@@ -6,6 +6,7 @@ import { getSystemApiKey } from '../../lib/system-keys'
 import { logger } from '../../lib/logger'
 import { generateFeaturedImage } from '../../article-pipeline/image-generation'
 import type { SocialBrandTheme } from '../brand-theme'
+import type { TintScheme } from './brand-tint'
 import { centeredTextLines, escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
 import { withTimeout } from '../../lib/net/with-timeout'
 import { withRetry } from '../../lib/net/retry'
@@ -35,6 +36,13 @@ export interface CarouselSlideInput {
   arrowBuffer?: Buffer | null
   /** F4 panel scheme: 'light' (dark diagram) → white panel/navy text; 'dark' → navy panel/white text. */
   diagramVariant?: 'light' | 'dark'
+  /**
+   * Wed/Sat brand-tint design (mutually exclusive with diagramMode): full-frame
+   * brand-color wash, centered text, logo bottom-right. See brand-tint.ts.
+   */
+  tint?: TintScheme
+  /** Pre-loaded light/dark logo variant for tinted slides (composited bottom-right). */
+  tintLogoBuffer?: Buffer | null
 }
 
 const SLIDE_SIZE = 1080
@@ -300,6 +308,87 @@ function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
 </svg>`
 }
 
+// ── Brand-tinted slides (Wed/Sat) ────────────────────────────────────────────
+// One uniform treatment for hook, content, and CTA slides: full-frame brand
+// wash at the scheme's opacity, headline + body centered as a single block both
+// axes, logo composited bottom-right (in renderCarouselSlide, not here — it's a
+// PNG buffer, not SVG). No org-name text watermark — the logo replaces it.
+
+// Text must stay clear of the bottom-right logo zone (logo ~140px wide + 48px
+// margins), so the centering region ends above it.
+const TINT_TEXT_TOP = 140
+const TINT_TEXT_BOTTOM = 880
+
+function buildTintedSlideOverlaySvg(input: CarouselSlideInput): string {
+  const { slide } = input
+  const tint = input.tint!
+
+  const headlineFontSz = 48
+  const headlineLineH = 62
+  const headBodyGap = 34
+  const paragraphGap = 16
+  const regionH = TINT_TEXT_BOTTOM - TINT_TEXT_TOP
+
+  const headLines = slide.headlineText ? wrapText(slide.headlineText, 22, 4) : []
+  const headlineBlockH = headLines.length * headlineLineH
+
+  // Auto-fit the body: shrink until the whole block fits the centering region.
+  const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
+  let bodyFontSz = 30
+  let bodyLineH = 42
+  let bodyGroups: string[][] = []
+  let bodyBlockH = 0
+  for (let fs = 30; fs >= 22; fs -= 2) {
+    const lineH = Math.round(fs * 1.4)
+    const maxChars = Math.max(24, Math.round(34 * (fs / 30)))
+    const groups = paragraphs.map((p) => wrapText(p.trim(), maxChars, 99))
+    const lines = groups.reduce((n, g) => n + g.length, 0)
+    const gaps = groups.length > 0 ? (groups.length - 1) * paragraphGap : 0
+    const h = lines * lineH + gaps
+    const gap = headLines.length > 0 && lines > 0 ? headBodyGap : 0
+    bodyFontSz = fs
+    bodyLineH = lineH
+    bodyGroups = groups
+    bodyBlockH = h
+    if (headlineBlockH + gap + h <= regionH) break
+  }
+
+  const gapH = headLines.length > 0 && bodyBlockH > 0 ? headBodyGap : 0
+  const totalH = headlineBlockH + gapH + bodyBlockH
+  let currentY = TINT_TEXT_TOP + Math.max(0, Math.round((regionH - totalH) / 2))
+
+  const centerX = SLIDE_SIZE / 2
+  const elements: string[] = []
+
+  if (headLines.length > 0) {
+    elements.push(
+      `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${tint.textColor}">` +
+      centeredTextLines(headLines, centerX, currentY + headlineFontSz, headlineLineH) +
+      `</text>`,
+    )
+    currentY += headlineBlockH + gapH
+  }
+
+  const bodyTspans: string[] = []
+  for (const lines of bodyGroups) {
+    for (const line of lines) {
+      bodyTspans.push(`<tspan x="${centerX}" y="${currentY + bodyFontSz}">${escapeXml(line)}</tspan>`)
+      currentY += bodyLineH
+    }
+    currentY += paragraphGap
+  }
+  if (bodyTspans.length > 0) {
+    elements.push(
+      `<text text-anchor="middle" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${bodyTspans.join('')}</text>`,
+    )
+  }
+
+  return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="${tint.overlayColor}" fill-opacity="${tint.overlayOpacity}"/>
+  ${elements.join('\n  ')}
+</svg>`
+}
+
 async function downloadImage(url: string): Promise<Buffer> {
   const response = await fetch(url)
   if (!response.ok) throw new Error(`Failed to download carousel background: ${response.status}`)
@@ -404,17 +493,22 @@ export async function renderCarouselSlide(
   input: CarouselSlideInput,
 ): Promise<Buffer> {
   let overlaySvg: string
-  switch (input.slide.type) {
-    case 'hook':
-      overlaySvg = buildHookSlideOverlaySvg(input)
-      break
-    case 'cta':
-      overlaySvg = buildCtaSlideOverlaySvg(input)
-      break
-    case 'content':
-    default:
-      overlaySvg = buildContentSlideOverlaySvg(input)
-      break
+  if (input.tint) {
+    // Brand-tint design: one uniform centered treatment for every slide type.
+    overlaySvg = buildTintedSlideOverlaySvg(input)
+  } else {
+    switch (input.slide.type) {
+      case 'hook':
+        overlaySvg = buildHookSlideOverlaySvg(input)
+        break
+      case 'cta':
+        overlaySvg = buildCtaSlideOverlaySvg(input)
+        break
+      case 'content':
+      default:
+        overlaySvg = buildContentSlideOverlaySvg(input)
+        break
+    }
   }
 
   const overlayPng = await sharp(Buffer.from(overlaySvg)).png().toBuffer()
@@ -425,6 +519,25 @@ export async function renderCarouselSlide(
     .toBuffer()
 
   const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
+
+  // Tinted slides: logo bottom-right on every slide, 48px margin to bottom and
+  // right (same corner margin the F4 arrow uses).
+  if (input.tint && input.tintLogoBuffer) {
+    const LOGO_W = 140
+    const MARGIN = 48
+    try {
+      const meta = await sharp(input.tintLogoBuffer).metadata()
+      const logoH = Math.round((LOGO_W * (meta.height ?? LOGO_W)) / (meta.width ?? LOGO_W))
+      const logoPng = await sharp(input.tintLogoBuffer).resize({ width: LOGO_W }).png().toBuffer()
+      composites.push({
+        input: logoPng,
+        left: SLIDE_SIZE - LOGO_W - MARGIN,
+        top: SLIDE_SIZE - logoH - MARGIN,
+      })
+    } catch (err) {
+      logger.warn({ err }, '[carousel] tint logo compositing failed (non-fatal)')
+    }
+  }
 
   // F4 hook slide: add the continuation-arrow swipe indicator, bottom-right,
   // sized small and lifted to clear the logo baked into the diagram's corner.

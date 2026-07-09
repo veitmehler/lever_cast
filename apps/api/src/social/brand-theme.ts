@@ -13,6 +13,14 @@ export interface SocialBrandTheme {
   /** When true, an Instagram-style blue verified badge is rendered on quote cards. */
   instagramVerified: boolean
   logoUrl: string | null
+  /**
+   * Auto-generated transparent logo variants for compositing onto colored
+   * backgrounds (brand-tint carousels): light = white logo (dark backdrops),
+   * dark = navy logo (light backdrops). Newsletter variants first, then the
+   * cached diagram variants; null when the client never uploaded a logo.
+   */
+  logoLightUrl: string | null
+  logoDarkUrl: string | null
   /** Client-specific instructions injected into the Fal.ai video reel prompt (e.g. style, restrictions). */
   videoSpecialInstructions: string
   /**
@@ -75,6 +83,8 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
     socialAccountName: brand?.socialAccountName?.trim() || organizationName,
     instagramVerified: brand?.instagramVerified ?? false,
     logoUrl: brand?.socialLogoUrl ?? brand?.organizationLogoUrl ?? null,
+    logoLightUrl: brand?.nlLogoLightUrl ?? brand?.diagramLogoLightUrl ?? null,
+    logoDarkUrl: brand?.nlLogoDarkUrl ?? brand?.diagramLogoDarkUrl ?? null,
     videoSpecialInstructions: brand?.videoSpecialInstructions?.trim() ?? '',
     socialCallToAction: resolveSocialCta(brand?.socialPrimaryGoal, brand?.socialCallToAction?.trim() ?? ''),
     socialBioUrl: brand?.socialBioUrl?.trim() ?? '',
@@ -92,4 +102,18 @@ export async function loadLogoBuffer(logoUrl: string | null): Promise<Buffer | n
   } catch {
     return null
   }
+}
+
+/**
+ * Load the logo buffer for a brand-tinted slide: the requested light/dark
+ * transparent variant when it exists, else the raw logo as a best-effort
+ * fallback (may clash with the tint color — acceptable; uploading through the
+ * newsletter/diagram flow generates real variants).
+ */
+export async function loadTintLogo(
+  brand: SocialBrandTheme,
+  variant: 'light' | 'dark',
+): Promise<Buffer | null> {
+  const url = (variant === 'light' ? brand.logoLightUrl : brand.logoDarkUrl) ?? brand.logoUrl
+  return loadLogoBuffer(url)
 }

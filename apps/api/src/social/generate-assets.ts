@@ -1,4 +1,5 @@
-import { loadSocialBrandTheme, loadLogoBuffer } from './brand-theme'
+import { loadSocialBrandTheme, loadLogoBuffer, loadTintLogo } from './brand-theme'
+import { tintScheme, type TintScheme } from './compositors/brand-tint'
 import { registerSocialMedia } from './media-register'
 import { renderQuoteCard } from './compositors/quote-card'
 import { selectQuoteForCard } from './generators/quote-selection'
@@ -118,6 +119,8 @@ export async function generateCarouselAssets(opts: {
   diagramBackground?: Buffer | null
   /** Watermark/arrow variant for diagram mode: 'light' (dark bg) → white arrows. */
   diagramLogoVariant?: 'light' | 'dark'
+  /** Wed/Sat brand-tinted design (ignored when diagramBackground is set). */
+  designVariant?: 'brand_tint'
   /** Fal.ai image model for AI slide backgrounds (admin-configurable). */
   imageModel?: string
 }): Promise<GeneratedCarousel> {
@@ -128,6 +131,15 @@ export async function generateCarouselAssets(opts: {
   const jobId = opts.jobId ?? genId
 
   const useDiagram = !!opts.diagramBackground
+
+  // Brand-tint design (Wed/Sat): resolve text/logo contrast against the brand
+  // color once for the whole carousel. Diagram mode wins if both are set.
+  let tint: TintScheme | undefined
+  let tintLogoBuffer: Buffer | null = null
+  if (opts.designVariant === 'brand_tint' && !useDiagram) {
+    tint = tintScheme(brand.primaryColor)
+    tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
+  }
   // Reserve one slot for the inserted explainer slide so the total stays within
   // the platform slide cap.
   const planCount = useDiagram ? Math.max(2, slideCount - 1) : slideCount
@@ -201,6 +213,8 @@ export async function generateCarouselAssets(opts: {
       diagramMode: useDiagram,
       arrowBuffer,
       diagramVariant: useDiagram ? arrowVariant : undefined,
+      tint,
+      tintLogoBuffer,
     })
 
     const registered = await registerSocialMedia({
@@ -268,12 +282,21 @@ export async function regenerateCarouselSlide(opts: {
   slideIndex: number
   totalSlides: number
   jobId?: string
+  /** Pass 'brand_tint' when regenerating a slide of a Wed/Sat tinted carousel. */
+  designVariant?: 'brand_tint'
 }): Promise<{ imageUrl: string; mediaId: string }> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
   const genId = generationId()
   const jobId = opts.jobId ?? genId
   const plan = opts.slidePlan
+
+  let tint: TintScheme | undefined
+  let tintLogoBuffer: Buffer | null = null
+  if (opts.designVariant === 'brand_tint') {
+    tint = tintScheme(brand.primaryColor)
+    tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
+  }
 
   const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
 
@@ -283,6 +306,8 @@ export async function regenerateCarouselSlide(opts: {
     totalSlides: opts.totalSlides,
     brand,
     logoBuffer,
+    tint,
+    tintLogoBuffer,
   })
 
   const registered = await registerSocialMedia({

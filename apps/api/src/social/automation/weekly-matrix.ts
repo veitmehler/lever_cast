@@ -28,6 +28,14 @@ export interface DaySlot {
   /** Generator post type: quote | video_reel | carousel | hook_video. */
   postType: string
   source: PostSource
+  /**
+   * Optional per-slot design variant. 'brand_tint' (Wed/Sat carousels): slides
+   * washed in the brand color at ~0.85 opacity, centered text, corner logo —
+   * see .plans/social-brand-tint-carousel.implementation-plan.md. The matrix is
+   * the single source of truth for WHERE this applies; downstream code only
+   * reads the flag.
+   */
+  designVariant?: 'brand_tint'
 }
 
 /** ISO weekday: 1 = Mon … 6 = Sat (Sun = 0 has no posts). */
@@ -46,9 +54,9 @@ export const DEFAULT_WEEKLY_SOCIAL_MATRIX: Record<Weekday, DaySlot[]> = {
     { hour: 12, postType: 'video_reel', source: 'art_keytakeaways' },
     { hour: 15, postType: 'hook_video', source: 'art_hook_other' },
   ],
-  // Wed — newsletter
+  // Wed — newsletter (brand-tinted carousel for feed variety)
   3: [
-    { hour: 9, postType: 'carousel', source: 'nl_feature' },
+    { hour: 9, postType: 'carousel', source: 'nl_feature', designVariant: 'brand_tint' },
     { hour: 12, postType: 'quote', source: 'nl_tips' },
     { hour: 15, postType: 'video_reel', source: 'nl_overview' },
   ],
@@ -64,9 +72,9 @@ export const DEFAULT_WEEKLY_SOCIAL_MATRIX: Record<Weekday, DaySlot[]> = {
     { hour: 12, postType: 'quote', source: 'nl_tips' },
     { hour: 15, postType: 'carousel', source: 'nl_feature' },
   ],
-  // Sat — newsletter
+  // Sat — newsletter (brand-tinted carousel for feed variety)
   6: [
-    { hour: 9, postType: 'carousel', source: 'nl_feature' },
+    { hour: 9, postType: 'carousel', source: 'nl_feature', designVariant: 'brand_tint' },
     { hour: 12, postType: 'video_reel', source: 'nl_overview' },
     { hour: 15, postType: 'quote', source: 'nl_tips' },
   ],

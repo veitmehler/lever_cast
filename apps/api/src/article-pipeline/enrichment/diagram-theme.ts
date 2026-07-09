@@ -120,18 +120,25 @@ export function buildDarkDiagramInitDirective(theme: DiagramTheme): string {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
+ * WCAG 2.x relative luminance of a hex color (0 = black, 1 = white). Shared with
+ * the social brand-tint compositor (compositors/brand-tint.ts).
+ */
+export function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex)
+  const linear = (c: number) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+}
+
+/**
  * Return `'#FFFFFF'` or `'#000000'` — whichever yields higher contrast against `hexBg`.
  * Uses WCAG 2.x relative luminance so mid-tone fills (blues, purples) always get
  * a readable label color instead of the near-identical RGB-invert Mermaid defaults to.
  */
 function pickContrastingText(hexBg: string): string {
-  const [r, g, b] = hexToRgb(hexBg)
-  const linear = (c: number) => {
-    const s = c / 255
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
-  }
-  const L = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
-  return L > 0.5 ? '#000000' : '#FFFFFF'
+  return relativeLuminance(hexBg) > 0.5 ? '#000000' : '#FFFFFF'
 }
 
 function hexToRgb(hex: string): [number, number, number] {

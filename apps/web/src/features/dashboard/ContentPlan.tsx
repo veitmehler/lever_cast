@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import {
-  Loader2, CalendarRange, Table as TableIcon, LayoutGrid, Pencil, X,
+  Loader2, CalendarRange, CalendarCheck, CalendarClock, Table as TableIcon, LayoutGrid, Pencil, X,
   Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -156,10 +156,12 @@ export function ContentPlan() {
   // Only show content days (article = Tue/Thu, newsletter = Mon/Wed/Fri/Sat); skip Sundays.
   const visibleDays = (data?.days ?? []).filter((d) => ARTICLE_DOW.has(dow(d.date)) || NEWSLETTER_DOW.has(dow(d.date)))
   // Planning window (up to 60 days) is always fully editable; production (checkbox-selectable)
-  // is capped at executableUntil — the current paid cycle. Null means ungated (legacy accounts).
+  // is capped at executableUntil — the current paid cycle. Null means ungated (legacy accounts,
+  // rendered as a single undivided section, exactly like before this feature existed).
   const executableUntil = data?.executableUntil ?? null
-  const isGated = (date: string) => executableUntil != null && date > executableUntil
-  const selectableDates = visibleDays.filter((d) => (d.article.primary || d.newsletter) && !isGated(d.date)).map((d) => d.date)
+  const currentCycleDays = executableUntil ? visibleDays.filter((d) => d.date <= executableUntil) : visibleDays
+  const nextCycleDays = executableUntil ? visibleDays.filter((d) => d.date > executableUntil) : []
+  const selectableDates = currentCycleDays.filter((d) => d.article.primary || d.newsletter).map((d) => d.date)
   const toggleSelect = (date: string) =>
     setSelected((prev) => { const n = new Set(prev); if (n.has(date)) n.delete(date); else n.add(date); return n })
   const fmt = (date: string) => format(new Date(date + 'T00:00:00'), 'EEE, MMM d')
@@ -299,6 +301,85 @@ export function ContentPlan() {
     )
   }
 
+  function SectionHeader({ icon: Icon, title, description }: { icon: typeof CalendarCheck; title: string; description: string }) {
+    return (
+      <div className="mb-2">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      </div>
+    )
+  }
+
+  // Table/grid rendering shared by both cycle sections. `withCheckbox` is false
+  // for the plan-ahead section — those days aren't in the production window yet,
+  // so there's nothing to select there (still fully editable via the cells below).
+  function PlanSection({ days, withCheckbox }: { days: Day[]; withCheckbox: boolean }) {
+    if (view === 'table') {
+      return (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border text-xs text-muted-foreground">
+              <tr>
+                {withCheckbox && (
+                  <th className="w-10 px-3 py-2">
+                    <input type="checkbox" checked={selected.size > 0 && selected.size === selectableDates.length}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(selectableDates) : new Set())} className="h-4 w-4 rounded border-input" />
+                  </th>
+                )}
+                <th className="w-32 px-3 py-2">Date</th>
+                <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Article</span></th>
+                <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Newsletter</span></th>
+                <th className="w-44 px-3 py-2 text-right">Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map((d) => {
+                const selectable = withCheckbox && !!(d.article.primary || d.newsletter)
+                return (
+                  <tr key={d.date} className="border-t border-border align-middle">
+                    {withCheckbox && (
+                      <td className="px-3 py-2.5">{selectable && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}</td>
+                    )}
+                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">{fmt(d.date)}</td>
+                    <td className="px-3 py-2.5"><ArticleCell d={d} /></td>
+                    <td className="px-3 py-2.5"><NewsletterCell d={d} /></td>
+                    <td className="px-3 py-2.5"><ReviewActions d={d} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    return (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {days.map((d) => (
+          <div key={d.date} className="rounded-xl border border-border bg-card p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">{fmt(d.date)}</span>
+              {withCheckbox && (d.article.primary || d.newsletter) && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}
+            </div>
+            <div className="space-y-2">
+              <div className="rounded-lg bg-muted/40 p-2">
+                <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><FileText className="h-3 w-3" /> Article</div>
+                <ArticleCell d={d} />
+              </div>
+              <div className="rounded-lg bg-muted/40 p-2">
+                <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><Mail className="h-3 w-3" /> Newsletter</div>
+                <NewsletterCell d={d} />
+              </div>
+              <div className="flex justify-end"><ReviewActions d={d} /></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -309,7 +390,7 @@ export function ContentPlan() {
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {executableUntil
-              ? `You can produce content through ${fmt(executableUntil)} — plan ahead through ${fmt(data!.to)}.`
+              ? 'This cycle is ready to produce; next cycle is open for planning.'
               : 'Your articles and newsletters for the next 30 days.'}
             {data ? ` ${data.ideaCount} ideas in your bank.` : ''}
           </p>
@@ -336,68 +417,23 @@ export function ContentPlan() {
         <div className="flex items-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> Loading plan…</div>
       ) : !data ? (
         <p className="text-sm text-muted-foreground">Could not load your plan.</p>
-      ) : view === 'table' ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border text-xs text-muted-foreground">
-              <tr>
-                <th className="w-10 px-3 py-2">
-                  <input type="checkbox" checked={selected.size > 0 && selected.size === selectableDates.length}
-                    onChange={(e) => setSelected(e.target.checked ? new Set(selectableDates) : new Set())} className="h-4 w-4 rounded border-input" />
-                </th>
-                <th className="w-32 px-3 py-2">Date</th>
-                <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Article</span></th>
-                <th className="px-3 py-2"><span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Newsletter</span></th>
-                <th className="w-44 px-3 py-2 text-right">Review</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleDays.map((d) => {
-                const selectable = !!(d.article.primary || d.newsletter)
-                const gated = isGated(d.date)
-                return (
-                  <tr key={d.date} className="border-t border-border align-middle">
-                    <td className="px-3 py-2.5">{selectable && !gated && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">
-                      {fmt(d.date)}
-                      {gated && <div className="mt-0.5 text-[10px] font-normal text-muted-foreground">Plan ahead — unlocks {fmt(executableUntil!)}</div>}
-                    </td>
-                    <td className="px-3 py-2.5"><ArticleCell d={d} /></td>
-                    <td className="px-3 py-2.5"><NewsletterCell d={d} /></td>
-                    <td className="px-3 py-2.5"><ReviewActions d={d} /></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      ) : executableUntil ? (
+        <div className="space-y-6">
+          <div>
+            <SectionHeader icon={CalendarCheck} title="This Cycle — Ready to Produce"
+              description={`${fmt(data.from)} – ${fmt(executableUntil)} · select days below to generate`} />
+            <PlanSection days={currentCycleDays} withCheckbox />
+          </div>
+          {nextCycleDays.length > 0 && (
+            <div>
+              <SectionHeader icon={CalendarClock} title="Next Cycle — Plan Ahead"
+                description={`${fmt(nextCycleDays[0].date)} – ${fmt(data.to)} · edit topics now, generation unlocks ${fmt(executableUntil)}`} />
+              <PlanSection days={nextCycleDays} withCheckbox={false} />
+            </div>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleDays.map((d) => {
-            const selectable = !!(d.article.primary || d.newsletter)
-            const gated = isGated(d.date)
-            return (
-            <div key={d.date} className="rounded-xl border border-border bg-card p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">{fmt(d.date)}</span>
-                {selectable && !gated && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}
-              </div>
-              {gated && selectable && <div className="-mt-1 mb-2 text-[10px] text-muted-foreground">Plan ahead — unlocks {fmt(executableUntil!)}</div>}
-              <div className="space-y-2">
-                <div className="rounded-lg bg-muted/40 p-2">
-                  <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><FileText className="h-3 w-3" /> Article</div>
-                  <ArticleCell d={d} />
-                </div>
-                <div className="rounded-lg bg-muted/40 p-2">
-                  <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><Mail className="h-3 w-3" /> Newsletter</div>
-                  <NewsletterCell d={d} />
-                </div>
-                <div className="flex justify-end"><ReviewActions d={d} /></div>
-              </div>
-            </div>
-            )
-          })}
-        </div>
+        <PlanSection days={visibleDays} withCheckbox />
       )}
 
       {(inbox?.assignedToMe ?? []).filter((a) => !visibleArticleIds.has(a.jobId)).length > 0 && (

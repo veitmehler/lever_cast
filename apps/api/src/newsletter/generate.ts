@@ -304,9 +304,9 @@ async function loadGenContext(newsletterId: string): Promise<GenContext> {
   const voice: VoiceVars = {
     writingStyle: user?.settings?.writingStyle ?? '',
     targetAudience: user?.brandSettings?.who ?? '',
-    industry: user?.brandSettings?.industry ?? calendar.industry,
+    industry: user?.brandSettings?.industry ?? calendar?.industry ?? '',
     specialization:
-      (await specializationLabel(user?.brandSettings?.primarySpecialization ?? calendar.specializationKey)) ||
+      (await specializationLabel(user?.brandSettings?.primarySpecialization ?? calendar?.specializationKey ?? null)) ||
       user?.brandSettings?.specialization ||
       '',
   }

@@ -18,6 +18,7 @@ import {
   generateWithFalAI,
   uploadBufferWithKey,
   deleteOldVersions,
+  brandSettingsForUser,
 } from '@socioply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
@@ -85,6 +86,28 @@ export interface TopicResearch {
   teaserSources?: TeaserSource[]
 }
 
+/**
+ * Minimal industry/specialization context the research/writer steps need — a
+ * real NewsletterCalendar row for admin-curated topics, or one synthesized from
+ * the account's own BrandSettings for account-scoped override topics (which
+ * have no calendar at all). Any `NewsletterCalendar` already satisfies this.
+ */
+export interface TopicVoiceContext {
+  industry: string
+  specializationKey: string | null
+}
+
+/** Resolve the industry/specialization context for a topic, calendar-routed or account-scoped. */
+export async function topicVoiceContext(
+  topic: NewsletterTopic & { calendar: NewsletterCalendar | null },
+): Promise<TopicVoiceContext> {
+  if (topic.calendar) return { industry: topic.calendar.industry, specializationKey: topic.calendar.specializationKey }
+  if (!topic.accountId) return { industry: '', specializationKey: null }
+  const account = await prisma.account.findUnique({ where: { id: topic.accountId }, select: { ownerUserId: true } })
+  const brand = account?.ownerUserId ? await brandSettingsForUser(account.ownerUserId) : null
+  return { industry: brand?.industry ?? '', specializationKey: brand?.primarySpecialization ?? null }
+}
+
 // ── Video ─────────────────────────────────────────────────────────────────────
 
 interface OEmbed {
@@ -129,7 +152,7 @@ async function thumbnailToS3(topicId: string, thumbnailUrl: string | null): Prom
 
 export async function researchVideo(
   topic: NewsletterTopic,
-  calendar: NewsletterCalendar,
+  voice: TopicVoiceContext,
 ): Promise<VideoResearch> {
   // Explicit override → use it directly; oEmbed only enriches title/thumbnail.
   if (topic.videoUrl) {
@@ -149,12 +172,12 @@ export async function researchVideo(
   }
 
   // Phase 1: AI-generated query. Phase 2: raw topic title.
-  const spec = await specializationLabel(calendar.specializationKey)
+  const spec = await specializationLabel(voice.specializationKey)
   let hit = null
   try {
     const { content } = await runNewsletterPrompt('nl_youtube_query', {
       topic: topic.topic,
-      industry: calendar.industry,
+      industry: voice.industry,
       specialization: spec,
       who: spec,
     })
@@ -197,7 +220,7 @@ function firstH2(html: string): string | null {
  */
 export async function researchOneRecipe(
   hint: string,
-  calendar: NewsletterCalendar,
+  voice: TopicVoiceContext,
   priorTitles: string[],
   topicId: string,
   slot: 'recipe' | 'recipe2',
@@ -220,9 +243,9 @@ export async function researchOneRecipe(
     recipeHint: hint,
     recipeResearch: research,
     previousRecipeTitles: priorTitles.join('\n'),
-    industry: calendar.industry,
-    specialization: await specializationLabel(calendar.specializationKey),
-    who: await specializationLabel(calendar.specializationKey),
+    industry: voice.industry,
+    specialization: await specializationLabel(voice.specializationKey),
+    who: await specializationLabel(voice.specializationKey),
     writingStyle: '',
   })
 
@@ -336,7 +359,7 @@ export function extractReadable(html: string): string {
 
 async function researchOneTeaser(
   bullet: string,
-  calendar: NewsletterCalendar,
+  voice: TopicVoiceContext,
 ): Promise<TeaserSource | null> {
   let urls = await googleSearch(bullet)
   urls = urls.filter(isUsableUrl)
@@ -357,7 +380,7 @@ async function researchOneTeaser(
       bulletPoint: bullet,
       urlCount: String(valid.length),
       urls: valid.join('\n'),
-      who: await specializationLabel(calendar.specializationKey),
+      who: await specializationLabel(voice.specializationKey),
     })
     const picked = cleanTextOutput(content).trim()
     if (valid.includes(picked)) chosen = picked
@@ -374,14 +397,14 @@ async function researchOneTeaser(
 
 export async function researchTeaserSources(
   topic: NewsletterTopic,
-  calendar: NewsletterCalendar,
+  voice: TopicVoiceContext,
 ): Promise<TeaserSource[]> {
   if (!(await isOxylabsConfigured())) return []
   const bullets = [topic.bullet1, topic.bullet2, topic.bullet3].filter(Boolean)
   const out: TeaserSource[] = []
   for (const bullet of bullets) {
     try {
-      const ts = await researchOneTeaser(bullet, calendar)
+      const ts = await researchOneTeaser(bullet, voice)
       if (ts) out.push(ts)
     } catch (err) {
       logger.warn({ topicId: topic.id, bullet, err }, '[newsletter/research] teaser source failed')
@@ -392,7 +415,8 @@ export async function researchTeaserSources(
 
 // ── Orchestrator ──────────────────────────────────────────────────────────────
 
-async function priorRecipeTitles(calendarId: string, excludeTopicId: string): Promise<string[]> {
+async function priorRecipeTitles(calendarId: string | null, excludeTopicId: string): Promise<string[]> {
+  if (!calendarId) return [] // account-scoped override topic — no shared calendar to dedupe against
   const rows = await prisma.newsletterTopic.findMany({
     where: { calendarId, id: { not: excludeTopicId }, research: { not: Prisma.JsonNull } },
     select: { research: true },
@@ -423,21 +447,21 @@ export async function ensureTopicResearch(topicId: string): Promise<ResearchOutc
     return { status: 'complete', research: (topic.research as TopicResearch) ?? {} }
   }
 
-  const calendar = topic.calendar
+  const voice = await topicVoiceContext(topic)
   const research: TopicResearch = {}
 
   // Video (always attempted).
   try {
-    research.video = await researchVideo(topic, calendar)
+    research.video = await researchVideo(topic, voice)
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] video research threw')
   }
 
   // Recipes (each only when its column is populated). Both share neutral voice.
-  const priors = topic.recipe || topic.recipe2 ? await priorRecipeTitles(calendar.id, topic.id) : []
+  const priors = topic.recipe || topic.recipe2 ? await priorRecipeTitles(topic.calendarId, topic.id) : []
   if (topic.recipe) {
     try {
-      const recipe = await researchOneRecipe(topic.recipe, calendar, priors, topic.id, 'recipe')
+      const recipe = await researchOneRecipe(topic.recipe, voice, priors, topic.id, 'recipe')
       if (recipe) {
         research.recipe = recipe
         if (recipe.title) priors.push(recipe.title)
@@ -448,7 +472,7 @@ export async function ensureTopicResearch(topicId: string): Promise<ResearchOutc
   }
   if (topic.recipe2) {
     try {
-      const recipe2 = await researchOneRecipe(topic.recipe2, calendar, priors, topic.id, 'recipe2')
+      const recipe2 = await researchOneRecipe(topic.recipe2, voice, priors, topic.id, 'recipe2')
       if (recipe2) research.recipe2 = recipe2
     } catch (err) {
       logger.warn({ topicId, err }, '[newsletter/research] recipe2 research threw')
@@ -457,7 +481,7 @@ export async function ensureTopicResearch(topicId: string): Promise<ResearchOutc
 
   // Teaser sources (one per bullet).
   try {
-    research.teaserSources = await researchTeaserSources(topic, calendar)
+    research.teaserSources = await researchTeaserSources(topic, voice)
   } catch (err) {
     logger.warn({ topicId, err }, '[newsletter/research] teaser research threw')
   }

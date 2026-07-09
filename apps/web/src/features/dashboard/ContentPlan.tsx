@@ -26,7 +26,7 @@ interface ArticleEntry {
 interface Day {
   date: string
   article: { primary: ArticleEntry | null; alternatives: ArticleEntry[] }
-  newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string } | null
+  newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string; isOverride: boolean } | null
 }
 interface PlanData { from: string; to: string; days: Day[]; ideaCount: number; executableUntil: string | null }
 interface Idea {
@@ -55,7 +55,7 @@ export function ContentPlan() {
   const [busyDate, setBusyDate] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const [pickerDate, setPickerDate] = useState<string | null>(null)
+  const [pickerTarget, setPickerTarget] = useState<{ date: string; kind: 'article' | 'newsletter' } | null>(null)
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [addDate, setAddDate] = useState<string | null>(null)
   const [addText, setAddText] = useState('')
@@ -96,9 +96,6 @@ export function ContentPlan() {
   const queueIndexFor = (kind: 'article' | 'newsletter', id: string) => readyQueue.findIndex((q) => q.kind === kind && q.id === id)
 
   const visibleArticleIds = new Set((data?.days ?? []).map((d) => d.article.primary?.jobId).filter(Boolean) as string[])
-  const visibleNewsletterIds = new Set((data?.days ?? []).map((d) => d.newsletter?.newsletterId).filter(Boolean) as string[])
-  const outOfWindow: ReviewItem[] = readyQueue.filter((q) =>
-    q.kind === 'article' ? !visibleArticleIds.has(q.id) : !visibleNewsletterIds.has(q.id))
 
   function onApproved() {
     setOpenIndex((idx) => (idx == null ? null : idx + 1 < readyQueue.length ? idx + 1 : null))
@@ -116,15 +113,23 @@ export function ContentPlan() {
       await load()
     } finally { setBusyDate(null) }
   }
-  async function assignIdea(date: string, idea: Idea) {
+  async function assignIdea(date: string, kind: 'article' | 'newsletter', idea: Idea) {
     setBusyDate(date)
     try {
-      const res = await fetch(`/api/topics/${idea.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledDate: `${date}T00:00:00.000Z` }),
-      })
-      if (!res.ok) return toast.error('Failed to assign idea')
-      setPickerDate(null); await load()
+      const res = kind === 'article'
+        ? await fetch(`/api/topics/${idea.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheduledDate: `${date}T00:00:00.000Z` }),
+          })
+        : await fetch('/api/content-plan/newsletter-topic', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, ideaTopicId: idea.id }),
+          })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        return toast.error(body.error ?? 'Failed to assign idea')
+      }
+      setPickerTarget(null); await load()
     } finally { setBusyDate(null) }
   }
   async function unschedule(topicId: string, date: string) {
@@ -135,6 +140,17 @@ export function ContentPlan() {
         body: JSON.stringify({ scheduledDate: null }),
       })
       if (!res.ok) return toast.error('Failed to unschedule')
+      await load()
+    } finally { setBusyDate(null) }
+  }
+  async function revertNewsletterTopic(date: string) {
+    setBusyDate(date)
+    try {
+      const res = await fetch(`/api/content-plan/newsletter-topic?date=${date}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        return toast.error(body.error ?? 'Failed to revert')
+      }
       await load()
     } finally { setBusyDate(null) }
   }
@@ -259,7 +275,7 @@ export function ContentPlan() {
     // Replaceable: empty, a calendar suggestion, or a planned topic (no job yet).
     const replaceBtns = (
       <div className="flex flex-wrap items-center gap-1.5">
-        <button onClick={() => { setPickerDate(d.date); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
+        <button onClick={() => { setPickerTarget({ date: d.date, kind: 'article' }); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
           <Lightbulb className="h-3.5 w-3.5" /> Use idea
         </button>
         <button onClick={() => { setAddDate(d.date); setAddText('') }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
@@ -292,11 +308,34 @@ export function ContentPlan() {
   function NewsletterCell({ d }: { d: Day }) {
     if (!NEWSLETTER_DOW.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
     const nl = d.newsletter
-    if (!nl) return <span className="text-xs text-muted-foreground">—</span>
+    // Once generation has started, it's read-only here (review happens at right) —
+    // same convention as ArticleCell going read-only once a jobId exists.
+    if (nl?.newsletterId) {
+      return (
+        <div>
+          <div className="text-sm text-foreground">{nl.topic}</div>
+          {nl.status && <span className="mt-0.5 inline-block rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{nl.status}</span>}
+        </div>
+      )
+    }
+    const useIdeaBtn = (
+      <button onClick={() => { setPickerTarget({ date: d.date, kind: 'newsletter' }); loadIdeas() }} className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs hover:bg-muted">
+        <Lightbulb className="h-3.5 w-3.5" /> Use idea
+      </button>
+    )
+    if (!nl) return <div className="text-muted-foreground">{useIdeaBtn}</div>
     return (
-      <div>
+      <div className="space-y-1">
         <div className="text-sm text-foreground">{nl.topic}</div>
-        {nl.status && <span className="mt-0.5 inline-block rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{nl.status}</span>}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {nl.isOverride && (
+            <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[11px] text-blue-700">your idea</span>
+          )}
+          {useIdeaBtn}
+          {nl.isOverride && (
+            <button onClick={() => revertNewsletterTopic(d.date)} disabled={busyDate === d.date} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600" title="Revert to original topic"><CalendarX className="h-3.5 w-3.5" /></button>
+          )}
+        </div>
       </div>
     )
   }
@@ -453,21 +492,6 @@ export function ContentPlan() {
         </div>
       )}
 
-      {outOfWindow.length > 0 && (
-        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Also ready to review</div>
-          <div className="space-y-2">
-            {outOfWindow.map((it) => (
-              <div key={`${it.kind}-${it.id}`} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
-                {it.kind === 'article' ? <FileText className="h-4 w-4 text-muted-foreground" /> : <Mail className="h-4 w-4 text-muted-foreground" />}
-                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{it.title}</span>
-                <ReviewBtn kind={it.kind} id={it.id} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {(inbox?.flagged?.length ?? 0) > 0 && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">Flagged by quality check</div>
@@ -507,14 +531,14 @@ export function ContentPlan() {
         />
       )}
 
-      {pickerDate && (
-        <Modal title={`Use an idea for ${fmt(pickerDate)}`} onClose={() => setPickerDate(null)}>
+      {pickerTarget && (
+        <Modal title={`Use an idea for ${fmt(pickerTarget.date)}`} onClose={() => setPickerTarget(null)}>
           {ideas.length === 0 ? (
             <p className="text-sm text-muted-foreground">No ideas in your bank yet. Capture some above.</p>
           ) : (
             <div className="max-h-80 space-y-1 overflow-y-auto">
               {ideas.map((idea) => (
-                <button key={idea.id} onClick={() => assignIdea(pickerDate, idea)} disabled={busyDate === pickerDate}
+                <button key={idea.id} onClick={() => assignIdea(pickerTarget.date, pickerTarget.kind, idea)} disabled={busyDate === pickerTarget.date}
                   className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50">
                   <span className="min-w-0 flex-1 truncate">{idea.topic}</span>
                   <span className="text-xs text-primary">Schedule →</span>

@@ -17,6 +17,7 @@ import { healthRoutes } from './routes/health'
 import { adminRoutes } from './routes/admin'
 import { topicRoutes } from './routes/topics'
 import { contentPlanRoutes } from './routes/content-plan'
+import { newsletterTopicOverrideRoutes } from './routes/newsletter-topic-override'
 import { editRequestRoutes } from './routes/edit-requests'
 import multipart from '@fastify/multipart'
 import { articleRoutes } from './routes/articles'
@@ -79,6 +80,7 @@ async function main() {
   await app.register(voiceRoutes, { prefix: '/api' })
   await app.register(topicRoutes, { prefix: '/api' })
   await app.register(contentPlanRoutes, { prefix: '/api' })
+  await app.register(newsletterTopicOverrideRoutes, { prefix: '/api' })
   await app.register(editRequestRoutes, { prefix: '/api' })
   await app.register(articleRoutes, { prefix: '/api' })
   await app.register(wpConnectionRoutes, { prefix: '/api' })

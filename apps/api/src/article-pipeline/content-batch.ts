@@ -15,6 +15,7 @@ import { prisma, type ResolvedAccount } from '@socioply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
 import { sendTransactionalEmail } from '../lib/alerts'
+import { resolveNewsletterTopicForDate } from '../newsletter/resolve'
 
 /** A generating item older than this (no completion) is presumed dead → failed. */
 const ITEM_TIMEOUT_MS = 45 * 60 * 1000
@@ -85,14 +86,9 @@ export async function createBatchFromDates(
       }
     }
 
-    // Newsletter: the routed calendar's topic for the date.
-    if (owner?.newsletterCalendarId) {
-      const nt = await prisma.newsletterTopic.findFirst({
-        where: { calendarId: owner.newsletterCalendarId, date: { gte: start, lt: end } },
-        select: { id: true },
-      })
-      if (nt) items.push({ kind: 'newsletter', date: start, newsletterTopicId: nt.id })
-    }
+    // Newsletter: an account override wins, else the routed calendar's topic for the date.
+    const nt = await resolveNewsletterTopicForDate(account.accountId, owner?.newsletterCalendarId ?? null, date)
+    if (nt) items.push({ kind: 'newsletter', date: start, newsletterTopicId: nt.id })
   }
 
   if (items.length === 0) return null

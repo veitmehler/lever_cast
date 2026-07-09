@@ -627,4 +627,48 @@ Output STRICT JSON only (no markdown, no commentary):
 {"title": "...", "body": "...", "ctaLabel": "..."}`,
     isActive: true,
   },
+  {
+    // Account-scoped newsletter-topic override auto-draft (Phase 4 of
+    // .plans/newsletter-topic-override.implementation-plan.md). Expands a bare
+    // idea-bank topic string into the same structured shape an admin's CSV row
+    // supplies (bullets + secondary topic + optional recipe hints), run ONCE per
+    // override topic before ensureTopicResearch — everything downstream is then
+    // identical to an admin-curated topic.
+    stepNumber: 337,
+    key: 'nl_topic_expand',
+    stepName: 'newsletter_topic_expand',
+    defaultProvider: 'gemini',
+    defaultModel: GEMINI_FLASH,
+    systemPrompt:
+      'You are an expert newsletter content strategist. Given a bare topic idea, you expand it into a ' +
+      'complete, structured edition brief — the exact same shape a human editor would prepare for a ' +
+      'content calendar.',
+    userPrompt: `Expand this newsletter topic idea into a complete edition brief.
+
+TOPIC IDEA: {{topic}}
+INDUSTRY: {{industry}}
+SPECIALIZATION: {{specialization}}
+TARGET AUDIENCE: {{who}}
+
+RECENT SECONDARY TOPICS used in this specialization's newsletter calendar (for tone/theme
+consistency — do not repeat them):
+{{recentSecondaryTopics}}
+
+Produce:
+- topic: a refined, specific version of the topic idea (a full feature-article headline/angle),
+  max ~12 words.
+- bullet1, bullet2, bullet3: three SPECIFIC, factually-groundable angles for the feature article.
+  Each must be concrete enough that a Google search on it alone would surface a real, relevant
+  source article — avoid vague or generic phrasing.
+- secondaryTopic: a second, related article topic for this specialization that fits the same
+  content schedule as the recent secondary topics above (a genuinely different angle from the main
+  topic, not a rehash of it). Always provide one.
+- recipe, recipe2: a recipe name/hint ONLY if a recipe section genuinely fits this industry/
+  specialization (e.g. wellness, food, health). Most B2B/professional-services specializations
+  should leave these as empty strings.
+
+Output STRICT JSON only (no markdown, no commentary):
+{"topic": "...", "bullet1": "...", "bullet2": "...", "bullet3": "...", "secondaryTopic": "...", "recipe": "", "recipe2": ""}`,
+    isActive: true,
+  },
 ]

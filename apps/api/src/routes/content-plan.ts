@@ -69,7 +69,7 @@ export async function contentPlanRoutes(app: FastifyInstance) {
       to.setUTCHours(23, 59, 59, 999)
     }
 
-    const [scheduledTopics, articleCalTopics, newsletterTopics, ideaCount] = await Promise.all([
+    const [scheduledTopics, articleCalTopics, newsletterCalTopics, newsletterOverrides, ideaCount] = await Promise.all([
       // User-scheduled article topics (account-scoped via the prisma extension).
       prisma.topic.findMany({
         where: {
@@ -98,8 +98,23 @@ export async function contentPlanRoutes(app: FastifyInstance) {
             select: { id: true, date: true, topic: true },
           })
         : Promise.resolve([]),
+      // Account-scoped overrides — wins over the calendar suggestion for a date.
+      prisma.newsletterTopic.findMany({
+        where: { accountId: account.accountId, date: { gte: from, lte: to } },
+        select: { id: true, date: true, topic: true },
+      }),
       prisma.topic.count({ where: { userId: account.userId, status: 'idea' } }),
     ])
+
+    // Override wins over the calendar suggestion, per date.
+    const newsletterCalByDate = new Map<string, (typeof newsletterCalTopics)[number]>()
+    for (const t of newsletterCalTopics) newsletterCalByDate.set(dateKey(t.date), t)
+    const newsletterOverrideByDate = new Map<string, (typeof newsletterOverrides)[number]>()
+    for (const t of newsletterOverrides) newsletterOverrideByDate.set(dateKey(t.date), t)
+    const newsletterTopics = [...newsletterCalByDate.entries()]
+      .filter(([key]) => !newsletterOverrideByDate.has(key))
+      .map(([, t]) => t)
+      .concat(newsletterOverrides)
 
     // Generated newsletters keyed by their source topic.
     const nlTopicIds = newsletterTopics.map((t) => t.id)
@@ -118,12 +133,13 @@ export async function contentPlanRoutes(app: FastifyInstance) {
     for (const t of articleCalTopics) articleCalByDate.set(dateKey(t.date), t)
     const nlByDate = new Map<string, (typeof newsletterTopics)[number]>()
     for (const t of newsletterTopics) nlByDate.set(dateKey(t.date), t)
+    const overrideDateKeys = new Set([...newsletterOverrideByDate.keys()])
 
     // Build a contiguous day list.
     const days: Array<{
       date: string
       article: { primary: ArticleEntry | null; alternatives: ArticleEntry[] }
-      newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string } | null
+      newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string; isOverride: boolean } | null
     }> = []
 
     for (let ts = from.getTime(); ts <= to.getTime(); ts += 86400000) {
@@ -154,7 +170,13 @@ export async function contentPlanRoutes(app: FastifyInstance) {
         date: key,
         article: { primary, alternatives },
         newsletter: nl
-          ? { topic: nl.topic, newsletterTopicId: nl.id, newsletterId: nlRow?.id, status: nlRow?.status }
+          ? {
+              topic: nl.topic,
+              newsletterTopicId: nl.id,
+              newsletterId: nlRow?.id,
+              status: nlRow?.status,
+              isOverride: overrideDateKeys.has(key),
+            }
           : null,
       })
     }

@@ -4,6 +4,7 @@ import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { getBoss, QUEUES } from '../queues/index'
 import { ensureTopicResearch } from '../newsletter/research'
+import { ensureTopicDraft } from '../newsletter/topic-draft'
 import { generateNewsletterForCustomer } from '../newsletter/generate'
 import type { NewsletterGenerateJobData } from '../newsletter/enqueue'
 
@@ -44,6 +45,10 @@ export async function newsletterGenerateHandler(
 
     logger.info({ userId, topicId, pgBossJobId: job.id }, '[newsletter-generate] starting')
     try {
+      // 0. Auto-draft an account-override topic's bullets/etc. (no-op for
+      //    calendar-routed or already-drafted topics — see topic-draft.ts).
+      await ensureTopicDraft(topicId)
+
       // 1. Shared research (idempotent across customers).
       await prisma.newsletter.update({ where: { id: nl.id }, data: { status: 'researching' } })
       await ensureTopicResearch(topicId)

@@ -37,6 +37,7 @@ model Account {
 
   members User[]          @relation("AccountMembers")
   roster  AccountMember[]
+  newsletterTopicOverrides NewsletterTopic[]
 
   @@index([articleCalendarId])
   @@map("accounts")
@@ -1034,10 +1035,23 @@ model NewsletterCalendar {
 
 // One dated edition's source content (one CSV row). Optional columns drive
 // industry modules / secondary article purely by presence.
+//
+// Two flavors of row, distinguished by which FK is set (see
+// .plans/newsletter-topic-override.implementation-plan.md):
+//  - admin-curated: calendarId set, accountId null — shared across every account
+//    routed to that calendar.
+//  - account override: accountId set, calendarId null — one account opted out of
+//    the shared calendar for that date with their own idea-bank topic. bullet1-3
+//    start as '' and are filled by the nl_topic_expand auto-draft step at
+//    generation time (see draftedAt), not at assignment time.
 model NewsletterTopic {
   id               String             @id @default(cuid())
-  calendarId       String
-  calendar         NewsletterCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  calendarId       String?
+  calendar         NewsletterCalendar? @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  accountId        String?
+  account          Account?           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceTopicId    String? // the idea-bank Topic.id this was assigned from (traceability)
+  draftedAt        DateTime? // set once nl_topic_expand has filled bullet1-3/etc; null = not yet drafted
   date             DateTime
   topic            String // feature article
   bullet1          String
@@ -1055,7 +1069,9 @@ model NewsletterTopic {
   updatedAt        DateTime           @updatedAt
 
   @@unique([calendarId, date])
+  @@unique([accountId, date])
   @@index([calendarId])
+  @@index([accountId])
   @@map("newsletter_topics")
 }
 

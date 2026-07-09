@@ -86,7 +86,7 @@ DB-orchestrating route handlers).
   `Day.newsletter.newsletterId`) — matching the new social-ready IDs against visible days is
   the same pattern already used for `readyArticleIds`/`readyNewsletterIds`.
 
-## Phase B — Article social review modal
+## Phase B — Article social review modal — IMPLEMENTED (2026-07-09)
 
 - New component, e.g. `features/dashboard/SocialReviewModal.tsx` (or
   `features/social/ArticleSocialReviewModal.tsx`) — modal chrome (header, close, title) wrapping
@@ -96,6 +96,25 @@ DB-orchestrating route handlers).
   (too much unrelated state).
 - Triggered from a new button in `ContentPlan.tsx`'s `ReviewActions`/day cell, shown when the
   new `socialReady` signal includes that day's `jobId`.
+
+**Done:**
+- `features/social/ArticleSocialPreview.tsx` — new, self-contained, structurally a near-exact
+  mirror of the already-proven `NewsletterSocialPreview.tsx` (fetch `/api/articles/:jobId/social-automation`,
+  5s poll while `pending`/`processing`/`scheduling`, retry via `/api/social-automation/:runId/retry/:slotKey`,
+  renders the existing `SocialPreviewPanel` which already owns its own approve-all/per-slot-approve
+  logic — zero new approve logic needed). No section header — the modal chrome owns the title.
+  Added `Loading…`/`No social posts yet` states neither `SocialMediaSetSection` nor
+  `NewsletterSocialPreview` needed (they only render once runs already exist), since this modal
+  can now be opened directly without that guarantee.
+- `features/dashboard/SocialReviewModal.tsx` — new modal chrome, structurally mirroring
+  `ReviewApproveModal`'s large-review-modal convention (`h-[90vh] max-w-6xl`, explicit close
+  button, no backdrop-click-to-close). Deliberately does **not** port `/workflow/[jobId]`'s other
+  panels (error logs, schema, syndication, export) — focused purely on social review, per the
+  2026-07-09 discussion.
+- `tsc --noEmit` and `eslint` both clean. Not yet wired into any page — that's Phase D
+  (`ContentPlan.tsx`'s trigger button + modal state). No live smoke test possible until then;
+  confidence comes from the close structural match to two already-deployed, working components
+  (`NewsletterSocialPreview`, `ReviewApproveModal`).
 
 ## Phase C — Newsletter social review modal (full page)
 

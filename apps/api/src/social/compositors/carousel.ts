@@ -310,26 +310,72 @@ function buildCtaSlideOverlaySvg(input: CarouselSlideInput): string {
 
 // ── Brand-tinted slides (Wed/Sat) ────────────────────────────────────────────
 // One uniform treatment for hook, content, and CTA slides: full-frame brand
-// wash at the scheme's opacity, headline + body centered as a single block both
-// axes, logo composited bottom-right (in renderCarouselSlide, not here — it's a
-// PNG buffer, not SVG). No org-name text watermark — the logo replaces it.
+// wash at the scheme's opacity, headline + body JUSTIFIED as a single centered
+// block — lines flush both edges. librsvg ignores SVG's textLength AND
+// word-spacing, so justification is done by measuring each line's natural
+// width (render + trim) and distributing the deficit as letter-spacing.
+// A paragraph's last line and short lines stay natural (standard justify).
+// Logo composited bottom-right in renderCarouselSlide (PNG buffer, not SVG).
+// No org-name text watermark — the logo replaces it.
 
 // Text must stay clear of the bottom-right logo zone (logo ~140px wide + 48px
 // margins), so the centering region ends above it.
 const TINT_TEXT_TOP = 140
 const TINT_TEXT_BOTTOM = 880
+// Only stretch a line to the block width when its natural width fills ≥72% of
+// it — stretching shorter lines reads gappy.
+const JUSTIFY_MIN_FILL = 0.72
 
-function buildTintedSlideOverlaySvg(input: CarouselSlideInput): string {
+/** Measure a text line's natural rendered width for a font family/size (render + trim). */
+async function measureLineWidth(text: string, fontFamily: string, fontSize: number): Promise<number> {
+  const svg = `<svg width="${SLIDE_SIZE * 2}" height="${Math.ceil(fontSize * 2)}" xmlns="http://www.w3.org/2000/svg"><text x="10" y="${Math.round(fontSize * 1.3)}" font-family="${fontFamily}" font-size="${fontSize}" fill="#000">${escapeXml(text)}</text></svg>`
+  try {
+    const { info } = await sharp(Buffer.from(svg)).trim().toBuffer({ resolveWithObject: true })
+    return info.width
+  } catch {
+    return Math.round(text.length * fontSize * 0.5) // char-count estimate fallback
+  }
+}
+
+/**
+ * One justified line as its own <text> element: flush-left at x0; when it is
+ * not a paragraph's last line and fills enough of the block, the width deficit
+ * is spread across the glyph gaps via letter-spacing (librsvg applies it to
+ * the n−1 gaps between characters).
+ */
+async function justifiedLineSvg(
+  line: string,
+  x0: number,
+  y: number,
+  blockW: number,
+  fontFamily: string,
+  fontSize: number,
+  fill: string,
+  isLast: boolean,
+): Promise<string> {
+  let spacing = 0
+  if (!isLast && line.length > 1) {
+    const natural = await measureLineWidth(line, fontFamily, fontSize)
+    if (natural < blockW && natural / blockW >= JUSTIFY_MIN_FILL) {
+      spacing = (blockW - natural) / (line.length - 1)
+    }
+  }
+  const spacingAttr = spacing > 0 ? ` letter-spacing="${spacing.toFixed(2)}"` : ''
+  return `<text x="${x0}" y="${y}" font-family="${fontFamily}" font-size="${fontSize}" fill="${fill}"${spacingAttr}>${escapeXml(line)}</text>`
+}
+
+async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<string> {
   const { slide } = input
   const tint = input.tint!
 
   const headlineFontSz = 48
   const headlineLineH = 62
+  const headlineMaxChars = 22
   const headBodyGap = 34
   const paragraphGap = 16
   const regionH = TINT_TEXT_BOTTOM - TINT_TEXT_TOP
 
-  const headLines = slide.headlineText ? wrapText(slide.headlineText, 22, 4) : []
+  const headLines = slide.headlineText ? wrapText(slide.headlineText, headlineMaxChars, 4) : []
   const headlineBlockH = headLines.length * headlineLineH
 
   // Auto-fit the body: shrink until the whole block fits the centering region.
@@ -357,30 +403,39 @@ function buildTintedSlideOverlaySvg(input: CarouselSlideInput): string {
   const totalH = headlineBlockH + gapH + bodyBlockH
   let currentY = TINT_TEXT_TOP + Math.max(0, Math.round((regionH - totalH) / 2))
 
-  const centerX = SLIDE_SIZE / 2
+  // One shared block width so headline and body justify to the same edges,
+  // centered on the slide: the widest measured line, capped to safe margins.
+  const headWidths = await Promise.all(headLines.map((l) => measureLineWidth(l, FONT_MEDIUM, headlineFontSz)))
+  const bodyWidths = await Promise.all(
+    bodyGroups.flat().map((l) => measureLineWidth(l, FONT_LIGHT, bodyFontSz)),
+  )
+  const widest = Math.max(0, ...headWidths, ...bodyWidths)
+  const blockW = Math.min(Math.max(widest, 320), SLIDE_SIZE - 2 * 120)
+  const x0 = Math.round((SLIDE_SIZE - blockW) / 2)
+
   const elements: string[] = []
 
-  if (headLines.length > 0) {
+  for (let i = 0; i < headLines.length; i++) {
     elements.push(
-      `<text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${tint.textColor}">` +
-      centeredTextLines(headLines, centerX, currentY + headlineFontSz, headlineLineH) +
-      `</text>`,
+      await justifiedLineSvg(
+        headLines[i], x0, currentY + headlineFontSz + i * headlineLineH,
+        blockW, FONT_MEDIUM, headlineFontSz, tint.textColor, i === headLines.length - 1,
+      ),
     )
-    currentY += headlineBlockH + gapH
   }
+  if (headLines.length > 0) currentY += headlineBlockH + gapH
 
-  const bodyTspans: string[] = []
   for (const lines of bodyGroups) {
-    for (const line of lines) {
-      bodyTspans.push(`<tspan x="${centerX}" y="${currentY + bodyFontSz}">${escapeXml(line)}</tspan>`)
+    for (let i = 0; i < lines.length; i++) {
+      elements.push(
+        await justifiedLineSvg(
+          lines[i], x0, currentY + bodyFontSz,
+          blockW, FONT_LIGHT, bodyFontSz, tint.textColor, i === lines.length - 1,
+        ),
+      )
       currentY += bodyLineH
     }
     currentY += paragraphGap
-  }
-  if (bodyTspans.length > 0) {
-    elements.push(
-      `<text text-anchor="middle" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${bodyTspans.join('')}</text>`,
-    )
   }
 
   return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
@@ -494,8 +549,8 @@ export async function renderCarouselSlide(
 ): Promise<Buffer> {
   let overlaySvg: string
   if (input.tint) {
-    // Brand-tint design: one uniform centered treatment for every slide type.
-    overlaySvg = buildTintedSlideOverlaySvg(input)
+    // Brand-tint design: one uniform justified-block treatment for every slide type.
+    overlaySvg = await buildTintedSlideOverlaySvg(input)
   } else {
     switch (input.slide.type) {
       case 'hook':

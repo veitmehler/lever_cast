@@ -166,7 +166,7 @@ export async function contentPlanRoutes(app: FastifyInstance) {
     const account = await resolveAccountForClerkId(clerkId)
     if (!account) return reply.status(404).send({ error: 'User not found' })
 
-    const [readyArticles, flaggedArticles, readyNewsletters] = await Promise.all([
+    const [readyArticles, flaggedArticles, readyNewsletters, socialReadyRuns] = await Promise.all([
       prisma.articleJob.findMany({
         where: { userId: account.userId, status: 'enriched' }, // extension → account members
         select: { id: true, topic: { select: { topic: true } }, sitePage: { select: { title: true } }, enrichedAt: true },
@@ -185,7 +185,26 @@ export async function contentPlanRoutes(app: FastifyInstance) {
         orderBy: { updatedAt: 'desc' },
         take: 50,
       }),
+      // Social posts awaiting approval — 'ready' is the generation-complete preview
+      // state (see social/automation/run.ts finalizeGenerationCounts). The dashboard
+      // currently has no visibility into this at all; surfaced here so it can offer a
+      // second "Review Social Posts" action alongside content approval.
+      prisma.socialAutomationRun.findMany({
+        where: { userId: account.userId, status: 'ready' }, // extension → account members
+        select: { jobId: true, newsletterId: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+      }),
     ])
+
+    // Dedupe — a run only ever has one of jobId/newsletterId set, but multiple runs
+    // could theoretically exist per article/newsletter over time.
+    const socialReadyArticleJobIds = [...new Set(
+      socialReadyRuns.map((r) => r.jobId).filter((id): id is string => !!id),
+    )]
+    const socialReadyNewsletterIds = [...new Set(
+      socialReadyRuns.map((r) => r.newsletterId).filter((id): id is string => !!id),
+    )]
 
     // Articles with an open edit request assigned to the CURRENT user (the teammate).
     const myEditReqs = await prisma.articleEditRequest.findMany({
@@ -220,6 +239,10 @@ export async function contentPlanRoutes(app: FastifyInstance) {
         at: a.createdAt,
       })),
       assignedToMe,
+      socialReady: {
+        articleJobIds: socialReadyArticleJobIds,
+        newsletterIds: socialReadyNewsletterIds,
+      },
     })
   })
 }

@@ -364,6 +364,56 @@ async function justifiedLineSvg(
   return `<text x="${x0}" y="${y}" font-family="${fontFamily}" font-size="${fontSize}" fill="${fill}"${spacingAttr}>${escapeXml(line)}</text>`
 }
 
+/**
+ * Hook (title) slide: full-width banner behind a CENTER-ALIGNED title spanning
+ * ~80% of the slide width. Banner/text colors are scheme-inverted relative to
+ * the body scheme so the title always pops against the tint:
+ *  - white-text scheme (dark brand): white banner @0.92, title in the brand color
+ *  - dark-text scheme (light brand): dark banner, white title
+ * Returns the banner's bottom Y so the compositor can center the swipe arrows
+ * exactly between banner and logo.
+ */
+async function buildTintedHookOverlaySvg(
+  input: CarouselSlideInput,
+): Promise<{ svg: string; bannerBottom: number }> {
+  const { slide } = input
+  const tint = input.tint!
+
+  const fontSize = 48
+  const lineH = 62
+  const padV = 40
+  const regionH = TINT_TEXT_BOTTOM - TINT_TEXT_TOP
+
+  // 80% width text zone at 48px HelveticaNeue Medium (~0.52em avg advance).
+  const textZoneW = Math.round(SLIDE_SIZE * 0.8)
+  const maxChars = Math.max(22, Math.floor(textZoneW / (fontSize * 0.52)))
+
+  const displayText = slide.headlineText?.trim() || slide.bodyText?.split('\n')[0]?.trim() || ''
+  const lines = wrapText(displayText, maxChars, 5)
+  const blockH = lines.length * lineH
+
+  const blockTop = TINT_TEXT_TOP + Math.max(0, Math.round((regionH - blockH) / 2))
+  const bannerY = blockTop - padV
+  const bannerH = blockH + 2 * padV
+  const bannerBottom = bannerY + bannerH
+
+  const lightScheme = tint.textColor === '#FFFFFF'
+  const bannerFill = lightScheme ? '#FFFFFF' : '#000000'
+  const bannerOpacity = lightScheme ? 0.92 : 0.55
+  const titleFill = lightScheme ? tint.overlayColor : '#FFFFFF'
+
+  const textSvg = centeredTextLines(lines, SLIDE_SIZE / 2, blockTop + fontSize, lineH)
+
+  const svg = `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="${tint.overlayColor}" fill-opacity="${tint.overlayOpacity}"/>
+  <rect x="0" y="${bannerY}" width="${SLIDE_SIZE}" height="${bannerH}" fill="${bannerFill}" fill-opacity="${bannerOpacity}"/>
+  <text text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${fontSize}" fill="${titleFill}">
+    ${textSvg}
+  </text>
+</svg>`
+  return { svg, bannerBottom }
+}
+
 async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<string> {
   const { slide } = input
   const tint = input.tint!
@@ -414,19 +464,6 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
   const x0 = Math.round((SLIDE_SIZE - blockW) / 2)
 
   const elements: string[] = []
-
-  // Hook slide: a rounded banner behind the title so it stands out over the
-  // tint + image (mirrors the classic hook's title box). Scheme-aware: black
-  // behind white text, white behind dark text — a fixed dark banner would
-  // fight the dark-text schemes light brands get.
-  if (slide.type === 'hook' && headLines.length > 0) {
-    const padV = 40
-    const padH = 60
-    const bannerFill = tint.textColor === '#FFFFFF' ? '#000000' : '#FFFFFF'
-    elements.push(
-      `<rect x="${x0 - padH}" y="${currentY - padV}" width="${blockW + 2 * padH}" height="${headlineBlockH + 2 * padV}" rx="6" fill="${bannerFill}" fill-opacity="0.55"/>`,
-    )
-  }
 
   for (let i = 0; i < headLines.length; i++) {
     elements.push(
@@ -561,9 +598,16 @@ export async function renderCarouselSlide(
   input: CarouselSlideInput,
 ): Promise<Buffer> {
   let overlaySvg: string
+  let hookBannerBottom: number | null = null
   if (input.tint) {
-    // Brand-tint design: one uniform justified-block treatment for every slide type.
-    overlaySvg = await buildTintedSlideOverlaySvg(input)
+    // Brand-tint design: full-width-banner hook, justified block for the rest.
+    if (input.slide.type === 'hook') {
+      const hook = await buildTintedHookOverlaySvg(input)
+      overlaySvg = hook.svg
+      hookBannerBottom = hook.bannerBottom
+    } else {
+      overlaySvg = await buildTintedSlideOverlaySvg(input)
+    }
   } else {
     switch (input.slide.type) {
       case 'hook':
@@ -588,45 +632,41 @@ export async function renderCarouselSlide(
 
   const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
 
-  // Tinted hook slide: continuation-arrow swipe cue on the RIGHT, sharing the
-  // logo's right margin so their right edges align, anchored at ~74% height —
-  // vertically between the centered title block and the bottom-right logo
-  // (the same anchor F4 uses). Color already matches the measured text/logo
-  // variant (loaded upstream).
-  if (input.tint && input.slide.type === 'hook' && input.arrowBuffer) {
-    const ARROW_W = 100
-    const MARGIN = 48
-    try {
-      const meta = await sharp(input.arrowBuffer).metadata()
-      const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
-      const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
-      const arrowBottom = Math.round(SLIDE_SIZE * 0.74)
-      composites.push({
-        input: arrowPng,
-        left: SLIDE_SIZE - ARROW_W - MARGIN,
-        top: arrowBottom - arrowH,
-      })
-    } catch (err) {
-      logger.warn({ err }, '[carousel] tint arrow compositing failed (non-fatal)')
-    }
-  }
-
-  // Tinted slides: logo bottom-right on every slide, 48px margin to bottom and
-  // right (same corner margin the F4 arrow uses).
-  if (input.tint && input.tintLogoBuffer) {
+  // Tinted slides: logo bottom-right on every slide (48px margins); on the
+  // hook slide the swipe arrows sit with their RIGHT edge on the logo's LEFT
+  // edge, centered exactly halfway between the title banner and the logo.
+  if (input.tint) {
     const LOGO_W = 140
     const MARGIN = 48
-    try {
-      const meta = await sharp(input.tintLogoBuffer).metadata()
-      const logoH = Math.round((LOGO_W * (meta.height ?? LOGO_W)) / (meta.width ?? LOGO_W))
-      const logoPng = await sharp(input.tintLogoBuffer).resize({ width: LOGO_W }).png().toBuffer()
-      composites.push({
-        input: logoPng,
-        left: SLIDE_SIZE - LOGO_W - MARGIN,
-        top: SLIDE_SIZE - logoH - MARGIN,
-      })
-    } catch (err) {
-      logger.warn({ err }, '[carousel] tint logo compositing failed (non-fatal)')
+    let logoLeft = SLIDE_SIZE - LOGO_W - MARGIN
+    let logoTop = SLIDE_SIZE - Math.round(LOGO_W * 0.32) - MARGIN // aspect fallback when no logo loads
+    if (input.tintLogoBuffer) {
+      try {
+        const meta = await sharp(input.tintLogoBuffer).metadata()
+        const logoH = Math.round((LOGO_W * (meta.height ?? LOGO_W)) / (meta.width ?? LOGO_W))
+        const logoPng = await sharp(input.tintLogoBuffer).resize({ width: LOGO_W }).png().toBuffer()
+        logoTop = SLIDE_SIZE - logoH - MARGIN
+        composites.push({ input: logoPng, left: logoLeft, top: logoTop })
+      } catch (err) {
+        logger.warn({ err }, '[carousel] tint logo compositing failed (non-fatal)')
+      }
+    }
+
+    if (input.slide.type === 'hook' && input.arrowBuffer && hookBannerBottom != null) {
+      const ARROW_W = 100
+      try {
+        const meta = await sharp(input.arrowBuffer).metadata()
+        const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
+        const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
+        const centerY = Math.round((hookBannerBottom + logoTop) / 2)
+        composites.push({
+          input: arrowPng,
+          left: logoLeft - ARROW_W,
+          top: centerY - Math.round(arrowH / 2),
+        })
+      } catch (err) {
+        logger.warn({ err }, '[carousel] tint arrow compositing failed (non-fatal)')
+      }
     }
   }
 

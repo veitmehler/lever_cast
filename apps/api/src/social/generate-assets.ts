@@ -144,10 +144,15 @@ export async function generateCarouselAssets(opts: {
   // the platform slide cap.
   const planCount = useDiagram ? Math.max(2, slideCount - 1) : slideCount
 
-  // Continuation-arrow glyph (color matches the watermark variant) for the hook +
-  // explainer slides in diagram mode.
+  // Continuation-arrow glyph for the hook slide's swipe cue: diagram mode colors
+  // it by the watermark variant; tint mode by the measured text/logo variant
+  // (light text → white arrows). Classic carousels carry no arrows.
   const arrowVariant: 'light' | 'dark' = opts.diagramLogoVariant === 'dark' ? 'dark' : 'light'
-  const arrowBuffer = useDiagram ? await loadContinuationArrow(arrowVariant) : null
+  const arrowBuffer = useDiagram
+    ? await loadContinuationArrow(arrowVariant)
+    : tint
+      ? await loadContinuationArrow(tint.logoVariant)
+      : null
 
   const slidePlans = await planCarouselSlides({
     content: opts.content,
@@ -293,9 +298,11 @@ export async function regenerateCarouselSlide(opts: {
 
   let tint: TintScheme | undefined
   let tintLogoBuffer: Buffer | null = null
+  let tintArrowBuffer: Buffer | null = null
   if (opts.designVariant === 'brand_tint') {
     tint = tintScheme(brand.primaryColor)
     tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
+    tintArrowBuffer = await loadContinuationArrow(tint.logoVariant)
   }
 
   const bg = await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId)
@@ -308,6 +315,7 @@ export async function regenerateCarouselSlide(opts: {
     logoBuffer,
     tint,
     tintLogoBuffer,
+    arrowBuffer: tintArrowBuffer,
   })
 
   const registered = await registerSocialMedia({

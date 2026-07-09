@@ -575,6 +575,22 @@ export async function renderCarouselSlide(
 
   const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
 
+  // Tinted hook slide: continuation-arrow swipe cue bottom-LEFT, mirroring the
+  // logo's corner margins so the two corner elements balance. Color already
+  // matches the measured text/logo variant (loaded upstream).
+  if (input.tint && input.slide.type === 'hook' && input.arrowBuffer) {
+    const ARROW_W = 100
+    const MARGIN = 48
+    try {
+      const meta = await sharp(input.arrowBuffer).metadata()
+      const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
+      const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
+      composites.push({ input: arrowPng, left: MARGIN, top: SLIDE_SIZE - arrowH - MARGIN })
+    } catch (err) {
+      logger.warn({ err }, '[carousel] tint arrow compositing failed (non-fatal)')
+    }
+  }
+
   // Tinted slides: logo bottom-right on every slide, 48px margin to bottom and
   // right (same corner margin the F4 arrow uses).
   if (input.tint && input.tintLogoBuffer) {

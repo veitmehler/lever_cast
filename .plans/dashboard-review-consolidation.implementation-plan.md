@@ -1,6 +1,6 @@
 # Dashboard Review Consolidation — Implementation Plan
 
-Status: **planned** (2026-07-09). Not started — discussion only, per user request.
+Status: **all 4 phases implemented and pushed to staging** (2026-07-09).
 
 ## Goal
 
@@ -147,7 +147,7 @@ DB-orchestrating route handlers).
   that's Phase D.
   includes that day's `newsletterId`.
 
-## Phase D — Dashboard wiring
+## Phase D — Dashboard wiring — IMPLEMENTED (2026-07-09)
 
 - `ContentPlan.tsx`: load the new `socialReady` data alongside the existing `inbox` fetch.
 - Add the second button (distinct label/icon from "Review & Approve") next to/near the existing
@@ -158,6 +158,36 @@ DB-orchestrating route handlers).
 - `outOfWindow`-equivalent handling: an item whose social posts become ready after it's scrolled
   out of the visible date range should still be reachable — mirror the existing `outOfWindow`
   pattern already in `ContentPlan.tsx` for content-review items.
+
+**Done:**
+- `Inbox` interface gains `socialReady?: { articleJobIds: string[]; newsletterIds: string[] }` —
+  no extra fetch needed, it rides along on the existing `/api/review-inbox` call.
+- Two new state slots (`socialReviewArticle` / `socialReviewNewsletter`, each `{ id, title } | null`
+  — separate slots rather than one generic one, since `SocialReviewModal` and
+  `NewsletterReviewModal` take different prop shapes by design).
+- `socialReadyArticleIds` / `socialReadyNewsletterIds` derived `Set`s, mirroring the existing
+  `readyArticleIds`/`readyNewsletterIds` pattern exactly.
+- New `SocialReviewBtn` — label **"Review Social Posts"**, styled as an outline/light-primary
+  button (vs. `ReviewBtn`'s solid primary) so it reads as a *distinct, secondary* action, not a
+  duplicate of content approval. Wired into `ReviewActions` (shared by both table and grid views
+  automatically, since both already call the same function) for both article and newsletter,
+  independent of the existing assigned/ready/flagged states — a day can show both a content
+  action and a social action at once if applicable.
+- On modal close, `void load()` re-fetches `/review-inbox` so the button disappears once the run
+  moves past `'ready'` (e.g. after approving) — matches the existing `onApproved` pattern for
+  content review.
+- **Out-of-window handling deliberately deferred** (see Risks below) — the button only appears
+  for days visible in the current 30-day plan window, where a title (`a.topic`/`nl.topic`) is
+  already available from the day-plan data. Phase A's `socialReady` only returns bare IDs, so an
+  out-of-window social-ready item has no title to show yet; extending this would mean going back
+  to Phase A's endpoint to add titles. Judged low-value for v1: social generation typically
+  completes within days of approval, well inside the 30-day window, making this a rare edge case
+  — not implemented now, easy follow-up if it turns out to matter in practice.
+- Verified via `tsc --noEmit`, `eslint`, and a full `next build` (not just typecheck) — `/dashboard`
+  grew 24.1→25.7 kB (expected, two new modal imports); `/newsletter/[id]`'s own chunk actually
+  *shrank* 5.68→3.19 kB, since Next.js now shares the `NewsletterEditionContent` chunk between the
+  route and the dashboard modal bundle rather than duplicating it — confirms the Phase C
+  extraction is genuinely shared, not copy-pasted.
 
 ## Touch list (files)
 

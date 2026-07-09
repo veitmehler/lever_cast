@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import {
   Loader2, CalendarRange, Table as TableIcon, LayoutGrid, Pencil, X,
-  Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle,
+  Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle, Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { ReviewApproveModal, type ReviewItem } from './ReviewApproveModal'
 import { TopicEditModal, type EditableTopic } from './TopicEditModal'
+import { SocialReviewModal } from './SocialReviewModal'
+import { NewsletterReviewModal } from './NewsletterReviewModal'
 
 interface ArticleEntry {
   source: 'scheduled' | 'article_calendar'
@@ -36,6 +38,7 @@ interface Inbox {
   newsletters: { newsletterId: string; title: string }[]
   flagged: { jobId: string; title: string; reasons: string[] }[]
   assignedToMe?: { jobId: string; title: string }[]
+  socialReady?: { articleJobIds: string[]; newsletterIds: string[] }
 }
 
 // Cadence: articles Tue/Thu, newsletters Mon/Wed/Fri/Sat, Sunday nothing.
@@ -58,6 +61,8 @@ export function ContentPlan() {
   const [addText, setAddText] = useState('')
   const [editTopic, setEditTopic] = useState<EditableTopic | null>(null)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [socialReviewArticle, setSocialReviewArticle] = useState<{ jobId: string; title: string } | null>(null)
+  const [socialReviewNewsletter, setSocialReviewNewsletter] = useState<{ newsletterId: string; title: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,6 +87,8 @@ export function ContentPlan() {
   const readyArticleIds = new Set((inbox?.articles ?? []).map((a) => a.jobId))
   const readyNewsletterIds = new Set((inbox?.newsletters ?? []).map((n) => n.newsletterId))
   const assignedToMeIds = new Set((inbox?.assignedToMe ?? []).map((a) => a.jobId))
+  const socialReadyArticleIds = new Set(inbox?.socialReady?.articleJobIds ?? [])
+  const socialReadyNewsletterIds = new Set(inbox?.socialReady?.newsletterIds ?? [])
   const readyQueue: ReviewItem[] = [
     ...(inbox?.articles ?? []).map((a) => ({ kind: 'article' as const, id: a.jobId, title: a.title })),
     ...(inbox?.newsletters ?? []).map((n) => ({ kind: 'newsletter' as const, id: n.newsletterId, title: n.title })),
@@ -163,6 +170,21 @@ export function ContentPlan() {
     )
   }
 
+  // Distinct affordance from ReviewBtn (content approval) — social posts unlock
+  // AFTER content approval, on a separate timeline, so it's a second button
+  // rather than folded into the same queue.
+  function SocialReviewBtn({ kind, id, title }: { kind: 'article' | 'newsletter'; id: string; title: string }) {
+    return (
+      <button
+        onClick={() => kind === 'article'
+          ? setSocialReviewArticle({ jobId: id, title })
+          : setSocialReviewNewsletter({ newsletterId: id, title })}
+        className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
+        <Share2 className="h-3.5 w-3.5" /> Review Social Posts
+      </button>
+    )
+  }
+
   // Materialize a calendar suggestion into a real topic, then open the options editor.
   async function materializeAndEdit(d: Day) {
     const p = d.article.primary
@@ -181,7 +203,8 @@ export function ContentPlan() {
     } finally { setBusyDate(null) }
   }
 
-  // The right-hand "Review" column for a day: assigned-edit > review > flagged.
+  // The right-hand "Review" column for a day: assigned-edit > review > flagged,
+  // plus (independently) social-post review once generation completes.
   function ReviewActions({ d }: { d: Day }) {
     const a = d.article.primary
     const nl = d.newsletter
@@ -189,7 +212,11 @@ export function ContentPlan() {
     const articleReady = a?.jobId && readyArticleIds.has(a.jobId)
     const articleFlagged = a?.jobStatus === 'needs_review' && a.jobId
     const nlReady = nl?.newsletterId && readyNewsletterIds.has(nl.newsletterId)
-    if (!assignedToMe && !articleReady && !articleFlagged && !nlReady) return <span className="text-xs text-muted-foreground">—</span>
+    const articleSocialReady = a?.jobId && socialReadyArticleIds.has(a.jobId)
+    const nlSocialReady = nl?.newsletterId && socialReadyNewsletterIds.has(nl.newsletterId)
+    if (!assignedToMe && !articleReady && !articleFlagged && !nlReady && !articleSocialReady && !nlSocialReady) {
+      return <span className="text-xs text-muted-foreground">—</span>
+    }
     return (
       <div className="flex flex-col items-end gap-1">
         {assignedToMe ? (
@@ -203,7 +230,9 @@ export function ContentPlan() {
             <AlertTriangle className="h-3.5 w-3.5" /> Needs review
           </Link>
         ) : null}
+        {articleSocialReady && <SocialReviewBtn kind="article" id={a!.jobId!} title={a!.topic} />}
         {nlReady && <ReviewBtn kind="newsletter" id={nl!.newsletterId!} />}
+        {nlSocialReady && <SocialReviewBtn kind="newsletter" id={nl!.newsletterId!} title={nl!.topic} />}
       </div>
     )
   }
@@ -407,6 +436,22 @@ export function ContentPlan() {
 
       {editTopic && (
         <TopicEditModal topic={editTopic} onClose={() => setEditTopic(null)} onSaved={() => { setEditTopic(null); void load() }} />
+      )}
+
+      {socialReviewArticle && (
+        <SocialReviewModal
+          jobId={socialReviewArticle.jobId}
+          title={socialReviewArticle.title}
+          onClose={() => { setSocialReviewArticle(null); void load() }}
+        />
+      )}
+
+      {socialReviewNewsletter && (
+        <NewsletterReviewModal
+          newsletterId={socialReviewNewsletter.newsletterId}
+          title={socialReviewNewsletter.title}
+          onClose={() => { setSocialReviewNewsletter(null); void load() }}
+        />
       )}
 
       {pickerDate && (

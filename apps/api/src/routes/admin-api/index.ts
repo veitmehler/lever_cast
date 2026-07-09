@@ -11,11 +11,13 @@ import { musicAdminRoutes } from './music'
 import { newslettersAdminRoutes } from './newsletters'
 import { specializationsAdminRoutes } from './specializations'
 import { articleCalendarsAdminRoutes } from './article-calendars'
+import { accountsAdminRoutes } from './accounts'
 
 export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(llmKeysAdminRoutes)
   await app.register(costsAdminRoutes)
   await app.register(usersAdminRoutes)
+  await app.register(accountsAdminRoutes)
   await app.register(errorsAdminRoutes)
   await app.register(articlesAdminRoutes)
   await app.register(promptsAdminRoutes)

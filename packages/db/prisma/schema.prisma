@@ -27,6 +27,11 @@ model Account {
   // Auto-routed admin-curated article calendar (specialization × hemisphere).
   articleCalendarId String?
   articleCalendar   ArticleCalendar? @relation(fields: [articleCalendarId], references: [id], onDelete: SetNull)
+  // Billing-cycle anchor (see .plans/content-plan-billing-window.implementation-plan.md).
+  // Set once, on first payment, never touched again — the current cycle boundary is always
+  // derived from this via billing-window.ts. Nullable: unset accounts keep the legacy
+  // rolling-30-day-from-today Content Plan behavior.
+  subscriptionStartedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

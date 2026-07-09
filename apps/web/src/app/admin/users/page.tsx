@@ -1,6 +1,7 @@
 import { prisma } from '@socioply/shared'
 import { KpiCard } from '@/components/admin/KpiCard'
 import { RoleToggle } from './RoleToggle'
+import { SubscriptionDateField } from './SubscriptionDateField'
 
 export default async function UsersPage() {
   const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -14,6 +15,8 @@ export default async function UsersPage() {
         name: true,
         role: true,
         createdAt: true,
+        accountId: true,
+        account: { select: { subscriptionStartedAt: true } },
         _count: { select: { articleJobs: true, posts: true } },
       },
     }),
@@ -50,6 +53,7 @@ export default async function UsersPage() {
             <tr className="border-b border-border bg-muted/30">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">User</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Subscription start</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Articles</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Posts</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Cost (30d)</th>
@@ -65,6 +69,16 @@ export default async function UsersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <RoleToggle userId={user.id} currentRole={user.role} />
+                </td>
+                <td className="px-4 py-3">
+                  {user.accountId ? (
+                    <SubscriptionDateField
+                      accountId={user.accountId}
+                      currentDate={user.account?.subscriptionStartedAt?.toISOString().slice(0, 10) ?? null}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">no account</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right text-muted-foreground">
                   {user._count.articleJobs}

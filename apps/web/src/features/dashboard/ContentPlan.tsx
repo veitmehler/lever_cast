@@ -28,7 +28,7 @@ interface Day {
   article: { primary: ArticleEntry | null; alternatives: ArticleEntry[] }
   newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string } | null
 }
-interface PlanData { from: string; to: string; days: Day[]; ideaCount: number }
+interface PlanData { from: string; to: string; days: Day[]; ideaCount: number; executableUntil: string | null }
 interface Idea {
   id: string; topic: string; mode?: string | null
   outlineFrameworkNumber?: number | null; outlineSpecialInstructions?: string | null; realCaseStudies?: string | null
@@ -155,7 +155,11 @@ export function ContentPlan() {
 
   // Only show content days (article = Tue/Thu, newsletter = Mon/Wed/Fri/Sat); skip Sundays.
   const visibleDays = (data?.days ?? []).filter((d) => ARTICLE_DOW.has(dow(d.date)) || NEWSLETTER_DOW.has(dow(d.date)))
-  const selectableDates = visibleDays.filter((d) => d.article.primary || d.newsletter).map((d) => d.date)
+  // Planning window (up to 60 days) is always fully editable; production (checkbox-selectable)
+  // is capped at executableUntil — the current paid cycle. Null means ungated (legacy accounts).
+  const executableUntil = data?.executableUntil ?? null
+  const isGated = (date: string) => executableUntil != null && date > executableUntil
+  const selectableDates = visibleDays.filter((d) => (d.article.primary || d.newsletter) && !isGated(d.date)).map((d) => d.date)
   const toggleSelect = (date: string) =>
     setSelected((prev) => { const n = new Set(prev); if (n.has(date)) n.delete(date); else n.add(date); return n })
   const fmt = (date: string) => format(new Date(date + 'T00:00:00'), 'EEE, MMM d')
@@ -304,7 +308,10 @@ export function ContentPlan() {
             <h2 className="text-xl font-bold text-foreground">Content Plan</h2>
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Your articles and newsletters for the next 30 days.{data ? ` ${data.ideaCount} ideas in your bank.` : ''}
+            {executableUntil
+              ? `You can produce content through ${fmt(executableUntil)} — plan ahead through ${fmt(data!.to)}.`
+              : 'Your articles and newsletters for the next 30 days.'}
+            {data ? ` ${data.ideaCount} ideas in your bank.` : ''}
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
@@ -347,10 +354,14 @@ export function ContentPlan() {
             <tbody>
               {visibleDays.map((d) => {
                 const selectable = !!(d.article.primary || d.newsletter)
+                const gated = isGated(d.date)
                 return (
                   <tr key={d.date} className="border-t border-border align-middle">
-                    <td className="px-3 py-2.5">{selectable && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">{fmt(d.date)}</td>
+                    <td className="px-3 py-2.5">{selectable && !gated && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-foreground">
+                      {fmt(d.date)}
+                      {gated && <div className="mt-0.5 text-[10px] font-normal text-muted-foreground">Plan ahead — unlocks {fmt(executableUntil!)}</div>}
+                    </td>
                     <td className="px-3 py-2.5"><ArticleCell d={d} /></td>
                     <td className="px-3 py-2.5"><NewsletterCell d={d} /></td>
                     <td className="px-3 py-2.5"><ReviewActions d={d} /></td>
@@ -362,12 +373,16 @@ export function ContentPlan() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleDays.map((d) => (
+          {visibleDays.map((d) => {
+            const selectable = !!(d.article.primary || d.newsletter)
+            const gated = isGated(d.date)
+            return (
             <div key={d.date} className="rounded-xl border border-border bg-card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">{fmt(d.date)}</span>
-                {(d.article.primary || d.newsletter) && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}
+                {selectable && !gated && <input type="checkbox" checked={selected.has(d.date)} onChange={() => toggleSelect(d.date)} className="h-4 w-4 rounded border-input" />}
               </div>
+              {gated && selectable && <div className="-mt-1 mb-2 text-[10px] text-muted-foreground">Plan ahead — unlocks {fmt(executableUntil!)}</div>}
               <div className="space-y-2">
                 <div className="rounded-lg bg-muted/40 p-2">
                   <div className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><FileText className="h-3 w-3" /> Article</div>
@@ -380,7 +395,8 @@ export function ContentPlan() {
                 <div className="flex justify-end"><ReviewActions d={d} /></div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

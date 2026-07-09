@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma, resolveAccountForClerkId } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'
+import { billingWindows } from '../article-pipeline/billing-window'
 
 /**
  * Unified content plan: merges, per day, the account's planned ARTICLE topic and
@@ -34,19 +35,39 @@ export async function contentPlanRoutes(app: FastifyInstance) {
     const account = await resolveAccountForClerkId(clerkId)
     if (!account) return reply.status(404).send({ error: 'User not found' })
 
-    const from = request.query.from ? new Date(request.query.from) : new Date()
-    from.setUTCHours(0, 0, 0, 0)
-    const to = request.query.to ? new Date(request.query.to) : new Date(from.getTime() + 29 * 86400000)
-    to.setUTCHours(23, 59, 59, 999)
-
     const acct = await prisma.account.findUnique({
       where: { id: account.accountId },
-      select: { articleCalendarId: true },
+      select: { articleCalendarId: true, subscriptionStartedAt: true },
     })
     const owner = await prisma.user.findUnique({
       where: { id: account.ownerUserId },
       select: { newsletterCalendarId: true },
     })
+
+    // Default window: billing-cycle-anchored (current + next cycle = 60-day
+    // planning window) when the account has a subscription anchor date; the
+    // legacy rolling-30-day-from-today window otherwise (unset accounts are
+    // unaffected). Explicit ?from=/?to= query overrides always win — used by
+    // admin/debug tooling, not by the dashboard's default fetch.
+    let executableUntil: Date | null = null
+    let from: Date
+    let to: Date
+    if (request.query.from || request.query.to) {
+      from = request.query.from ? new Date(request.query.from) : new Date()
+      from.setUTCHours(0, 0, 0, 0)
+      to = request.query.to ? new Date(request.query.to) : new Date(from.getTime() + 29 * 86400000)
+      to.setUTCHours(23, 59, 59, 999)
+    } else if (acct?.subscriptionStartedAt) {
+      const w = billingWindows(acct.subscriptionStartedAt)
+      from = w.from
+      to = w.to
+      executableUntil = w.executableUntil
+    } else {
+      from = new Date()
+      from.setUTCHours(0, 0, 0, 0)
+      to = new Date(from.getTime() + 29 * 86400000)
+      to.setUTCHours(23, 59, 59, 999)
+    }
 
     const [scheduledTopics, articleCalTopics, newsletterTopics, ideaCount] = await Promise.all([
       // User-scheduled article topics (account-scoped via the prisma extension).
@@ -138,7 +159,13 @@ export async function contentPlanRoutes(app: FastifyInstance) {
       })
     }
 
-    return reply.send({ from: dateKey(from), to: dateKey(to), days, ideaCount })
+    return reply.send({
+      from: dateKey(from),
+      to: dateKey(to),
+      days,
+      ideaCount,
+      executableUntil: executableUntil ? dateKey(executableUntil) : null,
+    })
   })
 
   // POST /content-plan/generate { dates: string[] } — bulk generate selected days.
@@ -148,15 +175,41 @@ export async function contentPlanRoutes(app: FastifyInstance) {
     const account = await resolveAccountForClerkId(clerkId)
     if (!account) return reply.status(404).send({ error: 'User not found' })
 
-    const dates = (request.body?.dates ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    if (dates.length === 0) return reply.status(400).send({ error: 'No valid dates provided' })
+    const requestedDates = (request.body?.dates ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    if (requestedDates.length === 0) return reply.status(400).send({ error: 'No valid dates provided' })
+
+    // Production gate: independent of whatever the frontend disabled — a date
+    // beyond the account's current paid cycle cannot be generated, only planned.
+    // Not just a UX nicety; this is the actual enforcement point (see
+    // .plans/content-plan-billing-window.implementation-plan.md Phase 3).
+    const acctBilling = await prisma.account.findUnique({
+      where: { id: account.accountId },
+      select: { subscriptionStartedAt: true },
+    })
+    let dates = requestedDates
+    let skippedDates: string[] = []
+    if (acctBilling?.subscriptionStartedAt) {
+      const executableUntilKey = dateKey(billingWindows(acctBilling.subscriptionStartedAt).executableUntil)
+      dates = requestedDates.filter((d) => d <= executableUntilKey)
+      skippedDates = requestedDates.filter((d) => d > executableUntilKey)
+    }
+    if (dates.length === 0) {
+      return reply.status(400).send({
+        error: 'Selected day(s) are beyond your current billing cycle — you can plan them, but not generate yet.',
+        skippedDates,
+      })
+    }
 
     const created = await createBatchFromDates(account, dates)
     if (!created) return reply.status(400).send({ error: 'Nothing to generate on the selected days.' })
 
     // Kick off the first item immediately; the monitor cron drives the rest.
     await advanceBatch(created.batchId)
-    return reply.status(202).send({ batchId: created.batchId, itemCount: created.itemCount })
+    return reply.status(202).send({
+      batchId: created.batchId,
+      itemCount: created.itemCount,
+      ...(skippedDates.length > 0 ? { skippedDates } : {}),
+    })
   })
 
   // GET /review-inbox — items ready to review + flagged, for the account.

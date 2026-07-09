@@ -23,15 +23,11 @@ interface PromptTemplate {
 // Used to display a hint and warn when the entered value exceeds the model ceiling.
 const MODEL_MAX_OUTPUT_TOKENS: Record<string, number> = {
   // Gemini
-  'gemini-2.5-flash':              65536,
-  'gemini-2.5-flash-lite':         32768,
-  'gemini-2.5-pro':                65536,
+  'gemini-3.5-flash':              65536,
   'gemini-3-flash-preview':        65536,
   'gemini-3.1-flash-lite':         65536,
   'gemini-3.1-flash-lite-preview': 65536,
   'gemini-3.1-pro-preview':        65536,
-  'gemini-2.0-flash':              8192,
-  'gemini-2.0-flash-lite':         8192,
   // Anthropic
   'claude-sonnet-4-5-20250929':    16384,
   'claude-sonnet-4-5':             16384,
@@ -185,18 +181,13 @@ const PROVIDER_OPTIONS = [
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string; group?: string }[]> = {
   gemini: [
-    // ── Gemini 3 (latest) ──────────────────────────────────────────────────
+    // Gemini 2.x was retired server-side in July 2026 (generateContent 404s) —
+    // only the 3.x family is offered. 2.x rows were migrated to these models.
+    { value: 'gemini-3.5-flash',                label: 'Gemini 3.5 Flash (Stable)',         group: 'Gemini 3' },
     { value: 'gemini-3.1-pro-preview',          label: 'Gemini 3.1 Pro Preview',           group: 'Gemini 3' },
     { value: 'gemini-3-flash-preview',          label: 'Gemini 3 Flash Preview',            group: 'Gemini 3' },
     { value: 'gemini-3.1-flash-lite',           label: 'Gemini 3.1 Flash-Lite (Stable)',    group: 'Gemini 3' },
     { value: 'gemini-3.1-flash-lite-preview',   label: 'Gemini 3.1 Flash-Lite Preview',     group: 'Gemini 3' },
-    // ── Gemini 2.5 ────────────────────────────────────────────────────────
-    { value: 'gemini-2.5-pro',                  label: 'Gemini 2.5 Pro',                    group: 'Gemini 2.5' },
-    { value: 'gemini-2.5-flash',                label: 'Gemini 2.5 Flash',                  group: 'Gemini 2.5' },
-    { value: 'gemini-2.5-flash-lite',           label: 'Gemini 2.5 Flash-Lite',             group: 'Gemini 2.5' },
-    // ── Gemini 2.0 (deprecated — avoid new use) ───────────────────────────
-    { value: 'gemini-2.0-flash',                label: 'Gemini 2.0 Flash (deprecated)',     group: 'Gemini 2.0' },
-    { value: 'gemini-2.0-flash-lite',           label: 'Gemini 2.0 Flash-Lite (deprecated)', group: 'Gemini 2.0' },
   ],
   anthropic: [
     // ── Latest ────────────────────────────────────────────────────────────

@@ -116,7 +116,7 @@ DB-orchestrating route handlers).
   confidence comes from the close structural match to two already-deployed, working components
   (`NewsletterSocialPreview`, `ReviewApproveModal`).
 
-## Phase C — Newsletter social review modal (full page)
+## Phase C — Newsletter social review modal (full page) — IMPLEMENTED (2026-07-09)
 
 - Extract `/newsletter/[id]/page.tsx`'s body into a shared component, e.g.
   `features/newsletter/NewsletterEditionContent.tsx`, taking `newsletterId` as a prop (all its
@@ -128,6 +128,23 @@ DB-orchestrating route handlers).
 - New `features/dashboard/NewsletterReviewModal.tsx` — modal chrome wrapping the same
   `<NewsletterEditionContent newsletterId={id} />`.
 - Triggered from a new button in `ContentPlan.tsx`, shown when `socialReady.newsletters`
+  includes that day's `newsletterId`.
+
+**Done:**
+- `features/newsletter/NewsletterEditionContent.tsx` — the extracted body (metadata edit,
+  regenerate-section controls, HTML preview, `NewsletterSocialPreview`), unchanged logic,
+  `newsletterId` as a plain string prop. Deliberately **excludes** route-navigation chrome (the
+  "All editions" back link, outer page width/padding) — a modal has no "navigate away" concept
+  and provides its own sizing, so those stay with each caller instead.
+- `/newsletter/[id]/page.tsx` — now a ~20-line thin wrapper: outer width/padding + the back link
+  + `<NewsletterEditionContent newsletterId={id} />`. Same URL, same behavior, verified via a
+  full production build (not just typecheck) — `npx next build` succeeded with `/newsletter/[id]`
+  compiling correctly.
+- `features/dashboard/NewsletterReviewModal.tsx` — modal chrome matching `SocialReviewModal`'s
+  exact convention (`h-[90vh] max-w-6xl`, explicit close, no backdrop-click-to-close), wrapping
+  the same shared content component so the route and the modal can never drift out of sync.
+- `tsc --noEmit`, `eslint`, and a full `next build` all clean. Not yet wired into the dashboard —
+  that's Phase D.
   includes that day's `newsletterId`.
 
 ## Phase D — Dashboard wiring

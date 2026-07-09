@@ -415,6 +415,19 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
 
   const elements: string[] = []
 
+  // Hook slide: a rounded banner behind the title so it stands out over the
+  // tint + image (mirrors the classic hook's title box). Scheme-aware: black
+  // behind white text, white behind dark text — a fixed dark banner would
+  // fight the dark-text schemes light brands get.
+  if (slide.type === 'hook' && headLines.length > 0) {
+    const padV = 40
+    const padH = 60
+    const bannerFill = tint.textColor === '#FFFFFF' ? '#000000' : '#FFFFFF'
+    elements.push(
+      `<rect x="${x0 - padH}" y="${currentY - padV}" width="${blockW + 2 * padH}" height="${headlineBlockH + 2 * padV}" rx="6" fill="${bannerFill}" fill-opacity="0.55"/>`,
+    )
+  }
+
   for (let i = 0; i < headLines.length; i++) {
     elements.push(
       await justifiedLineSvg(
@@ -575,9 +588,11 @@ export async function renderCarouselSlide(
 
   const composites: sharp.OverlayOptions[] = [{ input: overlayPng, top: 0, left: 0 }]
 
-  // Tinted hook slide: continuation-arrow swipe cue bottom-LEFT, mirroring the
-  // logo's corner margins so the two corner elements balance. Color already
-  // matches the measured text/logo variant (loaded upstream).
+  // Tinted hook slide: continuation-arrow swipe cue on the RIGHT, sharing the
+  // logo's right margin so their right edges align, anchored at ~74% height —
+  // vertically between the centered title block and the bottom-right logo
+  // (the same anchor F4 uses). Color already matches the measured text/logo
+  // variant (loaded upstream).
   if (input.tint && input.slide.type === 'hook' && input.arrowBuffer) {
     const ARROW_W = 100
     const MARGIN = 48
@@ -585,7 +600,12 @@ export async function renderCarouselSlide(
       const meta = await sharp(input.arrowBuffer).metadata()
       const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
       const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
-      composites.push({ input: arrowPng, left: MARGIN, top: SLIDE_SIZE - arrowH - MARGIN })
+      const arrowBottom = Math.round(SLIDE_SIZE * 0.74)
+      composites.push({
+        input: arrowPng,
+        left: SLIDE_SIZE - ARROW_W - MARGIN,
+        top: arrowBottom - arrowH,
+      })
     } catch (err) {
       logger.warn({ err }, '[carousel] tint arrow compositing failed (non-fatal)')
     }

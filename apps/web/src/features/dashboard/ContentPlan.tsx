@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import {
   Loader2, CalendarRange, Table as TableIcon, LayoutGrid, Pencil, X,
-  Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle, Share2,
+  Lightbulb, Plus, CalendarX, Mail, FileText, CheckCircle2, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -170,17 +170,18 @@ export function ContentPlan() {
     )
   }
 
-  // Distinct affordance from ReviewBtn (content approval) — social posts unlock
-  // AFTER content approval, on a separate timeline, so it's a second button
-  // rather than folded into the same queue.
+  // Same label/styling as ReviewBtn for visual consistency — a separate button
+  // (not folded into the same queue) only because it opens a different modal
+  // and unlocks on a separate timeline (after content approval), not because
+  // it should look different.
   function SocialReviewBtn({ kind, id, title }: { kind: 'article' | 'newsletter'; id: string; title: string }) {
     return (
       <button
         onClick={() => kind === 'article'
           ? setSocialReviewArticle({ jobId: id, title })
           : setSocialReviewNewsletter({ newsletterId: id, title })}
-        className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
-        <Share2 className="h-3.5 w-3.5" /> Review Social Posts
+        className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Review &amp; Approve
       </button>
     )
   }

@@ -167,9 +167,14 @@ DB-orchestrating route handlers).
   `NewsletterReviewModal` take different prop shapes by design).
 - `socialReadyArticleIds` / `socialReadyNewsletterIds` derived `Set`s, mirroring the existing
   `readyArticleIds`/`readyNewsletterIds` pattern exactly.
-- New `SocialReviewBtn` — label **"Review Social Posts"**, styled as an outline/light-primary
-  button (vs. `ReviewBtn`'s solid primary) so it reads as a *distinct, secondary* action, not a
-  duplicate of content approval. Wired into `ReviewActions` (shared by both table and grid views
+- New `SocialReviewBtn` — **corrected 2026-07-09**: initially shipped with a distinct label
+  ("Review Social Posts") and outline styling, which was my own unilateral judgment call while
+  writing this plan, not something actually agreed with the user (the two things explicitly
+  confirmed were the newsletter modal scope and keeping the old pages — button styling was never
+  asked about). User feedback: all review buttons should look the same for consistency. Now
+  identical to `ReviewBtn` — same label ("Review & Approve"), same icon (`CheckCircle2`), same
+  solid-primary styling. Still a structurally separate component (different click target/modal),
+  just no longer visually distinguished. Wired into `ReviewActions` (shared by both table and grid views
   automatically, since both already call the same function) for both article and newsletter,
   independent of the existing assigned/ready/flagged states — a day can show both a content
   action and a social action at once if applicable.

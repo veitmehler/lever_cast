@@ -4,6 +4,8 @@ const COST_TABLE: Record<string, { input: number; output: number }> = {
   'gemini-2.5-flash': { input: 0.075, output: 0.30 },
   'gemini-2.5-pro': { input: 1.25, output: 5.00 },
   'gemini-3-flash': { input: 0.50, output: 3.00 },
+  'gemini-3.5-flash': { input: 1.50, output: 9.00 },
+  'gemini-3.1-flash-lite': { input: 0.25, output: 1.50 },
   'gemini-3.1-pro': { input: 2.00, output: 12.00 },
   'gemini-3.1-pro-preview': { input: 2.00, output: 12.00 },
   'gemini-pro': { input: 0.50, output: 1.50 },

@@ -88,7 +88,7 @@ const LLM_PROVIDER_ORDER = ['openai', 'anthropic', 'gemini'] as const
 const LLM_DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-sonnet-20241022',
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-3.5-flash',
 }
 
 async function resolveSystemLLMProvider(): Promise<{

@@ -199,9 +199,9 @@ export async function GET(
           } catch {
             // Fallback to known models if API fails
             models = [
-              { value: 'gemini-pro', label: 'Gemini Pro' },
-              { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-              { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+              { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+              { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview' },
+              { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
             ]
           }
           break
@@ -337,9 +337,9 @@ export async function GET(
           { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
         ],
         gemini: [
-          { value: 'gemini-pro', label: 'Gemini Pro' },
-          { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-          { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+          { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+          { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview' },
+          { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
         ],
         openrouter: [
           { value: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o Mini' },

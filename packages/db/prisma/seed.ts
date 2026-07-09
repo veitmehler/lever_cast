@@ -8,7 +8,7 @@ const PROMPT_TEMPLATES = [
     stepNumber: 0,
     stepName: 'generate_title',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are an expert content strategist and SEO copywriter. Your task is to convert a raw article idea into a compelling, SEO-optimized H1 title.',
     userPrompt: `Convert this article idea into a single, compelling H1 article title:
@@ -28,7 +28,7 @@ Rules:
     stepNumber: 1,
     stepName: 'generate_outline',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are an expert content strategist and SEO specialist. Your task is to create comprehensive, well-structured article outlines that follow SEO best practices and engage readers.',
     userPrompt: `Create a detailed article outline for the following topic: {{topic}}
@@ -48,7 +48,7 @@ Return the outline in a structured format.`,
     stepNumber: 2,
     stepName: 'keyword_research',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: 'You are an expert SEO specialist focusing on keyword research and search intent analysis.',
     userPrompt: `Perform comprehensive keyword research for the topic: {{topic}}
 
@@ -67,7 +67,7 @@ Return ONLY a JSON object (no markdown fences, no extra text) with this exact st
     stepNumber: 3,
     stepName: 'find_supporting_keywords',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: 'You are an SEO expert specializing in semantic keyword research and LSI keywords.',
     userPrompt: `Based on the topic "{{topic}}" and the primary keywords: {{primary_keyword}}
 
@@ -85,7 +85,7 @@ Return as a JSON array with relevance scores.`,
     stepNumber: 4,
     stepName: 'optimize_outline_seo',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: 'You are an expert in Google SEO best practices and content optimization.',
     userPrompt: `Take this article outline and optimize it according to Google's latest SEO best practices:
 
@@ -107,7 +107,7 @@ Return the optimized outline with SEO annotations.`,
     stepNumber: 5,
     stepName: 'write_search_intent_intro',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are an expert content writer specializing in creating compelling introductions that match search intent.',
     userPrompt: `Write a compelling introduction for an article about: {{topic}}
@@ -128,7 +128,7 @@ Excluded keywords (do not use): {{excludedKeywords}}`,
     stepNumber: 6,
     stepName: 'research_faqs',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are an expert at understanding user questions and creating comprehensive FAQ sections.',
     userPrompt: `Research and generate frequently asked questions (FAQs) for the topic: {{topic}}
@@ -148,7 +148,7 @@ Return as JSON array with question text.`,
     stepNumber: 7,
     stepName: 'find_faq_facts',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: 'You are a research expert specializing in finding accurate, verifiable facts and data.',
     userPrompt: `For each of these FAQ questions, provide detailed, factual answers with supporting data:
 
@@ -169,7 +169,7 @@ Return as JSON with question-answer pairs and source suggestions.`,
     stepNumber: 8,
     stepName: 'find_article_facts',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are a research specialist focusing on gathering credible facts, statistics, and data for content creation.',
     userPrompt: `Research and provide supporting facts, statistics, and data for this article:
@@ -222,7 +222,7 @@ Output the complete article in clean HTML format.`,
     stepNumber: 10,
     stepName: 'fact_check_article',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are a professional fact-checker with expertise in verifying claims, statistics, and statements in content.',
     userPrompt: `Carefully fact-check the following article for accuracy:
@@ -268,7 +268,7 @@ Return the corrected article in HTML format.`,
     stepNumber: 12,
     stepName: 'find_citations',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt:
       'You are a research expert specializing in finding high-quality, authoritative sources for content citations.',
     userPrompt: `Find 8-12 high-quality citation sources for this article:
@@ -618,7 +618,7 @@ Example response: ["Why is X important?", null, "How does Y work?"]`,
     stepNumber: 102,
     stepName: 'enrichment_keyword_to_question',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: 'You are an expert SEO specialist converting keywords into natural search questions.',
     userPrompt: `Convert the following keyword or phrase into a clear, specific question that someone might ask when searching for information about "{{sectionHeading}}".
 

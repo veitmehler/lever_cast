@@ -41,7 +41,7 @@ export async function generateQuestionFromKeyword(opts: {
 }): Promise<{ question: string } & GenTokens> {
   const t = await loadPromptTemplate(102)
   const provider = (t?.defaultProvider ?? 'gemini').toLowerCase()
-  const model = t?.defaultModel ?? 'gemini-2.5-flash'
+  const model = t?.defaultModel ?? 'gemini-3.5-flash'
   const sys = t?.systemPrompt ?? DEF_102_SYS
   const usr = (t?.userPrompt ?? DEF_102_USER)
     .replace(/\{\{keyword\}\}/g, opts.keyword)

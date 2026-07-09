@@ -22,7 +22,7 @@ const SYSTEM_PROVIDER_ORDER = ['openai', 'anthropic', 'gemini', 'openrouter'] as
 const SYSTEM_DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-sonnet-20241022',
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-3.5-flash',
   openrouter: 'openai/gpt-4o-mini',
 }
 

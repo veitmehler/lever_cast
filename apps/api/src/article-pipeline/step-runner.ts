@@ -37,7 +37,7 @@ const BASE_RETRY_DELAY_MS = 1000
 const BACKOFF_MULTIPLIER = 2
 
 /** Stable fallback model used when the configured Gemini search model exhausts all retries. */
-const GEMINI_SEARCH_FALLBACK_MODEL = 'gemini-2.5-pro'
+const GEMINI_SEARCH_FALLBACK_MODEL = 'gemini-3.1-pro-preview'
 const FALLBACK_RETRIES = 3
 
 export interface StepRunResult {

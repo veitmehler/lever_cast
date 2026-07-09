@@ -5,7 +5,7 @@ import type { LLMAdapter, LLMCallOptions, LLMResponse } from './adapter'
 import { LLMError } from './adapter'
 import { instrumentCall } from '../../lib/net/instrument'
 
-const DEFAULT_MODEL = 'gemini-2.5-flash'
+const DEFAULT_MODEL = 'gemini-3.5-flash'
 
 /** Maximum time to wait for a single Gemini API call (search or standard). */
 const GEMINI_FETCH_TIMEOUT_MS = 180_000 // 3 minutes

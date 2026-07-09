@@ -33,8 +33,10 @@ export interface NewsletterPromptTemplate {
   isActive: boolean
 }
 
-const GEMINI_PRO = 'gemini-2.5-pro'
-const GEMINI_FLASH = 'gemini-2.5-flash'
+// Gemini 2.x was retired server-side in early July 2026 (per-project rollout, ahead of the
+// documented Oct 16 date) — these follow Google's official replacement mapping.
+const GEMINI_PRO = 'gemini-3.1-pro-preview'
+const GEMINI_FLASH = 'gemini-3.5-flash'
 const CLAUDE = 'claude-sonnet-4-5-20250929'
 
 export const NEWSLETTER_TEMPLATES: NewsletterPromptTemplate[] = [

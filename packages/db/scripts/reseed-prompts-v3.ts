@@ -320,7 +320,7 @@ const PROMPTS = [
     stepNumber: 1,
     stepName: 'generate_outline',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class marketer and SEO specialist. You are world renowned for writing highly compelling, attention grabbing articles. You are amazing at your job.
@@ -383,7 +383,7 @@ The article MUST also be optimized for SEO, so that it has the best chances to r
     stepNumber: 2,
     stepName: 'keyword_research',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert that knows all the insider knowledge of Google. You have worked in the Google search department for the last 25 years and know everything about SEO and keyword research. 
@@ -451,7 +451,7 @@ MAKE SURE the keyword is easy to rank for, but still have great search volume.
     stepNumber: 3,
     stepName: 'find_supporting_keywords',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert that knows all the insider knowledge of Google. You have worked in the Google search department for the last 25 years and know everything about SEO and keyword research. 
@@ -582,7 +582,7 @@ You will first receive your CONTEXT, then you will receive your TASK.
     stepNumber: 4,
     stepName: 'optimize_outline_seo',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert that knows all the insider knowledge of Google. You have worked in the Google search department for the last 25 years and know everything about SEO and keyword research. 
@@ -656,7 +656,7 @@ You will first receive your CONTEXT, then you will receive your TASK.
     stepNumber: 5,
     stepName: 'write_search_intent_intro',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert that knows all the insider knowledge of Google. You have worked in the Google search department for the last 25 years and know everything about SEO and keyword research. 
@@ -717,7 +717,7 @@ You will first receive your CONTEXT, then you will receive your TASK.
     stepNumber: 6,
     stepName: 'research_faqs',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert that knows all the insider knowledge of Google. You have worked in the Google search department for the last 25 years and know everything about SEO and keyword research. 
@@ -805,7 +805,7 @@ You will first receive your CONTEXT, then you will receive your TASK.
     stepNumber: 7,
     stepName: 'find_faq_facts',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE: 
           
 You are a world-class stats, facts, and data researcher for a world-renowned copywriter. You are the world's best at what you do. You always find the most impactful and valid facts for the research topic you are given. 
@@ -835,7 +835,7 @@ You are a world-class stats, facts, and data researcher for a world-renowned cop
     stepNumber: 8,
     stepName: 'find_article_facts',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE: 
           
 You are a world-class stats, facts, and data researcher for a world-renowned copywriter. You are the world's best at what you do. You always find the most impactful and valid facts for the research topic you are given. 
@@ -1021,7 +1021,7 @@ Before finishing, verify:
     stepNumber: 10,
     stepName: 'fact_check_article',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE: 
 
 You are a world-class fact-checker. You are the world's best at what you do. You are world-class at identifying facts, data points, and claims that must be fact-checked in a factual  article.  
@@ -1146,7 +1146,7 @@ CRITICAL RULE: No Repetition: Do not repeat the same fact in different sections.
     stepNumber: 12,
     stepName: 'find_citations',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE: 
 
 You are a world-class article citation finder. You are the world's best at what you do. You are world-class at identifying facts, data points, and claims that must be fact-checked in a factual article, and find verifiable, official, and authoritative sources that substantiate the claims and can be used as article citations. 
@@ -1229,7 +1229,7 @@ You are a world-class article citation finder. You are the world's best at what 
     stepNumber: 13,
     stepName: 'generate_seo_metadata',
     defaultProvider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.5-flash',
     systemPrompt: `# ROLE:
 
 You are a world-class SEO expert. You know exactly what makes people click on search result listings because you worked for the last 25 years at Google and know all the insider information about the highest performing Meta Titles, Meta Descriptions, and Google Adwords ads.

@@ -72,8 +72,9 @@ If nothing needs explaining (the common case), return: {"terms": [], "concept": 
       'CONSTRAINT: your gloss may only illustrate what the provided article excerpt already ' +
       'states — never add facts, never strengthen claims, never promise outcomes. Follow the ' +
       'advertising restrictions exactly. Do not reuse any imagery listed as already used. Study ' +
-      'the exemplars: they define the quality bar and tone. Output ONLY the gloss sentence(s) — ' +
-      'no quotes, no preamble, no markdown.',
+      'the exemplars: they define the quality bar and tone. Never use em-dashes; use commas, ' +
+      'colons, or separate sentences. Output ONLY the gloss sentence(s) — no quotes, no ' +
+      'preamble, no markdown.',
     userPrompt: `TERM: {{term}}
 
 THE SENTENCE IT APPEARS IN (your gloss will directly follow this sentence):
@@ -114,7 +115,8 @@ Write the gloss now.`,
       'excerpt already states — never add mechanisms, never strengthen hedged claims into ' +
       'certainty, never promise outcomes. Follow the advertising restrictions exactly. Do not ' +
       'reuse any imagery listed as already used. Study the exemplars: they define the quality ' +
-      'bar. Output ONLY the story text — no title, no quotes, no markdown.',
+      'bar. Never use em-dashes; use commas, colons, or separate sentences. Output ONLY the ' +
+      'story text — no title, no quotes, no markdown.',
     userPrompt: `THE MECHANISM TO EXPLAIN: {{conceptSummary}}
 
 THE ARTICLE PASSAGE EXPLAINING IT (the outer limit of what you may assert):
@@ -184,26 +186,26 @@ export const PLAIN_LANGUAGE_CONFIGS: Array<{
         metaphor:
           'Think of a garden hose watering a row of plants: kink one spot even slightly, and the ' +
           'plants furthest along the row are the first to droop. A subluxation is that kink in ' +
-          'your spine — a segment that has shifted out of its normal position and changed how the ' +
+          'your spine: a segment that has shifted out of its normal position, changing how the ' +
           'joint moves and how nearby nerves carry their signals.',
       },
       {
         kind: 'concept',
         subject: 'adjustment → nervous system → vagus nerve communication',
         metaphor:
-          'Your nervous system runs your body the way a control tower runs an airport — thousands ' +
+          'Your nervous system runs your body the way a control tower runs an airport: thousands ' +
           'of messages landing and taking off every second, all on precise timing. The spine is ' +
           'the main runway those messages travel through. When an adjustment restores normal ' +
-          'motion to a stuck segment, it\'s like clearing debris off that runway: the tower and ' +
+          'motion to a stuck segment, it\'s like clearing debris off that runway. The tower and ' +
           'the planes were always talking, but now the messages move the way they were designed ' +
-          'to. The vagus nerve is the busiest route of all — the direct line between the tower ' +
+          'to. The vagus nerve is the busiest route of all, the direct line between the tower ' +
           'and your body\'s engine rooms: heart, lungs, digestion.',
       },
       {
         kind: 'term',
         subject: 'proprioception',
         metaphor:
-          'Close your eyes and touch your nose. You didn\'t miss — because millions of tiny ' +
+          'Close your eyes and touch your nose. You didn\'t miss, because millions of tiny ' +
           'position sensors in your joints and muscles are constantly telling your brain exactly ' +
           'where every part of you is. That built-in GPS is called proprioception.',
       },
@@ -213,16 +215,16 @@ export const PLAIN_LANGUAGE_CONFIGS: Array<{
         metaphor:
           'Acute inflammation is a campfire you light on purpose: your body starts it to cook a ' +
           'repair, then puts it out. Chronic inflammation is a smoldering fire that never gets ' +
-          'extinguished — quiet, low, but slowly baking everything around it. The goal isn\'t to ' +
+          'extinguished: quiet, low, but slowly baking everything around it. The goal isn\'t to ' +
           'never have fire; it\'s to make sure every fire gets put out when its job is done.',
       },
       {
         kind: 'concept',
         subject: 'spinal discs need motion to stay nourished',
         metaphor:
-          'The discs between your vertebrae have almost no blood supply of their own — they feed ' +
+          'The discs between your vertebrae have almost no blood supply of their own; they feed ' +
           'like a sponge in a shallow dish of water. Leave the sponge sitting still and it barely ' +
-          'drinks; squeeze and release it, and it pulls water in. Movement is how your discs eat. ' +
+          'drinks. Squeeze and release it, and it pulls water in. Movement is how your discs eat. ' +
           'That\'s why long hours in one position leave your back feeling starved.',
       },
     ],
@@ -231,10 +233,10 @@ export const PLAIN_LANGUAGE_CONFIGS: Array<{
       'rules: NEVER claim or imply that care cures, treats, or prevents any disease or medical ' +
       'condition. NEVER promise outcomes or timelines ("you will feel...", "this fixes..."). ' +
       'NEVER use fear-based imagery about what happens without care. NEVER disparage other ' +
-      'health professions. NEVER overstate mechanisms — your metaphor may only illustrate what ' +
+      'health professions. NEVER overstate mechanisms: your metaphor may only illustrate what ' +
       'the adjacent article text already says; if the article says "may support", your image ' +
       'must carry the same hedging, never upgrade it to certainty. Avoid the phrases "boosts ' +
-      'immunity", "heals", "life force", and "toxins". Tone: warm, professional, respectful — ' +
-      'explain like a great teacher, never like you\'re talking down to a child.',
+      'immunity", "heals", "life force", and "toxins". Tone: warm, professional, respectful. ' +
+      'Explain like a great teacher, never like you\'re talking down to a child.',
   },
 ]

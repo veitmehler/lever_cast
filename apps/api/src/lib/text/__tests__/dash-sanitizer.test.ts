@@ -1,0 +1,111 @@
+import { describe, it, expect } from 'vitest'
+import { normalizeDashes, stripSafeDashes, rewriteIsSafe, wordTokens } from '../dash-sanitizer'
+
+describe('normalizeDashes', () => {
+  it('converts double hyphens to em-dashes', () => {
+    expect(normalizeDashes('one--two')).toBe('one—two')
+  })
+
+  it('converts word-adjacent en-dashes but keeps digit ranges', () => {
+    expect(normalizeDashes('pain–relief in 2–4 weeks')).toBe('pain—relief in 2–4 weeks')
+  })
+
+  it('leaves hyphenated compounds alone', () => {
+    expect(normalizeDashes('well-being and long-term care')).toBe('well-being and long-term care')
+  })
+})
+
+describe('stripSafeDashes', () => {
+  it('converts a paired parenthetical em-dash to commas', () => {
+    expect(stripSafeDashes('The spine—like any structure—needs balance.')).toBe(
+      'The spine, like any structure, needs balance.',
+    )
+  })
+
+  it('handles spaced paired dashes', () => {
+    expect(stripSafeDashes('The spine — like any structure — needs balance.')).toBe(
+      'The spine, like any structure, needs balance.',
+    )
+  })
+
+  it('converts a dash before a coordinating conjunction to a comma', () => {
+    expect(stripSafeDashes('Cold stiffens muscles—and that increases strain.')).toBe(
+      'Cold stiffens muscles, and that increases strain.',
+    )
+  })
+
+  it('leaves a lone non-conjunction dash for tier 2', () => {
+    const out = stripSafeDashes('It was never the mattress—it was the alignment.')
+    expect(out).toContain('—')
+  })
+
+  it('only pairs dashes within the same sentence', () => {
+    const text = 'First has one—dash here. Second also has one—dash there.'
+    const out = stripSafeDashes(text)
+    // Neither is a pair within its sentence → both stay for tier 2.
+    expect((out.match(/—/g) ?? []).length).toBe(2)
+  })
+
+  it('never touches dashes inside HTML tags or attributes', () => {
+    const html = '<a href="https://x.com/a—b" data-x="1—2">link—text stays for tier 2</a>'
+    const out = stripSafeDashes(html)
+    expect(out).toContain('href="https://x.com/a—b"')
+    expect(out).toContain('data-x="1—2"')
+  })
+
+  it('skips code and pre blocks entirely', () => {
+    const html = '<pre>const x = a—b—c;</pre><p>The spine—like any structure—needs balance.</p>'
+    const out = stripSafeDashes(html)
+    expect(out).toContain('const x = a—b—c;')
+    expect(out).toContain('The spine, like any structure, needs balance.')
+  })
+
+  it('normalizes double hyphens before fixing', () => {
+    expect(stripSafeDashes('The spine--like any structure--needs balance.')).toBe(
+      'The spine, like any structure, needs balance.',
+    )
+  })
+
+  it('is idempotent on clean text', () => {
+    const clean = 'A normal sentence, with commas, and 2–4 week ranges.'
+    expect(stripSafeDashes(clean)).toBe(clean)
+  })
+})
+
+describe('rewriteIsSafe (token-diff guard)', () => {
+  const original = 'It was never the mattress—it was the alignment.'
+
+  it('accepts a punctuation-only rewrite', () => {
+    expect(rewriteIsSafe(original, 'It was never the mattress. It was the alignment.')).toBe(true)
+  })
+
+  it('accepts a rewrite with one allowlisted insertion', () => {
+    expect(rewriteIsSafe(original, 'It was never the mattress, because it was the alignment.')).toBe(true)
+  })
+
+  it('rejects a rewrite that drops a word', () => {
+    expect(rewriteIsSafe(original, 'It was never the mattress. The alignment.')).toBe(false)
+  })
+
+  it('rejects a rewrite that paraphrases', () => {
+    expect(rewriteIsSafe(original, 'The mattress was never the problem; the alignment was.')).toBe(false)
+  })
+
+  it('rejects a rewrite introducing a non-allowlisted word', () => {
+    expect(rewriteIsSafe(original, 'It was never the mattress, rather it was the alignment.')).toBe(false)
+  })
+
+  it('rejects a rewrite that still contains a dash', () => {
+    expect(rewriteIsSafe(original, 'It was never the mattress—it was the alignment.')).toBe(false)
+  })
+
+  it('rejects more than two insertions even if allowlisted', () => {
+    expect(rewriteIsSafe('a—b', 'a and but so b')).toBe(false)
+  })
+})
+
+describe('wordTokens', () => {
+  it('lowercases and strips punctuation, keeping apostrophes', () => {
+    expect(wordTokens("It's the spine—not the mattress!")).toEqual(["it's", 'the', 'spine', 'not', 'the', 'mattress'])
+  })
+})

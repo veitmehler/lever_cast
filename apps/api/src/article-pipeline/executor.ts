@@ -11,9 +11,16 @@ import { cleanStepOutput } from './approval-service'
 import { getBoss, QUEUES } from '../queues/index'
 import { resolveGroundingUrls } from './grounding-resolver'
 import { injectClientStory } from './client-stories/select'
+import { sanitizeDashes } from '../lib/text/dash-sanitizer'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MAX_KEYWORD_RETRIES = 3
+
+/** Prose steps that get em-dash elimination right after completion (title + final
+ * fact-adjusted body — the body MUST be sanitized before inline-citation insertion,
+ * since tier 2 skips sentences containing markup). See
+ * .plans/de-ai-writing.implementation-plan.md. */
+const DASH_SANITIZE_STEPS = new Set([0, 11])
 
 /** Steps whose Gemini grounding sources should be captured as research sources (Tier 1 citations). */
 const GROUNDING_CAPTURE_STEPS = new Set([6, 7, 8, 10])
@@ -107,6 +114,25 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
         let stepOutput = result.output
         if (stepNumber === 3 || stepNumber === 6) {
           stepOutput = sanitizeKeywordText(stepOutput, stepNumber, jobId)
+        }
+
+        if (DASH_SANITIZE_STEPS.has(stepNumber)) {
+          try {
+            const s = await sanitizeDashes(stepOutput, { jobId, stepNumber })
+            if (s.changed) {
+              stepOutput = s.text
+              await prisma.pipelineStep.updateMany({
+                where: { jobId, stepNumber, status: 'completed' },
+                data: { output: stepOutput },
+              })
+              logger.info(
+                { jobId, stepNumber, llmCalls: s.llmCalls, kept: s.kept },
+                '[executor] dash-sanitized step output',
+              )
+            }
+          } catch (err) {
+            logger.warn({ jobId, stepNumber, err }, '[executor] dash sanitize failed — output kept as-is')
+          }
         }
 
         ctx.completedSteps.set(stepNumber, stepOutput)

@@ -11,6 +11,7 @@
  */
 import { prisma } from '@socioply/shared'
 import { logger } from '../../lib/logger'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import { runNewsletterPrompt, runNewsletterJsonPrompt } from '../../newsletter/llm'
 import type { LLMResponse } from '../llm/adapter'
 import { extractH2Sections, stripTags } from './html-parser'
@@ -211,7 +212,7 @@ export function insertBoxAfterAnchor(sectionHtml: string, anchorQuote: string | 
   return sectionHtml.slice(0, at) + boxHtml + sectionHtml.slice(at)
 }
 
-function formatExemplars(config: PlainLanguageConfigData): string {
+export function formatExemplars(config: PlainLanguageConfigData): string {
   return config.exemplars
     .map((e) => `- [${e.kind}] ${e.subject}:\n  "${e.metaphor}"`)
     .join('\n')
@@ -272,7 +273,7 @@ async function generateVerified(args: GenerateArgs): Promise<{ text: string; usa
     const written = await runNewsletterPrompt(key, { ...args.vars, restrictions })
     responses.push(written.response)
     if (args.onResponse) await args.onResponse(written.response)
-    const text = written.content.trim()
+    const text = (await sanitizeDashesText(written.content, args.logCtx)).trim()
     if (!text || text.length > args.maxChars) {
       logger.warn({ ...args.logCtx, attempt, len: text.length }, '[plain-language] generated text empty/oversized — skipping')
       return null

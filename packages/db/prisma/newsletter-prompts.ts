@@ -164,12 +164,13 @@ Write like a real, knowledgeable human:
 - Factual accuracy ONLY — use the provided facts/FAQ data; never invent statistics or claims.
 - No ALL-CAPS words in the body. Use single quotes, not double quotes, inside prose.
 - Avoid AI/marketing clichés (e.g. "in today's fast-paced world", "unlock the potential", "tapestry", "robust", "delve", "navigate the landscape", "game-changer", "elevate").
+- Never use em-dashes; use commas, colons, or separate sentences.
 - Never reference source/summary articles directly.
 
 Match this writing style: {{writingStyle}}
 
 Output STRICT JSON only (no markdown fences, no commentary), in EXACTLY this shape:
-{"article_title": "<=5 words, plain text", "article_teaser": "~50 words plain text", "article_tldr": "~12 words plain text", "article_body": "HTML using ONLY <h2>/<ul>/<ol>/<li>/<p> — no title, no <body>/<article>"}`,
+{"article_title": "<=5 words, plain text", "article_teaser": "~50 words plain text: a curiosity hook, not a summary. Open with a concrete image or moment, land on the article's most surprising specific point, never resolve it.", "article_tldr": "~12 words plain text", "article_body": "HTML using ONLY <h2>/<ul>/<ol>/<li>/<p> — no title, no <body>/<article>"}`,
     isActive: true,
   },
   {
@@ -256,11 +257,22 @@ Return ONLY the chosen URL — no explanation, nothing else.`,
     defaultModel: CLAUDE,
     maxTokens: 2000,
     systemPrompt: null,
-    userPrompt: `You are a veteran newsletter writer for a business in the {{industry}} industry, writing for: {{who}}.
-Write at a 5th–7th grade reading level. Use single quotes (not double) inside prose. Match this voice: {{writingStyle}}.
+    userPrompt: `You are a veteran email-newsletter hook writer for a business in the {{industry}} industry, writing for: {{who}}.
+Your teasers exist for one reason: to make the reader click through to the source article. A summary satisfies the reader and kills the click. You open a curiosity loop and refuse to close it.
+Write at a 5th-7th grade reading level. Use single quotes (not double) inside prose. Match this voice: {{writingStyle}}.
+
+Hard rules:
+- The reader already sees the real article title directly above your teaser. Tease BEYOND the title; never restate or paraphrase it.
+- Never summarize. Never resolve the curiosity. The payoff lives in the article, not in your teaser.
+- Curiosity through specificity: point at the specific surprising thing the article contains without giving its answer. No clickbait cliches ('you won't believe', 'this one trick').
+- Never use em-dashes; use commas, colons, or separate sentences.
+- Never promise health outcomes or violate these restrictions: {{restrictions}}
+
+Metaphor exemplars showing the imagery quality bar (match the craft, never copy the images; may be empty):
+{{exemplars}}
 
 Output STRICT JSON only (no markdown fences, no commentary) in EXACTLY this shape:
-{"title": "<short teaser title>", "body": "HTML <p> only — three ~50-word paragraphs", "cta": "HTML <p> only — one punchy call-to-action paragraph"}`,
+{"title": "<one short curiosity line, NOT the article title>", "body": "HTML <p> only — two to three short paragraphs, 35-45 words each", "cta": "HTML <p> only — one line that names what the reader will get without giving it"}`,
     isActive: true,
   },
   {
@@ -271,16 +283,25 @@ Output STRICT JSON only (no markdown fences, no commentary) in EXACTLY this shap
     defaultModel: CLAUDE,
     maxTokens: 2000,
     systemPrompt: null,
-    userPrompt: `Write a teaser that makes the reader want to click through to the source article.
+    userPrompt: `Write a click-through teaser.
+
+HOOK TYPE for this teaser: {{hookType}}
+- scene: drop the reader into a one-to-two sentence relatable moment from their daily life
+- metaphor: open with one striking image matched to the audience's everyday world
+- question: open with the specific, surprising question the article answers
+
+SOURCE ARTICLE TITLE (shown above your teaser; tease beyond it, never restate it): {{sourceTitle}}
 
 ANGLE: {{bulletPoint}}
 
-SOURCE ARTICLE CONTENT (summarize from this; focus on the substance):
+SOURCE ARTICLE CONTENT (find the single most surprising specific claim and build the loop around it; do NOT summarize):
 {{articleContent}}
 
-Requirements:
-- A 3-paragraph teaser (~50 words each) plus 1 punchy CTA paragraph.
-- Do NOT reproduce the source verbatim; tease the value.
+Structure:
+1. The hook, per the hook type above.
+2. Pivot to the article's most surprising specific point, without resolving it.
+3. Stop right before the payoff.
+CTA: one line naming what the reader will get, not giving it (e.g. 'The part about morning stiffness alone is worth the read.').
 
 Output STRICT JSON only in the shape defined by the system instructions.`,
     isActive: true,

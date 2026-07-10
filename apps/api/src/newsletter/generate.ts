@@ -15,8 +15,10 @@ import { prisma, brandSettingsForUser } from '@socioply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
-import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
+import { runNewsletterPrompt, runNewsletterWriterJson, runNewsletterJsonPrompt } from './llm'
 import { generateArticle, type VoiceVars, type UsageRecorder, type NewsletterArticle } from './article'
+import { loadPlainLanguageConfig, formatExemplars } from '../article-pipeline/enrichment/plain-language'
+import { sanitizeDashesText } from '../lib/text/dash-sanitizer'
 import type { TopicResearch, TeaserSource } from './research'
 import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
 import { generateCoverImage, type CoverItem, type CoverColors } from './cover'
@@ -61,31 +63,85 @@ interface Teaser {
   link: string
 }
 
+/** Hook types rotate across the 3 teaser slots so the pattern never reads as
+ * formula. See .plans/de-ai-writing.implementation-plan.md Phase 4. */
+const TEASER_HOOK_TYPES = ['scene', 'metaphor', 'question'] as const
+
 async function voiceTeasers(
   sources: TeaserSource[],
   voice: VoiceVars,
   usage: Usage,
 ): Promise<Teaser[]> {
   const out: Teaser[] = []
-  for (const s of sources) {
+
+  // Per-industry metaphor exemplars + advertising restrictions (empty for
+  // industries without a PlainLanguageConfig — the hook craft still applies).
+  let exemplars = ''
+  let restrictions = ''
+  try {
+    const config = await loadPlainLanguageConfig(voice.industry)
+    if (config) {
+      exemplars = formatExemplars(config)
+      restrictions = config.restrictions
+    }
+  } catch (err) {
+    logger.warn({ err }, '[newsletter/generate] plain-language config load failed — teasers proceed without exemplars')
+  }
+
+  for (let i = 0; i < sources.length; i++) {
+    const s = sources[i]
+    const hookType = TEASER_HOOK_TYPES[i % TEASER_HOOK_TYPES.length]
     try {
-      const { data, response } = await runNewsletterWriterJson<{
-        title?: string
-        body?: string
-        cta?: string
-      }>('nl_teaser_summarizer_system', 'nl_teaser_summarizer_user', {
+      const vars = {
         bulletPoint: s.bullet,
         articleContent: s.extract,
         writingStyle: voice.writingStyle,
         who: voice.targetAudience,
         industry: voice.industry,
-      })
+        hookType,
+        sourceTitle: s.headline ?? '',
+        exemplars,
+        restrictions,
+      }
+      let { data, response } = await runNewsletterWriterJson<{
+        title?: string
+        body?: string
+        cta?: string
+      }>('nl_teaser_summarizer_system', 'nl_teaser_summarizer_user', vars)
       await usage.record(response)
+
+      // Compliance check against the source extract. Unlike plain-language
+      // injections, a teaser slot shouldn't vanish on failure: regenerate once
+      // with the reason, then accept (logged for QA).
+      if (restrictions && data.body) {
+        try {
+          const verify = await runNewsletterJsonPrompt<{ ok?: boolean; reason?: string }>('pl_verify', {
+            sectionExcerpt: s.extract.slice(0, 8000),
+            generatedText: data.body.replace(/<[^>]+>/g, ' '),
+            restrictions,
+          })
+          await usage.record(verify.response)
+          if (verify.data.ok !== true) {
+            const reason = verify.data.reason ?? 'unspecified'
+            logger.warn({ bullet: s.bullet, reason }, '[newsletter/generate] teaser verify failed — regenerating once')
+            const retry = await runNewsletterWriterJson<{ title?: string; body?: string; cta?: string }>(
+              'nl_teaser_summarizer_system',
+              'nl_teaser_summarizer_user',
+              { ...vars, restrictions: `${restrictions}\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED FOR: ${reason} — fix exactly this.` },
+            )
+            await usage.record(retry.response)
+            if (retry.data.body) data = retry.data
+          }
+        } catch (err) {
+          logger.warn({ bullet: s.bullet, err }, '[newsletter/generate] teaser verify errored — keeping first draft')
+        }
+      }
+
       out.push({
         headline: s.headline,
-        title: (data.title ?? s.bullet).trim(),
-        body: data.body ?? '',
-        cta: data.cta ?? '',
+        title: (await sanitizeDashesText(data.title ?? s.bullet, { surface: 'nl_teaser_title' })).trim(),
+        body: await sanitizeDashesText(data.body ?? '', { surface: 'nl_teaser_body' }),
+        cta: await sanitizeDashesText(data.cta ?? '', { surface: 'nl_teaser_cta' }),
         link: s.url,
       })
     } catch (err) {
@@ -115,7 +171,8 @@ async function generateQuickHits(
       vars,
     )
     await usage.record(response)
-    result.tips = [data.tip_1, data.tip_2, data.tip_3, data.tip_4].filter(Boolean) as string[]
+    const tips = [data.tip_1, data.tip_2, data.tip_3, data.tip_4].filter(Boolean) as string[]
+    result.tips = await Promise.all(tips.map((t) => sanitizeDashesText(t, { surface: 'nl_tips' })))
   } catch (err) {
     logger.warn({ err }, '[newsletter/generate] tips failed')
   }
@@ -127,7 +184,8 @@ async function generateQuickHits(
       vars,
     )
     await usage.record(response)
-    result.facts = [data.fact_1, data.fact_2, data.fact_3, data.fact_4].filter(Boolean) as string[]
+    const facts = [data.fact_1, data.fact_2, data.fact_3, data.fact_4].filter(Boolean) as string[]
+    result.facts = await Promise.all(facts.map((f) => sanitizeDashesText(f, { surface: 'nl_facts' })))
   } catch (err) {
     logger.warn({ err }, '[newsletter/generate] facts failed')
   }
@@ -155,8 +213,8 @@ async function generateFun(
       trivia_answer?: string
     }>('nl_trivia_system', 'nl_trivia_user', vars)
     await usage.record(response)
-    fun.triviaQuestion = data.trivia_question ?? null
-    fun.triviaAnswer = data.trivia_answer ?? null
+    fun.triviaQuestion = data.trivia_question ? await sanitizeDashesText(data.trivia_question, { surface: 'nl_trivia' }) : null
+    fun.triviaAnswer = data.trivia_answer ? await sanitizeDashesText(data.trivia_answer, { surface: 'nl_trivia' }) : null
   } catch (err) {
     logger.warn({ err }, '[newsletter/generate] trivia failed')
   }
@@ -168,7 +226,7 @@ async function generateFun(
       vars,
     )
     await usage.record(response)
-    fun.joke = data.joke ?? null
+    fun.joke = data.joke ? await sanitizeDashesText(data.joke, { surface: 'nl_joke' }) : null
   } catch (err) {
     logger.warn({ err }, '[newsletter/generate] joke failed')
   }
@@ -257,7 +315,8 @@ async function generateSubject(topic: { topic: string }, voice: VoiceVars, usage
     who: voice.targetAudience,
   })
   await usage.record(s.response)
-  return cleanTextOutput(s.content) || null
+  const subject = cleanTextOutput(s.content)
+  return subject ? await sanitizeDashesText(subject, { surface: 'nl_subject' }) : null
 }
 
 async function generatePreview(
@@ -272,7 +331,8 @@ async function generatePreview(
     who: voice.targetAudience,
   })
   await usage.record(p.response)
-  return cleanTextOutput(p.content) || null
+  const preview = cleanTextOutput(p.content)
+  return preview ? await sanitizeDashesText(preview, { surface: 'nl_preview' }) : null
 }
 
 // ── Shared context ────────────────────────────────────────────────────────────

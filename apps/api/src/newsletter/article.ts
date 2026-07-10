@@ -17,6 +17,7 @@ import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
 import { loadPlainLanguageConfig, runNewsletterPlainLanguage } from '../article-pipeline/enrichment/plain-language'
+import { sanitizeDashesText } from '../lib/text/dash-sanitizer'
 import { vtoken } from './image-overlay'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
@@ -126,10 +127,13 @@ export async function generateArticle(
   )
   await usage.record(writer.response)
 
+  // 6a. Em-dash elimination on the fresh body (before plain-language injection,
+  // whose own outputs are sanitized at their generation point).
+  let body = await sanitizeDashesText(writer.data.article_body ?? '', { imageKey, surface: 'nl_article_body' })
+
   // 6b. Plain-language storytelling injection (additive; non-fatal — body stays
   // unmodified on any failure; skips when no PlainLanguageConfig matches the
   // industry). See .plans/plain-language-storytelling.implementation-plan.md.
-  let body = writer.data.article_body ?? ''
   if (body) {
     try {
       const plConfig = await loadPlainLanguageConfig(voice.industry)
@@ -174,9 +178,9 @@ export async function generateArticle(
   }
 
   return {
-    title: (writer.data.article_title ?? topicText).trim(),
-    teaser: (writer.data.article_teaser ?? '').trim(),
-    tldr: (writer.data.article_tldr ?? '').trim(),
+    title: (await sanitizeDashesText(writer.data.article_title ?? topicText, { imageKey, surface: 'nl_article_title' })).trim(),
+    teaser: (await sanitizeDashesText(writer.data.article_teaser ?? '', { imageKey, surface: 'nl_article_teaser' })).trim(),
+    tldr: (await sanitizeDashesText(writer.data.article_tldr ?? '', { imageKey, surface: 'nl_article_tldr' })).trim(),
     body,
     imageUrl,
   }

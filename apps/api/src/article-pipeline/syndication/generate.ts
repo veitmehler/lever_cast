@@ -9,6 +9,7 @@
 import { prisma } from '@socioply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 const PLATFORMS = ['linkedin', 'medium'] as const
 export type SyndicationPlatform = (typeof PLATFORMS)[number]
@@ -175,7 +176,9 @@ export async function generateSyndicationArticles(
       temperature:  0.7,
     })
 
-    const { title, content } = extractTitleAndContent(response.content, articleTitle)
+    const extracted = extractTitleAndContent(response.content, articleTitle)
+    const title = await sanitizeDashesText(extracted.title, { jobId, surface: `syndication_${platform}_title` })
+    const content = await sanitizeDashesText(extracted.content, { jobId, surface: `syndication_${platform}` })
 
     // Upsert — one row per platform per job
     await prisma.syndicationArticle.upsert({

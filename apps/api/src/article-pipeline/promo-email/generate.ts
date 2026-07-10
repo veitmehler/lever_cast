@@ -10,6 +10,7 @@
 import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 const PROMO_EMAIL_STEP_NUMBER = 32
 
@@ -167,7 +168,9 @@ export async function generatePromoEmail(jobId: string, userId: string): Promise
     temperature: 0.7,
   })
 
-  const { subject, bodyHtml } = parsePromoEmail(response.content, articleTitle)
+  const parsed = parsePromoEmail(response.content, articleTitle)
+  const subject = await sanitizeDashesText(parsed.subject, { jobId, surface: 'promo_subject' })
+  const bodyHtml = await sanitizeDashesText(parsed.bodyHtml, { jobId, surface: 'promo_body' })
 
   await prisma.articleEmailCampaign.upsert({
     where: { jobId },

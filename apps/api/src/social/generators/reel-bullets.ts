@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 export interface ReelBulletsResult {
   headline: string
@@ -70,12 +71,15 @@ export async function extractReelBullets(opts: {
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { headline?: string; bullets?: string[] }
 
-  const headline = (data.headline ?? '').replace(/\s+/g, ' ').trim()
+  const headline = await sanitizeDashesText((data.headline ?? '').replace(/\s+/g, ' ').trim(), { surface: 'reel_headline' })
 
-  const bullets = (data.bullets ?? [])
-    .map((b) => stripCheckmark(b.replace(/\s+/g, ' ').trim()))
-    .filter(Boolean)
-    .slice(0, 7)
+  const bullets = await Promise.all(
+    (data.bullets ?? [])
+      .map((b) => stripCheckmark(b.replace(/\s+/g, ' ').trim()))
+      .filter(Boolean)
+      .slice(0, 7)
+      .map((b) => sanitizeDashesText(b, { surface: 'reel_bullet' })),
+  )
 
   if (bullets.length === 0) throw new Error('Could not extract reel bullets from content')
 

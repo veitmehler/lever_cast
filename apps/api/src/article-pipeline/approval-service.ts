@@ -28,6 +28,7 @@ import { getBoss, QUEUES } from '../queues/index'
 import type { PipelineContext } from './variable-resolver'
 import { buildArticleSchema, type SchemaTypeRule } from './schema-builder'
 import { validateSchemaJsonLd } from './quality-gate'
+import { sanitizeDashesText, stripSafeDashes } from '../lib/text/dash-sanitizer'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,8 +66,10 @@ function extractSeoFields(parsed: Record<string, unknown>): {
   urlSlug: string
 } {
   return {
-    metaTitle: String(parsed.metaTitle ?? parsed['meta title'] ?? parsed.title ?? ''),
-    metaDescription: String(parsed.metaDescription ?? parsed['meta description'] ?? parsed.description ?? ''),
+    // Tier-1 dash cleanup only (sync): short fields, and the paired/conjunction
+    // rules cover the common meta-description dash tell without an LLM call.
+    metaTitle: stripSafeDashes(String(parsed.metaTitle ?? parsed['meta title'] ?? parsed.title ?? '')),
+    metaDescription: stripSafeDashes(String(parsed.metaDescription ?? parsed['meta description'] ?? parsed.description ?? '')),
     urlSlug: String(parsed.urlSlug ?? parsed.url_slug ?? parsed.slug ?? ''),
   }
 }
@@ -411,7 +414,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   const runner17 = new StepRunner(jobId, 17, ctx)
   const result17 = await runner17.execute()
   ctx.completedSteps.set(17, result17.output)
-  const excerpt = truncateExcerpt(result17.output)
+  const excerpt = truncateExcerpt(await sanitizeDashesText(result17.output, { jobId, stepNumber: 17 }))
 
   await prisma.sitePage.update({
     where: { jobId },
@@ -425,7 +428,7 @@ export async function approveArticleJob(jobId: string): Promise<void> {
   const runner18 = new StepRunner(jobId, 18, ctx)
   const result18 = await runner18.execute()
   ctx.completedSteps.set(18, result18.output)
-  const disclaimer = result18.output.trim()
+  const disclaimer = (await sanitizeDashesText(result18.output, { jobId, stepNumber: 18 })).trim()
 
   await prisma.sitePage.update({
     where: { jobId },

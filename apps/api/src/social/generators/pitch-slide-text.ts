@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 export type PitchSlideType = 'carousel' | 'hook'
 
@@ -88,5 +89,9 @@ export async function generatePitchSlideText(opts: {
     maxTokens: 256,
   })
 
-  return parsePitchAndCta(cleanTextOutput(run.content).trim(), fallbackCta)
+  const parsed = parsePitchAndCta(cleanTextOutput(run.content).trim(), fallbackCta)
+  return {
+    pitch: await sanitizeDashesText(parsed.pitch, { surface: 'pitch_slide' }),
+    cta: await sanitizeDashesText(parsed.cta, { surface: 'pitch_cta' }),
+  }
 }

@@ -8,6 +8,8 @@ import type { AutomationLogContext } from '../automation/log-context'
 import type { ArticleContentContext } from '../automation/content'
 import { resolveSlotContent } from '../automation/content'
 import { buildPlatformCaption, PLATFORM_CHAR_LIMITS } from '../automation/captions'
+import { loadPlainLanguageConfig, formatExemplars } from '../../article-pipeline/enrichment/plain-language'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 const PLATFORM_TONE: Record<string, string> = {
   linkedin:  'professional, thought-leadership tone; 1–2 short paragraphs; minimal hashtags',
@@ -18,13 +20,19 @@ const PLATFORM_TONE: Record<string, string> = {
   telegram:  'direct and informative; minimal fluff',
 }
 
+// Kept in lockstep with the DB row (stepNumber 203) — see
+// packages/db/prisma/deai-prompts.ts and .plans/de-ai-writing.implementation-plan.md.
 const DEF_SYS =
-  'You write platform-native social media captions. Match the platform tone and brand voice exactly. Never invent facts not in the source content.'
+  'You write platform-native social media captions that HOOK. The first line decides everything: it must ' +
+  'earn the tap on "more" with a concrete scene, striking image, or surprising specific — never a summary, ' +
+  'never the title restated. Open a curiosity loop and do not close it. Match the platform tone and brand ' +
+  'voice exactly. Never invent facts not in the source content. Never promise health outcomes. Never use ' +
+  'em-dashes; use commas, colons, or separate sentences.'
 
 const DEF_USER = `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
 
 Article title: {{title}}
-Section text (this slot\'s source):
+Section text (this slot's source):
 {{sectionText}}
 
 Platform tone: {{platformTone}}
@@ -36,10 +44,19 @@ Brand voice:
 - Target audience: {{who}}
 - Writing style: {{writingStyle}}
 
+Metaphor exemplars (the craft bar for imagery; may be empty):
+{{exemplars}}
+
+Advertising restrictions (hard rules; may be empty):
+{{restrictions}}
+
 Rules:
-- Return ONLY the caption text — no quotes, labels, or JSON
+- FIRST LINE = the hook: a concrete moment, image, or surprising specific from the source content. Never a summary, never the title restated.
+- Open a loop the caption does not close; the payoff lives in the content, not the caption.
+- Curiosity through specificity; no clickbait cliches ("you won't believe").
+- Return ONLY the caption text: no quotes, labels, or JSON
 - Stay under {{charLimit}} characters
-- Do not use markdown
+- Do not use markdown or em-dashes
 - Match native {{platform}} posting style
 - Apply the brand writing style above; if writing style is empty, default to the platform tone`
 
@@ -59,6 +76,20 @@ export async function generatePlatformCaption(opts: {
       loadPromptTemplate(203),
       loadSocialBrandTheme(logCtx.userId),
     ])
+
+    // Per-industry metaphor exemplars + advertising restrictions for the hook
+    // craft (empty when the industry has no PlainLanguageConfig — non-fatal).
+    let exemplars = ''
+    let restrictions = ''
+    try {
+      const plConfig = await loadPlainLanguageConfig(brand.industry)
+      if (plConfig) {
+        exemplars = formatExemplars(plConfig)
+        restrictions = plConfig.restrictions
+      }
+    } catch {
+      /* captions proceed without exemplars */
+    }
 
     const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
     const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
@@ -84,6 +115,8 @@ export async function generatePlatformCaption(opts: {
       .replace(/\{\{industry\}\}/g, brand.industry || 'general business')
       .replace(/\{\{call_to_action\}\}/g, brand.socialCallToAction || '')
       .replace(/\{\{callToAction\}\}/g, brand.socialCallToAction || '')
+      .replace(/\{\{exemplars\}\}/g, exemplars)
+      .replace(/\{\{restrictions\}\}/g, restrictions)
 
     const adapter = getLLMAdapter(provider)
     const run = await adapter.call({
@@ -94,7 +127,7 @@ export async function generatePlatformCaption(opts: {
       maxTokens: 512,
     })
 
-    const caption = cleanTextOutput(run.content).trim()
+    const caption = (await sanitizeDashesText(cleanTextOutput(run.content), { ...logCtx, surface: 'caption' })).trim()
     if (!caption) throw new Error('Empty caption')
 
     return caption.length <= charLimit ? caption : caption.slice(0, charLimit - 1).trim() + '…'

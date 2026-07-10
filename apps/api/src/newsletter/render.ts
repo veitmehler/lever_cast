@@ -7,9 +7,10 @@
  * "section" colors) separating white content blocks.
  *
  * Section order (redesign): header → trivia question → cover summary image →
- * video → facts → teaser 1 → tips → teaser 2 → joke → feature → teaser 3 →
- * secondary article → recipe → recipe 2 → trivia answer → footer. Sections with
- * no data drop out.
+ * video → facts → teaser 1 → tips → teaser 2 → joke → recipe → feature →
+ * teaser 3 → secondary article → recipe 2 → trivia answer → footer. Sections
+ * with no data drop out. The two recipes are deliberately split (one
+ * mid-edition, one near the end) so the green bands never stack back-to-back.
  */
 
 export interface RenderArticle {
@@ -436,6 +437,10 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   // Joke (pink)
   if (fun?.joke) section('Joke Of The Day', para(fun.joke, theme, 'center'), pink)
 
+  // Recipe 1 — mid-edition (green), deliberately separated from Recipe 2 near the
+  // end so the two green bands don't stack back-to-back.
+  if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme), green)
+
   // Feature article (navy)
   if (input.featureArticle) section('Article Of The Day', articleBlock(input.featureArticle, theme), navy)
 
@@ -448,8 +453,7 @@ export function renderNewsletterHtml(input: RenderInput, brand: RenderBrand): st
   // Secondary (specialization) article — band shows its own headline (navy)
   if (input.secondaryArticle) section(input.secondaryArticle.title, articleBlock(input.secondaryArticle, theme, false), navy)
 
-  // Recipes (green)
-  if (input.modules?.recipe) section('Recipe Of The Day', recipeBlock(input.modules.recipe, theme), green)
+  // Recipe 2 — near the end (green); Recipe 1 renders mid-edition, before the feature.
   if (input.modules?.recipe2) section('Another Recipe', recipeBlock(input.modules.recipe2, theme), green)
 
   // Trivia answer (payoff, last — pink). Extra 60px bottom padding for whitespace

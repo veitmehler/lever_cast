@@ -67,7 +67,7 @@ export class OpenAIAdapter implements LLMAdapter {
           model,
           messages,
           temperature,
-          ...(maxTokens ? { max_tokens: maxTokens } : {}),
+          ...(maxTokens ? { max_completion_tokens: maxTokens } : {}),
           ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
         }),
       )

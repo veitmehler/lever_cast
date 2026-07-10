@@ -27,7 +27,7 @@
 - ✅ DigitalOcean migration: API + worker as Docker containers on droplets (staging + prod), DO managed PostgreSQL; web stays on Vercel (`staging.socioply.com` / project `socioply` under team `azavea-media`) — see `.plans/Migration-DigitalOcean-Plan.md`
 - ✅ CI/CD: GitHub Actions → GHCR images → droplet deploy over Tailscale (`deploy-api-staging.yml` / `deploy-api.yml`); prod runs `prisma migrate deploy` + seed, staging migrate-only (manual targeted seeds)
 - ✅ Team accounts: up to 3 members per account, owner-managed roster with Clerk invitations, account-shared settings/brand/content
-- ✅ Remediation program: Prisma/libs consolidation, large-file decomposition, test expansion (**457 unit tests** across 58 files), hardening & observability (Sentry, structured logging, health endpoints) — see `.plans/Phase5–9` + `.plans/Remediation-Plan.md`
+- ✅ Remediation program: Prisma/libs consolidation, large-file decomposition, test expansion (**518 unit tests** across 64 files as of 2026-07-10), hardening & observability (Sentry, structured logging, health endpoints) — see `.plans/Phase5–9` + `.plans/Remediation-Plan.md`
 - ✅ Resilience layer (July 2026): timeouts/retry/instrumentation wrappers on every external call, per-provider circuit breaker, auto-recovery safety sweeper for stalled runs, graceful degradation fallbacks (video→quote card, hook→carousel), social-health snapshots — see `.plans/social-generation-resilience.implementation-plan.md`
 
 ### Article Production Pipeline (Done)
@@ -40,6 +40,11 @@
 - ✅ Shared per-topic research (real YouTube video search, web-search-grounded recipes with generated images, scraped teaser source articles) computed once per calendar and reused across clients — see `.plans/newsletter-magazine-pipeline.implementation-plan.md`
 - ✅ Per-client voiced generation: feature + secondary articles, teasers, quick hits, fun section, subject/preview, AI cover image, rendered HTML, offers, logo variants, ready-for-review email
 - ✅ Per-account newsletter topic overrides from the shared idea bank, with `nl_topic_expand` auto-draft (bullets/secondary topic/recipes) at generation time — see `.plans/newsletter-topic-override.implementation-plan.md` (July 2026)
+- ✅ Layout: the two recipes render split (Recipe Of The Day mid-edition after the joke, Another Recipe near the end) instead of back-to-back green bands (2026-07-10)
+
+### Content Quality & Readability (Done — July 2026)
+- ✅ **Plain-language storytelling injection**: detects jargon terms + complex concepts in FINAL fact-checked articles/newsletter articles (section-by-section, like the GEO pass) and additively injects brand-voiced explanations — inline glosses for terms, styled story boxes for concepts (rotating labels, brand accent, max 1/section). Few-shot guided by a per-industry exemplar bank (`PlainLanguageConfig`, chiropractic seeded, admin-managed, zero end-user curation) + AHPRA-aware restrictions; compliance verifier with regenerate-once-then-skip. Never modifies existing sentences. ~$0.14/article, <$0.08/newsletter — see `.plans/plain-language-storytelling.implementation-plan.md`
+- ✅ **De-AI writing**: full em-dash elimination via a two-tier sanitizer (deterministic fixes + flash-lite per-sentence micro-edit behind a token-diff guard that keeps the original unless only punctuation changed) hooked at every prose output boundary across all pipelines; curated newsletter teasers rewritten as curiosity hooks (three-beat structure, scene→metaphor→question rotation per edition, tease-beyond-the-source-title), article_teaser field + social captions get first-line hook craft fed by the same exemplar bank — see `.plans/de-ai-writing.implementation-plan.md`. ⚠️ Prod needs `reseed-deai-prompts.ts` post-deploy (see Pending Tasks)
 
 ### Social Media Automation (Done)
 - ✅ Weekly cadence matrix: 3 feed posts/day Mon–Sat (newsletter days Mon/Wed/Fri/Sat, article days Tue/Thu) + 3 companion stories/day; publishing via GoHighLevel — see `.plans/social-weekly-cadence.implementation-plan.md`, `social-media-automation-ghl`
@@ -94,6 +99,8 @@
 | `logging-observability-plan.md` | Social automation log context | `AutomationLogContext`/`withSlotKey` live |
 | `social-brand-tint-carousel.implementation-plan.md` | Wed/Sat tinted carousels | **Implemented 2026-07-10** (header current), incl. post-review refinements (justified text, full-width banner, swipe arrows) |
 | `client-story-review-mining.implementation-plan.md` | Google reviews → de-identified client stories in articles | **Implemented + deployed to staging 2026-07-10, ⏸️ ON HOLD** — chain works end-to-end (gate → spider → vision transcription → triage → injection) but scraper capture yield is unreliable (Google anti-scraping) and a GHL-based ingestion pivot is pending a verified-GBP test; resume guide in the plan doc's final section (also tracked under Pending Tasks → Product) |
+| `plain-language-storytelling.implementation-plan.md` | Metaphor/story injection for terms + complex concepts (articles + newsletter articles) | **Implemented + live-verified on staging 2026-07-10** — per-industry exemplar bank (`PlainLanguageConfig`, chiro seeded) + compliance verifier; inline term glosses + boxed concept stories (1/section cap, rotating labels, brand accent); article run: 9 glosses + 5 boxes, $0.14; newsletter run: budget-capped, theme-styled boxes; admin CRUD page deferred until quality review on real content |
+| `de-ai-writing.implementation-plan.md` | Em-dash elimination + storytelling hook teasers/captions | **Implemented + live-verified on staging 2026-07-10** — two-tier dash sanitizer (deterministic + flash-lite sentence micro-edit behind a token-diff guard) at every prose boundary; curated teasers rewritten as curiosity hooks (scene→metaphor→question rotation, tease-beyond-the-title), article_teaser + social captions hook-crafted; ⚠️ prod rollout REQUIRES `reseed-deai-prompts.ts` (see Pending Tasks → Ship) |
 
 **Legacy (pre-pivot, implemented then superseded)**:
 - `social-media-implementation-plan.md` — the original direct-OAuth multi-platform posting system (LinkedIn/Twitter/Facebook/Instagram/Threads/Telegram). Implemented Nov 2025–Jan 2026; publishing now flows through GHL for the automated cadence, but the direct surfaces still exist in `apps/web`
@@ -639,6 +646,7 @@
 
 ### Ship / Operations
 - ⏳ **Merge `staging` → `main`** to deploy the accumulated work to production. Prod is currently broken for all Gemini steps until this lands (the Gemini 2.x retirement fix self-heals prod via its migration on deploy)
+- ⚠️ **After the prod deploy: run `packages/db/scripts/reseed-deai-prompts.ts` against prod.** Prod's auto-seed is create-only — it will create the NEW prompts (`pl_*`, `st_dash_fix`, chiro `PlainLanguageConfig`) automatically, but it will NOT propagate the rewritten text of the pre-existing prompts (teaser hooks 309/310, article-writer 305, caption 203). Without the reseed, prod keeps the old summary-style teasers/captions while running the new code. (User signed off on this exact overwrite set 2026-07-10.) Also eyeball the first automated social run's captions across all 6 platforms after the reseed — the caption prompt change affects every automated post
 - ⏳ **Staging web DB connection pool (Option B)**: Vercel staging web's direct-Prisma server components read the DB with `connection_limit=1` stopgap; move to a DO connection pool
 - ⏳ Seed a production `subscriptionStartedAt` per paying account once billing decisions land (admin control exists)
 

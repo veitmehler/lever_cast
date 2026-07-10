@@ -58,6 +58,48 @@
 - ✅ **Gemini 2.x server-side retirement (July 9, 2026)**: Google turned off `generateContent` for the whole 2.x family ahead of the documented Oct 16 date — silently broke every Gemini step across all pipelines. Swapped all code fallbacks, seeds, DB prompt rows, and admin dropdowns to `gemini-3.5-flash` / `gemini-3.1-pro-preview` / `gemini-3.1-flash-lite` via migration (prod self-heals on next deploy). Cost impact ≈ +$2.40/client/month
 - ✅ Fal.ai hang + exhausted-balance production incident (July 2026) → motivated the full resilience layer above
 
+### Plan-by-Plan Implementation Ledger (audited 2026-07-09)
+
+> ⚠️ Many plan docs carry **stale in-file status headers** ("Draft / not started", "proposed", "approved-for-planning") written before implementation began and never updated. The statuses below were audited against the actual codebase/DB, which is authoritative. Recent plans (July 2026) do keep their headers current.
+
+**Implemented & live (2026 platform)** — verified against code/DB evidence:
+
+| Plan doc | Scope | Evidence / notes |
+|---|---|---|
+| `Migration-DigitalOcean-Plan.md` | Supabase/Vercel → DO droplets, monorepo, worker | All phases live (header stale: says 2/7/8 outstanding — monorepo, worker, cutover all shipped) |
+| `Remediation-Plan.md` + `Phase5/6/7/9-*.md` | Prisma consolidation, file decomposition, test expansion, hardening | Done/deployed; Phase 7 concluded (unit-testable surface exhausted at 457 tests) |
+| `article-production-pipeline.implementation-plan.md` + `Article-Pipeline-Phases.md` + `article-pipeline-v2` | Multi-step article pipeline | Pipeline steps 0–13 live with quality gate |
+| `article-outlines.implementation-plan.md` | Outline frameworks | `outlineFrameworkNumber` on topics, admin editor live |
+| `article-quality-fixes` / `article-pipeline-title-citations-geo-fixes` | Quality + title/citation/GEO fixes | Geo-question generator (step 102), quality-gate tests live |
+| `enrichment-phase-c-expansion.implementation-plan.md` | GEO enrichment, key takeaways, TOC, WP category | Live — `art_keytakeaways` even feeds social reels |
+| `diagram-enhancements-v2` / `diagram-svg-primary-and-rendering-fix` / `svg-externalization` | Diagram rendering architecture | `article_diagrams` with svg/png/dark variants + S3 keys |
+| `diagram-ai-restyle-branding.implementation-plan.md` | AI-restyled branded diagrams (nano-banana) | Header stale ("approved-for-planning") — live: `stylizedPngS3Key`, `gemini-3.1-flash-image` usage recorded, brand colors + logo watermark |
+| `workflow-detail-ui-enhancements.implementation-plan.md` | Workflow page: schema review, rerun enrichment, publish/export, rewrite | `/articles/:jobId/rewrite` (steps 7–12) + rerun endpoints live |
+| `ghl-integration-plan.md` + `GHL-Integration_Explanation.md` | GoHighLevel client (email + social) | `GhlSettings`, campaigns, social posting via GHL all live |
+| `article-promo-email-ghl.implementation-plan.md` | Per-article promo email via GHL | Header stale ("Draft / not started") — `article_email_campaigns` live with recorded costs |
+| `publish-triggered-content-generation.implementation-plan.md` | Publish → auto-generate syndication + social | Implemented in evolved form: `syndication_articles` (LinkedIn/Medium) live; social generation now flows through ContentBatch/weekly cadence instead of the originally-planned after-enrichment hook (that helper exists but is intentionally unused) |
+| `newsletter-magazine-pipeline.implementation-plan.md` | Full newsletter pipeline (phases 1a–1d) | Header stale ("Draft / not started") — COMPLETE, PR #75 merged 2026-06-16 |
+| `newsletter-template-redesign` / `newsletter-cover-ai-redesign` / `newsletter-offers` / `newsletter-logo-variants-footer` | Edition redesign, AI cover, offers, logo variants | Headers stale ("proposed") — all live: render.ts/cover.ts, `summaryImageUrl`, `/newsletter/offers`, `nlLogoLightUrl/DarkUrl` (reused by brand-tint carousels) |
+| `newsletter-specialization-hemisphere.implementation-plan.md` | Deterministic calendar routing | Header stale ("proposed") — `calendar-routing.ts` + `Specialization` model live |
+| `newsletter-topic-override.implementation-plan.md` | Per-account topic overrides + auto-draft | **Implemented 2026-07-10** (header current) |
+| `content-planning-bulk-review.implementation-plan.md` | Content Plan, bulk batches, quality gate, collaborative review | Header stale ("approved-for-planning") — `ContentBatch`, review inbox, `ArticleEditRequest` all live |
+| `content-plan-billing-window.implementation-plan.md` | Billing-cycle windowing | **Implemented 2026-07-09** (header current) |
+| `dashboard-review-consolidation.implementation-plan.md` | Review modals on dashboard | **Implemented 2026-07-09** (header current) |
+| `social-media-automation-ghl.implementation-plan.md` | Social automation runs via GHL | Runs/spec-results/posts pipeline live |
+| `social-post-quality-preview.implementation-plan.md` | Preview-first social review | `previewJson` flow live across all processors |
+| `social-video-background-music.implementation-plan.md` | Licensed music library + overlay | `MusicTrack` model, admin library, reel muxing live |
+| `social-weekly-cadence.implementation-plan.md` | Weekly matrix, 3 feed + 3 stories/day, Phases 8–9 | Header stale ("approved-for-planning") — fully live incl. story posts + link-in-bio CTA |
+| `social-article-day-and-section-fixes.implementation-plan.md` | Article-day date alignment + section selection | Header stale — shipped (commit `5aada14`) |
+| `social-generation-resilience.implementation-plan.md` | Timeouts/retries/breaker/sweeper/degradation | **All 6 phases implemented + deployed 2026-07-08** (header current) |
+| `logging-observability-plan.md` | Social automation log context | `AutomationLogContext`/`withSlotKey` live |
+| `social-brand-tint-carousel.implementation-plan.md` | Wed/Sat tinted carousels | **Implemented 2026-07-10** (header current), incl. post-review refinements (justified text, full-width banner, swipe arrows) |
+
+**Legacy (pre-pivot, implemented then superseded)**:
+- `social-media-implementation-plan.md` — the original direct-OAuth multi-platform posting system (LinkedIn/Twitter/Facebook/Instagram/Threads/Telegram). Implemented Nov 2025–Jan 2026; publishing now flows through GHL for the automated cadence, but the direct surfaces still exist in `apps/web`
+
+**Reference documents (not plans — no implementation status)**:
+- `newsletter-creation-workflow.md` (ported reference workflow), `active-prompts-from-db.md` (DB prompt snapshot), `article-production-pipeline.implementation-plan - original.md` (pre-adaptation original)
+
 ---
 
 ## Completed Tasks (Chronological Order)
@@ -950,7 +992,11 @@
 
 ## Change Log
 
-### July 2026 (Latest — Platform status snapshot)
+### July 2026 (Latest — Plan-by-plan audit)
+- Audited all 45 `.plans/*.md` docs against the actual codebase/DB and added the "Plan-by-Plan Implementation Ledger" — every 2026 plan is implemented and live except where noted; flagged the many stale in-file status headers ("Draft", "proposed", "approved-for-planning") that predate implementation
+- One evolution noted: publish-triggered generation shipped in evolved form (ContentBatch flow supersedes the planned after-enrichment hook, which exists but is unused)
+
+### July 2026 (Earlier — Platform status snapshot)
 - Added the "Platform Evolution 2026" section documenting the full pivot to the productized content platform (monorepo, DO infrastructure, article/newsletter/social pipelines, admin system, resilience layer) — detailed records live in `.plans/*.md`
 - July 2026 highlights: 6-phase social generation resilience layer; dashboard review consolidation (article/newsletter/social review via modals); billing-cycle Content Plan windowing with two-tier planning/production sections; account-scoped newsletter topic overrides with auto-draft; Gemini 2.x retirement incident + full model swap to 3.x; Wed/Sat brand-tinted carousels (measured WCAG contrast, justified text, banner, swipe arrows, corner logo); per-client AI cost model measured (≈$50/client/month)
 - Replaced the stale pending list with current priorities (merge to main, Stripe billing, Threads via GHL, DO connection pool, cost-recording blind spots); legacy pre-pivot sections kept below for history

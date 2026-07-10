@@ -19,8 +19,7 @@
 import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from '../prisma/newsletter-prompts'
 import { PLAIN_LANGUAGE_TEMPLATES, PLAIN_LANGUAGE_CONFIGS } from '../prisma/plain-language-prompts'
-import { DEAI_TEMPLATES } from '../prisma/deai-prompts'
-import { PROMPT_TEMPLATES } from '../prisma/seed'
+import { DEAI_TEMPLATES, CAPTION_HOOK_SYSTEM, CAPTION_HOOK_USER } from '../prisma/deai-prompts'
 
 const prisma = new PrismaClient()
 
@@ -59,24 +58,34 @@ async function main() {
   }
 
   for (const stepNumber of OVERWRITE_STEP_NUMBERS) {
-    const template = PROMPT_TEMPLATES.find((t) => t.stepNumber === stepNumber)
-    if (!template) throw new Error(`Source template not found for stepNumber ${stepNumber}`)
+    // 203's canonical text lives in deai-prompts.ts (seed.ts uses the same constants).
     const existing = await prisma.promptTemplate.findFirst({
       where: { stepNumber },
       select: { id: true, userPrompt: true, systemPrompt: true },
     })
     if (!existing) {
-      await prisma.promptTemplate.create({ data: template })
+      await prisma.promptTemplate.create({
+        data: {
+          stepNumber,
+          stepName: 'social_platform_caption',
+          defaultProvider: 'anthropic',
+          defaultModel: 'claude-sonnet-4-5-20250929',
+          maxTokens: 512,
+          systemPrompt: CAPTION_HOOK_SYSTEM,
+          userPrompt: CAPTION_HOOK_USER,
+          isActive: true,
+        },
+      })
       console.log(`  + step ${stepNumber}: created (did not exist)`)
       continue
     }
     await prisma.promptTemplate.update({
       where: { id: existing.id },
-      data: { systemPrompt: template.systemPrompt, userPrompt: template.userPrompt },
+      data: { systemPrompt: CAPTION_HOOK_SYSTEM, userPrompt: CAPTION_HOOK_USER },
     })
     const before = (existing.systemPrompt ?? '').length + (existing.userPrompt ?? '').length
-    const after = (template.systemPrompt ?? '').length + template.userPrompt.length
-    console.log(`  ⤳ step ${stepNumber} (${template.stepName}): OVERWRITTEN (${before} → ${after} chars)`)
+    const after = CAPTION_HOOK_SYSTEM.length + CAPTION_HOOK_USER.length
+    console.log(`  ⤳ step ${stepNumber} (social_platform_caption): OVERWRITTEN (${before} → ${after} chars)`)
   }
 
   // Dash-free exemplars + restrictions.

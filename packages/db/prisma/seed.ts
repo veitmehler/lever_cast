@@ -2,11 +2,11 @@ import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from './newsletter-prompts'
 import { CLIENT_STORY_TEMPLATES } from './client-story-prompts'
 import { PLAIN_LANGUAGE_TEMPLATES, PLAIN_LANGUAGE_CONFIGS } from './plain-language-prompts'
-import { DEAI_TEMPLATES } from './deai-prompts'
+import { DEAI_TEMPLATES, CAPTION_HOOK_SYSTEM, CAPTION_HOOK_USER } from './deai-prompts'
 
 const prisma = new PrismaClient()
 
-export const PROMPT_TEMPLATES = [
+const PROMPT_TEMPLATES = [
   {
     stepNumber: 0,
     stepName: 'generate_title',
@@ -1530,43 +1530,10 @@ Rules:
     defaultProvider: 'anthropic',
     defaultModel: 'claude-sonnet-4-5-20250929',
     maxTokens: 512,
-    // Kept in lockstep with DEF_SYS/DEF_USER in social/generators/platform-caption.ts.
-    systemPrompt:
-      'You write platform-native social media captions that HOOK. The first line decides everything: it must ' +
-      'earn the tap on "more" with a concrete scene, striking image, or surprising specific — never a summary, ' +
-      'never the title restated. Open a curiosity loop and do not close it. Match the platform tone and brand ' +
-      'voice exactly. Never invent facts not in the source content. Never promise health outcomes. Never use ' +
-      'em-dashes; use commas, colons, or separate sentences.',
-    userPrompt: `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
-
-Article title: {{title}}
-Section text (this slot's source):
-{{sectionText}}
-
-Platform tone: {{platformTone}}
-Character limit: {{charLimit}}
-
-Brand voice:
-- Organization: {{organizationName}}
-- Business: {{businessDescription}}
-- Target audience: {{who}}
-- Writing style: {{writingStyle}}
-
-Metaphor exemplars (the craft bar for imagery; may be empty):
-{{exemplars}}
-
-Advertising restrictions (hard rules; may be empty):
-{{restrictions}}
-
-Rules:
-- FIRST LINE = the hook: a concrete moment, image, or surprising specific from the source content. Never a summary, never the title restated.
-- Open a loop the caption does not close; the payoff lives in the content, not the caption.
-- Curiosity through specificity; no clickbait cliches ("you won't believe").
-- Return ONLY the caption text: no quotes, labels, or JSON
-- Stay under {{charLimit}} characters
-- Do not use markdown or em-dashes
-- Match native {{platform}} posting style
-- Apply the brand writing style above; if writing style is empty, default to the platform tone`,
+    // Canonical text lives in deai-prompts.ts (also used by reseed-deai-prompts.ts);
+    // platform-caption.ts keeps matching in-code fallbacks.
+    systemPrompt: CAPTION_HOOK_SYSTEM,
+    userPrompt: CAPTION_HOOK_USER,
     isActive: true,
   },
   {

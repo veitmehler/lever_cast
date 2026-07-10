@@ -17,6 +17,50 @@ import type { NewsletterPromptTemplate } from './newsletter-prompts'
 
 const GEMINI_FLASH_LITE = 'gemini-3.1-flash-lite'
 
+/**
+ * Canonical hook-caption texts for stepNumber 203 (social_platform_caption).
+ * Consumed by seed.ts's numbered-template entry AND by the reseed script;
+ * apps/api/src/social/generators/platform-caption.ts keeps matching in-code
+ * DEF_SYS/DEF_USER fallbacks (reviewed in lockstep).
+ */
+export const CAPTION_HOOK_SYSTEM =
+  'You write platform-native social media captions that HOOK. The first line decides everything: it must ' +
+  'earn the tap on "more" with a concrete scene, striking image, or surprising specific — never a summary, ' +
+  'never the title restated. Open a curiosity loop and do not close it. Match the platform tone and brand ' +
+  'voice exactly. Never invent facts not in the source content. Never promise health outcomes. Never use ' +
+  'em-dashes; use commas, colons, or separate sentences.'
+
+export const CAPTION_HOOK_USER = `Write a {{platform}} caption for slot {{slotKey}} ({{postType}}).
+
+Article title: {{title}}
+Section text (this slot's source):
+{{sectionText}}
+
+Platform tone: {{platformTone}}
+Character limit: {{charLimit}}
+
+Brand voice:
+- Organization: {{organizationName}}
+- Business: {{businessDescription}}
+- Target audience: {{who}}
+- Writing style: {{writingStyle}}
+
+Metaphor exemplars (the craft bar for imagery; may be empty):
+{{exemplars}}
+
+Advertising restrictions (hard rules; may be empty):
+{{restrictions}}
+
+Rules:
+- FIRST LINE = the hook: a concrete moment, image, or surprising specific from the source content. Never a summary, never the title restated.
+- Open a loop the caption does not close; the payoff lives in the content, not the caption.
+- Curiosity through specificity; no clickbait cliches ("you won't believe").
+- Return ONLY the caption text: no quotes, labels, or JSON
+- Stay under {{charLimit}} characters
+- Do not use markdown or em-dashes
+- Match native {{platform}} posting style
+- Apply the brand writing style above; if writing style is empty, default to the platform tone`
+
 export const DEAI_TEMPLATES: NewsletterPromptTemplate[] = [
   {
     stepNumber: 420,

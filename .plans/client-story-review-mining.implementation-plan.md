@@ -1,9 +1,13 @@
 # Client Story Review Mining — Implementation Plan
 
-Status: **implemented** (2026-07-10). All 7 phases shipped — schema, discovery route, onboarding
-UI, browser capture + vision transcription, fingerprinting, triage prompt, story selection/pipeline
-injection, spider job + narrow auto-generate cron, and the generation gate on
-`POST /content-plan/generate`. Deployed to staging.
+Status: **implemented, ON HOLD pending verified-GBP access** (2026-07-10). All 7 phases shipped and
+deployed to staging — schema, discovery route, onboarding UI, browser capture + vision
+transcription, fingerprinting, triage prompt, story selection/pipeline injection, spider job +
+narrow auto-generate cron, and the generation gate on `POST /content-plan/generate`. Live testing
+proved the full chain works mechanically end-to-end, but **review-capture yield is unreliable**
+(Google anti-scraping) and a **GHL-based ingestion pivot** was investigated the same day that may
+replace the scraper. See **"Post-implementation: live testing, fixes & the GHL pivot"** at the
+bottom of this doc — that section is the pick-up-here guide for finishing this feature.
 
 ## Goal
 
@@ -418,3 +422,92 @@ successful creation enqueue the spider job.
   debugging) would be cheap to add later using the same pattern as `/admin/prompts` or
   `/admin/music`, if QA/support visibility into triage quality or gate timing turns out to be
   needed.
+
+---
+
+## Post-implementation: live testing, fixes & the GHL pivot (2026-07-10)
+
+> **⏸️ PICK UP HERE.** This feature is implemented and deployed to staging but is ON HOLD. The
+> blocker: finishing requires access to a **verified Google Business Profile** (owner or manager)
+> — none was available on 2026-07-10 (Coast Chiropractic Kawana was only a content-testing
+> subject, not ours; the user's own GBP is unverified, and GHL refuses unverified profiles).
+> Resume checklist at the bottom of this section.
+
+### What live testing proved (staging, real listing: Coast Chiropractic Kawana, ~97 reviews)
+
+The full chain works mechanically end-to-end, triggered through the real production code path
+(`checkArticleGenerationGate` → run row → pg-boss job → worker):
+navigate via Oxylabs residential proxy → screenshot → vision-transcribe (OpenAI) →
+fingerprint/persist → triage (Gemini) → run `completed`. The triage LLM also demonstrated the
+intended safety behavior: given a truncated review fragment, it declined to fabricate a story
+(`not_story`) instead of inventing one.
+
+### Bugs found & fixed during live testing (all deployed to staging, SHA-verified)
+
+| Commit | Fix |
+|---|---|
+| `a86fce3` | `OpenAIAdapter` sent legacy `max_tokens`; `gpt-5.4-mini` requires `max_completion_tokens` (400 error killed the first run) |
+| `11dd2f8` | Force `hl=en` (URL + Accept-Language) — proxy exit IPs made Google render in random locales, silently breaking every text-based selector; click into the actual Reviews tab; click "More" to expand truncated reviews; scroll-height check moved after the lazy-load wait (screenshot yield 1 → 3 immediately) |
+| `7c6dadd` | Dismiss `consent.google.com` interstitial — EU/EEA proxy exits redirect the whole navigation there (observed `gl=HR`); neither Reviews tab nor Sort exists on that page |
+| `29b7fb9` | Retry with a fresh proxy session (up to 3) when the reviews UI is absent — Google intermittently serves a **stripped page variant** (Overview/About only, no reviews at all) on the same listing; confirmed not a hydration race (persists past 9.5 s), most likely anti-scraping tied to proxy-IP reputation |
+
+### What remains UNPROVEN about the scraper
+
+- Capture yield: across ~6 live runs, the full reviews UI appeared exactly **once**. The
+  fresh-session retry fired correctly but all 3 attempts still hit the stripped variant in the last
+  test. Confound: the test hammered one listing with dozens of requests in ~20 minutes, which a
+  real monthly cadence never would — the target may have been self-poisoned. Needs a clean re-test
+  after a cooldown, or against a different listing.
+- `expandTruncatedReviews` ("More" click) — implemented but never exercised against a page that
+  actually had visible reviews.
+
+### The GHL pivot (investigated same day — likely replaces the scraper)
+
+Findings, all verified against the official `GoHighLevel/highlevel-api-docs` repo + live API calls:
+
+1. **No pull API for reputation reviews exists** in GHL's public API (v2 or v3) — the only
+   "reviews" endpoints/scopes are e-commerce product reviews. Publishing Omniply as a GHL
+   marketplace app does NOT help: the complete official app-webhook event list (58 events) has no
+   review event either.
+2. **Workflow trigger "Review Received"** (Google + FB; filterable by source/rating/spam) →
+   outbound **Webhook action** POSTs each new review to any URL. Location-side config → ship it in
+   the **agency snapshot** so every client location is armed automatically before GBP ever
+   connects.
+3. **Conversations API has a documented `TYPE_REVIEW` message type**:
+   `GET /conversations/search?locationId=…&lastMessageType=TYPE_REVIEW` +
+   `GET /conversations/{id}/messages` (`body` = review text, `dateAdded` = real timestamp, untyped
+   `meta` may carry rating/reviewer). Verified live with our stored PIT credentials against dev
+   location `nTr8IulThJiXAzJXmy9N`: 200 OK, `total: 0` — zero only because that location has never
+   had a GBP connected. Requires `conversations.readonly` / `conversations/message.readonly`
+   scopes on the Private Integration.
+4. **THE open question (load-bearing for backfill):** when a GBP is first connected, GHL imports
+   the existing reviews into Reputation — but does that initial import (a) fire the Review
+   Received trigger, and/or (b) create TYPE_REVIEW conversations? Undocumented. Prior: the trigger
+   is suppressed on backfill (otherwise auto-reply automations would blast years-old reviews — no
+   such community complaints exist). If (b) is true, backfill becomes a simple documented API pull
+   and the scraper can be deleted outright.
+
+### Resume checklist (when a verified GBP is available)
+
+1. In the target GHL location, create the test workflow **before** connecting GBP: trigger
+   "Review Received" (NO filters) → action "Webhook" (plain, not Custom) → POST to a fresh
+   capture URL (webhook.site token expires ~7 days — make a new one). **Publish** it (not Draft).
+2. Connect the GBP: sub-account → Settings → Integrations → Google Business Profile (needs
+   owner/manager Google account, verified listing).
+3. Observe three things: (a) does the webhook fire for the imported historical reviews; (b) does
+   Reputation → Reviews populate (confirms import happened); (c) re-run the Conversations probe —
+   `GET /conversations/search?lastMessageType=TYPE_REVIEW` with the location's PIT (one-liner via
+   `getGhlCredentials` in the staging api container; see memory/session 2026-07-10).
+4. Decide per the outcome matrix: historical reviews pullable via Conversations API → **retire the
+   scraper entirely** and switch cycle-start ingestion to an API pull; only new reviews flow → keep
+   scraper as one-time onboarding backfill, webhook/API for ongoing; neither works → scraper stays,
+   as built today.
+5. Either way: add the Review Received → Omniply webhook workflow to the **client snapshot**, and
+   build the receiving endpoint (`POST /api/ghl/review-webhook` or similar, mapping locationId →
+   account, feeding the existing fingerprint → triage → story pipeline — everything downstream of
+   capture stays unchanged).
+6. Optional parallels: ask HighLevel support the backfill question directly; verify the user's own
+   GBP as a permanent test rig (starts at 0 reviews — tests new-review flow only, not backfill).
+
+Test rig state as of 2026-07-10: a Review Received → webhook workflow may already exist (inert) in
+the dev GHL location; the webhook.site URL from that day is expired — regenerate.

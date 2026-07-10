@@ -1,9 +1,18 @@
 'use client'
 
-import { Save, Loader2, X, Plus, Upload, Building2 } from 'lucide-react'
+import { useState } from 'react'
+import { Save, Loader2, X, Plus, Upload, Building2, Search, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { COUNTRIES } from './countries'
 import type { SettingsData } from './useSettingsData'
+
+interface GbpCandidate {
+  description: string | null
+  website: string | null
+  address: string | null
+  mapsSearchUrl: string
+}
 
 // Equator-straddling countries (mirror of packages/shared/src/hemisphere.ts EDGE map).
 // Kept inline so this client component doesn't pull the server bundle into the browser.
@@ -52,6 +61,29 @@ export function BrandProfileSection({ settings }: { settings: SettingsData }) {
     handleSaveBrandProfile,
     isSavingBrand,
   } = settings
+
+  const [discovering, setDiscovering] = useState(false)
+  const [candidate, setCandidate] = useState<GbpCandidate | null>(null)
+  const [candidateMatched, setCandidateMatched] = useState(false)
+  const [discoverAttempted, setDiscoverAttempted] = useState(false)
+
+  async function findBusiness() {
+    setDiscovering(true)
+    setCandidate(null)
+    try {
+      const res = await fetch('/api/brand-settings/discover-gbp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      })
+      const body = await res.json().catch(() => ({}))
+      setDiscoverAttempted(true)
+      if (!res.ok) return toast.error(body.error ?? 'Could not search for your business')
+      if (!body.found) return toast.error('No Google Business listing found — enter your GBP URL manually below.')
+      setCandidate(body.candidate)
+      setCandidateMatched(!!body.websiteMatches)
+    } finally {
+      setDiscovering(false)
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -556,14 +588,51 @@ export function BrandProfileSection({ settings }: { settings: SettingsData }) {
               <label className="block text-xs font-medium text-card-foreground mb-1">
                 Google Business Profile URL
               </label>
-              <input
-                type="url"
-                value={googleBusinessProfileUrl}
-                onChange={(e) => setGoogleBusinessProfileUrl(e.target.value)}
-                placeholder="https://g.page/your-business"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Used as publisher location in schema markup.</p>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={googleBusinessProfileUrl}
+                  onChange={(e) => setGoogleBusinessProfileUrl(e.target.value)}
+                  placeholder="https://g.page/your-business"
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={findBusiness} disabled={discovering}>
+                  {discovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Find my business
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Used as publisher location in schema markup, and to source real client stories from
+                your Google reviews for articles.
+              </p>
+              {candidate && (
+                <div className="mt-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs font-medium text-card-foreground mb-1">Is this your business?</p>
+                  {candidateMatched && (
+                    <p className="text-xs text-emerald-600 mb-1.5 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Website matches what you entered above
+                    </p>
+                  )}
+                  {candidate.address && <p className="text-xs text-muted-foreground">{candidate.address}</p>}
+                  {candidate.website && <p className="text-xs text-muted-foreground">{candidate.website}</p>}
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      type="button" size="sm"
+                      onClick={() => { setGoogleBusinessProfileUrl(candidate.mapsSearchUrl); setCandidate(null) }}
+                    >
+                      <Check className="h-3.5 w-3.5" /> Yes, that&apos;s us
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setCandidate(null)}>
+                      Not us — I&apos;ll enter it manually
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {discoverAttempted && !candidate && !discovering && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the URL manually above if search didn&apos;t find the right listing.
+                </p>
+              )}
             </div>
 
             {/* Social media links */}

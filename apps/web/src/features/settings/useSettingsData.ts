@@ -27,6 +27,11 @@ export function useSettingsData() {
   const [telegramChatId, setTelegramChatId] = useState('')
   const [isSavingTelegramChatId, setIsSavingTelegramChatId] = useState(false)
 
+  // Standing preference: auto-generate the whole next billing cycle once review-spidering
+  // completes for it (see .plans/client-story-review-mining.implementation-plan.md).
+  const [autoGenerateNextCycle, setAutoGenerateNextCycleState] = useState(false)
+  const [isSavingAutoGenerate, setIsSavingAutoGenerate] = useState(false)
+
   // Article Brand Profile — content fields
   const [industry, setIndustry]                         = useState('')
   const [specialization, setSpecialization]             = useState('') // legacy free-text (kept for back-compat)
@@ -114,6 +119,7 @@ export function useSettingsData() {
           const settings = await settingsRes.json()
           if (settings.writingStyle) setWritingStyle(settings.writingStyle)
           if (settings.telegramChatId) setTelegramChatId(settings.telegramChatId)
+          setAutoGenerateNextCycleState(Boolean(settings.autoGenerateNextCycle))
         }
 
         if (keysRes.ok) {
@@ -214,6 +220,30 @@ export function useSettingsData() {
       toast.error('Failed to save writing style')
     } finally {
       setIsSavingWritingStyle(false)
+    }
+  }
+
+  const handleToggleAutoGenerate = async (next: boolean) => {
+    const prev = autoGenerateNextCycle
+    setAutoGenerateNextCycleState(next) // optimistic
+    setIsSavingAutoGenerate(true)
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoGenerateNextCycle: next }),
+      })
+      if (response.ok) {
+        toast.success(next ? 'Auto-generate enabled for next month' : 'Auto-generate disabled')
+      } else {
+        setAutoGenerateNextCycleState(prev)
+        toast.error('Failed to update auto-generate preference')
+      }
+    } catch {
+      setAutoGenerateNextCycleState(prev)
+      toast.error('Failed to update auto-generate preference')
+    } finally {
+      setIsSavingAutoGenerate(false)
     }
   }
 
@@ -485,6 +515,10 @@ export function useSettingsData() {
     showTelegramKey, setShowTelegramKey,
     telegramChatId, setTelegramChatId,
     isSavingTelegramChatId, setIsSavingTelegramChatId,
+    // Auto-generate next cycle
+    autoGenerateNextCycle,
+    isSavingAutoGenerate,
+    handleToggleAutoGenerate,
     // Brand profile — content
     industry, setIndustry,
     specialization, setSpecialization,

@@ -47,3 +47,12 @@ export function buildProxyUrl(creds: OxylabsCreds): string {
   const host = process.env.OXYLABS_PROXY_HOST || DEFAULT_PROXY_HOST
   return `http://${encodeURIComponent(creds.username)}:${encodeURIComponent(creds.password)}@${host}`
 }
+
+/**
+ * The proxy host alone, no embedded credentials — for Puppeteer's `--proxy-server`
+ * launch arg, which (unlike undici's ProxyAgent) ignores credentials embedded in
+ * the URL. Pair with `page.authenticate({ username, password })` instead.
+ */
+export function resolveProxyHost(): string {
+  return process.env.OXYLABS_PROXY_HOST || DEFAULT_PROXY_HOST
+}

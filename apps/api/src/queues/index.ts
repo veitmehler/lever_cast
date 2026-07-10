@@ -101,6 +101,8 @@ export const QUEUES = {
   NEWSLETTER_SAFETY: 'newsletter-safety',
   NEWSLETTER_NOTIFY: 'newsletter-notify',
   CONTENT_BATCH_MONITOR: 'content-batch-monitor',
+  CLIENT_STORY_SPIDER: 'client-story-spider',
+  CLIENT_STORY_AUTO_GENERATE_CHECK: 'client-story-auto-generate-check',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

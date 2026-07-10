@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from './newsletter-prompts'
+import { CLIENT_STORY_TEMPLATES } from './client-story-prompts'
 
 const prisma = new PrismaClient()
 
@@ -1709,6 +1710,18 @@ async function main() {
     console.log(`  ✓ ${template.key}: ${template.stepName}`)
   }
   console.log(`Seeded ${NEWSLETTER_TEMPLATES.length} newsletter prompt templates.`)
+
+  // Client-story review-mining prompts — same string-key convention.
+  console.log('\nSeeding client-story prompt templates...')
+  for (const template of CLIENT_STORY_TEMPLATES) {
+    await prisma.promptTemplate.upsert({
+      where: { key: template.key },
+      create: template,
+      update: {},
+    })
+    console.log(`  ✓ ${template.key}: ${template.stepName}`)
+  }
+  console.log(`Seeded ${CLIENT_STORY_TEMPLATES.length} client-story prompt templates.`)
 
   // Seed outline frameworks
   console.log('\nSeeding outline frameworks...')

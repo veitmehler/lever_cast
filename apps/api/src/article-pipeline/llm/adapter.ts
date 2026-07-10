@@ -26,6 +26,11 @@ export interface LLMCallOptions {
   jsonMode?: boolean
   /** Gemini 2.5: set `0` to disable thinking so output budget is not consumed by reasoning tokens. */
   thinkingBudget?: number
+  /**
+   * Image parts attached to the user turn (vision input). Only OpenAIAdapter honors this today —
+   * see .plans/client-story-review-mining.implementation-plan.md. Other adapters ignore it.
+   */
+  images?: Array<{ mimeType: string; base64: string }>
 }
 
 export interface LLMAdapter {

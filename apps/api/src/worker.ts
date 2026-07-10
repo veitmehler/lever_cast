@@ -35,6 +35,8 @@ import { newsletterGenerateHandler } from './handlers/newsletter-generate'
 import { newsletterSafetyHandler } from './handlers/newsletter-safety'
 import { newsletterNotifyHandler, NewsletterNotifyJobData } from './handlers/newsletter-notify'
 import type { NewsletterGenerateJobData } from './newsletter/enqueue'
+import { clientStorySpiderHandler, ClientStorySpiderJobData } from './handlers/client-story-spider'
+import { clientStoryAutoGenerateCheckHandler } from './handlers/client-story-auto-generate-check'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -93,6 +95,7 @@ async function main() {
   await boss.schedule(QUEUES.PROMO_EMAIL_SAFETY, '*/10 * * * *', {})      // every 10 min
   await boss.schedule(QUEUES.NEWSLETTER_SAFETY, '*/10 * * * *', {})       // every 10 min
   await boss.schedule(QUEUES.CONTENT_BATCH_MONITOR, '* * * * *', {})      // every minute
+  await boss.schedule(QUEUES.CLIENT_STORY_AUTO_GENERATE_CHECK, '*/15 * * * *', {}) // every 15 min
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -278,6 +281,21 @@ async function main() {
     QUEUES.NEWSLETTER_NOTIFY,
     { batchSize: 1 },
     withSentry('newsletter-notify', newsletterNotifyHandler),
+  )
+
+  // ── Client-story review mining ─────────────────────────────────────────────────
+  await boss.work<ClientStorySpiderJobData>(
+    QUEUES.CLIENT_STORY_SPIDER,
+    { batchSize: 1 },
+    withSentry('client-story-spider', clientStorySpiderHandler),
+  )
+
+  await boss.work(
+    QUEUES.CLIENT_STORY_AUTO_GENERATE_CHECK,
+    { batchSize: 1 },
+    withSentry('client-story-auto-generate-check', async () => {
+      await clientStoryAutoGenerateCheckHandler()
+    }),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

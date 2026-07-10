@@ -10,6 +10,7 @@ import { insertInlineCitations } from './citation-inserter'
 import { cleanStepOutput } from './approval-service'
 import { getBoss, QUEUES } from '../queues/index'
 import { resolveGroundingUrls } from './grounding-resolver'
+import { injectClientStory } from './client-stories/select'
 
 const PHASE_A_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const MAX_KEYWORD_RETRIES = 3
@@ -24,6 +25,12 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     where: { id: jobId },
     include: { topic: true },
   })
+
+  // Fill topic.realCaseStudies from the account's client-story bank if the user hasn't
+  // provided their own — before any step reads it. Best-effort: never blocks the pipeline.
+  await injectClientStory(job.topicId).catch((err) =>
+    logger.warn({ jobId, err }, '[article-pipeline] client-story injection failed (non-fatal)'),
+  )
 
   const userId = job.userId
   const topicId = job.topicId

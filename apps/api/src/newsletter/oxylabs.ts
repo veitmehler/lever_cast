@@ -158,6 +158,48 @@ export async function googleSearch(
   return [...new Set(urls)]
 }
 
+// ── Business discovery (client-story review mining onboarding) ─────────────────
+
+export interface BusinessKnowledgePanel {
+  description: string | null
+  website: string | null
+  address: string | null
+}
+
+/**
+ * Google search for a business name (+ location), returns the knowledge panel's
+ * website/description/address if Google surfaces one — used to auto-find and
+ * confirm a client's Google Business Profile at onboarding. See
+ * .plans/client-story-review-mining.implementation-plan.md Phase 1. Confirmed
+ * live against staging: the google_maps source can't be parsed and universal+
+ * render rejects Maps URLs, but google_search's knowledge panel works cleanly.
+ */
+export async function searchBusinessKnowledgePanel(
+  query: string,
+  geo = 'United States',
+): Promise<BusinessKnowledgePanel | null> {
+  const resp = await oxyQuery({
+    source: 'google_search',
+    query,
+    parse: true,
+    geo_location: geo,
+    pages: 1,
+  })
+  const content = resp.results?.[0]?.content as
+    | { results?: { knowledge?: { description?: string; factoids?: Array<{ title?: string; content?: string }> } } }
+    | undefined
+  const knowledge = content?.results?.knowledge
+  if (!knowledge) return null
+
+  const factoids = knowledge.factoids ?? []
+  const website = factoids.find((f) => f.title?.toLowerCase() === 'website')?.content ?? null
+  const address =
+    factoids.find((f) => f.title?.toLowerCase().includes('located') || f.title?.toLowerCase().includes('address'))
+      ?.content ?? null
+
+  return { description: knowledge.description ?? null, website, address }
+}
+
 // ── YouTube search ──────────────────────────────────────────────────────────
 
 export interface YoutubeHit {

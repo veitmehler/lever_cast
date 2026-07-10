@@ -38,6 +38,9 @@ model Account {
   members User[]          @relation("AccountMembers")
   roster  AccountMember[]
   newsletterTopicOverrides NewsletterTopic[]
+  clientStories            ClientStory[]
+  rawReviews               RawReview[]
+  clientStorySpiderRuns    ClientStorySpiderRun[]
 
   @@index([articleCalendarId])
   @@map("accounts")
@@ -318,6 +321,9 @@ model Settings {
   voiceoverSpeed                Float    @default(1.0)
   socialTimezone                String?  @default("America/New_York")
   socialAutomationEnabled       Boolean  @default(true)
+  // Standing preference (see .plans/client-story-review-mining.implementation-plan.md): when true,
+  // a new billing cycle's content generates automatically once review-spidering completes for it.
+  autoGenerateNextCycle         Boolean  @default(false)
   lastLogin                     DateTime @default(now())
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
@@ -1073,6 +1079,59 @@ model NewsletterTopic {
   @@index([calendarId])
   @@index([accountId])
   @@map("newsletter_topics")
+}
+
+// De-identified client story mined from Google reviews, fed into the article pipeline's
+// {{real_case_studies}} slot when a topic doesn't already have one of its own. See
+// .plans/client-story-review-mining.implementation-plan.md.
+model ClientStory {
+  id             String    @id @default(cuid())
+  accountId      String
+  account        Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  storyText      String    @db.Text // de-identified narrative — no names, no stars, no "a reviewer wrote"
+  topicTags      String[] // 2-4 keywords from triage, used for topic-matching at generation time
+  sourceReviewId String    @unique
+  sourceReview   RawReview @relation(fields: [sourceReviewId], references: [id], onDelete: Cascade)
+  lastUsedAt     DateTime? // null = never used; gates the once-a-month cap
+  useCount       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([accountId, lastUsedAt])
+  @@map("client_stories")
+}
+
+// Every uniquely-fingerprinted Google review ever transcribed for an account, story or not — lets
+// triage be re-run later (e.g. a better prompt) without re-scraping.
+model RawReview {
+  id           String       @id @default(cuid())
+  accountId    String
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  fingerprint  String // sha256(normalize(reviewerName) + '|' + normalize(reviewText))
+  reviewText   String       @db.Text
+  starRating   Int?
+  relativeDate String? // "2 weeks ago" — logging/debugging only, never a cursor
+  triageStatus String       @default("pending") // pending | story | not_story
+  clientStory  ClientStory?
+  capturedAt   DateTime     @default(now())
+
+  @@unique([accountId, fingerprint])
+  @@map("raw_reviews")
+}
+
+// One billing cycle's review-spidering attempt for an account — the idempotent dedup key for the
+// rollover trigger AND the queryable signal the article-generation gate waits on.
+model ClientStorySpiderRun {
+  id          String    @id @default(cuid())
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cycleStart  DateTime // billingWindows().from for the cycle this run is for
+  status      String    @default("running") // running | completed | failed
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@unique([accountId, cycleStart])
+  @@map("client_story_spider_runs")
 }
 
 // A bulk content-generation batch kicked off from the content plan. Items run

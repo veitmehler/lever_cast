@@ -47,7 +47,20 @@ export class OpenAIAdapter implements LLMAdapter {
       if (options.systemPrompt) {
         messages.push({ role: 'system', content: options.systemPrompt })
       }
-      messages.push({ role: 'user', content: options.userPrompt })
+      if (options.images?.length) {
+        const content: OpenAI.ChatCompletionContentPart[] = [
+          { type: 'text', text: options.userPrompt },
+          ...options.images.map(
+            (img): OpenAI.ChatCompletionContentPart => ({
+              type: 'image_url',
+              image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+            }),
+          ),
+        ]
+        messages.push({ role: 'user', content })
+      } else {
+        messages.push({ role: 'user', content: options.userPrompt })
+      }
 
       const response = await instrumentCall({ provider: 'openai', op: `chat.completions.create:${model}` }, () =>
         client.chat.completions.create({
@@ -55,6 +68,7 @@ export class OpenAIAdapter implements LLMAdapter {
           messages,
           temperature,
           ...(maxTokens ? { max_tokens: maxTokens } : {}),
+          ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
         }),
       )
 

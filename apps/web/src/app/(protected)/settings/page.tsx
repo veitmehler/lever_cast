@@ -5,6 +5,7 @@ import { VoiceSettingsPanel } from '@/components/VoiceSettingsPanel'
 import { AppearanceSection } from '@/features/settings/AppearanceSection'
 import { WritingStyleSection } from '@/features/settings/WritingStyleSection'
 import { BrandProfileSection } from '@/features/settings/BrandProfileSection'
+import { AutoGenerateSection } from '@/features/settings/AutoGenerateSection'
 import { SocialPostsSection } from '@/features/settings/SocialPostsSection'
 import { DiagramStyleSection } from '@/features/settings/DiagramStyleSection'
 import { ArticleTypographySection } from '@/features/settings/ArticleTypographySection'
@@ -37,6 +38,8 @@ export default function SettingsPage() {
         <WritingStyleSection settings={settings} />
 
         <BrandProfileSection settings={settings} />
+
+        <AutoGenerateSection settings={settings} />
 
         <SocialPostsSection settings={settings} />
 

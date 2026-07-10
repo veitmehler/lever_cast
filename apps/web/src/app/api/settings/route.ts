@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, defaultImagePromptLlmProvider, defaultImagePromptLlmModel, writingStyle, telegramChatId } = body
+    const { theme, sidebarState, defaultProvider, defaultModel, defaultImageProvider, defaultImageModel, defaultImageStyle, defaultImagePromptLlmProvider, defaultImagePromptLlmModel, writingStyle, telegramChatId, autoGenerateNextCycle } = body
 
     console.log('Updating settings with:', {
       theme,
@@ -134,6 +134,7 @@ export async function PATCH(request: NextRequest) {
           defaultImagePromptLlmModel: defaultImagePromptLlmModel || null,
           writingStyle: writingStyle || null,
           telegramChatId: telegramChatId || null,
+          autoGenerateNextCycle: Boolean(autoGenerateNextCycle),
         },
       })
     } else {
@@ -152,6 +153,7 @@ export async function PATCH(request: NextRequest) {
         defaultImagePromptLlmModel?: string | null
         writingStyle?: string | null
         telegramChatId?: string | null
+        autoGenerateNextCycle?: boolean
       } = {
         lastLogin: new Date(),
       }
@@ -184,6 +186,9 @@ export async function PATCH(request: NextRequest) {
       }
       if (telegramChatId !== undefined) {
         updateData.telegramChatId = telegramChatId || null
+      }
+      if (autoGenerateNextCycle !== undefined) {
+        updateData.autoGenerateNextCycle = Boolean(autoGenerateNextCycle)
       }
 
       console.log('Update data:', updateData)

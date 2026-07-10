@@ -3,6 +3,7 @@ import { prisma, resolveAccountForClerkId } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'
 import { billingWindows } from '../article-pipeline/billing-window'
+import { hasArticleCadenceDate, checkArticleGenerationGate, readStorySpiderStatus } from '../article-pipeline/client-stories/gate'
 
 /**
  * Unified content plan: merges, per day, the account's planned ARTICLE topic and
@@ -181,12 +182,18 @@ export async function contentPlanRoutes(app: FastifyInstance) {
       })
     }
 
+    // Story-spider status hint for the dashboard (Phase 6) — read-only, never triggers a run.
+    const storySpiderStatus = acct?.subscriptionStartedAt
+      ? await readStorySpiderStatus(account.accountId, billingWindows(acct.subscriptionStartedAt).from)
+      : 'not_configured'
+
     return reply.send({
       from: dateKey(from),
       to: dateKey(to),
       days,
       ideaCount,
       executableUntil: executableUntil ? dateKey(executableUntil) : null,
+      storySpiderStatus,
     })
   })
 
@@ -220,6 +227,22 @@ export async function contentPlanRoutes(app: FastifyInstance) {
         error: 'Selected day(s) are beyond your current billing cycle — you can plan them, but not generate yet.',
         skippedDates,
       })
+    }
+
+    // Client-story gate: article dates only (see
+    // .plans/client-story-review-mining.implementation-plan.md Phase 6) — a
+    // newsletter-only batch never waits on review-spidering. Also the on-demand
+    // trigger: if no run exists yet for this cycle, this call creates one.
+    if (hasArticleCadenceDate(dates) && acctBilling?.subscriptionStartedAt) {
+      const brand = await prisma.brandSettings.findFirst({
+        where: { user: { accountId: account.accountId } },
+        select: { googleBusinessProfileUrl: true },
+      })
+      if (brand?.googleBusinessProfileUrl?.trim()) {
+        const cycleStart = billingWindows(acctBilling.subscriptionStartedAt).from
+        const waitMessage = await checkArticleGenerationGate(account.accountId, cycleStart)
+        if (waitMessage) return reply.status(409).send({ error: waitMessage })
+      }
     }
 
     const created = await createBatchFromDates(account, dates)

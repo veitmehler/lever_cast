@@ -1,6 +1,6 @@
 # Phase 9 — Hardening & Observability: Full Implementation Plan
 
-> **Status:** v1.0 — implementation-ready
+> **Status: IMPLEMENTED** (audited 2026-07-09) — hardening & observability shipped (Sentry, structured logging, health endpoints); extended further by the July 2026 resilience layer (`social-generation-resilience.implementation-plan.md`).
 > **Estimated effort:** 6–8 hours of focused work
 > **Estimated cost increment:** $0 (everything fits free tiers at our scale)
 > **Prerequisite:** Phases 0–8, 10 complete (✅ done)

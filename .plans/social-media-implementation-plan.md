@@ -1,5 +1,7 @@
 # Social Media Posting — Complete Implementation Plan
 
+> **Status: LEGACY — implemented Nov 2025–Jan 2026, superseded** (audited 2026-07-09) — the original direct-OAuth posting system; the automated cadence now publishes via GoHighLevel. Direct surfaces still exist in `apps/web`.
+
 ## Overview
 
 This document describes the complete social media posting system including platform integrations, manual posting, the 18-post automation engine, background processing, image/video generation, and the full database schema. It is intended as a handover document for implementing equivalent functionality in another application.

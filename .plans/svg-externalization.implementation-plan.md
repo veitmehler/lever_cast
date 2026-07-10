@@ -1,6 +1,6 @@
 # SVG Externalization — Clean DOM, Faster Pages, Better SEO — Implementation Plan
 
-> **Status:** v1.0 — implementation-ready
+> **Status: IMPLEMENTED** (audited 2026-07-09) — diagram SVGs externalized to S3 (`article_diagrams.svgS3Key` + PNG variants).
 > **Scope:** Three coordinated fixes that eliminate inline SVG bloat from all article outputs
 > **Prerequisite:** Current main branch with SVG-primary architecture (commit `6a87589`)
 

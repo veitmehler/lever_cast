@@ -1,6 +1,6 @@
 # Article Production Pipeline — Levercast v1 Implementation Plan
 
-> **Status:** v1.0 (Levercast adaptation) — implementation-ready, pending DO droplet (Phase 8 of `Migration-DigitalOcean-Plan.md`).
+> **Status: IMPLEMENTED** (audited 2026-07-09) — the article pipeline is live (steps 0–13, quality gate, enrichment, publishing). Header previously said implementation-ready pending the DO droplet, which has long since shipped.
 >
 > **Purpose:** Complete, self-contained specification for the article production feature in Levercast/Socioply. Adapted from a generic source plan (originally a single-tenant WordPress publisher) into Levercast's multi-tenant, multi-output-target model.
 >

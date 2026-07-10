@@ -1,6 +1,6 @@
 # Article Quality Fixes — Implementation Plan
 
-> **Status:** v1.0 — implementation-ready
+> **Status: IMPLEMENTED** (audited 2026-07-09) — quality fixes live in the pipeline + quality gate.
 > **Estimated effort:** 8–10 hours of focused work
 > **Estimated cost increment:** ~$0.001–0.003 per article (one extra LLM call for inline citations) + OxyLabs residential proxy costs (~$0.10/GB, negligible at article scale)
 > **Prerequisite:** Current main branch (commit `0a13919`) deployed

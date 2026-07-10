@@ -1,7 +1,7 @@
 
 # Implementation Plan — AI-Restyled, Branded Article Diagrams (Nano Banana)
 
-Status: **approved-for-planning (do not implement yet)** · Author: design discussion 2026-06-22
+Status: **implemented** (audited 2026-07-09) — AI-restyled branded diagrams live (`stylizedPngS3Key`, gemini-3.1-flash-image, brand colors + logo watermark). · Author: design discussion 2026-06-22
 
 ## Goal
 

@@ -1,5 +1,7 @@
 # Diagram Enhancements V2 — Puppeteer PNG, Type Variety, Brand Colors
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — Puppeteer PNG, type variety, and brand colors live on `article_diagrams`.
+
 > **Scope:** Replace the broken resvg-js PNG rasterizer with Puppeteer screenshots, add a GPT-4o-mini diagram-type selector for visual variety, and wire diagram colors to user BrandSettings.
 
 > **Prerequisites:** The SVG-primary architecture from the previous plan is already deployed. SVGs render correctly with text in browsers. PNGs remain broken (empty boxes) because resvg-js cannot render `<foreignObject>`.

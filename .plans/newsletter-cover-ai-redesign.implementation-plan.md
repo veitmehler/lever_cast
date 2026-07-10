@@ -1,6 +1,6 @@
 # Newsletter Cover Redesign — AI-generated cover + HTML masthead
 
-**Status:** proposed (awaiting approval)
+**Status: IMPLEMENTED** (audited 2026-07-09) — AI cover generation live (`generateCoverImage`, `summaryImageUrl`).
 **Author:** Claude / Veit
 **Date:** 2026-06-18
 

@@ -1,5 +1,7 @@
 # Article Outline Frameworks — Implementation Plan & Inventory
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — outline frameworks live (`outlineFrameworkNumber`, admin editor); doc doubles as the framework inventory.
+
 > Snapshot taken: 2026-05-01T18:39:07.050Z
 > Source row: `OutlineInstructions` id `cmiqhtcvz00013qh5tglmtqq4` (last updated 2026-01-24T15:17:40.732Z)
 

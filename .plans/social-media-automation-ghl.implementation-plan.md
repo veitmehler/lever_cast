@@ -1,5 +1,7 @@
 # Social Media Automation + GHL Integration — Implementation Plan
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — automation runs, spec results, and GHL posting live; superseded in cadence by `social-weekly-cadence.implementation-plan.md`.
+
 > **Goal:** (1) Move Facebook / Instagram / LinkedIn posting & scheduling to the **Go HighLevel (GHL) Social Planner API**, (2) keep Twitter/X, Threads, Telegram on our existing direct clients, (3) add a **content-generation subsystem** (quote cards, image carousels, FFmpeg slideshow videos, fal.ai hook clips, per-user ElevenLabs voiceover), and (4) build a **per-article automation engine** that produces a fixed daily set of **6 feed + 6 story posts** and schedules them.
 >
 > **Explicitly out of scope / dropped:** All diagram-based social post types. (Article diagrams remain for the article pipeline; they are NOT used for social posts.)

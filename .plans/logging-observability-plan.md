@@ -1,5 +1,7 @@
 # Social Automation — Logging & Observability Plan (Option B)
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — `AutomationLogContext`/`withSlotKey` structured logging live.
+
 ## Goal
 
 Achieve comprehensive, searchable, end-to-end observability for every social post that flows

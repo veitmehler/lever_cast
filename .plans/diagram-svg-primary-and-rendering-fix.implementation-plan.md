@@ -1,5 +1,7 @@
 # Diagram Rendering Fix — SVG-Primary Architecture + Init Directive + S3 Path Cleanup
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — SVG-primary architecture live.
+
 > **Scope:** Fix the empty-diagram bug (text missing from Mermaid PNGs), switch to SVG-primary output for article HTML, sanitize SVGs against XSS, fix S3 path inconsistency, and keep PNG as a fallback for email/social/bundle exports.
 
 > **Root cause (confirmed):** `mermaid-config.json` with `htmlLabels: false` is **ignored by mmdc** (Mermaid CLI v11+). The generated SVGs contain `<foreignObject>` with HTML text labels. `@resvg/resvg-js` is a pure-SVG renderer that cannot process `<foreignObject>`, so rasterized PNGs come out as boxes-without-text. Browsers render `<foreignObject>` perfectly — so SVG-primary output avoids the rasterizer entirely.

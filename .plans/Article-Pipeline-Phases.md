@@ -1,6 +1,6 @@
 # Article Production Pipeline — Phased Implementation Plan
 
-> **Status:** v1.0 — phased roadmap derived from `article-production-pipeline.implementation-plan.md`
+> **Status: IMPLEMENTED** (audited 2026-07-09) — all phases live in production (pipeline steps 0–13, quality gate, enrichment). Originally a phased roadmap derived from `article-production-pipeline.implementation-plan.md`.
 > **Estimated total effort:** 5–7 weeks for one focused developer
 > **Estimated cost increment:** ~$0–10/mo infrastructure (LLM costs are use-driven, see §3)
 > **Prerequisite:** Phases 0–10 of `Migration-DigitalOcean-Plan.md` complete (✅), Phase 9 hardening complete (✅)

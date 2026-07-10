@@ -1,6 +1,6 @@
 # Newsletter Logo Variants + Footer Polish — Implementation Plan
 
-**Status:** proposed (awaiting approval)
+**Status: IMPLEMENTED** (audited 2026-07-09) — auto-generated light/dark logo variants live (`nlLogoLightUrl/DarkUrl`); reused by diagram watermarks and the Wed/Sat brand-tint carousels.
 **Date:** 2026-06-18
 **Builds on:** PR #91 (footer: logo/contact/social/disclaimer/unsubscribe)
 

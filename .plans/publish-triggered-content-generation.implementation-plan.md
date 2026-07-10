@@ -2,7 +2,7 @@
 
 **Goal:** When a user clicks Publish, automatically generate the LinkedIn article, Medium article, and 12-post social set in the background — with automatic retries so nothing gets stuck.
 
-**Status:** Planning
+**Status: IMPLEMENTED (evolved)** (audited 2026-07-09) — syndication articles (LinkedIn/Medium) live; social generation flows through the ContentBatch/weekly-cadence system rather than the after-enrichment hook planned here (`maybeEnqueueSocialAutomationAfterEnrichment` exists but is intentionally unused).
 
 ---
 

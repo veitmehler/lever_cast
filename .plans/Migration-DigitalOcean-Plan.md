@@ -1,6 +1,6 @@
 # Migration Plan: Supabase + Vercel → Digital Ocean
 
-> **Status:** v3.2 — final, comprehensive, implementation-ready. Phases 0, 1 (DB + S3/CF only — droplet now provisioned manually per runbook), 3, 4, 5, 6 already shipped. Phase 2 (monorepo), Phase 7 (pg-boss worker code), Phase 8 (endpoint cutover) outstanding. Phase 8 is the gating prerequisite for the **Article Production Pipeline** (`.plans/article-production-pipeline.implementation-plan.md`).
+> **Status: COMPLETE** (audited 2026-07-09) — all phases shipped, incl. monorepo (Phase 2), pg-boss worker (Phase 7), and endpoint cutover (Phase 8). The platform runs fully on DO droplets + DO managed Postgres; web on Vercel.
 >
 > **Changes from v3.1 (this revision):**
 > - **Article pipeline elevated to primary driver.** Originally framed as "one of many" long-running workloads; the latest product alignment makes the article pipeline the *killer feature* that justifies the migration. Without the droplet (Phase 8), the article pipeline is functionally impossible to ship (single article = 8–25 min wall time vs. Vercel's 300 s ceiling).

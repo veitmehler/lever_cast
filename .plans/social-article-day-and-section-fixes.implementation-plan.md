@@ -1,7 +1,7 @@
 
 # Implementation Plan — Fix article-day social: date alignment + section selection
 
-Status: **approved-for-planning (do not implement yet)** · Author: investigation 2026-07-03
+Status: **implemented** (audited 2026-07-09) — shipped in commit 5aada14 (UTC day alignment + non-content-section exclusion). · Author: investigation 2026-07-03
 
 ## Problem (both confirmed on staging)
 1. **P3 on article days is built from "Key Takeaways."** The last two P3 posts both have

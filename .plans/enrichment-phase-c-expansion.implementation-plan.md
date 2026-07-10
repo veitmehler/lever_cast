@@ -1,5 +1,7 @@
 # Phase C Enrichment Expansion — GEO Enrichment, Key Takeaways, TOC & WP Category
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — GEO enrichment, key takeaways, TOC, and WP category live.
+
 > **Scope:** Expand the existing Phase C enrichment orchestrator (`enrichment/index.ts`) from Mermaid-diagram-only to a full enrichment pipeline: GEO question/summary injection, heading restructuring, Key Takeaways generation, collapsible Table of Contents, and conditional WordPress category assignment. Translation (Steps 105–106) is **out of scope**.
 
 > **Prerequisite:** Phase C Mermaid enrichment is already deployed and working (htmlLabels fix shipped). Prompt templates 101–104 are already seeded in the `PromptTemplate` table.

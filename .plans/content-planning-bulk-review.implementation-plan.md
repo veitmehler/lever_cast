@@ -1,6 +1,7 @@
+
 # Implementation Plan — Content Planning, Bulk Generation, Auto Quality Gate & Collaborative Review
 
-Status: **approved-for-planning (do not implement yet)** · Author: design discussion 2026-06-19
+Status: **implemented** (audited 2026-07-09) — Content Plan, ContentBatch bulk generation, quality gate, review inbox, and collaborative edit requests all live. · Author: design discussion 2026-06-19
 
 ## Goal
 
@@ -75,6 +76,7 @@ Give end-users the **most ways to capture/plan article + newsletter topics** and
 ---
 
 ## Phase 2 — Article content calendars (admin-curated, routed)
+
 
 **Goal:** an admin-managed article topic calendar, mirroring newsletters, auto-populating each client's plan.
 

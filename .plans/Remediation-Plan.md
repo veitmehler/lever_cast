@@ -1,5 +1,7 @@
 # Socioply Remediation & Optimization Plan
 
+> **Status: COMPLETE** (audited 2026-07-09) — all remediation phases done/deployed; see `Phase5`–`Phase9` docs for per-phase detail.
+
 > Phased plan to fix the security findings and structural debt identified in the
 > codebase review, sequenced for safety. Planning document only — no code changes
 > until each phase is approved.

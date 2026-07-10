@@ -1,6 +1,6 @@
 # Newsletter Offers — Implementation Plan
 
-**Status:** proposed (awaiting approval)
+**Status: IMPLEMENTED** (audited 2026-07-09) — offers live (`/newsletter/offers`, `nl_offer_draft` prompt).
 **Date:** 2026-06-18
 
 ## Goal

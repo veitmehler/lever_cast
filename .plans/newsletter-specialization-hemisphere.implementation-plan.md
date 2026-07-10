@@ -1,6 +1,6 @@
 # Newsletter Calendars: Deterministic Specializations + Hemisphere Routing
 
-**Status:** proposed (awaiting approval)
+**Status: IMPLEMENTED** (audited 2026-07-09) — deterministic specialization × hemisphere calendar routing live (`calendar-routing.ts`, `Specialization` model).
 **Date:** 2026-06-19
 
 ## Goal

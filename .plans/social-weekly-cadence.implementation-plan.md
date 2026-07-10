@@ -1,7 +1,7 @@
 
 # Implementation Plan — Weekly Social Cadence (3/day, newsletter + article sourced)
 
-Status: **approved-for-planning (do not implement yet)** · Author: design discussion 2026-06-26
+Status: **implemented** (audited 2026-07-09) — weekly matrix live incl. Phase 8 story posts and Phase 9 link-in-bio CTA; extended by the Wed/Sat brand-tint carousel variant (July 2026). · Author: design discussion 2026-06-26
 
 ## Goal
 Replace the current "every article fires 12 posts, newsletters fire none" model with a

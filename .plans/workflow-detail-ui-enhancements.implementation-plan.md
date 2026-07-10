@@ -1,5 +1,7 @@
 # Workflow Detail Page — UI Enhancements
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — schema review, rerun enrichment, publish/export, and rewrite (`POST /articles/:jobId/rewrite`, steps 7–12) all live.
+
 > **Scope:** Five enhancements to the article detail page (`/workflow/[jobId]`): Schema Review section with validation link, "Rerun Enrichment" button, gated "Publish" → Export flow, "Rewrite Article" (partial rerun steps 7–12), and higher-contrast Approve button. Includes one new `published` status, two new backend endpoints, and frontend changes to a single page component.
 
 > **Prerequisite:** Phase C enrichment expansion (GEO, Key Takeaways, TOC, WP Category) is deployed and operational. `SitePage.schemaJson` is populated by Step 16 during the approval service.

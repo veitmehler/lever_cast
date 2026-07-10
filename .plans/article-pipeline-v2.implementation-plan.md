@@ -1,5 +1,7 @@
 # Article Pipeline V2 — Implementation Plan
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — V2 pipeline live in production.
+
 > **Goal:** Bring the article pipeline up to feature parity with the original production system documented in `active-prompts-from-db.md`, by (1) wiring all required prompt variables into the resolver, (2) adopting the production-tuned prompts (with persona stripped), (3) building per-tenant article brand profile UI, (4) adopting the 12-outline-framework system with admin management, and (5) migrating all LLM API keys to platform-owned (no longer per-user).
 >
 > **Deferred (out of scope for this plan):** Translation pipeline (Steps 19–26), newsletter generation (Steps 27–28), GEO enrichment (Steps 101–106), Mermaid-diagram enrichment removal/replacement.

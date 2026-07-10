@@ -1,5 +1,7 @@
 # Social Post Quality + Preview-First — Implementation Plan
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — preview-first flow live (`previewJson` across all processors).
+
 ## Overview
 
 This plan reworks the 12-post social automation so that (a) each post type is created the

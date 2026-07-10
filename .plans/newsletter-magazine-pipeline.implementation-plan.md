@@ -1,6 +1,6 @@
 # Magazine-Style Newsletter Pipeline — Implementation Plan
 
-**Status:** Draft / not started (phase 1)
+**Status: COMPLETE** (audited 2026-07-09) — phases 1a–1d shipped; PR #75 merged 2026-06-16. Shared research + per-client voiced generation + render + review flow all live.
 **Author:** planning session 2026-06-16
 **Reference workflow:** [[newsletter-creation-workflow.md]] (a *different* app's chiropractic newsletter system — we port its **creation workflow**, not its code/domain models)
 **Builds on:** the shipped promo-email GHL client (`createGhlEmailCampaign`/`scheduleGhlEmailCampaign`/tags), the article pipeline, `PromptTemplate`, `image-generation.ts`, pg-boss queues.

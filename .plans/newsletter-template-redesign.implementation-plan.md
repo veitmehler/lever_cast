@@ -1,6 +1,6 @@
 # Newsletter Template Redesign — Implementation Plan
 
-**Status:** Approved (design agreed 2026-06-17). Not started.
+**Status: IMPLEMENTED** (audited 2026-07-09) — redesigned edition + genericized content model + composited cover all live (render.ts, cover.ts).
 **Supersedes:** the §8 renderer + parts of §4/§7 of `newsletter-magazine-pipeline.implementation-plan.md` (Phases 1a–1d shipped to the `staging` branch).
 **Goal:** restructure the newsletter edition (order + visual hierarchy), genericize the CSV/content model away from family-care-specific columns, and add a composited "cover" summary image at the top.
 

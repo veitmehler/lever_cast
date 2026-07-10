@@ -1,5 +1,7 @@
 # Background music for social video posts — implementation plan
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — `MusicTrack` library + admin management + reel audio muxing live.
+
 > Admin-managed music library; every generated social video gets a randomly
 > picked track, cut to length with an end fade-out; narrated types duck the
 > music −18 dB when speech starts. Decisions confirmed 2026-06-12: loop short

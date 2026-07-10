@@ -1,6 +1,6 @@
 # Article Pipeline — Title Alignment, Citations & GEO Fixes — Implementation Plan
 
-> **Status:** v1.0 — implementation-ready
+> **Status: IMPLEMENTED** (audited 2026-07-09) — title alignment, citations, and GEO fixes live (incl. geo-question generator, step 102).
 > **Scope:** Four independent fixes that can be implemented and deployed incrementally
 > **Prerequisite:** Current main branch deployed with Article Quality Fixes (commit `0a13919`)
 

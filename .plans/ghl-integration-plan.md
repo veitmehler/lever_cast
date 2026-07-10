@@ -1,5 +1,7 @@
 # Go HighLevel (GHL) API Integration — Complete Implementation Plan
 
+> **Status: IMPLEMENTED** (audited 2026-07-09) — GHL client live for email campaigns and social posting (`GhlSettings`, encrypted keys).
+
 ## Overview
 
 This document describes the complete Go HighLevel CRM integration: credential management, contact upsert, newsletter email campaigns, lead generation via Google Drive, contact form capture, and inbound conversation messages. It is a handover document for implementing equivalent functionality in another application.

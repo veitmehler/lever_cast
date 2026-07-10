@@ -1,5 +1,7 @@
 # Phase 5 (remainder) — Prisma client + platform-lib consolidation
 
+> **Status: COMPLETE** (audited 2026-07-09).
+
 > Completes Phase 5. The self-contained libs (`encryption`, `storage`,
 > `imageGeneration`) are already consolidated into `@socioply/shared` and live in
 > production. What remains is the **prisma-coupled platform-lib cluster**, which

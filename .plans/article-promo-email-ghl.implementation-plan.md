@@ -1,6 +1,6 @@
 # Article Promotional Email via GHL Campaign — Implementation Plan
 
-**Status:** Draft / not started
+**Status: IMPLEMENTED** (audited 2026-07-09) — live: `article_email_campaigns` with recorded per-campaign costs, GHL scheduling.
 **Author:** planning session 2026-06-15
 **Related:** [[social-media-automation-ghl.implementation-plan.md]], [[publish-triggered-content-generation.implementation-plan.md]], [[ghl-integration-plan.md]]
 

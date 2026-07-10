@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from './newsletter-prompts'
 import { CLIENT_STORY_TEMPLATES } from './client-story-prompts'
+import { PLAIN_LANGUAGE_TEMPLATES, PLAIN_LANGUAGE_CONFIGS } from './plain-language-prompts'
 
 const prisma = new PrismaClient()
 
@@ -1722,6 +1723,30 @@ async function main() {
     console.log(`  ✓ ${template.key}: ${template.stepName}`)
   }
   console.log(`Seeded ${CLIENT_STORY_TEMPLATES.length} client-story prompt templates.`)
+
+  // Plain-language storytelling prompts — same string-key convention.
+  console.log('\nSeeding plain-language prompt templates...')
+  for (const template of PLAIN_LANGUAGE_TEMPLATES) {
+    await prisma.promptTemplate.upsert({
+      where: { key: template.key },
+      create: template,
+      update: {},
+    })
+    console.log(`  ✓ ${template.key}: ${template.stepName}`)
+  }
+  console.log(`Seeded ${PLAIN_LANGUAGE_TEMPLATES.length} plain-language prompt templates.`)
+
+  // Plain-language per-industry exemplar configs (never overwrite admin edits).
+  console.log('\nSeeding plain-language configs...')
+  for (const config of PLAIN_LANGUAGE_CONFIGS) {
+    await prisma.plainLanguageConfig.upsert({
+      where: { industry: config.industry },
+      create: config,
+      update: {},
+    })
+    console.log(`  ✓ plain-language config: ${config.industry}`)
+  }
+  console.log(`Seeded ${PLAIN_LANGUAGE_CONFIGS.length} plain-language configs.`)
 
   // Seed outline frameworks
   console.log('\nSeeding outline frameworks...')

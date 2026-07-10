@@ -273,6 +273,22 @@ function offerCard(offer: RenderOffer, theme: Theme, accent: string, label: stri
   )
 }
 
+/**
+ * Swap plain-language box markers (emitted by runNewsletterPlainLanguage into the
+ * article body) for fully-styled, email-safe blocks. Styling lives here so it
+ * follows the edition's theme; label/text were HTML-escaped at marker build time.
+ * Bodies without markers pass through untouched.
+ */
+export function stylePlainLanguageBoxes(html: string, theme: Theme): string {
+  return html.replace(
+    /<div data-pl-box data-pl-label="([^"]*)">\s*<p>([\s\S]*?)<\/p>\s*<\/div>/gi,
+    (_m, label: string, text: string) =>
+      `<div style="border-left:4px solid ${theme.linkColor};background-color:#f4f7f9;padding:14px 18px;margin:16px 0;border-radius:6px;">` +
+      `<p style="margin:0 0 6px;font-family:${theme.fontStack};font-size:14px;font-weight:700;color:${theme.fontColor};">${label}</p>` +
+      `<p style="margin:0;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.bodyWeight};color:${theme.fontColor};line-height:1.6;">${text}</p></div>`,
+  )
+}
+
 function articleBlock(a: RenderArticle, theme: Theme, showTitle = true): string {
   const img = a.imageUrl
     ? `<img src="${esc(a.imageUrl)}" width="624" alt="${esc(a.title)}" style="display:block;width:100%;max-width:624px;height:auto;border-radius:6px;margin:0 0 18px;" />`
@@ -284,7 +300,7 @@ function articleBlock(a: RenderArticle, theme: Theme, showTitle = true): string 
   const tldr = a.tldr
     ? `<p style="margin:0 0 14px;font-family:${theme.fontStack};font-size:15px;color:${theme.fontColor};"><u>TL;DR:</u> ${esc(a.tldr)}</p>`
     : ''
-  return `${img}${h2}${tldr}${para(a.body, theme)}`
+  return `${img}${h2}${tldr}${para(stylePlainLanguageBoxes(a.body, theme), theme)}`
 }
 
 function teaserBlock(t: RenderTeaser, theme: Theme): string {

@@ -16,6 +16,7 @@ import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
 import { runNewsletterPrompt, runNewsletterWriterJson } from './llm'
+import { loadPlainLanguageConfig, runNewsletterPlainLanguage } from '../article-pipeline/enrichment/plain-language'
 import { vtoken } from './image-overlay'
 
 const NL_IMAGE_MODEL = 'fal-ai/flux-pro'
@@ -125,6 +126,31 @@ export async function generateArticle(
   )
   await usage.record(writer.response)
 
+  // 6b. Plain-language storytelling injection (additive; non-fatal — body stays
+  // unmodified on any failure; skips when no PlainLanguageConfig matches the
+  // industry). See .plans/plain-language-storytelling.implementation-plan.md.
+  let body = writer.data.article_body ?? ''
+  if (body) {
+    try {
+      const plConfig = await loadPlainLanguageConfig(voice.industry)
+      if (plConfig) {
+        body = await runNewsletterPlainLanguage({
+          bodyHtml: body,
+          voice: {
+            writingStyle: voice.writingStyle,
+            audience: voice.targetAudience,
+            industry: voice.industry,
+          },
+          config: plConfig,
+          labelSeed: imageKey,
+          onResponse: (r) => usage.record(r),
+        })
+      }
+    } catch (err) {
+      logger.warn({ imageKey, err }, '[newsletter/article] plain-language pass failed (non-fatal)')
+    }
+  }
+
   // 7. Image (non-fatal)
   let imageUrl: string | null = null
   try {
@@ -151,7 +177,7 @@ export async function generateArticle(
     title: (writer.data.article_title ?? topicText).trim(),
     teaser: (writer.data.article_teaser ?? '').trim(),
     tldr: (writer.data.article_tldr ?? '').trim(),
-    body: writer.data.article_body ?? '',
+    body,
     imageUrl,
   }
 }

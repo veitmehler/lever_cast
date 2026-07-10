@@ -41,6 +41,7 @@ import { generateAiSummary } from './geo-summary-generator'
 import { restructureHtmlWithGeo, type GeoSectionData } from './geo-html-restructurer'
 import { sanitizeGeoQuestion } from './geo-question-sanitizer'
 import { normalizeH2Questions } from '../approval-service'
+import { loadPlainLanguageConfig, runPlainLanguagePass } from './plain-language'
 import { generateKeyTakeaways } from './key-takeaways-generator'
 import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
@@ -325,6 +326,45 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
     // Normalise question-style H2s (append `?`) before the TOC is built so
     // TOC display text matches the headings that appear in the article body.
     geoHtml = normalizeH2Questions(geoHtml)
+  }
+
+  // Plain-language storytelling pass — additive glosses/story boxes injected into
+  // the post-GEO HTML so TOC/heading-ids/diagrams downstream all see the final
+  // structure. Skips silently when no PlainLanguageConfig matches the industry.
+  try {
+    const plBrand = await brandSettingsForUser(job.userId)
+    const plConfig = await loadPlainLanguageConfig(plBrand?.industry)
+    if (plConfig) {
+      const plSettings = await prisma.settings.findUnique({
+        where: { userId: job.userId },
+        select: { writingStyle: true },
+      })
+      const plTheme = themeFromBrand(plBrand ?? undefined)
+      const pl = await runPlainLanguagePass({
+        jobId,
+        sitePageId: sitePage.id,
+        html: geoHtml,
+        voice: {
+          writingStyle: plSettings?.writingStyle ?? '',
+          audience: plBrand?.who ?? '',
+          industry: plBrand?.industry ?? '',
+        },
+        config: plConfig,
+        accentHex: plTheme.primaryColor,
+      })
+      geoHtml = pl.html
+      totalCost += pl.cost
+      totalInputTokens += pl.inputTokens
+      totalOutputTokens += pl.outputTokens
+      logger.info(
+        { jobId, glosses: pl.injectedGlosses, boxes: pl.injectedBoxes, cost: pl.cost },
+        '[enrichment] plain-language pass complete',
+      )
+    } else {
+      logger.info({ jobId }, '[enrichment] plain-language pass skipped — no config for industry')
+    }
+  } catch (err) {
+    logger.warn({ jobId, err }, '[enrichment] plain-language pass failed — continuing without it')
   }
 
   await setEnrichmentPhaseStep(jobId, 20)

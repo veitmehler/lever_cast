@@ -695,6 +695,7 @@ model SitePage {
   sectionEnrichments   SectionEnrichment[]
   socialAutomationRuns SocialAutomationRun[]
   editRequests         ArticleEditRequest[]
+  plainLanguageBlocks  PlainLanguageBlock[]
 
   @@unique([userId, slug])
   @@index([primaryKeyword])
@@ -1132,6 +1133,44 @@ model ClientStorySpiderRun {
 
   @@unique([accountId, cycleStart])
   @@map("client_story_spider_runs")
+}
+
+// Global, admin-managed per-industry exemplar bank + advertising-claim restrictions
+// for plain-language metaphor generation. Clients never see or edit this. When no
+// row matches an account's industry, the whole injection pass silently skips.
+// See .plans/plain-language-storytelling.implementation-plan.md.
+model PlainLanguageConfig {
+  id           String   @id @default(cuid())
+  industry     String   @unique // matched case-insensitively against BrandSettings.industry
+  exemplars    Json // Array<{ kind: 'term'|'concept', subject: string, metaphor: string, note?: string }>
+  restrictions String   @db.Text // advertising-claim limitation instructions injected into every generation
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("plain_language_config")
+}
+
+// Per-run record of injected plain-language blocks (observability + admin QA).
+// Wiped and re-created by each enrichment run, same lifecycle as SectionEnrichment.
+model PlainLanguageBlock {
+  id              String   @id @default(cuid())
+  sitePageId      String
+  sitePage        SitePage @relation(fields: [sitePageId], references: [id], onDelete: Cascade)
+  sectionPosition Int
+  kind            String // 'term' | 'concept'
+  subject         String // the term itself, or a one-line concept summary
+  label           String? // rotated box label used (concept boxes only)
+  generatedText   String   @db.Text
+  verified        Boolean  @default(false)
+  llmProvider     String?
+  llmModel        String?
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  cost            Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([sitePageId])
+  @@map("plain_language_blocks")
 }
 
 // A bulk content-generation batch kicked off from the content plan. Items run

@@ -20,6 +20,14 @@ const NAV_TIMEOUT_MS = 45_000
 const SCROLL_INCREMENTS = 8
 const SCROLL_WAIT_MS = 1_800
 const MAX_SCREENSHOTS = 8
+// Live diagnosis (2026-07-10): the same real listing, navigated fresh, sometimes renders a full
+// page (Reviews tab + count) and sometimes a stripped variant with only Overview/About tabs and no
+// review count — confirmed NOT a hydration race (persists after 9.5s) and NOT tied to the
+// consent.google.com redirect (happens on non-redirected sessions too). Most likely Google's
+// anti-scraping mitigation varying by the residential proxy exit IP's reputation, not geography.
+// A fresh browser (new proxy session) sometimes gets the full page — bounded retry is the
+// practical lever available without deeper anti-detection engineering.
+const MAX_PAGE_ATTEMPTS = 3
 
 // Derived from Page itself rather than spelled out as ElementHandle<Element> — this project has
 // no "dom" lib, so the bare `Element` type name isn't resolvable here.
@@ -224,36 +232,60 @@ async function transcribeScreenshots(screenshots: Buffer[]): Promise<Transcribed
     }))
 }
 
-/** Full capture: resolve → navigate (proxied, forced hl=en) → open Reviews tab → sort →
+/** Cheap signal for "did we get the full page with reviews, or a stripped variant" — checked
+ * before committing to sort/scroll/screenshot so a bad session can be retried on a fresh one. */
+async function hasReviewsSignal(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    // Runs in the browser context — accessed via globalThis (not the bare `document`
+    // identifier) since this Node project has no "dom" lib to declare that global's type.
+    const doc = (globalThis as unknown as { document: { body: { innerText: string } } }).document
+    return doc.body.innerText.includes('Reviews')
+  })
+}
+
+/** Full capture: resolve → (retry up to MAX_PAGE_ATTEMPTS fresh sessions until the reviews UI is
+ * actually present) navigate (proxied, forced hl=en) → open Reviews tab → sort →
  * scroll+expand+screenshot → vision-transcribe. */
 export async function captureReviews(googleBusinessProfileUrl: string): Promise<TranscribedReview[]> {
   const placeUrl = withEnglishLocale(await resolvePlaceUrl(googleBusinessProfileUrl))
 
-  const { browser, authenticate } = await launchReviewCaptureBrowser()
-  try {
-    const page = await browser.newPage()
-    await authenticate(page)
-    await page.setViewport({ width: 1080, height: 1400 })
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' })
+  for (let attempt = 1; attempt <= MAX_PAGE_ATTEMPTS; attempt++) {
+    const { browser, authenticate } = await launchReviewCaptureBrowser()
+    try {
+      const page = await browser.newPage()
+      await authenticate(page)
+      await page.setViewport({ width: 1080, height: 1400 })
+      await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' })
 
-    await withRetry(
-      () =>
-        withTimeout(
-          async () => {
-            await page.goto(placeUrl, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS })
-          },
-          NAV_TIMEOUT_MS,
-          'client-story-capture:navigate',
-        ),
-      { attempts: 2, onRetry: (err) => logger.warn({ err }, '[client-stories/capture] navigation retrying') },
-    )
+      await withRetry(
+        () =>
+          withTimeout(
+            async () => {
+              await page.goto(placeUrl, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS })
+            },
+            NAV_TIMEOUT_MS,
+            'client-story-capture:navigate',
+          ),
+        { attempts: 2, onRetry: (err) => logger.warn({ err }, '[client-stories/capture] navigation retrying') },
+      )
 
-    await dismissConsentIfPresent(page)
-    await openReviewsTab(page)
-    await trySortByNewest(page)
-    const screenshots = await scrollAndScreenshot(page)
-    return await transcribeScreenshots(screenshots)
-  } finally {
-    await browser.close().catch(() => {})
+      await dismissConsentIfPresent(page)
+
+      if (!(await hasReviewsSignal(page)) && attempt < MAX_PAGE_ATTEMPTS) {
+        logger.warn(
+          { attempt },
+          '[client-stories/capture] reviews UI not present on this session — retrying with a fresh proxy session',
+        )
+        continue
+      }
+
+      await openReviewsTab(page)
+      await trySortByNewest(page)
+      const screenshots = await scrollAndScreenshot(page)
+      return await transcribeScreenshots(screenshots)
+    } finally {
+      await browser.close().catch(() => {})
+    }
   }
+  return []
 }

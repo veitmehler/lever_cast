@@ -410,7 +410,9 @@ export async function runPlainLanguagePass(args: ArticlePassArgs): Promise<Plain
         result.outputTokens += generated?.usage.outputTokens ?? 0
         if (!generated) continue
         explainedTerms.add(norm)
-        usedImagery.push(`gloss for "${t.term.trim()}"`)
+        // Feed the actual opening imagery forward (not just the term name) so later
+        // sections don't reuse the same metaphor vehicle (hose, bridge, ...).
+        usedImagery.push(generated.text.slice(0, 80))
         plan.glosses.push({ term: t.term.trim(), text: generated.text, usage: generated.usage })
       }
 
@@ -427,7 +429,7 @@ export async function runPlainLanguagePass(args: ArticlePassArgs): Promise<Plain
         result.inputTokens += generated?.usage.inputTokens ?? 0
         result.outputTokens += generated?.usage.outputTokens ?? 0
         if (generated) {
-          usedImagery.push(concept.summary.trim())
+          usedImagery.push(generated.text.slice(0, 80))
           plan.box = {
             label: rotatedLabel(`${sitePageId}:${section.position}`),
             subject: concept.summary.trim(),
@@ -562,7 +564,7 @@ export async function runNewsletterPlainLanguage(args: NewsletterPassArgs): Prom
       if (spliced) {
         html = spliced
         explained.add(norm)
-        usedImagery.push(`gloss for "${t.term.trim()}"`)
+        usedImagery.push(generated.text.slice(0, 80))
       }
     }
 

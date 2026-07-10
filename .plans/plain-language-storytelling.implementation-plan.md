@@ -1,11 +1,19 @@
 # Plain-Language Storytelling Injection — Implementation Plan
 
-Status: **implemented** (2026-07-10). Phases 1–4 + 6 shipped: schema (`PlainLanguageConfig` +
-`PlainLanguageBlock`), the four `pl_*` prompts + chiro exemplar config (seed.ts + staging seeder),
-the article enrichment pass (hooked after GEO restructure), and the newsletter pass (hooked in
-`generateArticle` with `data-pl-box` markers styled by `render.ts`). 25 unit tests. Phase 5
-(admin CRUD page for the config) deliberately deferred until output quality has been reviewed on
-real content — exemplars/restrictions are editable via DB until then.
+Status: **implemented + live-verified on staging** (2026-07-10). Phases 1–4 + 6 shipped: schema
+(`PlainLanguageConfig` + `PlainLanguageBlock`), the four `pl_*` prompts + chiro exemplar config
+(seed.ts + staging seeder), the article enrichment pass (hooked after GEO restructure), and the
+newsletter pass (hooked in `generateArticle` with `data-pl-box` markers styled by `render.ts`).
+25 unit tests. **Live test** (enrichment re-run on the "Winter Pregnancy Comfort" article, dev
+account): 9 glosses + 5 boxes injected, $0.139 LLM cost, brand-navy box styling correct, gloss
+splices land precisely after the term's sentence; the verifier rejected 6 candidates across 5
+sections (condescension, fear-based imagery on "placental abruption", claim-upgrading) — strict
+but the surviving quality is high. Known tuning knobs: verifier strictness + detection density are
+admin-editable prompts; imagery-dedup now feeds actual generated openings forward (fixed same day
+after observing garden-hose/suspension-bridge reuse). Newsletter path unit-tested but not yet
+live-run — verify visually on the next real edition. Phase 5 (admin CRUD page for the config)
+deliberately deferred until output quality has been reviewed on real content — exemplars/
+restrictions are editable via DB until then.
 
 ## Goal
 

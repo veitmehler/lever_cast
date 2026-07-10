@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeDashes, stripSafeDashes, rewriteIsSafe, wordTokens } from '../dash-sanitizer'
+import { normalizeDashes, stripSafeDashes, rewriteIsSafe, wordTokens, splitTagAffixes } from '../dash-sanitizer'
 
 describe('normalizeDashes', () => {
   it('converts double hyphens to em-dashes', () => {
@@ -101,6 +101,33 @@ describe('rewriteIsSafe (token-diff guard)', () => {
 
   it('rejects more than two insertions even if allowlisted', () => {
     expect(rewriteIsSafe('a—b', 'a and but so b')).toBe(false)
+  })
+})
+
+describe('splitTagAffixes', () => {
+  it('peels a wrapping <p> tag so the core is tag-free', () => {
+    const { lead, core, trail } = splitTagAffixes('<p>It was never the mattress—it was the alignment.')
+    expect(lead).toBe('<p>')
+    expect(core).toBe('It was never the mattress—it was the alignment.')
+    expect(trail).toBe('')
+  })
+
+  it('peels trailing closing tags', () => {
+    const { lead, core, trail } = splitTagAffixes('Final dash—sentence here.</p>')
+    expect(lead).toBe('')
+    expect(core).toBe('Final dash—sentence here.')
+    expect(trail).toBe('</p>')
+  })
+
+  it('keeps inner markup in the core (so it still blocks the rewrite)', () => {
+    const { core } = splitTagAffixes('<p>A <a href="x">link—here</a> stays.')
+    expect(core).toContain('<a href="x">')
+  })
+
+  it('handles multiple leading tags and whitespace', () => {
+    const { lead, core } = splitTagAffixes('\n<div><p> Text—body. ')
+    expect(lead).toBe('\n<div><p> ')
+    expect(core).toBe('Text—body.')
   })
 })
 

@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 const DEF_SYS =
   'You are a social media content strategist. Select the single most compelling, shareable quote from the provided content. The quote must stand alone without context, be under 220 characters, and avoid hashtags or emojis.'
@@ -85,7 +86,9 @@ export async function selectQuoteForCard(opts: {
   if (!quote) throw new Error('LLM did not return a quote')
 
   return {
-    quote: quote.slice(0, 280),
+    // Dash cleanup covers quotes lifted from pre-sanitizer articles; the
+    // token-diff guard means words never change, only punctuation.
+    quote: (await sanitizeDashesText(quote, { surface: 'quote_card' })).slice(0, 280),
     attribution: attributionRaw || undefined,
   }
 }
@@ -122,12 +125,18 @@ export async function selectQuotesForCards(opts: {
 
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { quotes?: Array<{ quote?: string; attribution?: string }> }
-  const quotes = (data.quotes ?? [])
-    .map((q) => ({
-      quote: (q.quote ?? '').trim().slice(0, 280),
-      attribution: q.attribution?.trim() || undefined,
-    }))
-    .filter((q) => q.quote.length > 0)
+  const quotes = await Promise.all(
+    (data.quotes ?? [])
+      .map((q) => ({
+        quote: (q.quote ?? '').trim().slice(0, 280),
+        attribution: q.attribution?.trim() || undefined,
+      }))
+      .filter((q) => q.quote.length > 0)
+      .map(async (q) => ({
+        ...q,
+        quote: await sanitizeDashesText(q.quote, { surface: 'quote_card' }),
+      })),
+  )
 
   if (quotes.length === 0) throw new Error('LLM did not return any quotes')
   return quotes.slice(0, opts.count)

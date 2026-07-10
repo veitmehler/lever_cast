@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { logger } from '../../lib/logger'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import type { CarouselSlidePlan, CarouselSlideType } from '../compositors/carousel'
 
 const DEF_SYS =
@@ -148,7 +149,7 @@ export async function planCarouselSlides(opts: {
 
   const lastIdx = Math.min(rawSlides.length, opts.slideCount) - 1
 
-  return rawSlides.slice(0, opts.slideCount).map((s, i): CarouselSlidePlan => {
+  const planned = rawSlides.slice(0, opts.slideCount).map((s, i): CarouselSlidePlan => {
     // Support both new (headlineText/bodyText/type) and old (headline/bullets) formats
     const headlineText = (s.headlineText !== undefined ? s.headlineText : s.headline ?? null)
     const bodyText = s.bodyText !== undefined
@@ -182,4 +183,18 @@ export async function planCarouselSlides(opts: {
       imagePrompt: (s.imagePrompt ?? '').trim().slice(0, 500),
     }
   })
+
+  // Em-dash elimination on the visible on-image text (imagePrompt is not
+  // reader-facing and stays untouched). See .plans/de-ai-writing.implementation-plan.md.
+  return Promise.all(
+    planned.map(async (slide) => ({
+      ...slide,
+      headlineText: slide.headlineText
+        ? await sanitizeDashesText(slide.headlineText, { surface: 'carousel_headline' })
+        : slide.headlineText,
+      bodyText: slide.bodyText
+        ? await sanitizeDashesText(slide.bodyText, { surface: 'carousel_body' })
+        : slide.bodyText,
+    })),
+  )
 }

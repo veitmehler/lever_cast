@@ -56,14 +56,36 @@ function withEnglishLocale(url: string): string {
   return u.toString()
 }
 
+/** The Oxylabs residential proxy's exit IP rotates per connection and occasionally geolocates to
+ * an EU/EEA country, which redirects the whole navigation to consent.google.com instead of the
+ * Maps place page — confirmed live (2026-07-10 spike: a run landed on consent.google.com with
+ * gl=HR, found no Reviews tab or Sort control because neither exists on that page, and correctly
+ * transcribed 0 reviews from screenshots of it). Best-effort: if the button text doesn't match
+ * (different consent-page variant), capture proceeds and will likely find nothing — same
+ * degradation as any other selector miss here. */
+async function dismissConsentIfPresent(page: Page): Promise<void> {
+  if (!page.url().includes('consent.google.com')) return
+  try {
+    const acceptBtn = await page.waitForSelector('button ::-p-text(Accept all), button ::-p-text(I agree)', {
+      timeout: 8_000,
+    })
+    if (!acceptBtn) throw new Error('accept-all button not found')
+    await acceptBtn.click()
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS })
+  } catch (err) {
+    logger.warn({ err }, '[client-stories/capture] consent-interstitial dismiss failed — capture may return nothing')
+  }
+}
+
 /** The place page loads with only a short, truncated preview carousel of reviews — the full
  * scrollable list (with Sort control) only appears after clicking into the Reviews tab. Best-effort:
  * if the tab isn't found, capture proceeds against whatever preview panel is already on the page. */
 async function openReviewsTab(page: Page): Promise<void> {
   try {
-    const tab = await page.waitForSelector('button[aria-label*="Reviews for" i], button[role="tab"] ::-p-text(Reviews)', {
-      timeout: 8_000,
-    })
+    const tab = await page.waitForSelector(
+      'button[aria-label*="Reviews for" i], button[role="tab"] ::-p-text(Reviews), ::-p-text(Reviews)',
+      { timeout: 8_000 },
+    )
     if (!tab) throw new Error('reviews tab not found')
     await tab.click()
     await new Promise((r) => setTimeout(r, SCROLL_WAIT_MS))
@@ -226,6 +248,7 @@ export async function captureReviews(googleBusinessProfileUrl: string): Promise<
       { attempts: 2, onRetry: (err) => logger.warn({ err }, '[client-stories/capture] navigation retrying') },
     )
 
+    await dismissConsentIfPresent(page)
     await openReviewsTab(page)
     await trySortByNewest(page)
     const screenshots = await scrollAndScreenshot(page)

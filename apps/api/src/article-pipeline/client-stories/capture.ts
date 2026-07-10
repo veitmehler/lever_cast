@@ -21,6 +21,10 @@ const SCROLL_INCREMENTS = 8
 const SCROLL_WAIT_MS = 1_800
 const MAX_SCREENSHOTS = 8
 
+// Derived from Page itself rather than spelled out as ElementHandle<Element> — this project has
+// no "dom" lib, so the bare `Element` type name isn't resolvable here.
+type PanelHandle = NonNullable<Awaited<ReturnType<Page['$']>>>
+
 export interface TranscribedReview {
   reviewerName: string | null
   starRating: number | null
@@ -43,6 +47,31 @@ export async function resolvePlaceUrl(rawUrl: string): Promise<string> {
   return url
 }
 
+/** Force English so our text/aria-label selectors (Sort, Newest, Reviews, More) match reliably —
+ * without this Google renders in whatever locale the Oxylabs residential-proxy exit IP geolocates
+ * to, which silently breaks every text-based click below. */
+function withEnglishLocale(url: string): string {
+  const u = new URL(url)
+  u.searchParams.set('hl', 'en')
+  return u.toString()
+}
+
+/** The place page loads with only a short, truncated preview carousel of reviews — the full
+ * scrollable list (with Sort control) only appears after clicking into the Reviews tab. Best-effort:
+ * if the tab isn't found, capture proceeds against whatever preview panel is already on the page. */
+async function openReviewsTab(page: Page): Promise<void> {
+  try {
+    const tab = await page.waitForSelector('button[aria-label*="Reviews for" i], button[role="tab"] ::-p-text(Reviews)', {
+      timeout: 8_000,
+    })
+    if (!tab) throw new Error('reviews tab not found')
+    await tab.click()
+    await new Promise((r) => setTimeout(r, SCROLL_WAIT_MS))
+  } catch (err) {
+    logger.warn({ err }, '[client-stories/capture] reviews-tab click failed — using whatever panel is already present')
+  }
+}
+
 /** Click "Sort" then "Newest" by visible text/aria-label — far more stable than CSS classes,
  * which Google rotates. Best-effort: logs and continues with default sort if not found. */
 async function trySortByNewest(page: Page): Promise<void> {
@@ -63,7 +92,25 @@ async function trySortByNewest(page: Page): Promise<void> {
   }
 }
 
-/** Scroll the reviews panel, screenshotting its bounding box after each increment. */
+/** Click every visible "More" expansion control in the panel so long reviews aren't screenshotted
+ * mid-truncation. Best-effort: Google's expand control isn't always a real <button>, so this
+ * matches on visible text within the panel rather than a specific tag/class. */
+async function expandTruncatedReviews(panelHandle: PanelHandle): Promise<void> {
+  try {
+    const moreButtons = await panelHandle.$$('::-p-text(More)')
+    for (const btn of moreButtons) {
+      await btn.click().catch(() => {})
+    }
+  } catch (err) {
+    logger.warn({ err }, '[client-stories/capture] expand-review-text click failed — leaving reviews as previewed')
+  }
+}
+
+/** Scroll the reviews panel, screenshotting its bounding box after each increment. The first
+ * screenshot is taken before any scrolling (captures whatever's initially in view); each
+ * subsequent one scrolls, waits for Google's lazy-loaded reviews to arrive, expands truncated
+ * text, THEN measures height/screenshots — checking height before the wait (the previous version)
+ * raced the lazy-load and could look "done" one scroll too early. */
 async function scrollAndScreenshot(page: Page): Promise<Buffer[]> {
   const panelHandle = await page.$('div[role="feed"], div.m6QErb[aria-label]')
   if (!panelHandle) {
@@ -73,7 +120,20 @@ async function scrollAndScreenshot(page: Page): Promise<Buffer[]> {
 
   const shots: Buffer[] = []
   let lastHeight = 0
+  let stagnantRounds = 0
   for (let i = 0; i < SCROLL_INCREMENTS && shots.length < MAX_SCREENSHOTS; i++) {
+    if (i > 0) {
+      await page.evaluate((el) => {
+        // Runs in the browser context, where DOM lib types aren't available to this Node
+        // project — the element's shape is well-known (scrollBy/clientHeight), so a minimal
+        // structural cast is clearer than pulling in "dom" lib.
+        const node = el as unknown as { scrollBy(x: number, y: number): void; clientHeight: number }
+        node.scrollBy(0, node.clientHeight * 0.85)
+      }, panelHandle)
+      await new Promise((r) => setTimeout(r, SCROLL_WAIT_MS))
+      await expandTruncatedReviews(panelHandle)
+    }
+
     const box = await panelHandle.boundingBox()
     if (box) {
       const shot = await page.screenshot({
@@ -81,18 +141,20 @@ async function scrollAndScreenshot(page: Page): Promise<Buffer[]> {
       })
       shots.push(Buffer.from(shot))
     }
-    const { height, grew } = await page.evaluate((el, prevHeight) => {
-      // Runs in the browser context, where DOM lib types aren't available to this
-      // Node project — the element's actual shape is well-known (scrollBy/clientHeight/
-      // scrollHeight), so a minimal structural cast is clearer than pulling in "dom" lib.
-      const node = el as unknown as { scrollBy(x: number, y: number): void; clientHeight: number; scrollHeight: number }
-      node.scrollBy(0, node.clientHeight * 0.85)
-      return { height: node.scrollHeight, grew: node.scrollHeight > prevHeight }
-    }, panelHandle, lastHeight)
-    if (i > 1 && !grew) break // reached the end of all reviews
+
+    const height = await page.evaluate(
+      (el) => (el as unknown as { scrollHeight: number }).scrollHeight,
+      panelHandle,
+    )
+    if (height <= lastHeight) {
+      stagnantRounds++
+      if (stagnantRounds >= 2) break // two scrolls in a row with no new content — reached the end
+    } else {
+      stagnantRounds = 0
+    }
     lastHeight = height
-    await new Promise((r) => setTimeout(r, SCROLL_WAIT_MS))
   }
+  logger.info({ screenshotCount: shots.length }, '[client-stories/capture] scroll capture complete')
   return shots
 }
 
@@ -140,15 +202,17 @@ async function transcribeScreenshots(screenshots: Buffer[]): Promise<Transcribed
     }))
 }
 
-/** Full capture: resolve → navigate (proxied) → sort → scroll+screenshot → vision-transcribe. */
+/** Full capture: resolve → navigate (proxied, forced hl=en) → open Reviews tab → sort →
+ * scroll+expand+screenshot → vision-transcribe. */
 export async function captureReviews(googleBusinessProfileUrl: string): Promise<TranscribedReview[]> {
-  const placeUrl = await resolvePlaceUrl(googleBusinessProfileUrl)
+  const placeUrl = withEnglishLocale(await resolvePlaceUrl(googleBusinessProfileUrl))
 
   const { browser, authenticate } = await launchReviewCaptureBrowser()
   try {
     const page = await browser.newPage()
     await authenticate(page)
     await page.setViewport({ width: 1080, height: 1400 })
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' })
 
     await withRetry(
       () =>
@@ -162,6 +226,7 @@ export async function captureReviews(googleBusinessProfileUrl: string): Promise<
       { attempts: 2, onRetry: (err) => logger.warn({ err }, '[client-stories/capture] navigation retrying') },
     )
 
+    await openReviewsTab(page)
     await trySortByNewest(page)
     const screenshots = await scrollAndScreenshot(page)
     return await transcribeScreenshots(screenshots)

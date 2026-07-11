@@ -199,36 +199,37 @@ behavior is `advanceBatch`'s start-next logic, not a resource limit.
   quota endpoint shape).
 - Worst-case added cost stays ≤ ~$8.60/client/month (3 × 4.33 × $0.66 carousel).
 
-## Phase 3 — Prompt-row drift guard (recurring bug class: 3 instances this week)
+## Phase 3 — Prompt-row drift guard — ✅ IMPLEMENTED 2026-07-11
 
-- `packages/db/scripts/diff-prompt-rows.ts`: connects to both DBs (or runs per-env producing a
-  fingerprint file: stepNumber, key, provider, model, isActive, md5(system#user)), diffs and
-  prints staging-only / prod-only / differing. Run before every prod deploy as part of the
-  release checklist (documented in PM doc).
-- Policy note: admin edits are per-environment by design; anything edited on staging that should
-  ship must be replayed to prod deliberately (or edited on prod directly for config-type rows).
+- `packages/db/scripts/diff-prompt-rows.ts` (read-only): fingerprint mode (identity = key else
+  stepNumber; provider, model, isActive, maxTokens, md5(system\x00user), text lengths) + diff
+  mode (`--diff a.json b.json --labels staging,prod`; exits 1 on any drift). Prod has no tsx —
+  the script header carries the in-container `node -e` fingerprint equivalent.
+- Release-checklist policy documented in the PM doc (Ship/Operations): run the diff before every
+  prod deploy; admin edits are per-environment by design, so anything edited on staging that
+  should ship must be replayed to prod deliberately.
 
-### Phase 3b — Remediate the drifts found in the 2026-07-11 audit
+### Phase 3b — Remediate the drifts found in the 2026-07-11 audit — ✅ DONE 2026-07-11
 
-Each row change below is an overwrite of existing DB data → **individually sign-off-gated**
-(same convention as the de-AI reseed):
+1. **Step 202** ✅ prod overwritten with staging's live-verified text (4899 chars). Root cause
+   confirmed by the text diff: prod's version carried three "caption MUST START with the URL"
+   / CTA-URL instructions — exactly what produced the caption-shaped JSON the E2E's in-code
+   retry had to rescue. (Note: staging's text is admin-evolved far beyond the small in-code
+   DEF in carousel-plan.ts — the DEF is only the parse-failure fallback, not the canon.)
+2. **Step 32** ✅ user picked staging's "Click here >>" CTA fallback (the only line that
+   differed); prod synced to it.
+3. **Step 201** ✅ BOTH envs refreshed to the in-code seed defaults (anthropic /
+   claude-sonnet-4-5-20250929, maxTokens 256, current JSON-explicit text; was
+   openai/gpt-4o-mini + old text on both).
+4. **Staging "orphan" rows** — NOT orphans after all: `nl_kids_snack_*`/`nl_tech_free_*` belong
+   to a half-built newsletter module (calendar `modules` JSON slots + admin badges + CSV columns
+   exist; `buildModules` never wired up). **User decision: KEEP and finish the module** — tracked
+   as a Product roadmap item in the PM doc. Rows stay staging-only until the module ships.
+5. Step 218 residual: unchanged — auto-resolves when Phase 1e flips both rows to the direct
+   Gemini model; no separate action.
 
-1. **Step 202 `social_carousel_plan` (prod stale — confirmed live)**: prod's text returns a
-   caption-shaped response; the in-code default-prompt retry rescues it but burns an LLM call and
-   failed once during the E2E. Fix: overwrite prod's row with the current in-code/staging text
-   (verify staging's text matches the in-code DEF first).
-2. **Step 32 `generate_promotional_email` (direction unknown)**: staging and prod texts differ —
-   one side was admin-edited at some point. Fix: eyeball both texts side by side, pick the
-   intended one, sync the other. Decision needed from the user during implementation.
-3. **Step 201 `social_quote_selection` (stale on BOTH, not drift)**: both environments still run
-   `openai/gpt-4o-mini` with pre-current text vs. the in-code Anthropic default. Functional since
-   the jsonMode adapter fix, but off-convention. Fix: refresh both rows to the current in-code
-   defaults (provider anthropic, current prompt text).
-4. **Staging orphan rows** (`nl_kids_snack_*` ×4, `nl_tech_free_*` ×3 — zero code references):
-   delete from staging, or explicitly keep as parked experiments with a note. User's call;
-   default recommendation: delete.
-5. Step 218 residual: cosmetic stepName/dummy-text mismatch — auto-resolves when Phase 1e flips
-   both rows to the direct Gemini model; no separate action.
+**Verified end state (re-run of the diff after remediation): 78 rows in sync; differing = 218
+only; staging-only = the 7 parked module rows; prod-only = 0.**
 
 ## Expected outcomes
 

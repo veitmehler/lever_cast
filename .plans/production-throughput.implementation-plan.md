@@ -132,6 +132,27 @@ User-proposed during Phase-1 review; matches the run's actual dependency graph.
   post-Phase-1, across ~26 runs per client cycle.
 - Sequencing: implement AFTER the Phase-1 timing test so there's a real before/after baseline.
 
+## Phase 1h — Dual-lane batch advancement (designed 2026-07-11, NOT yet implemented)
+
+User question during Phase-1 review: can bulk-selected articles + newsletters generate in
+parallel? Yes — an article and a newsletter share zero state, and the Phase-1 semaphores govern
+every real resource (provider caps, Chromium, mmdc, ffmpeg via 1g). The current one-item-at-a-time
+behavior is `advanceBatch`'s start-next logic, not a resource limit.
+
+- `advanceBatch` keeps **one article item AND one newsletter item generating concurrently** per
+  account (dual lanes). Within each kind, items stay serial — preserves date-ordered review flow
+  and keeps Anthropic-cap contention sane (writer + feature∥secondary writers already meet at the
+  global cap of 4 during overlaps; graceful queuing, but >2 concurrent items per account has
+  diminishing returns).
+- Ready-for-review email logic already waits for ALL items — out-of-order completion is invisible
+  to the user.
+- Expected: article lane (~8 × ~20 min) and newsletter lane (~17 × ~7 min) overlap instead of
+  stacking — roughly another 30–40% off a cycle burst's content-generation wall-clock.
+- Watch: multiple accounts bursting funnel into the same global provider caps — platform
+  throughput becomes provider-limited (correct failure mode: slower, never broken); caps are the
+  env-tunable knobs as provider tiers grow.
+- Sequencing: after 1g, each with its own before/after measurement.
+
 ## Phase 1f — Article retry parity
 
 - `content-batch.ts` startItem + `routes/topics.ts` enqueue: add `retryLimit: 2, retryDelay: 120`

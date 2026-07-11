@@ -179,7 +179,30 @@ transition + deletion (incl. dry runs) alerts the admin via sendFailureAlert. 9 
 - Dry-run mode first (logs what WOULD be deleted); verified on a staging clone account
   before the auto path is armed.
 
-## Phase D — Hardening batch (independent of A–C, can interleave)
+## Phase D — Hardening batch — ✅ IMPLEMENTED 2026-07-12
+
+- **D1**: `lib/llm-usage.ts` `recordLLMUsage` (never throws); all 7 social generators record
+  (quote-selection ×2 fns, carousel-plan main+retry, platform-caption, video-reel-prompt,
+  pitch-slide-text, reel-bullets, quote-video-narration); userId threaded through
+  generate-assets + generate-video-assets call sites. Sources: social_quote_selection,
+  social_carousel_plan, social_caption, social_video_prompt, social_pitch_slides,
+  social_reel_bullets, social_narration. Verify against the next social run's LLMUsage rows.
+- **D2**: article-pipeline terminal alert (via boss.getJobById retryCount≥retryLimit — never
+  per retry; also alerts when boss.fail itself errors = no retry coming), enrichment +
+  output failure alerts, publish-scheduled ONE summary alert per tick with failures.
+  generate-social-from-article is an unimplemented stub — nothing to alert.
+- **D3 audit report**: 25 userId models — 21 were scoped or deliberate; **4 gaps added to
+  ACCOUNT_SCOPED_MODELS**: ArticleEmailCampaign, OutputAttempt, SyndicationArticle,
+  VideoGenerationJob (tenant content members should co-see). Deliberately unscoped:
+  Settings (per-member personal), BrandSettings/GhlSettings (canonical-owner singletons).
+  8 accountId models query by accountId directly — no broadening needed. Admin routes:
+  every route in admin-api/* calls requireAdmin — full coverage, no fixes needed.
+  Deletion-cascade coverage was audited in Phase C (5 no-relation tables handled there).
+- **D4**: staging workflow paths filter (docs-only pushes no longer deploy); in-flight gate
+  in BOTH deploy workflows (waits up to 15 min for zero active runs/jobs before container
+  recreation, fails loudly; skips when the stack isn't running).
+
+### Original plan (for reference)
 
 **D1. Social cost logging** (closes the last per-client margin blind spot): sweep the
 social-side direct adapter calls missing LLMUsage rows — carousel-plan, platform-caption,

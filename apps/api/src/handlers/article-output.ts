@@ -2,6 +2,7 @@ import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { prisma } from '@socioply/shared'
+import { sendFailureAlert } from '../lib/alerts'
 import { buildOutputPayload } from '../article-pipeline/output/payload-builder'
 import { getOutputTarget } from '../article-pipeline/output/registry'
 
@@ -49,6 +50,12 @@ export async function articleOutputHandler(
           errorMessage: msg,
           completedAt:  new Date(),
         },
+      }).catch(() => {})
+      await sendFailureAlert({
+        jobId,
+        errorType: 'article-output-failed',
+        message: `Article export to ${target} failed for job ${jobId}: ${msg}`,
+        context: { jobId, target, attemptId },
       }).catch(() => {})
 
       throw err

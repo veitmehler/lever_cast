@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 export interface ReelBulletsResult {
   headline: string
@@ -43,6 +44,7 @@ export async function extractReelBullets(opts: {
   topic?: string
   details?: string
   specialInstructions?: string
+  userId?: string
 }): Promise<ReelBulletsResult> {
   const t = await loadPromptTemplate(204)
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
@@ -67,6 +69,7 @@ export async function extractReelBullets(opts: {
     maxTokens: 2048,
     jsonMode: true,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_reel_bullets', run)
 
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { headline?: string; bullets?: string[] }

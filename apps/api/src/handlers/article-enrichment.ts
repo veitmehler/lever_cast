@@ -3,6 +3,7 @@ import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { runArticleEnrichment } from '../article-pipeline/enrichment/index'
 import { prisma } from '@socioply/shared'
+import { sendFailureAlert } from '../lib/alerts'
 
 export interface ArticleEnrichmentJobData {
   jobId: string
@@ -20,6 +21,12 @@ export async function articleEnrichmentHandler(
     } catch (err) {
       logger.error({ jobId, err }, '[article-enrichment] enrichment failed')
       Sentry.captureException(err, { tags: { queue: 'article-enrichment', jobId } })
+      await sendFailureAlert({
+        jobId,
+        errorType: 'article-enrichment-failed',
+        message: `Enrichment failed for job ${jobId}: ${err instanceof Error ? err.message : String(err)}`,
+        context: { jobId },
+      }).catch(() => {})
 
       // Mark job as failed so UI can show a retry button
       await prisma.articleJob.update({

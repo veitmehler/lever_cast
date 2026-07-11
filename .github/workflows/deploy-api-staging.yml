@@ -10,6 +10,16 @@ name: Deploy API (Staging)
 on:
   push:
     branches: [staging]
+    # Paths filter (multi-tenancy plan D4a): docs-only pushes must not recreate
+    # containers — two rapid docs pushes once cancelled each other mid-`up` and
+    # killed in-flight staging work. Mirrors prod's filter.
+    paths:
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.dockerignore'
+      - '.github/workflows/deploy-api-staging.yml'
   workflow_dispatch:
     inputs:
       ref:
@@ -132,6 +142,31 @@ jobs:
             sleep 5
           done
           echo "::error::Could not reach staging-droplet over Tailscale after retries"
+          exit 1
+
+      # In-flight gate (multi-tenancy plan D4b): container recreation kills
+      # running generation work. Wait up to 15 min for the worker to go idle;
+      # fail loudly instead of silently killing a burst. Skips when the stack
+      # isn't running (first deploy / broken state — nothing to kill).
+      - name: Wait for in-flight work to finish
+        run: |
+          for i in $(seq 1 30); do
+            BUSY=$(ssh staging-droplet 'cd /opt/socioply-staging && docker compose ps --status running -q api 2>/dev/null | grep -q . && docker compose exec -T api node -e "
+              const {prisma}=require(\"@socioply/shared\");
+              (async()=>{
+                const runs=await prisma.socialAutomationRun.count({where:{status:{in:[\"pending\",\"processing\",\"scheduling\"]}}});
+                const jobs=await prisma.articleJob.count({where:{status:\"in_progress\"}});
+                console.log(runs+jobs);process.exit(0);
+              })().catch(()=>{console.log(0);process.exit(0)})" 2>/dev/null || echo 0' | tail -1)
+            BUSY=${BUSY:-0}
+            if [ "$BUSY" = "0" ]; then
+              echo "No in-flight work — safe to deploy."
+              exit 0
+            fi
+            echo "In-flight work detected ($BUSY active) — waiting 30s (attempt $i/30)..."
+            sleep 30
+          done
+          echo "::error::In-flight generation still running after 15 min — deploy aborted to avoid killing it. Re-run when idle."
           exit 1
 
       - name: Deploy to staging droplet

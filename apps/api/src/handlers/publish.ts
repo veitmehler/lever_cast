@@ -3,6 +3,7 @@ import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { dispatchPublish } from '../social/dispatcher'
 import { publishingGateForUser } from '../lib/account-billing'
+import { sendFailureAlert } from '../lib/alerts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,18 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
       })
       failed.push({ id: post.id, error: msg })
     }
+  }
+
+  // One summary alert per tick with failures — never one email per post (D2).
+  if (failed.length > 0) {
+    await sendFailureAlert({
+      errorType: 'publish-scheduled-failures',
+      message: `${failed.length} scheduled post(s) failed to publish: ${failed
+        .slice(0, 5)
+        .map((f) => `${f.id} (${f.error.slice(0, 80)})`)
+        .join('; ')}${failed.length > 5 ? ` … and ${failed.length - 5} more` : ''}`,
+      context: { failedCount: failed.length, publishedCount: published.length },
+    }).catch(() => {})
   }
 
   logger.info(

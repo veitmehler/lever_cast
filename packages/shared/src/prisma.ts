@@ -48,6 +48,14 @@ const ACCOUNT_SCOPED_MODELS = new Set([
   'SocialPostSpec',
   'Newsletter',
   'NewsletterOffer',
+  // Added by the 2026-07-12 account-scope audit (multi-tenancy plan D3):
+  // tenant content account members should co-see. Deliberately NOT scoped:
+  // Settings (per-member personal), BrandSettings + GhlSettings
+  // (canonical-owner singletons via canonicalAccountUserId).
+  'ArticleEmailCampaign',
+  'OutputAttempt',
+  'SyndicationArticle',
+  'VideoGenerationJob',
 ])
 
 const SCOPED_OPS = new Set([

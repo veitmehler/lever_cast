@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 export type PitchSlideType = 'carousel' | 'hook'
 
@@ -68,6 +69,7 @@ export async function generatePitchSlideText(opts: {
   topic: string
   content: string
   pitchType: PitchSlideType
+  userId?: string
 }): Promise<PitchSlideCopy> {
   const fallbackCta = ctaActionForType(opts.pitchType)
 
@@ -88,6 +90,7 @@ export async function generatePitchSlideText(opts: {
     temperature: 0.7,
     maxTokens: 256,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_pitch_slides', run)
 
   const parsed = parsePitchAndCta(cleanTextOutput(run.content).trim(), fallbackCta)
   return {

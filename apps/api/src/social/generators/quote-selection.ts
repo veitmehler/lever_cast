@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 const DEF_SYS =
   'You are a social media content strategist. Select the single most compelling, shareable quote from the provided content. The quote must stand alone without context, be under 220 characters, and avoid hashtags or emojis.'
@@ -46,6 +47,7 @@ export interface QuoteSelectionResult {
 export async function selectQuoteForCard(opts: {
   content: string
   organizationName: string
+  userId?: string
 }): Promise<QuoteSelectionResult> {
   const t = await loadPromptTemplate(201)
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
@@ -64,6 +66,7 @@ export async function selectQuoteForCard(opts: {
     maxTokens: 256,
     jsonMode: true,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_quote_selection', run)
 
   let quote = ''
   let attributionRaw: string | undefined
@@ -103,6 +106,7 @@ export async function selectQuotesForCards(opts: {
   content: string
   organizationName: string
   count: number
+  userId?: string
 }): Promise<QuoteSelectionResult[]> {
   const t = await loadPromptTemplate(209)
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
@@ -122,6 +126,7 @@ export async function selectQuotesForCards(opts: {
     maxTokens: 1024,
     jsonMode: true,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_quote_selection', run)
 
   const parsed = cleanAndParseJSON(cleanTextOutput(run.content))
   const data = parsed.data as { quotes?: Array<{ quote?: string; attribution?: string }> }

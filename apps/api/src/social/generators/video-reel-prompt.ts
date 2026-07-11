@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 const DEF_SYS = `You are an expert at writing cinematic video generation prompts for text-to-video AI models.
 
@@ -39,6 +40,7 @@ export async function generateVideoReelPrompt(opts: {
   details: string
   specialInstructions: string
   videoModel: string
+  userId?: string
 }): Promise<string> {
   const t = await loadPromptTemplate(206)
   const provider = (t?.defaultProvider ?? 'gemini').toLowerCase()
@@ -58,6 +60,7 @@ export async function generateVideoReelPrompt(opts: {
     temperature: 0.7,
     maxTokens: 512,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_video_prompt', run)
 
   return cleanTextOutput(run.content).trim()
 }

@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { logger } from '../../lib/logger'
+import { recordLLMUsage } from '../../lib/llm-usage'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import type { CarouselSlidePlan, CarouselSlideType } from '../compositors/carousel'
 
@@ -79,6 +80,7 @@ export async function planCarouselSlides(opts: {
   slideCount: number
   articleUrl?: string
   specialInstructions?: string
+  userId?: string
 }): Promise<CarouselSlidePlan[]> {
   const t = await loadPromptTemplate(202)
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
@@ -109,6 +111,7 @@ export async function planCarouselSlides(opts: {
     maxTokens: 4096,
     jsonMode: true,
   })
+  await recordLLMUsage(opts.userId ?? null, 'social_carousel_plan', run)
 
   let data = parseSlidesFromRaw(run.content)
 
@@ -129,6 +132,7 @@ export async function planCarouselSlides(opts: {
       maxTokens: 4096,
       jsonMode: true,
     })
+    await recordLLMUsage(opts.userId ?? null, 'social_carousel_plan', retryRun)
 
     data = parseSlidesFromRaw(retryRun.content)
 

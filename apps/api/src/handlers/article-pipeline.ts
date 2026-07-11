@@ -3,6 +3,7 @@ import { logger } from '../lib/logger'
 import { prisma } from '@socioply/shared'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { getBoss, QUEUES } from '../queues'
+import { sendFailureAlert } from '../lib/alerts'
 
 export interface ArticlePipelineJobData {
   jobId: string
@@ -32,8 +33,24 @@ export async function articlePipelineHandler(
       try {
         const boss = await getBoss()
         await boss.fail(QUEUES.ARTICLE_PIPELINE, job.id)
+        // Terminal-failure alert only — never one email per retry (Phase D2).
+        const meta = await boss.getJobById(QUEUES.ARTICLE_PIPELINE, job.id)
+        if (!meta || meta.retryCount >= meta.retryLimit) {
+          await sendFailureAlert({
+            jobId,
+            errorType: 'article-pipeline-terminal',
+            message: `Article pipeline failed permanently after ${meta ? meta.retryCount + 1 : '?'} attempt(s): ${err instanceof Error ? err.message : String(err)}`,
+            context: { jobId, pgBossJobId: job.id },
+          }).catch(() => {})
+        }
       } catch (failErr) {
         logger.error({ jobId, pgBossJobId: job.id, failErr }, '[article-pipeline] boss.fail failed — no automatic retry will fire')
+        await sendFailureAlert({
+          jobId,
+          errorType: 'article-pipeline-terminal',
+          message: `Article pipeline failed AND boss.fail errored (no retry will fire): ${err instanceof Error ? err.message : String(err)}`,
+          context: { jobId, pgBossJobId: job.id },
+        }).catch(() => {})
       }
     }
   }

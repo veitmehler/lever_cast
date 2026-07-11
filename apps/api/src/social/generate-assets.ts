@@ -70,6 +70,7 @@ export async function generateQuoteCardAsset(opts: {
 
   if (!quoteText) {
     const selected = await selectQuoteForCard({
+      userId: opts.userId,
       content: opts.content,
       organizationName: brand.organizationName,
     })
@@ -159,6 +160,7 @@ export async function generateCarouselAssets(opts: {
       : null
 
   const slidePlans = await planCarouselSlides({
+      userId: opts.userId,
     content: opts.content,
     topic: opts.topic,
     organizationName: brand.organizationName,

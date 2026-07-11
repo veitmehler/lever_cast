@@ -10,6 +10,7 @@ import { resolveSlotContent } from '../automation/content'
 import { buildPlatformCaption, PLATFORM_CHAR_LIMITS } from '../automation/captions'
 import { loadPlainLanguageConfig, formatExemplars } from '../../article-pipeline/enrichment/plain-language'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 const PLATFORM_TONE: Record<string, string> = {
   linkedin:  'professional, thought-leadership tone; 1–2 short paragraphs; minimal hashtags',
@@ -126,6 +127,7 @@ export async function generatePlatformCaption(opts: {
       temperature: 0.6,
       maxTokens: 512,
     })
+    await recordLLMUsage(logCtx.userId, 'social_caption', run)
 
     const caption = (await sanitizeDashesText(cleanTextOutput(run.content), { ...logCtx, surface: 'caption' })).trim()
     if (!caption) throw new Error('Empty caption')

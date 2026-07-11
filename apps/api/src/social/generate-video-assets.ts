@@ -128,12 +128,14 @@ export async function generateVideoReelAsset(opts: {
 
   const [{ headline, bullets }, videoPrompt] = await Promise.all([
     extractReelBullets({
+      userId: opts.userId,
       content: opts.content,
       topic,
       details,
       specialInstructions: brand.videoSpecialInstructions,
     }),
     generateVideoReelPrompt({
+      userId: opts.userId,
       topic,
       details,
       specialInstructions: brand.videoSpecialInstructions,
@@ -214,6 +216,7 @@ export async function generateStoriesReelAsset(opts: {
     brand.organizationName
 
   const { headline, bullets } = await extractReelBullets({
+      userId: opts.userId,
     content: opts.content,
     topic,
     details: opts.content.replace(/<[^>]+>/g, ' ').slice(0, 1500),
@@ -318,6 +321,7 @@ export async function generateHookVideoAsset(opts: {
 
   // Generate Seedance video prompt (narration is now derived from slide plans)
   const hookVideoPrompt = await generateVideoReelPrompt({
+      userId: opts.userId,
     topic,
     details,
     specialInstructions: brand.videoSpecialInstructions,
@@ -456,6 +460,7 @@ export async function generateQuoteVideoAsset(opts: {
     try {
       const brand = await loadSocialBrandTheme(opts.userId)
       batchQuotes = await selectQuotesForCards({
+      userId: opts.userId,
         content: opts.content,
         organizationName: brand.organizationName,
         count: quoteCount,
@@ -541,7 +546,7 @@ export async function generateStoryCarouselVideo(opts: {
   const [titleBgResp, pitchBgResp, pitchCopy, voice] = await Promise.all([
     fetch(titleBgUrl),
     fetch(pitchBgUrl),
-    generatePitchSlideText({ topic: opts.topic, content: opts.content, pitchType: 'carousel' }),
+    generatePitchSlideText({ topic: opts.topic, content: opts.content, pitchType: 'carousel', userId: opts.userId }),
     getVoiceSettings(opts.userId),
   ])
 
@@ -686,6 +691,7 @@ export async function generateStoryHookVideo(opts: {
   // Generate pitch text while we prepare the video assets
   const [pitchCopy, voice] = await Promise.all([
     generatePitchSlideText({
+      userId: opts.userId,
       topic: opts.topic,
       content: opts.content,
       pitchType: 'hook',

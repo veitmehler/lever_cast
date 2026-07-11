@@ -2,6 +2,7 @@ import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { cleanAndParseJSON, cleanTextOutput } from '../../article-pipeline/output-cleaner'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { loadSocialBrandTheme } from '../brand-theme'
+import { recordLLMUsage } from '../../lib/llm-usage'
 
 const DEF_SYS =
   'You write short spoken narration scripts for social media quote videos. The script must sound natural when read aloud by text-to-speech.'
@@ -41,6 +42,7 @@ export async function generateQuoteVideoNarration(
     maxTokens: 256,
     jsonMode: true,
   })
+  await recordLLMUsage(userId, 'social_narration', run)
 
   let narration = ''
 

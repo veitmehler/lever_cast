@@ -1,6 +1,7 @@
 import { getLLMAdapter } from '../llm/factory'
 import { cleanTextOutput } from '../output-cleaner'
 import { logger } from '../../lib/logger'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 
 const PROVIDER = 'anthropic'
 const MODEL = 'claude-haiku-4-5'
@@ -100,6 +101,9 @@ export async function generateDiagramCaption(opts: {
         '[enrichment] caption-gen JSON parse failed — using fallbacks',
       )
     }
+
+    altText = await sanitizeDashesText(altText, { jobId: opts.jobId, surface: 'diagram_alt' })
+    caption = await sanitizeDashesText(caption, { jobId: opts.jobId, surface: 'diagram_caption' })
 
     return { altText, caption, inputTokens: run.tokens.input, outputTokens: run.tokens.output, cost: run.cost }
   } catch (err) {

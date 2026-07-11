@@ -1,5 +1,6 @@
 import { getLLMAdapter } from '../llm/factory'
 import { cleanTextOutput } from '../output-cleaner'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import { loadPromptTemplate } from './prompt-template'
 import { withGeoRetry } from './geo-retry'
 
@@ -57,7 +58,10 @@ export async function generateAiSummary(opts: {
       maxTokens: 512,
     }),
   )
-  const summary = cleanTextOutput(run.content).trim()
+  const summary = await sanitizeDashesText(cleanTextOutput(run.content).trim(), {
+    jobId: opts.jobId,
+    surface: 'geo_summary',
+  })
   return {
     summary,
     inputTokens: run.tokens.input,

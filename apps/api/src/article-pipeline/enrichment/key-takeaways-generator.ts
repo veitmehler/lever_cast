@@ -1,5 +1,6 @@
 import { getLLMAdapter } from '../llm/factory'
 import { cleanTextOutput } from '../output-cleaner'
+import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import { loadPromptTemplate } from './prompt-template'
 import { withGeoRetry } from './geo-retry'
 
@@ -57,7 +58,10 @@ export async function generateKeyTakeaways(opts: {
       maxTokens: 512,
     }),
   )
-  const listInner = cleanTextOutput(run.content).trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, '')
+  const listInner = await sanitizeDashesText(
+    cleanTextOutput(run.content).trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, ''),
+    { jobId: opts.jobId, surface: 'key_takeaways' },
+  )
   const sectionHtml = `<section class="key-takeaways" aria-label="Key Takeaways">\n<h2 id="key-takeaways-heading">Key Takeaways</h2>\n${listInner}\n</section>`
 
   return {

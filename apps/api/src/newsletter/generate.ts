@@ -584,6 +584,18 @@ export async function renderAndSave(newsletterId: string): Promise<string> {
     }
   }
 
+  // Offer cards are human/admin-authored stored text (same class as the footer
+  // disclaimer was) — full-elimination policy applies to them too.
+  for (const offer of [input.seasonalOffer, input.evergreenOffer]) {
+    if (!offer) continue
+    try {
+      offer.title = await sanitizeDashesText(offer.title, { newsletterId, surface: 'offer_title' })
+      offer.body = await sanitizeDashesText(offer.body, { newsletterId, surface: 'offer_body' })
+    } catch {
+      /* keep original */
+    }
+  }
+
   const html = renderNewsletterHtml(input, toRenderBrand(brandRow))
   await prisma.newsletter.update({
     where: { id: newsletterId },

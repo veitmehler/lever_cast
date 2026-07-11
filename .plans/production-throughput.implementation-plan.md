@@ -232,10 +232,14 @@ behavior is `advanceBatch`'s start-next logic, not a resource limit.
 3. **Step 201** ✅ BOTH envs refreshed to the in-code seed defaults (anthropic /
    claude-sonnet-4-5-20250929, maxTokens 256, current JSON-explicit text; was
    openai/gpt-4o-mini + old text on both).
-4. **Staging "orphan" rows** — NOT orphans after all: `nl_kids_snack_*`/`nl_tech_free_*` belong
-   to a half-built newsletter module (calendar `modules` JSON slots + admin badges + CSV columns
-   exist; `buildModules` never wired up). **User decision: KEEP and finish the module** — tracked
-   as a Product roadmap item in the PM doc. Rows stay staging-only until the module ships.
+4. **Staging orphan rows** ✅ DELETED 2026-07-11 (after a correction loop): first read them as a
+   half-built module, but git history (commit `0d81182`, 2026-06-17 Phase 2a genericization)
+   shows they were deliberately RETIRED — `kids_snack` consolidated into `recipe_2`,
+   `tech_free_activity` into `secondary_article`. The DB rows survived retirement because seeds
+   are create-only and the planned "deactivate" never happened. Deleted all 7 from staging;
+   also cleaned the stale breadcrumbs that caused the misread (csv.ts optional-columns comment,
+   `Newsletter.modules` schema comment, dead `kidsSnack`/`techFreeActivity` admin badge code —
+   now a live `recipe-2` badge).
 5. Step 218 residual: unchanged — auto-resolves when Phase 1e flips both rows to the direct
    Gemini model; no separate action.
 

@@ -2,9 +2,11 @@
  * Newsletter content-calendar CSV ingestion.
  *
  * One row = one dated edition (a NewsletterTopic). Required columns: date, topic,
- * bullet1, bullet2, bullet3. Optional columns: secondary_topic, recipe,
- * kids_snack, tech_free_activity, video_url. Module / secondary-article generation
- * is driven purely by which optional columns are populated — there is no dayType.
+ * bullet1, bullet2, bullet3. Optional columns: secondary_article, recipe,
+ * recipe_2, video_url. Module / secondary-article generation is driven purely by
+ * which optional columns are populated — there is no dayType. (kids_snack and
+ * tech_free_activity were consolidated into recipe_2 / secondary_article in the
+ * 2026-06-17 genericization, commit 0d81182.)
  *
  * The flow is two-phase so the admin gets a dry-run preview + per-row error report
  * BEFORE anything is written:

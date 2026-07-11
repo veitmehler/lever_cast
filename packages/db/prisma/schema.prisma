@@ -1264,7 +1264,7 @@ model Newsletter {
   teasers          Json? // [{title,body,cta,link} ×3]
   quickHits        Json? // {tips:[..4], facts:[..4]}
   fun              Json? // {triviaQuestion,triviaAnswer,joke}
-  modules          Json? // {recipe?,kidsSnack?,techFreeActivity?}
+  modules          Json? // {recipe?,recipe2?}
   subjectLine      String?
   previewText      String?
   summaryTitle     String? // LLM 3-word cover title

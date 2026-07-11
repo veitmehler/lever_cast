@@ -22,8 +22,7 @@ interface Topic {
   bullet3: string
   secondaryTopic: string | null
   recipe: string | null
-  kidsSnack: string | null
-  techFreeActivity: string | null
+  recipe2: string | null
   videoUrl: string | null
   researchStatus: string
 }
@@ -47,8 +46,7 @@ interface PreviewRow {
   bullet3: string
   secondaryTopic: string | null
   recipe: string | null
-  kidsSnack: string | null
-  techFreeActivity: string | null
+  recipe2: string | null
   videoUrl: string | null
 }
 
@@ -292,8 +290,7 @@ export default function AdminNewsletterCalendarDetailPage({
                           {[
                             r.secondaryTopic && 'secondary',
                             r.recipe && 'recipe',
-                            r.kidsSnack && 'kids-snack',
-                            r.techFreeActivity && 'tech-free',
+                            r.recipe2 && 'recipe-2',
                             r.videoUrl && 'video',
                           ]
                             .filter(Boolean)
@@ -344,8 +341,7 @@ export default function AdminNewsletterCalendarDetailPage({
                     {[
                       t.secondaryTopic && 'secondary',
                       t.recipe && 'recipe',
-                      t.kidsSnack && 'kids-snack',
-                      t.techFreeActivity && 'tech-free',
+                      t.recipe2 && 'recipe-2',
                       t.videoUrl && 'video',
                     ]
                       .filter(Boolean)

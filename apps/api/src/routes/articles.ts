@@ -502,7 +502,8 @@ export async function articleRoutes(app: FastifyInstance) {
         )
       }
 
-      // Skip the 12-post social set for "Article only" jobs (topic mode), in
+      // Skip the day's social set (3 feed + 3 stories via the weekly matrix —
+      // see social/automation/weekly-matrix.ts) for "Article only" jobs, in
       // addition to the global socialAutomationEnabled setting. Syndication
       // (LinkedIn/Medium article) still runs — that's article distribution.
       if (settings?.socialAutomationEnabled !== false && job.topic.mode !== 'article_only') {

@@ -1,7 +1,8 @@
 import { prisma } from '@socioply/shared'
 import { DEFAULT_SOCIAL_POST_SPECS } from './default-specs'
 
-/** Seed the 12 default slot configs for a user (idempotent). */
+/** Seed the per-user slot CONFIG rows (idempotent). Which slots actually run
+ * each day is decided by weekly-matrix.ts (3 feed + 3 stories), not this table. */
 export async function ensureDefaultSocialPostSpecs(userId: string): Promise<void> {
   const existing = await prisma.socialPostSpec.count({ where: { userId } })
   if (existing >= DEFAULT_SOCIAL_POST_SPECS.length) return

@@ -1,4 +1,9 @@
-/** Default 12-slot daily social schedule (per plan §1). */
+/**
+ * LEGACY 12-slot table — NOT what runs. Since the weekly-cadence redesign
+ * (.plans/social-weekly-cadence.implementation-plan.md), runs are built from
+ * weekly-matrix.ts (3 feed + 3 stories per day); this table only seeds per-user
+ * SocialPostSpec config rows (ensure-specs.ts) for slot-level settings.
+ */
 
 export interface DefaultSpecSeed {
   slotKey: string

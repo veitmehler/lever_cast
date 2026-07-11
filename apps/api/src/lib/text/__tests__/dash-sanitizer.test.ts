@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeDashes, stripSafeDashes, rewriteIsSafe, wordTokens, splitTagAffixes } from '../dash-sanitizer'
+import {
+  normalizeDashes,
+  stripSafeDashes,
+  rewriteIsSafe,
+  wordTokens,
+  splitTagAffixes,
+  parseSimpleInlineTags,
+  rewrapInlineTags,
+} from '../dash-sanitizer'
 
 describe('normalizeDashes', () => {
   it('converts double hyphens to em-dashes', () => {
@@ -128,6 +136,65 @@ describe('splitTagAffixes', () => {
     const { lead, core } = splitTagAffixes('\n<div><p> Text—body. ')
     expect(lead).toBe('\n<div><p> ')
     expect(core).toBe('Text—body.')
+  })
+})
+
+describe('parseSimpleInlineTags', () => {
+  it('extracts plain text and simple tag pairs with attributes', () => {
+    const core = 'These <strong>Banana Oat Cookies</strong> combine oats—both are <a href="/x">sources</a> of melatonin.'
+    const parsed = parseSimpleInlineTags(core)
+    expect(parsed).not.toBeNull()
+    expect(parsed!.plain).toBe('These Banana Oat Cookies combine oats—both are sources of melatonin.')
+    expect(parsed!.spans).toEqual([
+      { open: '<strong>', close: '</strong>', innerText: 'Banana Oat Cookies' },
+      { open: '<a href="/x">', close: '</a>', innerText: 'sources' },
+    ])
+  })
+
+  it('returns null for nested tags', () => {
+    expect(parseSimpleInlineTags('a <strong>b <em>c</em></strong> d—e.')).toBeNull()
+  })
+
+  it('returns null for void tags', () => {
+    expect(parseSimpleInlineTags('line one—line two<br>rest.')).toBeNull()
+  })
+
+  it('returns null for a stray closing tag', () => {
+    expect(parseSimpleInlineTags('dangling</a> text—here.')).toBeNull()
+  })
+
+  it('handles a tag-free sentence', () => {
+    const parsed = parseSimpleInlineTags('no tags—at all.')
+    expect(parsed!.plain).toBe('no tags—at all.')
+    expect(parsed!.spans).toEqual([])
+  })
+})
+
+describe('rewrapInlineTags', () => {
+  const spans = [
+    { open: '<strong>', close: '</strong>', innerText: 'Banana Oat Cookies' },
+    { open: '<a href="/x">', close: '</a>', innerText: 'sources' },
+  ]
+
+  it('re-wraps tags around their preserved text in the rewrite', () => {
+    const rewrite = 'These Banana Oat Cookies combine oats; both are sources of melatonin.'
+    expect(rewrapInlineTags(rewrite, spans)).toBe(
+      'These <strong>Banana Oat Cookies</strong> combine oats; both are <a href="/x">sources</a> of melatonin.',
+    )
+  })
+
+  it('returns null when a tagged phrase was altered by the rewrite', () => {
+    const rewrite = 'These Banana Oat, Cookies combine oats; both are sources of melatonin.'
+    expect(rewrapInlineTags(rewrite, spans)).toBeNull()
+  })
+
+  it('respects original order for repeated phrases', () => {
+    const twice = [
+      { open: '<em>', close: '</em>', innerText: 'sleep' },
+      { open: '<strong>', close: '</strong>', innerText: 'sleep' },
+    ]
+    const out = rewrapInlineTags('sleep now, then sleep again.', twice)
+    expect(out).toBe('<em>sleep</em> now, then <strong>sleep</strong> again.')
   })
 })
 

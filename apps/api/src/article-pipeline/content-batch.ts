@@ -62,10 +62,14 @@ export async function createBatchFromDates(
         status: { not: 'idea' },
         mode: { in: ['article_first', 'article_only'] },
       },
-      select: { id: true },
+      select: { id: true, articleJobs: { where: { status: { not: 'failed' } }, select: { id: true }, take: 1 } },
     })
     if (scheduled) {
-      items.push({ kind: 'article', date: start, topicId: scheduled.id })
+      // Idempotence: a topic that already has a live/completed job is done —
+      // never regenerate it (payment bursts may re-offer already-handled days).
+      if (scheduled.articleJobs.length === 0) {
+        items.push({ kind: 'article', date: start, topicId: scheduled.id })
+      }
     } else if (acct?.articleCalendarId) {
       const cal = await prisma.articleCalendarTopic.findFirst({
         where: { calendarId: acct.articleCalendarId, date: { gte: start, lt: end } },

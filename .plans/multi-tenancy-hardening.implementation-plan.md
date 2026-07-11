@@ -93,7 +93,19 @@ Migration: add columns, backfill `status='active'`.
 **Tests:** gate helper unit tests; route tests for 402-style rejection on paused/cancelled;
 publish skip test.
 
-## Phase B — GHL webhook receiver + payment-driven cycle
+## Phase B — GHL webhook receiver + payment-driven cycle — ✅ IMPLEMENTED 2026-07-12
+
+As-built: `routes/ghl-billing.ts` (POST /api/ghl/billing-events/:token; x-billing-secret
+header vs `GHL_BILLING_WEBHOOK_SECRET` env — 503 if unset, 401 on mismatch, 404 on unknown
+token, rate-limited 60/min); `lib/account-lifecycle.ts` (`applyBillingEvent` + re-dating +
+burst); `GhlBillingEvent` audit table (every event logged incl. suppressed duplicates;
+10-min same-type duplicate window); admin `POST /admin/accounts/:id/billing-token` mints
+the per-account URL token. paidThrough = payment + 30 + 3 grace days. Burst offers every
+future day of the re-anchored window to createBatchFromDates (which now skips topics that
+already have a non-failed job — idempotence guard added) and honors the client-story gate
+like the dashboard route. Re-dating only fires when the anchor gap exceeds one cycle +
+grace (normal renewals need none — the old "next cycle" dates already line up); collisions
+skip. 11 new tests. GHL-side workflow setup = at first real subscription (runbook below).
 
 **Receiver (`apps/api/src/routes/ghl-billing.ts`, new):**
 - `POST /api/ghl/billing-events/:token` — per-account URL token (webhook-action-friendly,

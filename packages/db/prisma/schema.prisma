@@ -38,6 +38,10 @@ model Account {
   statusChangedAt DateTime? // drives the 60d pause→cancel and 90d cancel→delete clocks
   paidThrough     DateTime? // null = legacy/unbilled account, publishing unrestricted
   billingExempt   Boolean   @default(false) // comp accounts: bypass both gates
+  // Per-account URL token for the GHL billing webhook receiver (Phase B) —
+  // the GHL workflow posts to /api/ghl/billing-events/<token>.
+  ghlBillingToken String?   @unique
+  billingEvents   GhlBillingEvent[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -54,6 +58,21 @@ model Account {
 
 // Owner-managed roster of teammate emails (no invitations). A user whose email
 // matches a roster entry is auto-joined to that account on sign-in.
+// Audit log + idempotency window for GHL billing webhook events (multi-tenancy
+// plan Phase B). One row per received event, including suppressed duplicates.
+model GhlBillingEvent {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type      String // payment_cleared | payment_failed | cancelled
+  duplicate Boolean  @default(false) // suppressed by the idempotency window
+  raw       Json?
+  createdAt DateTime @default(now())
+
+  @@index([accountId, type, createdAt])
+  @@map("ghl_billing_events")
+}
+
 model AccountMember {
   id              String   @id @default(cuid())
   accountId       String

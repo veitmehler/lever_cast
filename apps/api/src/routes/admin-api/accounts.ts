@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { randomBytes } from 'node:crypto'
 import { prisma } from '@socioply/shared'
 import { requireAdmin } from '../../middleware/admin'
 
@@ -86,4 +87,18 @@ export async function accountsAdminRoutes(app: FastifyInstance) {
       return reply.send(updated)
     },
   )
+
+  // Mint (or rotate) the account's GHL billing webhook token and return the
+  // receiver path for the GHL workflow's webhook action (Phase B runbook).
+  app.post<{ Params: { id: string } }>('/accounts/:id/billing-token', async (request, reply) => {
+    const admin = await requireAdmin(request, reply)
+    if (!admin) return
+
+    const existing = await prisma.account.findUnique({ where: { id: request.params.id }, select: { id: true } })
+    if (!existing) return reply.status(404).send({ error: 'Account not found' })
+
+    const token = randomBytes(24).toString('base64url')
+    await prisma.account.update({ where: { id: request.params.id }, data: { ghlBillingToken: token } })
+    return reply.send({ token, path: `/api/ghl/billing-events/${token}` })
+  })
 }

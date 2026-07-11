@@ -10,6 +10,7 @@ import { aiRoutes } from './routes/ai'
 import { imageRoutes } from './routes/images'
 import { mediaRoutes } from './routes/media'
 import { ghlRoutes } from './routes/ghl'
+import { ghlBillingRoutes } from './routes/ghl-billing'
 import { socialRoutes } from './routes/social'
 import { socialAutomationRoutes } from './routes/social-automation'
 import { voiceRoutes } from './routes/voice'
@@ -76,6 +77,7 @@ async function main() {
   await app.register(imageRoutes, { prefix: '/api/images' })
   await app.register(mediaRoutes, { prefix: '/api' })
   await app.register(ghlRoutes, { prefix: '/api' })
+  await app.register(ghlBillingRoutes, { prefix: '/api' })
   await app.register(socialRoutes, { prefix: '/api' })
   await app.register(socialAutomationRoutes, { prefix: '/api' })
   await app.register(voiceRoutes, { prefix: '/api' })

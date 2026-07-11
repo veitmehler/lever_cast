@@ -14,6 +14,8 @@ const templateFindMany = vi.fn()
 const templateFindFirst = vi.fn()
 const socialConnFindMany = vi.fn()
 const apiKeyFindFirst = vi.fn()
+const platformSettingsFindUnique = vi.fn()
+const draftFindMany = vi.fn()
 vi.mock('@socioply/shared', () => ({
   prisma: {
     user: {
@@ -30,6 +32,8 @@ vi.mock('@socioply/shared', () => ({
     },
     socialConnection: { findMany: (...a: unknown[]) => socialConnFindMany(...a) },
     apiKey: { findFirst: (...a: unknown[]) => apiKeyFindFirst(...a) },
+    platformSettings: { findUnique: (...a: unknown[]) => platformSettingsFindUnique(...a) },
+    draft: { findMany: (...a: unknown[]) => draftFindMany(...a) },
   },
 }))
 
@@ -54,6 +58,9 @@ beforeEach(() => {
   templateFindMany.mockResolvedValue([])
   // No system LLM key configured by default → routes degrade to 503.
   getSystemApiKey.mockResolvedValue(null)
+  // Extra-post cap defaults: platform default cap (3), no drafts in window.
+  platformSettingsFindUnique.mockResolvedValue(null)
+  draftFindMany.mockResolvedValue([])
 })
 
 describe('POST /generate', () => {
@@ -116,6 +123,61 @@ describe('POST /analyze-writing-style', () => {
     const res = await app.inject({ method: 'POST', url: '/analyze-writing-style', payload: { sampleText: 'word '.repeat(500) } })
     expect(res.statusCode).toBe(503)
     expect(res.json().error).toContain('No LLM provider is configured')
+    await app.close()
+  })
+})
+
+describe('weekly extra-post cap', () => {
+  const recentDraft = (daysAgo: number) => ({ createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000) })
+
+  it('returns 429 with reset info when the account is at the cap', async () => {
+    draftFindMany.mockResolvedValue([recentDraft(6), recentDraft(3), recentDraft(1)])
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(429)
+    const body = res.json()
+    expect(body.error).toContain('Weekly limit of 3 extra posts reached')
+    expect(body.cap).toBe(3)
+    expect(body.used).toBe(3)
+    expect(body.resetsAt).toBeTruthy()
+    await app.close()
+  })
+
+  it('honors an admin-configured cap from platform settings', async () => {
+    platformSettingsFindUnique.mockResolvedValue({ weeklyExtraPostCap: 1 })
+    draftFindMany.mockResolvedValue([recentDraft(2)])
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(429)
+    expect(res.json().cap).toBe(1)
+    await app.close()
+  })
+
+  it('proceeds past the cap check when under the limit (degrades to 503, no provider)', async () => {
+    draftFindMany.mockResolvedValue([recentDraft(1), recentDraft(2)])
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(503)
+    await app.close()
+  })
+
+  it('exempts admins from the cap entirely', async () => {
+    userFindUnique.mockResolvedValue({ id: 'user_A', role: 'admin' })
+    draftFindMany.mockResolvedValue([recentDraft(1), recentDraft(2), recentDraft(3), recentDraft(4)])
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(503) // past the cap → provider 503
+    await app.close()
+  })
+
+  it('GET /extra-post-quota reports usage and reset', async () => {
+    draftFindMany.mockResolvedValue([recentDraft(5)])
+    const app = await build()
+    const res = await app.inject({ method: 'GET', url: '/extra-post-quota' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body).toMatchObject({ cap: 3, used: 1, remaining: 2, exempt: false })
+    expect(new Date(body.resetsAt).getTime()).toBeGreaterThan(Date.now())
     await app.close()
   })
 })

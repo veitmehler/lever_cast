@@ -6,6 +6,7 @@ import { prisma } from '@socioply/shared'
 import { cleanText } from '../lib/utils'
 import { requireAuth } from '../middleware/auth'
 import { getSystemApiKey } from '../lib/system-keys'
+import { weeklyExtraPostQuota, quotaExceededMessage } from '../lib/extra-post-cap'
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -239,6 +240,20 @@ export async function aiRoutes(app: FastifyInstance) {
     try {
       const user = await getOrCreateUser(clerkId)
 
+      // Weekly extra-post cap (throughput plan Phase 2): dashboard ad-hoc post
+      // generation is capped per account per rolling 7 days. Admins are exempt.
+      if (user.role !== 'admin') {
+        const quota = await weeklyExtraPostQuota(user.id)
+        if (quota.remaining <= 0) {
+          return reply.status(429).send({
+            error: quotaExceededMessage(quota),
+            cap: quota.cap,
+            used: quota.used,
+            resetsAt: quota.resetsAt,
+          })
+        }
+      }
+
       let settings = await prisma.settings.findUnique({ where: { userId: user.id } })
       if (!settings) {
         settings = await prisma.settings.create({
@@ -453,6 +468,15 @@ export async function aiRoutes(app: FastifyInstance) {
   })
 
   // POST /api/ai/analyze-writing-style
+  // GET /api/ai/extra-post-quota — dashboard shows remaining weekly ad-hoc posts.
+  app.get('/extra-post-quota', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await getOrCreateUser(clerkId)
+    const quota = await weeklyExtraPostQuota(user.id)
+    return reply.send({ ...quota, exempt: user.role === 'admin' })
+  })
+
   app.post('/analyze-writing-style', { config: { rateLimit: { max: 10, timeWindow: '1 minute', keyGenerator: (req: any) => req.clerkId ?? req.ip } } }, async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return

@@ -17,6 +17,7 @@ export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
     setCarouselJobId,
     handleGenerate,
     currentDraftId,
+    postQuota,
   } = dashboard
 
   return (
@@ -37,6 +38,13 @@ export function DashboardInput({ dashboard }: { dashboard: DashboardView }) {
       {/* Idea Capture Widget */}
       {activeTab === 'social' && (
       <div className="mb-8">
+        {postQuota && !postQuota.exempt && (
+          <p className="mb-2 text-xs text-muted-foreground text-right">
+            {postQuota.remaining > 0
+              ? `${postQuota.remaining} of ${postQuota.cap} extra posts left this week`
+              : `Weekly limit of ${postQuota.cap} extra posts reached`}
+          </p>
+        )}
         <IdeaCapture
           initialIdea={prefillIdea ?? undefined}
           postType={postType}

@@ -896,6 +896,10 @@ model PlatformSettings {
   // From address for transactional emails (newsletter "ready for review", etc.).
   // The Resend API key itself is a SystemApiKey row (provider "resend").
   transactionalEmailFrom String?
+  // Max user-requested (dashboard) social posts per account per rolling 7 days.
+  // Cadence-generated content is never counted. See
+  // .plans/production-throughput.implementation-plan.md Phase 2.
+  weeklyExtraPostCap Int @default(3)
   updatedAt        DateTime @updatedAt
 
   @@map("platform_settings")

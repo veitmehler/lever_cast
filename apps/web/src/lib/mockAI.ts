@@ -94,12 +94,17 @@ export async function generateContent(
 
   // Handle error response
   const errorData = await response.json().catch(() => ({}))
-  
+
+  // Weekly extra-post cap (429) — surface the server's message verbatim.
+  if (response.status === 429 && errorData.error) {
+    throw new Error(`QUOTA:${errorData.error}`)
+  }
+
   // Check if it's a "no API key" error
   if (errorData.requiresApiKey || errorData.provider === 'template') {
     throw new Error('NO_API_KEY')
   }
-  
+
   // Other API errors
   throw new Error('API_ERROR')
 }

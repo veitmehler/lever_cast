@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { generateContent, GeneratedContent } from '@/lib/mockAI'
@@ -14,6 +14,26 @@ export function useDashboard() {
   const { user } = useUser()
   const [activeTab, setActiveTab] = useState<DashboardTab>('workflow')
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Weekly extra-post quota (throughput plan Phase 2) — shown near the generate
+  // input; the server enforces it (429), this is display only.
+  const [postQuota, setPostQuota] = useState<{
+    cap: number
+    used: number
+    remaining: number
+    exempt: boolean
+  } | null>(null)
+  const refreshPostQuota = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/extra-post-quota')
+      if (res.ok) setPostQuota(await res.json())
+    } catch {
+      /* display-only — never block the dashboard */
+    }
+  }, [])
+  useEffect(() => {
+    void refreshPostQuota()
+  }, [refreshPostQuota])
 
   // Pre-fill from ?idea=... (set by "Generate Social Posts" on workflow detail page)
   // Read from window.location to avoid useSearchParams() / Suspense requirement during static export.
@@ -92,7 +112,9 @@ export function useDashboard() {
       console.error('Error generating content:', error)
       
       // Check if it's an API key error
-      if (error instanceof Error && error.message === 'NO_API_KEY') {
+      if (error instanceof Error && error.message.startsWith('QUOTA:')) {
+        toast.error(error.message.slice('QUOTA:'.length))
+      } else if (error instanceof Error && error.message === 'NO_API_KEY') {
         setApiKeyErrorReason('no_key')
         setShowApiKeyModal(true)
       } else if (error instanceof Error && error.message === 'API_ERROR') {
@@ -200,7 +222,8 @@ export function useDashboard() {
 
         const draft = await response.json()
         setCurrentDraftId(draft.id)
-        
+        void refreshPostQuota() // a new draft consumes one weekly slot
+
         toast.success('Draft saved successfully!', {
           description: 'You can find it in the Posts page',
         })
@@ -227,7 +250,11 @@ export function useDashboard() {
       toast.success(`${platform} post regenerated!`)
     } catch (error) {
       console.error('Error regenerating content:', error)
-      toast.error('Failed to regenerate post')
+      if (error instanceof Error && error.message.startsWith('QUOTA:')) {
+        toast.error(error.message.slice('QUOTA:'.length))
+      } else {
+        toast.error('Failed to regenerate post')
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -897,6 +924,7 @@ export function useDashboard() {
     router,
     activeTab, setActiveTab,
     isGenerating, setIsGenerating,
+    postQuota, refreshPostQuota,
     prefillIdea,
     generatedContent, setGeneratedContent,
     rawIdea, setRawIdea,

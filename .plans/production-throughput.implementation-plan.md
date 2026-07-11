@@ -180,14 +180,23 @@ behavior is `advanceBatch`'s start-next logic, not a resource limit.
   resuming (mirror the manual salvage: delete failed step rows for the job at claim time).
 - Batch `checkItem` already handles terminal failure → item 'failed' + ready-email reporting.
 
-## Phase 2 — User-requested social post cap (3/week)
+## Phase 2 — User-requested social post cap (3/week) — ✅ IMPLEMENTED 2026-07-11
 
-- `platformSettings` (admin singleton) gains `weeklyExtraPostCap` (default 3).
-- Count user-initiated generations per account per rolling 7 days (source: posts/runs created via
-  the dashboard's manual endpoints, distinguished from cadence runs by origin flag — add
-  `origin: 'user' | 'cadence'` to the run/post creation paths that lack it).
-- Enforce at the manual generation endpoints with a clear error ("Weekly limit of 3 extra posts
-  reached — resets <date>"); UI shows remaining count.
+- `PlatformSettings.weeklyExtraPostCap Int @default(3)` + migration
+  `20260711140000_weekly_extra_post_cap`.
+- Counting basis (simpler than the origin-flag idea above, which turned out unnecessary):
+  dashboard ad-hoc generations are the ONLY path that creates `Draft` rows — cadence runs write
+  `posts` directly and regeneration reuses the existing draft. So the quota counts account-scoped
+  drafts created in the rolling 7 days (`Draft` is in `ACCOUNT_SCOPED_MODELS`, so the userId
+  filter auto-broadens to all account members). Helper: `apps/api/src/lib/extra-post-cap.ts`
+  (`weeklyExtraPostQuota` → `{cap, used, remaining, resetsAt}`; resetsAt = oldest counted draft
+  + 7d).
+- Enforced in `POST /api/ai/generate` → 429 with "Weekly limit of N extra posts reached —
+  resets <date>" (admins exempt). New `GET /api/ai/extra-post-quota` (+ web proxy route) feeds
+  the dashboard hint ("X of N extra posts left this week") above IdeaCapture; the 429 message is
+  surfaced verbatim as a toast (`QUOTA:` error prefix through mockAI → useDashboard).
+- 5 route tests (429 at cap, custom cap from settings, under-cap passthrough, admin exemption,
+  quota endpoint shape).
 - Worst-case added cost stays ≤ ~$8.60/client/month (3 × 4.33 × $0.66 carousel).
 
 ## Phase 3 — Prompt-row drift guard (recurring bug class: 3 instances this week)

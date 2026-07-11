@@ -109,6 +109,29 @@ gemini key, per-image ≈ 1290 output tokens).
 - Prod's 218 was aligned to staging's intent (`fal-ai/nano-banana-2`) on 2026-07-11 as an interim
   step — the migration then swaps both environments to the direct model.
 
+## Phase 1g — Two-wave social run parallelism (designed 2026-07-11, NOT yet implemented)
+
+User-proposed during Phase-1 review; matches the run's actual dependency graph.
+
+- **Wave 1: the day's feed slots (P1–P3) in parallel** — mutually independent (distinct post
+  types/content sources, per-slot spec-result rows, per-slot try/catch + `retryAutomationSpec`
+  already exist). **Wave 2: story slots (S1–S3) in parallel after wave 1 settles** — stories
+  depend on feed assets (S1 needs P1's carousel backgrounds, pitch stories reuse feed slides;
+  confirmed live: "Feed carousel P1 required before S1").
+- **Prerequisite: a global ffmpeg semaphore (max 1–2 encodes)** — this is the first
+  parallelization stacking CPU-BOUND local work (a feed wave can hold a video reel AND a hook
+  video, two multi-minute encodes; concurrent encodes on a 2–4 vCPU droplet just steal each
+  other's cores). Same pattern as the mmdc semaphore. The waiting-dominated parts (Seedance,
+  image gen, captions) are where the overlap actually pays.
+- `currentSpec`/"Creating X of N" UI semantics assume one in-flight spec — switch the chip to
+  completed-count (or "n in progress") when this lands.
+- **Check at implementation time**: any cross-slot dedup that's implicit in sequential order
+  (e.g. same quote landing on the feed quote card and a story quote card the same day) gets the
+  diagram treatment — select serially (cheap), generate in parallel.
+- Expected: run time goes from ~sum of slots to ~max per wave — roughly **~12–15 min → ~7–10 min**
+  post-Phase-1, across ~26 runs per client cycle.
+- Sequencing: implement AFTER the Phase-1 timing test so there's a real before/after baseline.
+
 ## Phase 1f — Article retry parity
 
 - `content-batch.ts` startItem + `routes/topics.ts` enqueue: add `retryLimit: 2, retryDelay: 120`

@@ -130,6 +130,28 @@ gemini key, per-image ≈ 1290 output tokens).
 - Policy note: admin edits are per-environment by design; anything edited on staging that should
   ship must be replayed to prod deliberately (or edited on prod directly for config-type rows).
 
+### Phase 3b — Remediate the drifts found in the 2026-07-11 audit
+
+Each row change below is an overwrite of existing DB data → **individually sign-off-gated**
+(same convention as the de-AI reseed):
+
+1. **Step 202 `social_carousel_plan` (prod stale — confirmed live)**: prod's text returns a
+   caption-shaped response; the in-code default-prompt retry rescues it but burns an LLM call and
+   failed once during the E2E. Fix: overwrite prod's row with the current in-code/staging text
+   (verify staging's text matches the in-code DEF first).
+2. **Step 32 `generate_promotional_email` (direction unknown)**: staging and prod texts differ —
+   one side was admin-edited at some point. Fix: eyeball both texts side by side, pick the
+   intended one, sync the other. Decision needed from the user during implementation.
+3. **Step 201 `social_quote_selection` (stale on BOTH, not drift)**: both environments still run
+   `openai/gpt-4o-mini` with pre-current text vs. the in-code Anthropic default. Functional since
+   the jsonMode adapter fix, but off-convention. Fix: refresh both rows to the current in-code
+   defaults (provider anthropic, current prompt text).
+4. **Staging orphan rows** (`nl_kids_snack_*` ×4, `nl_tech_free_*` ×3 — zero code references):
+   delete from staging, or explicitly keep as parked experiments with a note. User's call;
+   default recommendation: delete.
+5. Step 218 residual: cosmetic stepName/dummy-text mismatch — auto-resolves when Phase 1e flips
+   both rows to the direct Gemini model; no separate action.
+
 ## Expected outcomes
 
 | Item | Today | After phase 1 |

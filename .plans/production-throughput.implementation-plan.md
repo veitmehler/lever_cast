@@ -127,7 +127,7 @@ gemini key, per-image ≈ 1290 output tokens).
 - Prod's 218 was aligned to staging's intent (`fal-ai/nano-banana-2`) on 2026-07-11 as an interim
   step — the migration then swaps both environments to the direct model.
 
-## Phase 1g — Two-wave social run parallelism (designed 2026-07-11, NOT yet implemented)
+## Phase 1g — Two-wave social run parallelism (IMPLEMENTED 2026-07-11 — measured 25m → 7m14s, 6/6 specs first-try)
 
 User-proposed during Phase-1 review; matches the run's actual dependency graph.
 
@@ -150,7 +150,7 @@ User-proposed during Phase-1 review; matches the run's actual dependency graph.
   post-Phase-1, across ~26 runs per client cycle.
 - Sequencing: implement AFTER the Phase-1 timing test so there's a real before/after baseline.
 
-## Phase 1h — Dual-lane batch advancement (designed 2026-07-11, NOT yet implemented)
+## Phase 1h — Dual-lane batch advancement (IMPLEMENTED 2026-07-11)
 
 User question during Phase-1 review: can bulk-selected articles + newsletters generate in
 parallel? Yes — an article and a newsletter share zero state, and the Phase-1 semaphores govern

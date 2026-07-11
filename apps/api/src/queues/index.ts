@@ -103,6 +103,8 @@ export const QUEUES = {
   CONTENT_BATCH_MONITOR: 'content-batch-monitor',
   CLIENT_STORY_SPIDER: 'client-story-spider',
   CLIENT_STORY_AUTO_GENERATE_CHECK: 'client-story-auto-generate-check',
+  ACCOUNT_LIFECYCLE_CLOCK: 'account-lifecycle-clock',
+  ACCOUNT_DELETE: 'account-delete',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

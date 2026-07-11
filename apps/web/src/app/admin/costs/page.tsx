@@ -49,7 +49,8 @@ export default async function CostsPage({
     `,
   ])
 
-  const userIds = byUser.map((u) => u.userId)
+  // userId is nullable since Phase C: deleted accounts leave anonymous rows.
+  const userIds = byUser.map((u) => u.userId).filter((id): id is string => id !== null)
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
     select: { id: true, email: true },
@@ -176,8 +177,8 @@ export default async function CostsPage({
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">No data</p>
           )}
           {byUser.map((row) => (
-            <div key={row.userId} className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span className="text-muted-foreground">{userMap[row.userId] ?? row.userId}</span>
+            <div key={row.userId ?? 'deleted'} className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-muted-foreground">{row.userId ? (userMap[row.userId] ?? row.userId) : 'deleted account'}</span>
               <span className="font-mono text-foreground">${(row._sum.cost ?? 0).toFixed(4)}</span>
             </div>
           ))}

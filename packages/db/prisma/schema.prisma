@@ -855,8 +855,10 @@ model ErrorLog {
 
 model LLMUsage {
   id           String      @id @default(cuid())
-  userId       String
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Nullable + SetNull: cost rows are OUR business records — they survive
+  // account deletion as anonymous aggregates (multi-tenancy plan Phase C).
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   jobId        String?
   job          ArticleJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
   stepNumber   Int?

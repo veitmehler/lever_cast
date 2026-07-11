@@ -144,7 +144,21 @@ skip. 11 new tests. GHL-side workflow setup = at first real subscription (runboo
 3. First-client verification: run a test payment + a forced failure; confirm both events land
    (this is also the live payload-shape check flagged above).
 
-## Phase C — Lifecycle clocks + deletion path
+## Phase C — Lifecycle clocks + deletion path — ✅ IMPLEMENTED 2026-07-12
+
+As-built: `handlers/account-lifecycle-clock.ts` (daily 04:30 UTC cron; paused>60d→cancelled
+with statusChangedAt reset + admin alert; cancelled>90d→enqueue ACCOUNT_DELETE — **dry-run
+unless `ACCOUNT_AUTO_DELETE_ENABLED=true`**, so the auto path stays disarmed until
+explicitly enabled; billingExempt excluded from both clocks). `handlers/account-delete.ts`:
+LLMUsage detach first (migration `20260712140000_llm_usage_detach` made userId nullable +
+SetNull — admin costs pages updated for anonymous rows), explicit deletes for the 5
+userId-but-no-relation tables cascade can't reach (videoGenerationJob, syndicationArticle,
+articleEmailCampaign, sitePage, outputAttempt — found by schema audit), user cascade
+deletes, account cascade delete, then S3 sweep (per-member `${userId}/` prefix + referenced
+`tmp/` keys; shared `newsletter/<topicId>/` research assets deliberately untouched — other
+accounts reference them). Admin `POST /admin/accounts/:id/delete` defaults to dry-run;
+real deletion requires `dryRun:false` + `confirm` matching the account id/name. Every
+transition + deletion (incl. dry runs) alerts the admin via sendFailureAlert. 9 new tests.
 
 **Clock cron (`handlers/account-lifecycle.ts`, new; daily via pg-boss):**
 - paused && statusChangedAt < now − 60d → cancelled (statusChangedAt reset — 90d clock

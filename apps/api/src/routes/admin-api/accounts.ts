@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
 import { prisma } from '@socioply/shared'
 import { requireAdmin } from '../../middleware/admin'
+import { getBoss, QUEUES } from '../../queues/index'
 
 interface PatchAccountBody {
   subscriptionStartedAt?: string | null
@@ -85,6 +86,42 @@ export async function accountsAdminRoutes(app: FastifyInstance) {
       })
 
       return reply.send(updated)
+    },
+  )
+
+  // Enqueue account deletion (Phase C). Default is a DRY RUN that emails the
+  // admin a full report; pass { dryRun: false, confirm: '<account name or id>' }
+  // to actually delete. Serves both statutory deletion requests (any status)
+  // and manual cleanup.
+  app.post<{ Params: { id: string }; Body: { dryRun?: boolean; confirm?: string } }>(
+    '/accounts/:id/delete',
+    async (request, reply) => {
+      const admin = await requireAdmin(request, reply)
+      if (!admin) return
+
+      const account = await prisma.account.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, name: true },
+      })
+      if (!account) return reply.status(404).send({ error: 'Account not found' })
+
+      const dryRun = request.body?.dryRun !== false // default TRUE — deleting requires explicit intent
+      if (!dryRun) {
+        const confirm = request.body?.confirm?.trim()
+        if (confirm !== account.id && confirm !== account.name) {
+          return reply.status(400).send({
+            error: 'Real deletion requires confirm to match the account id or name exactly.',
+          })
+        }
+      }
+
+      const boss = await getBoss()
+      await boss.send(
+        QUEUES.ACCOUNT_DELETE,
+        { accountId: account.id, reason: 'manual', dryRun },
+        { singletonKey: `account-delete-${account.id}`, expireInSeconds: 3600 },
+      )
+      return reply.status(202).send({ enqueued: true, dryRun })
     },
   )
 

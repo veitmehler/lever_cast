@@ -48,7 +48,8 @@ export async function costsAdminRoutes(app: FastifyInstance) {
       `,
     ])
 
-    const userIds = byUser.map((u) => u.userId)
+    // userId is nullable since Phase C: deleted accounts leave anonymous rows.
+    const userIds = byUser.map((u) => u.userId).filter((id): id is string => id !== null)
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, email: true, name: true },
@@ -67,8 +68,8 @@ export async function costsAdminRoutes(app: FastifyInstance) {
       bySource,
       byUser: byUser.map((u) => ({
         userId: u.userId,
-        email: userMap[u.userId]?.email ?? 'unknown',
-        name: userMap[u.userId]?.name ?? null,
+        email: u.userId ? (userMap[u.userId]?.email ?? 'unknown') : 'deleted account',
+        name: u.userId ? (userMap[u.userId]?.name ?? null) : null,
         cost: u._sum.cost ?? 0,
       })),
       dailyTrend,

@@ -37,6 +37,8 @@ import { newsletterNotifyHandler, NewsletterNotifyJobData } from './handlers/new
 import type { NewsletterGenerateJobData } from './newsletter/enqueue'
 import { clientStorySpiderHandler, ClientStorySpiderJobData } from './handlers/client-story-spider'
 import { clientStoryAutoGenerateCheckHandler } from './handlers/client-story-auto-generate-check'
+import { accountLifecycleClockHandler } from './handlers/account-lifecycle-clock'
+import { accountDeleteHandler } from './handlers/account-delete'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -96,6 +98,7 @@ async function main() {
   await boss.schedule(QUEUES.NEWSLETTER_SAFETY, '*/10 * * * *', {})       // every 10 min
   await boss.schedule(QUEUES.CONTENT_BATCH_MONITOR, '* * * * *', {})      // every minute
   await boss.schedule(QUEUES.CLIENT_STORY_AUTO_GENERATE_CHECK, '*/15 * * * *', {}) // every 15 min
+  await boss.schedule(QUEUES.ACCOUNT_LIFECYCLE_CLOCK, '30 4 * * *', {}) // daily 04:30 UTC — 60/90d billing clocks
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -296,6 +299,18 @@ async function main() {
     withSentry('client-story-auto-generate-check', async () => {
       await clientStoryAutoGenerateCheckHandler()
     }),
+  )
+
+  // Account lifecycle clocks + deletion (multi-tenancy plan Phase C).
+  await boss.work(
+    QUEUES.ACCOUNT_LIFECYCLE_CLOCK,
+    { batchSize: 1 },
+    withSentry('account-lifecycle-clock', accountLifecycleClockHandler),
+  )
+  await boss.work(
+    QUEUES.ACCOUNT_DELETE,
+    { batchSize: 1 },
+    withSentry('account-delete', accountDeleteHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

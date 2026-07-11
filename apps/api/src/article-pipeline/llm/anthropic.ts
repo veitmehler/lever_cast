@@ -9,9 +9,15 @@ const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'
 
 // The SDK's own default is 10 minutes with 2 built-in retries (retried
 // automatically on timeout/429/5xx) — far too long to hold a worker slot for
-// a text call. 2 min covers the largest completions used here (maxTokens up
-// to 8000). See .plans/social-generation-resilience.implementation-plan.md.
-const ANTHROPIC_TIMEOUT_MS = 120_000
+// a text call. But 120s proved too tight: the writer/adjust steps run at
+// maxTokens 16384, and a long article at degraded provider throughput
+// legitimately exceeds 2 minutes — the old cap (× the SDK's 2 retries = the
+// observed 361s failures) killed step 9 on both the 2026-07-10 prod E2E and
+// the 2026-07-11 staging E2E while small calls returned in ~1s. 5 min with a
+// single SDK retry bounds one step-runner attempt at 10 min while giving
+// long completions room. Env-tunable for incident response.
+const ANTHROPIC_TIMEOUT_MS = Number(process.env.ANTHROPIC_TIMEOUT_MS ?? 300_000)
+const ANTHROPIC_SDK_MAX_RETRIES = 1
 
 function parseAnthropicError(err: unknown): LLMError {
   const msg = err instanceof Error ? err.message : String(err)
@@ -49,7 +55,7 @@ export class AnthropicAdapter implements LLMAdapter {
     const maxTokens = options.maxTokens ?? 8192
 
     try {
-      const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS })
+      const client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS, maxRetries: ANTHROPIC_SDK_MAX_RETRIES })
       const response = await instrumentCall({ provider: 'anthropic', op: `messages.create:${model}` }, () =>
         client.messages.create({
           model,

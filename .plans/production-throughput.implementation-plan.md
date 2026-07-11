@@ -1,13 +1,31 @@
 # Production Throughput & Multi-Tenancy Hardening — Implementation Plan
 
-Status: **Phase 1 implemented** (2026-07-11). 1a–1f all shipped: concurrency util + per-provider
-limiter in `instrumentCall`, diagram tail parallelism (serial type/mermaid head preserves the
-diversity chains; global Chromium page semaphore max 4 + mmdc semaphore max 2; pooled browser no
-longer closed per-run since it's cross-job shared now), newsletter feature∥secondary + teasers∥ +
-quickHits∥fun, carousel slides at concurrency 3, direct-Gemini image routing for `gemini*` models
-in carousel backgrounds + featured images (fal fallback, black-frame check, per-image LLMUsage
-logging), article retryLimit 2 with failed-step reset at claim. Phases 2 (post cap) and 3/3b
-(drift guard + remediation) still pending.
+Status: **Phases 1a–1h implemented + measured on staging** (2026-07-11). 1a–1f: concurrency util +
+per-provider limiter, diagram tail parallelism (serial type/mermaid head preserves diversity
+chains; Chromium pages max 4, mmdc max 2, pooled browser now worker-lifetime), newsletter
+feature∥secondary + teasers∥ + quickHits∥fun, carousel slides ×3, direct-Gemini image routing
+(fal fallback, black-frame check, LLMUsage logging), article retryLimit 2 + failed-step reset.
+1g: two-wave social runs + global ffmpeg semaphore (max 2). 1h: dual-lane batch advancement.
+Provider caps tier-sized (Anthropic Scale, Gemini Tier 2): anthropic 8, gemini 16, openai 6.
+
+**Measured results (staging, 2026-07-11):**
+| Item | Baseline | Phase 1 | Δ |
+|---|---|---|---|
+| Article enrichment (6 diagram sections) | ~15 min | **5m 23s** | −64% |
+| Full newsletter generation | ~12 min | **4m 27s** | −63% |
+| Social run, two waves (6 specs) | ~25 min | **7m 14s** | −71% |
+| Direct-Gemini carousel image | — | 9.3 s, clean | new path |
+
+Quality held throughout: plain-language boxes/glosses normal, 0 caption dashes, 6/6 specs
+first-try, no provider-gate congestion warnings. Estimated burst: ~18 h → **~5–6 h**/client/cycle.
+
+⚠️ Operational finding: a deploy's container-overlap briefly EXHAUSTED the 25-connection DB
+cluster ("slots reserved for SUPERUSER") — recovered on retry, but Phase-1 parallelism widens
+pool usage moments. **The B4 cluster upsize should precede multi-client bursts.** Also: the
+staging deploy workflow has NO paths filter (every push deploys, docs included) — adding one is
+a cheap ops fix.
+
+Phases 2 (post cap) and 3/3b (drift guard + remediation) still pending. Prod rollout pending.
 
 ## Goal
 

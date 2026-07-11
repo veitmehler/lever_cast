@@ -41,6 +41,18 @@ export class OpenAIAdapter implements LLMAdapter {
     const temperature = options.temperature ?? 0.7
     const maxTokens = options.maxTokens
 
+    // OpenAI rejects response_format json_object unless the word "json" appears
+    // in the messages (400). DB-backed prompts don't all say it (surfaced live
+    // on prod's quote-selection row 2026-07-11) — guarantee it at the adapter.
+    let userPrompt = options.userPrompt
+    if (
+      options.jsonMode &&
+      !/json/i.test(options.userPrompt) &&
+      !/json/i.test(options.systemPrompt ?? '')
+    ) {
+      userPrompt = `${options.userPrompt}\n\nRespond with valid JSON only.`
+    }
+
     try {
       const client = new OpenAI({ apiKey, timeout: OPENAI_TIMEOUT_MS })
       const messages: OpenAI.ChatCompletionMessageParam[] = []
@@ -49,7 +61,7 @@ export class OpenAIAdapter implements LLMAdapter {
       }
       if (options.images?.length) {
         const content: OpenAI.ChatCompletionContentPart[] = [
-          { type: 'text', text: options.userPrompt },
+          { type: 'text', text: userPrompt },
           ...options.images.map(
             (img): OpenAI.ChatCompletionContentPart => ({
               type: 'image_url',
@@ -59,7 +71,7 @@ export class OpenAIAdapter implements LLMAdapter {
         ]
         messages.push({ role: 'user', content })
       } else {
-        messages.push({ role: 'user', content: options.userPrompt })
+        messages.push({ role: 'user', content: userPrompt })
       }
 
       const response = await instrumentCall({ provider: 'openai', op: `chat.completions.create:${model}` }, () =>

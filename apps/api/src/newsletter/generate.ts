@@ -562,10 +562,23 @@ export async function renderAndSave(newsletterId: string): Promise<string> {
   })
 
   const offers = await selectOffers(nl.userId, nl.topic.date)
-  const html = renderNewsletterHtml(
-    buildRenderInput(nl, video, nl.topic.date, offers),
-    toRenderBrand(brandRow),
-  )
+  const input = buildRenderInput(nl, video, nl.topic.date, offers)
+
+  // Recipes come from SHARED topic research rendered verbatim (no per-client LLM
+  // call), so pre-sanitizer research can still carry em-dashes — clean them at
+  // render time. Non-fatal; covers old research without re-running it.
+  for (const recipe of [input.modules?.recipe, input.modules?.recipe2]) {
+    if (!recipe) continue
+    try {
+      recipe.intro = await sanitizeDashesText(recipe.intro, { newsletterId, surface: 'recipe_intro' })
+      recipe.ingredients = await sanitizeDashesText(recipe.ingredients, { newsletterId, surface: 'recipe_ingredients' })
+      recipe.instructions = await sanitizeDashesText(recipe.instructions, { newsletterId, surface: 'recipe_instructions' })
+    } catch {
+      /* keep original */
+    }
+  }
+
+  const html = renderNewsletterHtml(input, toRenderBrand(brandRow))
   await prisma.newsletter.update({
     where: { id: newsletterId },
     data: { renderedHtml: html, validation: J(validation) },

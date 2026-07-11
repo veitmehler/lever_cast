@@ -527,7 +527,7 @@ function footerBlock(brand: RenderBrand, theme: Theme): string {
 
   const disclaimer =
     brand.nlFooterDisclaimer?.trim() ||
-    'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you — it helps support our work.'
+    'If you follow a link in this email and make a purchase, we may earn a small commission at no extra cost to you; it helps support our work.'
   const nameLine = footerLogo ? '' : `<div style="font-weight:600;">${esc(brand.organizationName ?? '')}</div>`
 
   return `<tr><td style="background-color:${theme.footerBg};padding:60px 24px 32px;">

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { REEL_HEADLINE_MAX_CHARS, REEL_HEADLINE_MAX_LINES } from '../generators/reel-bullets'
+import { Semaphore } from '../../lib/concurrency'
 import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -57,10 +58,19 @@ export function dejaVuSansFontPath(): string {
 // seconds; only pathological input should ever approach this.
 const FFMPEG_TIMEOUT_MS = 5 * 60 * 1000
 
+// Global encode gate (Phase 1g): ffmpeg is the one CPU-BOUND stage — concurrent
+// encodes on a small droplet just steal each other's cores. Max 2 across ALL
+// jobs; env-tunable.
+const ffmpegSemaphore = new Semaphore(
+  Number(process.env.FFMPEG_MAX_CONCURRENT) > 0 ? Number(process.env.FFMPEG_MAX_CONCURRENT) : 2,
+)
+
 export async function runFfmpeg(args: string[]): Promise<void> {
-  await execFileAsync(ffmpegBin(), ['-y', ...args], {
-    maxBuffer: 64 * 1024 * 1024,
-    timeout: FFMPEG_TIMEOUT_MS,
+  await ffmpegSemaphore.run(async () => {
+    await execFileAsync(ffmpegBin(), ['-y', ...args], {
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: FFMPEG_TIMEOUT_MS,
+    })
   })
 }
 

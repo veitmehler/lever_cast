@@ -243,11 +243,21 @@ export async function advanceBatch(batchId: string): Promise<void> {
   const generating = items.filter((i) => i.status === 'generating')
   const pending = items.filter((i) => i.status === 'pending')
 
-  // 2. Start the next item if nothing is currently generating (sequential).
-  if (generating.length === 0 && pending.length > 0) {
-    await startItem(pending[0] as Item, ownerUserId)
-    return
+  // 2. Dual-lane advancement (.plans/production-throughput.implementation-plan.md 1h):
+  // keep ONE article item AND ONE newsletter item generating concurrently — the
+  // two kinds share no state, and the Phase-1 semaphores bound every real
+  // resource. Within each kind, items stay serial (date order preserved for the
+  // review flow; keeps Anthropic-cap contention sane).
+  let started = false
+  for (const kind of ['article', 'newsletter'] as const) {
+    if (generating.some((i) => i.kind === kind)) continue
+    const next = pending.find((i) => i.kind === kind)
+    if (next) {
+      await startItem(next as Item, ownerUserId)
+      started = true
+    }
   }
+  if (started || generating.length > 0) return
 
   // 3. Finalize when nothing is left to do.
   if (generating.length === 0 && pending.length === 0) {

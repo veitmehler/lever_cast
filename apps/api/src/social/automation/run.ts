@@ -6,6 +6,12 @@ import { matrixForDay, storySlotsForDay, type DaySlot } from './weekly-matrix'
 import { buildMatrixRunContext, processMatrixSlot } from './matrix-processor'
 import { processStorySlot } from './story-processor'
 import { finalizeGenerationCounts, updateGenerationProgress, loadPriorAssets } from './spec-processor'
+import { mapWithConcurrency } from '../../lib/concurrency'
+
+/** 1g wave widths — all 3 slots of a wave in flight at once; heavier local
+ * stages are bounded downstream (ffmpeg 2, Chromium 4, provider caps). */
+const FEED_WAVE_CONCURRENCY = 3
+const STORY_WAVE_CONCURRENCY = 3
 
 /** scheduledDate (YYYY-MM-DD, user tz) → ISO weekday (1=Mon … 7=Sun). */
 function isoWeekdayOf(scheduledDate: string): number {
@@ -138,8 +144,13 @@ export async function runSocialAutomation(
     })
   }
 
-  // Feed posts first — stories reuse their generated assets.
-  for (const entry of feedToRun) {
+  // Two-wave parallelism (.plans/production-throughput.implementation-plan.md 1g):
+  // WAVE 1 — the day's feed slots in parallel (mutually independent; per-slot
+  // failure isolation lives inside processMatrixSlot's spec-result handling).
+  // WAVE 2 — story slots in parallel AFTER wave 1 settles (stories reuse feed
+  // assets). Heavy local stages stay bounded by the ffmpeg/Chromium/provider
+  // semaphores. currentSpec shows the most recently STARTED slot.
+  await mapWithConcurrency(feedToRun, FEED_WAVE_CONCURRENCY, async (entry) => {
     await prisma.socialAutomationRun.update({
       where: { id: runId },
       data: { currentSpec: entry.slotKey },
@@ -157,12 +168,11 @@ export async function runSocialAutomation(
     })
 
     await updateGenerationProgress(runId)
-  }
+  })
 
-  // Story posts — companion to each feed post, reusing feed assets where needed.
   if (storiesToRun.length > 0) {
     const priorAssets = await loadPriorAssets(runId)
-    for (const story of storiesToRun) {
+    await mapWithConcurrency(storiesToRun, STORY_WAVE_CONCURRENCY, async (story) => {
       await prisma.socialAutomationRun.update({
         where: { id: runId },
         data: { currentSpec: story.slotKey },
@@ -171,7 +181,7 @@ export async function runSocialAutomation(
       await processStorySlot({ run, story, ctx, priorAssets, timeZone, logCtx: baseCtx })
 
       await updateGenerationProgress(runId)
-    }
+    })
   }
 
   await finalizeGenerationCounts(runId)

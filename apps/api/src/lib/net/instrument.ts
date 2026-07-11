@@ -9,10 +9,14 @@ import { Semaphore } from '../concurrency'
  * job on this worker. Env-tunable: PROVIDER_CONCURRENCY_<NAME>=n.
  * See .plans/production-throughput.implementation-plan.md Phase 1d.
  */
+// Sized against actual account tiers (2026-07-11): Anthropic Scale tier +
+// Gemini API Tier 2 — both leave these far below hard limits; Anthropic's
+// binding constraint is TPM on long writer calls, not request count. OpenAI
+// tier unconfirmed → moderate. fal has its own queue semantics.
 const DEFAULT_PROVIDER_CONCURRENCY: Record<string, number> = {
-  gemini: 8,
-  anthropic: 4,
-  openai: 4,
+  gemini: 16,
+  anthropic: 8,
+  openai: 6,
   'fal-ai': 5,
 }
 const FALLBACK_CONCURRENCY = 6

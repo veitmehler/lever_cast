@@ -111,7 +111,18 @@ fal-ai 5; env-tunable). Queued waiters logged when wait > 5 s.
   when providers throttle.
 - Tests: limiter honors cap, FIFO-ish fairness, release on error.
 
-## Phase 1e — Direct Gemini image API for nano-banana workloads
+## Phase 1e — Direct Gemini image API for nano-banana workloads — ✅ COMPLETE 2026-07-11
+
+Code side shipped with Phase 1 (prefix routing, `generateWithGeminiImage`, black-frame check,
+$0.039 LLMUsage row). Cutover done 2026-07-11: rows 150 + 218 flipped to
+`gemini/gemini-3.1-flash-image` on staging → A/B eyeball passed (2 slide backgrounds, 8.8–11.1s,
+photorealistic, no black frames / safety-filter artifacts) → prod flipped (218's
+stepName/userPrompt synced from staging at the same time, closing the last drift row) → prod
+smoke test clean (8.6s). Post-cutover drift report: **Differing: 0** — prod's 79 rows fully in
+sync with staging; only the 7 parked kids-snack/tech-free rows are staging-only. fal remains
+the automatic fallback on gemini failure.
+
+### Original plan (for reference)
 
 Template: `diagram-restyle.ts` already calls `gemini-3.1-flash-image` directly (auth via system
 gemini key, per-image ≈ 1290 output tokens).

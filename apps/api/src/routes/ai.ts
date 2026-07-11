@@ -7,6 +7,7 @@ import { cleanText } from '../lib/utils'
 import { requireAuth } from '../middleware/auth'
 import { getSystemApiKey } from '../lib/system-keys'
 import { weeklyExtraPostQuota, quotaExceededMessage } from '../lib/extra-post-cap'
+import { generationGateForUser } from '../lib/account-billing'
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -239,6 +240,13 @@ export async function aiRoutes(app: FastifyInstance) {
 
     try {
       const user = await getOrCreateUser(clerkId)
+
+      // Lifecycle gate first (multi-tenancy Phase A): paused/cancelled accounts
+      // never generate, regardless of quota.
+      if (user.role !== 'admin') {
+        const lifecycleGate = await generationGateForUser(user.id)
+        if (!lifecycleGate.allowed) return reply.status(402).send({ error: lifecycleGate.reason })
+      }
 
       // Weekly extra-post cap (throughput plan Phase 2): dashboard ad-hoc post
       // generation is capped per account per rolling 7 days. Admins are exempt.

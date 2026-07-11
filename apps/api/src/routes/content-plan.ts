@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'
 import { billingWindows } from '../article-pipeline/billing-window'
 import { hasArticleCadenceDate, checkArticleGenerationGate, readStorySpiderStatus } from '../article-pipeline/client-stories/gate'
+import { generationGateForUser } from '../lib/account-billing'
 
 /**
  * Unified content plan: merges, per day, the account's planned ARTICLE topic and
@@ -206,6 +207,11 @@ export async function contentPlanRoutes(app: FastifyInstance) {
 
     const requestedDates = (request.body?.dates ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
     if (requestedDates.length === 0) return reply.status(400).send({ error: 'No valid dates provided' })
+
+    // Lifecycle gate: paused/cancelled accounts never generate (status governs
+    // generation — .plans/multi-tenancy-hardening.implementation-plan.md Phase A).
+    const lifecycleGate = await generationGateForUser(account.userId)
+    if (!lifecycleGate.allowed) return reply.status(402).send({ error: lifecycleGate.reason })
 
     // Production gate: independent of whatever the frontend disabled — a date
     // beyond the account's current paid cycle cannot be generated, only planned.

@@ -9,6 +9,7 @@
 import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
+import { generationGateForUser } from '../lib/account-billing'
 
 export interface NewsletterGenerateJobData {
   userId: string
@@ -27,6 +28,14 @@ export async function enqueueNewsletterGeneration(
   from?: Date,
   to?: Date,
 ): Promise<EnqueueResult> {
+  // Lifecycle gate (multi-tenancy Phase A): covers every caller, including the
+  // admin bulk route — comp accounts pass via billingExempt.
+  const gate = await generationGateForUser(userId)
+  if (!gate.allowed) {
+    logger.warn({ userId, calendarId }, '[newsletter/enqueue] blocked — account not active')
+    return { enqueued: 0, skipped: 0, totalTopics: 0 }
+  }
+
   const dateFilter =
     from || to
       ? { date: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }

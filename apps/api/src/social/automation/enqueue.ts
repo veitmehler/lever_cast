@@ -1,6 +1,7 @@
 import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { formatScheduledDate, utcDateKey } from './schedule'
+import { generationGateForUser } from '../../lib/account-billing'
 
 /**
  * How long pg-boss lets a SOCIAL_GENERATE job sit `active` before expiring it.
@@ -24,6 +25,12 @@ export interface EnqueueSocialAutomationOpts {
 export async function enqueueSocialAutomation(
   opts: EnqueueSocialAutomationOpts,
 ): Promise<{ runId: string; enqueued: boolean; message?: string }> {
+  // Lifecycle gate (multi-tenancy Phase A): social runs generate content.
+  const gate = await generationGateForUser(opts.userId)
+  if (!gate.allowed) {
+    return { runId: '', enqueued: false, message: gate.reason }
+  }
+
   // Article content dates are date-only (UTC midnight); use the UTC calendar day
   // so the social run day matches the dashboard content plan (and the correct
   // weekday matrix). Post times still apply the user's timezone via slotToUtc.
@@ -92,6 +99,12 @@ export interface EnqueueNewsletterSocialOpts {
 export async function enqueueNewsletterSocialAutomation(
   opts: EnqueueNewsletterSocialOpts,
 ): Promise<{ runId: string; enqueued: boolean; message?: string }> {
+  // Lifecycle gate (multi-tenancy Phase A): social runs generate content.
+  const gate = await generationGateForUser(opts.userId)
+  if (!gate.allowed) {
+    return { runId: '', enqueued: false, message: gate.reason }
+  }
+
   const timeZone = opts.timeZone ?? 'America/New_York'
   const scheduledDate = formatScheduledDate(opts.publishingDate, timeZone)
 

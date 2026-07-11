@@ -4,6 +4,7 @@ import { prisma } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
+import { generationGateForUser } from '../lib/account-billing'
 
 // Accepted CSV header variations → normalised field name
 const CSV_ALIASES: Record<string, string> = {
@@ -68,6 +69,9 @@ export async function topicRoutes(app: FastifyInstance) {
     if (!user) {
       return reply.status(404).send({ error: 'User not found' })
     }
+
+    const lifecycleGate = await generationGateForUser(user.id)
+    if (!lifecycleGate.allowed) return reply.status(402).send({ error: lifecycleGate.reason })
 
     const {
       topic,
@@ -138,6 +142,9 @@ export async function topicRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
+
+    const lifecycleGate = await generationGateForUser(user.id)
+    if (!lifecycleGate.allowed) return reply.status(402).send({ error: lifecycleGate.reason })
 
     let csvText: string
     try {

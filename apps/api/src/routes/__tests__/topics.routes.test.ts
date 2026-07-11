@@ -11,6 +11,8 @@ const topicCreate = vi.fn()
 const topicFindMany = vi.fn()
 const articleJobCreate = vi.fn()
 const outlineFindMany = vi.fn()
+const accountFindUnique = vi.fn()
+const accountIdForUserMock = vi.fn().mockResolvedValue(null)
 vi.mock('@socioply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
@@ -20,7 +22,9 @@ vi.mock('@socioply/shared', () => ({
     },
     articleJob: { create: (...a: unknown[]) => articleJobCreate(...a) },
     outlineFramework: { findMany: (...a: unknown[]) => outlineFindMany(...a) },
+    account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) },
   },
+  accountIdForUser: (...a: unknown[]) => accountIdForUserMock(...a),
 }))
 
 const bossSend = vi.fn()
@@ -43,6 +47,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   requireAuthMock.mockResolvedValue('clerk_A')
   userFindUnique.mockResolvedValue({ id: 'user_A' })
+  // Lifecycle gate defaults: no account → generation allowed (legacy behavior).
+  accountIdForUserMock.mockResolvedValue(null)
+  accountFindUnique.mockResolvedValue(null)
 })
 
 describe('topic routes — auth & user resolution', () => {
@@ -111,6 +118,18 @@ describe('POST /topics', () => {
     expect(res.json()).toEqual({ topicId: 'topic_1', jobId: 'job_1', mode: 'article_first' })
     expect((articleJobCreate.mock.calls[0][0] as { data: { userId: string } }).data.userId).toBe('user_A')
     expect(bossSend).toHaveBeenCalledWith('article-pipeline', { jobId: 'job_1' }, expect.objectContaining({ singletonKey: 'job_1' }))
+    await app.close()
+  })
+})
+
+describe('lifecycle generation gate (multi-tenancy Phase A)', () => {
+  it('returns 402 on topic creation when the account is cancelled', async () => {
+    accountIdForUserMock.mockResolvedValue('acct_1')
+    accountFindUnique.mockResolvedValue({ status: 'cancelled', paidThrough: null, billingExempt: false })
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/topics', payload: { topic: 'blocked topic' } })
+    expect(res.statusCode).toBe(402)
+    expect(topicCreate).not.toHaveBeenCalled()
     await app.close()
   })
 })

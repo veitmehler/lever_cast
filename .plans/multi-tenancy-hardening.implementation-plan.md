@@ -51,9 +51,19 @@ account-health validation (manual onboarding checklist covers the concierge batc
   encode account identity in a per-workflow URL token (receiver supports both; the review
   design already assumed URL tokens and works regardless).
 
-## Phase A — Account state machine + enforcement gates
+## Phase A — Account state machine + enforcement gates — ✅ IMPLEMENTED 2026-07-12
 
-No GHL dependency; admin can drive statuses manually until Phase B lands. Ship first.
+No GHL dependency; admin drives statuses manually until Phase B lands (admin Users page →
+Billing column: status select + paid-through date + comp checkbox; PATCH /admin/accounts/:id).
+As-built notes: gates live in `apps/api/src/lib/account-billing.ts`
+(`generationGateForUser` / `publishingGateForUser`); generation gate enforced at
+content-plan generate, topics create + CSV import, ai generate (admin-exempt like the cap),
+newsletter enqueue (inside the fn — covers the admin bulk route), and both social automation
+enqueues; publishing gate enforced in publish-scheduled (posts on lapsed accounts are parked,
+not failed — they auto-publish if paidThrough extends) and enqueueSocialDispatch (GHL
+scheduling is where publishing leaves our control). Migration `20260712100000_account_lifecycle`
+(status/statusChangedAt/paidThrough/billingExempt). 14 new tests (gate unit + route 402s +
+publish parking).
 
 **Schema (`packages/db/prisma/schema.prisma` — Account):**
 ```prisma

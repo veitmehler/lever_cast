@@ -2,6 +2,7 @@ import { prisma } from '@socioply/shared'
 import { KpiCard } from '@/components/admin/KpiCard'
 import { RoleToggle } from './RoleToggle'
 import { SubscriptionDateField } from './SubscriptionDateField'
+import { BillingControls } from './BillingControls'
 
 export default async function UsersPage() {
   const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -16,7 +17,7 @@ export default async function UsersPage() {
         role: true,
         createdAt: true,
         accountId: true,
-        account: { select: { subscriptionStartedAt: true } },
+        account: { select: { subscriptionStartedAt: true, status: true, paidThrough: true, billingExempt: true } },
         _count: { select: { articleJobs: true, posts: true } },
       },
     }),
@@ -54,6 +55,7 @@ export default async function UsersPage() {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">User</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Subscription start</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Billing</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Articles</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Posts</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Cost (30d)</th>
@@ -78,6 +80,18 @@ export default async function UsersPage() {
                     />
                   ) : (
                     <span className="text-xs text-muted-foreground">no account</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {user.accountId && user.account ? (
+                    <BillingControls
+                      accountId={user.accountId}
+                      status={user.account.status}
+                      paidThrough={user.account.paidThrough?.toISOString().slice(0, 10) ?? null}
+                      billingExempt={user.account.billingExempt}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right text-muted-foreground">

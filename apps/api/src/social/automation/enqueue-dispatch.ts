@@ -1,6 +1,7 @@
 import { prisma } from '@socioply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { SOCIAL_GENERATE_EXPIRE_SECONDS } from './enqueue'
+import { publishingGateForUser } from '../../lib/account-billing'
 
 export async function enqueueSocialDispatch(
   runId: string,
@@ -8,11 +9,19 @@ export async function enqueueSocialDispatch(
 ): Promise<{ enqueued: boolean; message?: string }> {
   const run = await prisma.socialAutomationRun.findUnique({
     where: { id: runId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, userId: true },
   })
   if (!run) {
     return { enqueued: false, message: 'Automation run not found' }
   }
+
+  // Lifecycle gate (multi-tenancy Phase A): dispatching schedules posts into
+  // GHL, where publishing leaves our control — gate on paidThrough here.
+  const gate = await publishingGateForUser(run.userId)
+  if (!gate.allowed) {
+    return { enqueued: false, message: gate.reason }
+  }
+
   if (run.status !== 'ready') {
     return {
       enqueued: false,

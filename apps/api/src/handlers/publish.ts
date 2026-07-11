@@ -2,6 +2,7 @@ import PgBoss from 'pg-boss'
 import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
 import { dispatchPublish } from '../social/dispatcher'
+import { publishingGateForUser } from '../lib/account-billing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,21 @@ export async function publishScheduledHandler(jobs: PgBoss.Job<PublishScheduledJ
     orderBy: { scheduledAt: 'asc' },
   })
 
-  const scheduledPosts = scheduledPostsRaw.sort((a, b) => {
+  // Lifecycle gate (multi-tenancy Phase A): paidThrough governs publishing.
+  // Posts on lapsed accounts are SKIPPED, not failed — they stay 'scheduled'
+  // and publish automatically if paidThrough later extends (reactivation).
+  const distinctUserIds = [...new Set(scheduledPostsRaw.map((p) => p.user.id))]
+  const publishableByUser = new Map<string, boolean>()
+  for (const uid of distinctUserIds) {
+    const gate = await publishingGateForUser(uid)
+    publishableByUser.set(uid, gate.allowed)
+    if (!gate.allowed) {
+      logger.info({ userId: uid }, '[publish-scheduled] account paid period lapsed — parking its due posts')
+    }
+  }
+  const publishablePosts = scheduledPostsRaw.filter((p) => publishableByUser.get(p.user.id) !== false)
+
+  const scheduledPosts = publishablePosts.sort((a, b) => {
     if (a.threadOrder === null && b.threadOrder === null) return 0
     if (a.threadOrder === null) return 1
     if (b.threadOrder === null) return -1

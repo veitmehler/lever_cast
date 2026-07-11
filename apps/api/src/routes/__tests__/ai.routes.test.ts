@@ -16,6 +16,8 @@ const socialConnFindMany = vi.fn()
 const apiKeyFindFirst = vi.fn()
 const platformSettingsFindUnique = vi.fn()
 const draftFindMany = vi.fn()
+const accountFindUnique = vi.fn()
+const accountIdForUserMock = vi.fn()
 vi.mock('@socioply/shared', () => ({
   prisma: {
     user: {
@@ -34,7 +36,9 @@ vi.mock('@socioply/shared', () => ({
     apiKey: { findFirst: (...a: unknown[]) => apiKeyFindFirst(...a) },
     platformSettings: { findUnique: (...a: unknown[]) => platformSettingsFindUnique(...a) },
     draft: { findMany: (...a: unknown[]) => draftFindMany(...a) },
+    account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) },
   },
+  accountIdForUser: (...a: unknown[]) => accountIdForUserMock(...a),
 }))
 
 const getSystemApiKey = vi.fn()
@@ -61,6 +65,9 @@ beforeEach(() => {
   // Extra-post cap defaults: platform default cap (3), no drafts in window.
   platformSettingsFindUnique.mockResolvedValue(null)
   draftFindMany.mockResolvedValue([])
+  // Lifecycle gate defaults: no account → generation allowed (legacy behavior).
+  accountIdForUserMock.mockResolvedValue(null)
+  accountFindUnique.mockResolvedValue(null)
 })
 
 describe('POST /generate', () => {
@@ -178,6 +185,27 @@ describe('weekly extra-post cap', () => {
     const body = res.json()
     expect(body).toMatchObject({ cap: 3, used: 1, remaining: 2, exempt: false })
     expect(new Date(body.resetsAt).getTime()).toBeGreaterThan(Date.now())
+    await app.close()
+  })
+})
+
+describe('lifecycle generation gate (multi-tenancy Phase A)', () => {
+  it('returns 402 when the account is paused', async () => {
+    accountIdForUserMock.mockResolvedValue('acct_1')
+    accountFindUnique.mockResolvedValue({ status: 'paused', paidThrough: null, billingExempt: false })
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(402)
+    expect(res.json().error).toContain('paused')
+    await app.close()
+  })
+
+  it('billingExempt account generates normally (degrades to provider 503)', async () => {
+    accountIdForUserMock.mockResolvedValue('acct_1')
+    accountFindUnique.mockResolvedValue({ status: 'cancelled', paidThrough: null, billingExempt: true })
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/generate', payload: { rawIdea: 'x', platform: 'linkedin' } })
+    expect(res.statusCode).toBe(503)
     await app.close()
   })
 })

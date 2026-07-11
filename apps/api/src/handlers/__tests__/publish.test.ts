@@ -19,6 +19,8 @@ const postFindUnique = vi.fn()
 const postUpdate = vi.fn()
 const draftUpdate = vi.fn()
 const settingsFindUnique = vi.fn()
+const accountFindUnique = vi.fn()
+const accountIdForUserMock = vi.fn()
 vi.mock('@socioply/shared', () => ({
   prisma: {
     post: {
@@ -30,7 +32,9 @@ vi.mock('@socioply/shared', () => ({
       update: (...a: unknown[]) => draftUpdate(...a),
     },
     settings: { findUnique: (...a: unknown[]) => settingsFindUnique(...a) },
+    account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) },
   },
+  accountIdForUser: (...a: unknown[]) => accountIdForUserMock(...a),
 }))
 
 import { publishHandler, publishScheduledHandler } from '../publish'
@@ -70,6 +74,9 @@ beforeEach(() => {
   dispatchPublish.mockResolvedValue(OK)
   postUpdate.mockResolvedValue({})
   draftUpdate.mockResolvedValue({})
+  // Lifecycle publishing gate defaults: user has no account → gate allows.
+  accountIdForUserMock.mockResolvedValue(null)
+  accountFindUnique.mockResolvedValue(null)
 })
 
 function job<T>(data: T): PgBoss.Job<T> {
@@ -267,5 +274,36 @@ describe('publishScheduledHandler — thread reply ordering', () => {
 
     const opts = dispatchPublish.mock.calls[0][3] as { chatId?: string }
     expect(opts.chatId).toBe('@mychan')
+  })
+})
+
+describe('publishScheduledHandler — lifecycle publishing gate', () => {
+  it('parks due posts when the account paid period has lapsed (skip, not fail)', async () => {
+    accountIdForUserMock.mockResolvedValue('acct_1')
+    accountFindUnique.mockResolvedValue({
+      status: 'cancelled',
+      paidThrough: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      billingExempt: false,
+    })
+    postFindMany.mockResolvedValueOnce([makePost()])
+    await publishScheduledHandler([job({})])
+    expect(dispatchPublish).not.toHaveBeenCalled()
+    // Post must remain scheduled: no status update to published OR failed.
+    const statusUpdates = postUpdate.mock.calls.filter(
+      (c) => (c[0] as { data?: { status?: string } })?.data?.status,
+    )
+    expect(statusUpdates).toHaveLength(0)
+  })
+
+  it('publishes normally while paidThrough is still in the future on a cancelled account', async () => {
+    accountIdForUserMock.mockResolvedValue('acct_1')
+    accountFindUnique.mockResolvedValue({
+      status: 'cancelled',
+      paidThrough: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      billingExempt: false,
+    })
+    postFindMany.mockResolvedValueOnce([makePost()]).mockResolvedValue([])
+    await publishScheduledHandler([job({})])
+    expect(dispatchPublish).toHaveBeenCalledTimes(1)
   })
 })

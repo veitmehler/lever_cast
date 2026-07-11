@@ -28,10 +28,16 @@ model Account {
   articleCalendarId String?
   articleCalendar   ArticleCalendar? @relation(fields: [articleCalendarId], references: [id], onDelete: SetNull)
   // Billing-cycle anchor (see .plans/content-plan-billing-window.implementation-plan.md).
-  // Set once, on first payment, never touched again — the current cycle boundary is always
-  // derived from this via billing-window.ts. Nullable: unset accounts keep the legacy
-  // rolling-30-day-from-today Content Plan behavior.
+  // Re-anchored on EVERY payment_cleared event (multi-tenancy plan Phase B) — a
+  // reactivation after a gap is just a payment. Nullable: unset accounts keep the
+  // legacy rolling-30-day-from-today Content Plan behavior.
   subscriptionStartedAt DateTime?
+  // Lifecycle state machine (.plans/multi-tenancy-hardening.implementation-plan.md Phase A).
+  // Invariant: paidThrough governs publishing; status governs generation.
+  status          String    @default("active") // active | paused | cancelled
+  statusChangedAt DateTime? // drives the 60d pause→cancel and 90d cancel→delete clocks
+  paidThrough     DateTime? // null = legacy/unbilled account, publishing unrestricted
+  billingExempt   Boolean   @default(false) // comp accounts: bypass both gates
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

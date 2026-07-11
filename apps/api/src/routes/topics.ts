@@ -123,6 +123,8 @@ export async function topicRoutes(app: FastifyInstance) {
     await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id }, {
       expireInSeconds: 3600,
       singletonKey: job.id,
+      retryLimit: 2,
+      retryDelay: 120,
     })
 
     logger.info({ topicId: topicRow.id, jobId: job.id, mode }, '[topics] article job enqueued')
@@ -216,6 +218,8 @@ export async function topicRoutes(app: FastifyInstance) {
         await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id }, {
           expireInSeconds: 3600,
           singletonKey: job.id,
+          retryLimit: 2,
+          retryDelay: 120,
         })
         results.push({ row: i + 1, topicId: topicRow.id, jobId: job.id, mode })
       } catch (err) {

@@ -78,6 +78,16 @@ export async function runPipelinePhaseA(jobId: string): Promise<void> {
     return
   }
 
+  // pg-boss retry support (throughput plan 1f): clear failed step rows so the
+  // resume logic re-runs only what actually failed — completed steps stay.
+  // Mirrors the manual salvage procedure used during the 2026-07-11 prod E2E.
+  const clearedFailed = await prisma.pipelineStep.deleteMany({
+    where: { jobId, status: 'failed' },
+  })
+  if (clearedFailed.count > 0) {
+    logger.info({ jobId, clearedFailed: clearedFailed.count }, '[executor] cleared failed steps for retry resume')
+  }
+
   // Pre-flight: ensure the topic has an outline framework assigned.
   // Runs here (in the worker) instead of in POST /api/topics so the HTTP
   // response is fast and not subject to Vercel's serverless function timeout.

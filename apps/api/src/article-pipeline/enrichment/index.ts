@@ -46,7 +46,12 @@ import { generateKeyTakeaways } from './key-takeaways-generator'
 import { generateDiagramCaption } from './diagram-caption-generator'
 import { selectWordPressCategory } from './wp-category-selector'
 import { selectWordPressTags } from './wp-tag-selector'
-import { closeDiagramRasterBrowser, getDiagramRasterBrowser } from './diagram-browser-pool'
+import { getDiagramRasterBrowser } from './diagram-browser-pool'
+import { mapWithConcurrency } from '../../lib/concurrency'
+
+/** Parallelism for the heavy diagram tail (render/caption/restyle/uploads).
+ * Bounded further downstream by the mmdc + Chromium-page semaphores. */
+const DIAGRAM_TAIL_CONCURRENCY = 3
 import { buildRestylePrompt, restyleDiagram } from './diagram-restyle'
 import { overlayLogo } from './diagram-logo'
 import { processLogo } from '../../newsletter/logo-process'
@@ -441,65 +446,138 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
   // Rolling window of concept labels from the last 2 successful diagrams.
   const priorConceptWindows: string[] = []
 
-  try {
-    await getDiagramRasterBrowser()
+  // Phase-1 parallelization (.plans/production-throughput.implementation-plan.md 1a):
+  // type selection + Mermaid GENERATION stay SERIAL — the type-diversity chain
+  // (usedDiagramTypes) and the prior-concepts window both depend on order. The
+  // heavy tail (render → caption → restyle → uploads, ~70% of the time) runs in
+  // parallel below, bounded by mmdc/Chromium semaphores + the provider limiter.
+  type PreparedDiagram = {
+    section: (typeof sections)[number]
+    diagramType: string
+    gen: Awaited<ReturnType<typeof generateMermaidDiagram>>
+    priorConceptsContext: string | undefined
+  }
+  const prepared: PreparedDiagram[] = []
 
-    for (const section of sections) {
-      logger.info(
-        { jobId, position: section.position, heading: section.heading.slice(0, 60) },
-        '[enrichment] processing section (mermaid)',
-      )
+  await getDiagramRasterBrowser()
 
-      try {
-        let typePick = await selectDiagramType({
+  for (const section of sections) {
+    logger.info(
+      { jobId, position: section.position, heading: section.heading.slice(0, 60) },
+      '[enrichment] processing section (mermaid)',
+    )
+
+    try {
+      let typePick = await selectDiagramType({
+        sectionTitle: section.heading,
+        contentSnippet: stripTags(section.sectionHtml),
+        alreadyUsed: [...usedDiagramTypes],
+        jobId,
+        position: section.position,
+      })
+      totalCost += typePick.cost
+      totalInputTokens += typePick.inputTokens
+      totalOutputTokens += typePick.outputTokens
+
+      // Code-enforced diversity: if the LLM picked the same type as the last
+      // used one, re-query once with a hard exclusion so back-to-back dupes
+      // are broken without relying on prompt-only soft hints.
+      const lastUsed = usedDiagramTypes.at(-1)
+      if (typePick.diagramType !== null && typePick.diagramType === lastUsed) {
+        logger.info(
+          { jobId, position: section.position, type: typePick.diagramType },
+          '[enrichment] type same as previous — re-querying with exclusion',
+        )
+        const retry = await selectDiagramType({
           sectionTitle: section.heading,
           contentSnippet: stripTags(section.sectionHtml),
           alreadyUsed: [...usedDiagramTypes],
+          excludeType: typePick.diagramType,
           jobId,
           position: section.position,
         })
-        totalCost += typePick.cost
-        totalInputTokens += typePick.inputTokens
-        totalOutputTokens += typePick.outputTokens
+        totalCost += retry.cost
+        totalInputTokens += retry.inputTokens
+        totalOutputTokens += retry.outputTokens
+        // Use the retry result if it yielded a different (non-null) type; otherwise
+        // keep the original so the section still gets a diagram.
+        if (retry.diagramType !== null) typePick = retry
+      }
 
-        // Code-enforced diversity: if the LLM picked the same type as the last
-        // used one, re-query once with a hard exclusion so back-to-back dupes
-        // are broken without relying on prompt-only soft hints.
-        const lastUsed = usedDiagramTypes.at(-1)
-        if (typePick.diagramType !== null && typePick.diagramType === lastUsed) {
-          logger.info(
-            { jobId, position: section.position, type: typePick.diagramType },
-            '[enrichment] type same as previous — re-querying with exclusion',
-          )
-          const retry = await selectDiagramType({
-            sectionTitle: section.heading,
-            contentSnippet: stripTags(section.sectionHtml),
-            alreadyUsed: [...usedDiagramTypes],
-            excludeType: typePick.diagramType,
-            jobId,
-            position: section.position,
-          })
-          totalCost += retry.cost
-          totalInputTokens += retry.inputTokens
-          totalOutputTokens += retry.outputTokens
-          // Use the retry result if it yielded a different (non-null) type; otherwise
-          // keep the original so the section still gets a diagram.
-          if (retry.diagramType !== null) typePick = retry
-        }
+      if (typePick.diagramType === null) {
+        logger.info({ jobId, position: section.position }, '[enrichment] section skipped by diagram-type selector')
+        continue
+      }
 
-        if (typePick.diagramType === null) {
-          logger.info({ jobId, position: section.position }, '[enrichment] section skipped by diagram-type selector')
-          continue
-        }
+      const diagramType = typePick.diagramType
 
-        const diagramType = typePick.diagramType
+      // Build prior-concepts hint: concat labels from the last 2 diagrams.
+      const priorConceptsContext = priorConceptWindows.length > 0
+        ? priorConceptWindows.join(', ')
+        : undefined
 
-        // Build prior-concepts hint: concat labels from the last 2 diagrams.
-        const priorConceptsContext = priorConceptWindows.length > 0
-          ? priorConceptWindows.join(', ')
-          : undefined
+      const gen1 = await generateMermaidDiagram({
+        sectionTitle: section.heading,
+        sectionHtml: section.sectionHtml,
+        articleTopic: topic.topic,
+        primaryKeyword,
+        diagramType,
+        priorConceptsContext,
+        jobId,
+        position: section.position,
+      })
 
-        const gen1 = await generateMermaidDiagram({
+      totalCost += gen1.cost
+      totalInputTokens += gen1.inputTokens
+      totalOutputTokens += gen1.outputTokens
+
+      if (gen1.mermaidSyntax === null) {
+        logger.info({ jobId, position: section.position }, '[enrichment] section skipped by LLM')
+        continue
+      }
+
+      // Chains advance at generation time (slightly stricter than the old
+      // after-save point: a diagram that later fails render still "used" its
+      // type/concepts — acceptable, diversity only gets stronger).
+      usedDiagramTypes.push(diagramType)
+      priorConceptWindows.push(extractMermaidConcepts(gen1.mermaidSyntax))
+      if (priorConceptWindows.length > 2) priorConceptWindows.shift()
+
+      prepared.push({ section, diagramType, gen: gen1, priorConceptsContext })
+    } catch (sectionErr) {
+      const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)
+      logger.error({ jobId, position: section.position, err: sectionErr }, '[enrichment] section error')
+      Sentry.captureException(sectionErr, {
+        tags: { phase: 'enrichment', jobId },
+        extra: { position: section.position, heading: section.heading },
+      })
+      await prisma.errorLog.create({
+        data: {
+          jobId,
+          userId: job.userId,
+          errorType: 'enrichment_section_error',
+          errorMessage: `Section "${section.heading}": ${errMsg}`,
+          context: { position: section.position },
+        },
+      })
+      failCount++
+    }
+  }
+
+  // Heavy tail, parallel. Failures are caught PER TASK (mapWithConcurrency then
+  // never rejects); shared accumulators are safe — JS increments are synchronous.
+  await mapWithConcurrency(prepared, DIAGRAM_TAIL_CONCURRENCY, async (task) => {
+    const { section, diagramType, priorConceptsContext } = task
+    let gen = task.gen
+    try {
+      let svgContent: string
+      try {
+        svgContent = await renderMermaidToSvg(gen.mermaidSyntax!, diagramInitDirective)
+      } catch (renderErr) {
+        const errMsg = renderErr instanceof Error ? renderErr.message : String(renderErr)
+        logger.warn({ jobId, position: section.position, errMsg }, '[enrichment] render failed — retrying')
+
+        const gen2 = await generateMermaidDiagram({
           sectionTitle: section.heading,
           sectionHtml: section.sectionHtml,
           articleTopic: topic.topic,
@@ -508,144 +586,84 @@ export async function runArticleEnrichment(jobId: string): Promise<void> {
           priorConceptsContext,
           jobId,
           position: section.position,
+          retryContext: errMsg,
         })
 
-        totalCost += gen1.cost
-        totalInputTokens += gen1.inputTokens
-        totalOutputTokens += gen1.outputTokens
+        totalCost += gen2.cost
+        totalInputTokens += gen2.inputTokens
+        totalOutputTokens += gen2.outputTokens
 
-        if (gen1.mermaidSyntax === null) {
-          logger.info({ jobId, position: section.position }, '[enrichment] section skipped by LLM')
-          continue
-        }
+        if (gen2.mermaidSyntax === null) return
 
-        let svgContent: string
         try {
-          svgContent = await renderMermaidToSvg(gen1.mermaidSyntax, diagramInitDirective)
-        } catch (renderErr) {
-          const errMsg = renderErr instanceof Error ? renderErr.message : String(renderErr)
-          logger.warn({ jobId, position: section.position, errMsg }, '[enrichment] render failed — retrying')
-
-          const gen2 = await generateMermaidDiagram({
-            sectionTitle: section.heading,
-            sectionHtml: section.sectionHtml,
-            articleTopic: topic.topic,
-            primaryKeyword,
-            diagramType,
-            priorConceptsContext,
-            jobId,
-            position: section.position,
-            retryContext: errMsg,
+          svgContent = await renderMermaidToSvg(gen2.mermaidSyntax, diagramInitDirective)
+        } catch (retryRenderErr) {
+          const retryMsg =
+            retryRenderErr instanceof Error ? retryRenderErr.message : String(retryRenderErr)
+          logger.warn({ jobId, position: section.position, retryMsg }, '[enrichment] render failed after retry')
+          await prisma.errorLog.create({
+            data: {
+              jobId,
+              userId: job.userId,
+              errorType: 'enrichment_render_failed',
+              errorMessage: `Section "${section.heading}": mmdc render failed after retry: ${retryMsg}`,
+              context: { position: section.position },
+            },
           })
-
-          totalCost += gen2.cost
-          totalInputTokens += gen2.inputTokens
-          totalOutputTokens += gen2.outputTokens
-
-          if (gen2.mermaidSyntax === null) {
-            continue
-          }
-
-          try {
-            svgContent = await renderMermaidToSvg(gen2.mermaidSyntax, diagramInitDirective)
-          } catch (retryRenderErr) {
-            const retryMsg =
-              retryRenderErr instanceof Error ? retryRenderErr.message : String(retryRenderErr)
-            logger.warn({ jobId, position: section.position, retryMsg }, '[enrichment] render failed after retry')
-            await prisma.errorLog.create({
-              data: {
-                jobId,
-                userId: job.userId,
-                errorType: 'enrichment_render_failed',
-                errorMessage: `Section "${section.heading}": mmdc render failed after retry: ${retryMsg}`,
-                context: { position: section.position },
-              },
-            })
-            failCount++
-            continue
-          }
-
-          const captionResult2 = await generateDiagramCaption({
-            articleTopic: topic.topic,
-            sectionTitle: section.heading,
-            diagramType,
-            mermaidSyntax: gen2.mermaidSyntax,
-            jobId,
-            position: section.position,
-          })
-          totalCost += captionResult2.cost
-          totalInputTokens += captionResult2.inputTokens
-          totalOutputTokens += captionResult2.outputTokens
-          await saveDiagramAndInsert({
-            jobId,
-            sitePage: { id: sitePage.id, userId: job.userId },
-            section,
-            mermaidSyntax: gen2.mermaidSyntax,
-            svgContent,
-            gen: gen2,
-            figuresToInsert,
-            darkDiagramInitDirective,
-            altText: captionResult2.altText,
-            caption: captionResult2.caption,
-            restyle: restyleCfg,
-          })
-          usedDiagramTypes.push(diagramType)
-          priorConceptWindows.push(extractMermaidConcepts(gen2.mermaidSyntax))
-          if (priorConceptWindows.length > 2) priorConceptWindows.shift()
-          successCount++
-          continue
+          failCount++
+          return
         }
-
-        const captionResult1 = await generateDiagramCaption({
-          articleTopic: topic.topic,
-          sectionTitle: section.heading,
-          diagramType,
-          mermaidSyntax: gen1.mermaidSyntax,
-          jobId,
-          position: section.position,
-        })
-        totalCost += captionResult1.cost
-        totalInputTokens += captionResult1.inputTokens
-        totalOutputTokens += captionResult1.outputTokens
-        await saveDiagramAndInsert({
-          jobId,
-          sitePage: { id: sitePage.id, userId: job.userId },
-          section,
-          mermaidSyntax: gen1.mermaidSyntax,
-          svgContent,
-          gen: gen1,
-          figuresToInsert,
-          darkDiagramInitDirective,
-          altText: captionResult1.altText,
-          caption: captionResult1.caption,
-          restyle: restyleCfg,
-        })
-        usedDiagramTypes.push(diagramType)
-        priorConceptWindows.push(extractMermaidConcepts(gen1.mermaidSyntax))
-        if (priorConceptWindows.length > 2) priorConceptWindows.shift()
-        successCount++
-      } catch (sectionErr) {
-        const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)
-        logger.error({ jobId, position: section.position, err: sectionErr }, '[enrichment] section error')
-        Sentry.captureException(sectionErr, {
-          tags: { phase: 'enrichment', jobId },
-          extra: { position: section.position, heading: section.heading },
-        })
-        await prisma.errorLog.create({
-          data: {
-            jobId,
-            userId: job.userId,
-            errorType: 'enrichment_section_error',
-            errorMessage: `Section "${section.heading}": ${errMsg}`,
-            context: { position: section.position },
-          },
-        })
-        failCount++
+        gen = gen2
       }
+
+      const captionResult = await generateDiagramCaption({
+        articleTopic: topic.topic,
+        sectionTitle: section.heading,
+        diagramType,
+        mermaidSyntax: gen.mermaidSyntax!,
+        jobId,
+        position: section.position,
+      })
+      totalCost += captionResult.cost
+      totalInputTokens += captionResult.inputTokens
+      totalOutputTokens += captionResult.outputTokens
+
+      await saveDiagramAndInsert({
+        jobId,
+        sitePage: { id: sitePage.id, userId: job.userId },
+        section,
+        mermaidSyntax: gen.mermaidSyntax!,
+        svgContent,
+        gen,
+        figuresToInsert,
+        darkDiagramInitDirective,
+        altText: captionResult.altText,
+        caption: captionResult.caption,
+        restyle: restyleCfg,
+      })
+      successCount++
+    } catch (sectionErr) {
+      const errMsg = sectionErr instanceof Error ? sectionErr.message : String(sectionErr)
+      logger.error({ jobId, position: section.position, err: sectionErr }, '[enrichment] section error')
+      Sentry.captureException(sectionErr, {
+        tags: { phase: 'enrichment', jobId },
+        extra: { position: section.position, heading: section.heading },
+      })
+      await prisma.errorLog.create({
+        data: {
+          jobId,
+          userId: job.userId,
+          errorType: 'enrichment_section_error',
+          errorMessage: `Section "${section.heading}": ${errMsg}`,
+          context: { position: section.position },
+        },
+      })
+      failCount++
     }
-  } finally {
-    await closeDiagramRasterBrowser()
-  }
+  })
+  // NOTE: the pooled browser is intentionally NOT closed here anymore — it is
+  // shared across concurrent jobs (newsletter covers/overlays) under Phase 1,
+  // and getDiagramRasterBrowser() relaunches lazily if it ever dies.
 
   if (successCount === 0 && sections.length > 0 && failCount === sections.length) {
     await prisma.sitePage.update({

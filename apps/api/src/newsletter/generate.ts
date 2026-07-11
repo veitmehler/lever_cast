@@ -19,6 +19,7 @@ import { runNewsletterPrompt, runNewsletterWriterJson, runNewsletterJsonPrompt }
 import { generateArticle, type VoiceVars, type UsageRecorder, type NewsletterArticle } from './article'
 import { loadPlainLanguageConfig, formatExemplars } from '../article-pipeline/enrichment/plain-language'
 import { sanitizeDashesText } from '../lib/text/dash-sanitizer'
+import { mapWithConcurrency } from '../lib/concurrency'
 import type { TopicResearch, TeaserSource } from './research'
 import { renderNewsletterHtml, buildRenderInput, type RenderBrand, type RenderVideo } from './render'
 import { generateCoverImage, type CoverItem, type CoverColors } from './cover'
@@ -88,8 +89,10 @@ async function voiceTeasers(
     logger.warn({ err }, '[newsletter/generate] plain-language config load failed — teasers proceed without exemplars')
   }
 
-  for (let i = 0; i < sources.length; i++) {
-    const s = sources[i]
+  // The 3 teasers are independent — voiced in parallel; hookType stays
+  // index-based so the scene→metaphor→question rotation is deterministic, and
+  // results keep source order (mapWithConcurrency preserves index order).
+  const voiced = await mapWithConcurrency(sources, 3, async (s, i) => {
     const hookType = TEASER_HOOK_TYPES[i % TEASER_HOOK_TYPES.length]
     try {
       const vars = {
@@ -137,17 +140,20 @@ async function voiceTeasers(
         }
       }
 
-      out.push({
+      return {
         headline: s.headline,
         title: (await sanitizeDashesText(data.title ?? s.bullet, { surface: 'nl_teaser_title' })).trim(),
         body: await sanitizeDashesText(data.body ?? '', { surface: 'nl_teaser_body' }),
         cta: await sanitizeDashesText(data.cta ?? '', { surface: 'nl_teaser_cta' }),
         link: s.url,
-      })
+      } satisfies Teaser
     } catch (err) {
       logger.warn({ bullet: s.bullet, err }, '[newsletter/generate] teaser voicing failed')
+      return null
     }
-  }
+  })
+
+  for (const t of voiced) if (t) out.push(t)
   return out
 }
 
@@ -602,41 +608,31 @@ export async function generateNewsletterForCustomer(userId: string, topicId: str
   const ctx = await loadGenContext(row.id)
   const { topic, voice, research, usage, bullets, topicVars } = ctx
 
-  // Feature article — required (a throw aborts the edition).
-  const featureArticle = await generateArticle(
-    topic.topic,
-    bullets,
-    voice,
-    `${topic.id}/${userId}-feature`,
-    usage,
-  )
+  // Feature + secondary articles run in PARALLEL — fully independent (distinct
+  // imageKeys; plain-language imagery dedup is per-article). Feature stays
+  // required (its rejection aborts the edition); secondary stays optional.
+  // See .plans/production-throughput.implementation-plan.md Phase 1b.
+  const [featureArticle, secondaryArticle] = await Promise.all([
+    generateArticle(topic.topic, bullets, voice, `${topic.id}/${userId}-feature`, usage),
+    topic.secondaryTopic
+      ? generateArticle(topic.secondaryTopic, bullets, voice, `${topic.id}/${userId}-secondary`, usage).catch(
+          (err) => {
+            logger.warn({ topicId, err }, '[newsletter/generate] secondary article failed')
+            return null
+          },
+        )
+      : Promise.resolve(null),
+  ])
 
-  // Secondary article — optional.
-  let secondaryArticle = null
-  if (topic.secondaryTopic) {
-    try {
-      secondaryArticle = await generateArticle(
-        topic.secondaryTopic,
-        bullets,
-        voice,
-        `${topic.id}/${userId}-secondary`,
-        usage,
-      )
-    } catch (err) {
-      logger.warn({ topicId, err }, '[newsletter/generate] secondary article failed')
-    }
-  }
-
-  // Teasers, quick-hits, fun, modules, metadata (all fault-tolerant).
-  let teasers: Teaser[] | null = null
-  try {
-    teasers = await voiceTeasers(research.teaserSources ?? [], voice, usage)
-  } catch (err) {
-    logger.warn({ topicId, err }, '[newsletter/generate] teasers failed')
-  }
-
-  const quickHits = await generateQuickHits(topicVars, voice, usage)
-  const fun = await generateFun(topicVars, voice, usage)
+  // Teasers, quick-hits, fun (all fault-tolerant) — also independent of each other.
+  const [teasers, quickHits, fun] = await Promise.all([
+    voiceTeasers(research.teaserSources ?? [], voice, usage).catch((err): Teaser[] | null => {
+      logger.warn({ topicId, err }, '[newsletter/generate] teasers failed')
+      return null
+    }),
+    generateQuickHits(topicVars, voice, usage),
+    generateFun(topicVars, voice, usage),
+  ])
   const modules = buildModules(research)
 
   let subjectLine: string | null = null

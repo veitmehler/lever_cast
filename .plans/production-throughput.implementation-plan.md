@@ -1,6 +1,13 @@
 # Production Throughput & Multi-Tenancy Hardening — Implementation Plan
 
-Status: **planned** (2026-07-11). Awaiting go-ahead to implement.
+Status: **Phase 1 implemented** (2026-07-11). 1a–1f all shipped: concurrency util + per-provider
+limiter in `instrumentCall`, diagram tail parallelism (serial type/mermaid head preserves the
+diversity chains; global Chromium page semaphore max 4 + mmdc semaphore max 2; pooled browser no
+longer closed per-run since it's cross-job shared now), newsletter feature∥secondary + teasers∥ +
+quickHits∥fun, carousel slides at concurrency 3, direct-Gemini image routing for `gemini*` models
+in carousel backgrounds + featured images (fal fallback, black-frame check, per-image LLMUsage
+logging), article retryLimit 2 with failed-step reset at claim. Phases 2 (post cap) and 3/3b
+(drift guard + remediation) still pending.
 
 ## Goal
 

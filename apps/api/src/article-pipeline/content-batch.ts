@@ -131,7 +131,13 @@ async function startItem(item: Item, ownerUserId: string): Promise<void> {
     const job = await prisma.articleJob.create({
       data: { topicId: item.topicId, userId: topic.userId, status: 'pending' },
     })
-    await boss.send(QUEUES.ARTICLE_PIPELINE, { jobId: job.id }, { expireInSeconds: 3600, singletonKey: job.id })
+    // retryLimit 2 = parity with newsletters; cheap because the executor resumes
+    // from completed steps (only failed steps re-run). See throughput plan 1f.
+    await boss.send(
+      QUEUES.ARTICLE_PIPELINE,
+      { jobId: job.id },
+      { expireInSeconds: 3600, singletonKey: job.id, retryLimit: 2, retryDelay: 120 },
+    )
     await prisma.contentBatchItem.update({
       where: { id: item.id },
       data: { status: 'generating', articleJobId: job.id },

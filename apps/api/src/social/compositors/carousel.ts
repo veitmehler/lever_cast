@@ -10,6 +10,10 @@ import type { TintScheme } from './brand-tint'
 import { centeredTextLines, escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
 import { withTimeout } from '../../lib/net/with-timeout'
 import { withRetry } from '../../lib/net/retry'
+import { generateWithGeminiImage, prisma } from '@socioply/shared'
+
+/** Per-image cost for Gemini image models (~1290 output tokens), mirrored from diagram-restyle. */
+const GEMINI_IMAGE_COST_USD = 0.039
 import { instrumentCall } from '../../lib/net/instrument'
 
 /** Bound Fal image calls so a hang can't wedge a run (see with-timeout.ts). */
@@ -523,14 +527,56 @@ export async function generateCarouselBackground(
   imagePrompt: string,
   jobId: string,
   model: string = 'fal-ai/flux/schnell',
+  userId?: string,
 ): Promise<Buffer> {
+  // An empty prompt makes image models emit a black frame — always send something.
+  const promptText = (imagePrompt || '').trim().slice(0, 2000) || FALLBACK_BG_PROMPT
+
+  // Direct Google path for Gemini image models (nano-banana class) — no fal
+  // middleman: better rate limits/concurrency, at-worst price parity. Falls
+  // back to the fal default model on any failure or near-black result.
+  // See .plans/production-throughput.implementation-plan.md Phase 1e.
+  if (model.startsWith('gemini')) {
+    const geminiKey = await getSystemApiKey('gemini')
+    if (geminiKey) {
+      try {
+        const buf = await instrumentCall({ provider: 'gemini', op: `image:${model}` }, () =>
+          withRetry(
+            () =>
+              withTimeout(
+                () => generateWithGeminiImage(geminiKey, promptText, model, '1:1'),
+                FAL_IMAGE_TIMEOUT_MS,
+                `gemini-image:${model}`,
+              ),
+            { attempts: 2, onRetry: (err) => logger.warn({ jobId, model, err }, '[carousel] gemini image retrying') },
+          ),
+        )
+        if (!(await isNearlyBlack(buf))) {
+          if (userId) {
+            await prisma.lLMUsage
+              .create({
+                data: { userId, source: 'social_carousel_bg', provider: 'gemini', model, inputTokens: 0, outputTokens: 0, cost: GEMINI_IMAGE_COST_USD },
+              })
+              .catch(() => {})
+          }
+          return buf
+        }
+        logger.warn({ jobId, model }, '[carousel] gemini returned a near-black image — falling back to fal')
+      } catch (err) {
+        logger.warn({ jobId, model, err }, '[carousel] gemini image failed — falling back to fal')
+      }
+    } else {
+      logger.warn({ jobId }, '[carousel] no gemini system key — falling back to fal')
+    }
+    model = 'fal-ai/flux/schnell'
+  }
+
   const apiKey = await getSystemApiKey('fal-ai')
   if (!apiKey) throw new Error('No Fal.ai system API key configured')
 
   fal.config({ credentials: apiKey })
 
-  // An empty prompt makes flux emit a black frame — always send something.
-  const prompt = (imagePrompt || '').trim().slice(0, 2000) || FALLBACK_BG_PROMPT
+  const prompt = promptText
 
   const result = await instrumentCall({ provider: 'fal-ai', op: `image:${model}` }, () =>
     withRetry(

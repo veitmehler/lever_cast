@@ -15,6 +15,10 @@ import {
 import { planCarouselSlides } from './generators/carousel-plan'
 import { renderPitchStory, type PitchStoryType } from './compositors/pitch-story'
 import { maxSlidesForPlatforms } from './platform-limits'
+import { mapWithConcurrency } from '../lib/concurrency'
+
+/** Parallel slide chains per carousel (bounded upstream by the fal/gemini provider limiter). */
+const SLIDE_CONCURRENCY = 3
 
 export type QuoteCardVariant = 'feed' | 'story'
 
@@ -166,9 +170,6 @@ export async function generateCarouselAssets(opts: {
     specialInstructions: brand.videoSpecialInstructions || undefined,
   })
 
-  const slides: GeneratedCarousel['slides'] = []
-  const backgroundImageUrls: string[] = []
-
   // When using the diagram, register it once and reuse the URL for every slide
   // (S4/S6 read backgroundImageUrls for their pitch slides).
   let diagramBgUrl: string | null = null
@@ -185,11 +186,13 @@ export async function generateCarouselAssets(opts: {
     diagramBgUrl = reg.url
   }
 
-  for (let i = 0; i < slidePlans.length; i++) {
-    const plan = slidePlans[i]
+  // Slides run in PARALLEL (concurrency 3) — each slide's chain (background gen
+  // → register → composite → register) is independent; results keep index order
+  // via mapWithConcurrency. See .plans/production-throughput.implementation-plan.md 1c.
+  const slideResults = await mapWithConcurrency(slidePlans, SLIDE_CONCURRENCY, async (plan, i) => {
     const bg = useDiagram
       ? opts.diagramBackground!
-      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId, opts.imageModel)
+      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId, opts.imageModel, opts.userId)
 
     // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
     let bgUrl: string
@@ -207,7 +210,6 @@ export async function generateCarouselAssets(opts: {
       })
       bgUrl = bgRegistered.url
     }
-    backgroundImageUrls.push(bgUrl)
 
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,
@@ -232,12 +234,18 @@ export async function generateCarouselAssets(opts: {
       jobId,
     })
 
-    slides.push({
-      imageUrl: registered.url,
-      mediaId: registered.mediaId,
-      headline: plan.headlineText ?? plan.bodyText?.split('\n')[0] ?? `Slide ${i + 1}`,
-    })
-  }
+    return {
+      bgUrl,
+      slide: {
+        imageUrl: registered.url,
+        mediaId: registered.mediaId,
+        headline: plan.headlineText ?? plan.bodyText?.split('\n')[0] ?? `Slide ${i + 1}`,
+      },
+    }
+  })
+
+  const slides: GeneratedCarousel['slides'] = slideResults.map((r) => r.slide)
+  const backgroundImageUrls: string[] = slideResults.map((r) => r.bgUrl)
 
   // Insert the "Let's explain the diagram >>>" slide right after the hook (slide 1).
   if (useDiagram && slides.length >= 1) {

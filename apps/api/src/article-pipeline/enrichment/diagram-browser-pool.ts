@@ -1,9 +1,14 @@
 /**
  * Singleton Chromium browser for diagram PNG rasterization (Puppeteer).
  * Re-used across sections in one enrichment run to avoid startup cost.
+ *
+ * Page usage is gated by a GLOBAL semaphore (max concurrent pages across ALL
+ * jobs on this worker) so the Phase-1 parallelization can't stack unbounded
+ * Chromium pages — see .plans/production-throughput.implementation-plan.md 1a.
  */
 
-import puppeteer, { type Browser } from 'puppeteer-core'
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
+import { Semaphore } from '../../lib/concurrency'
 
 function chromiumPath(): string {
   return (
@@ -12,6 +17,11 @@ function chromiumPath(): string {
     '/usr/bin/chromium-browser'
   )
 }
+
+const MAX_CONCURRENT_PAGES = Number(process.env.CHROMIUM_MAX_PAGES) > 0
+  ? Number(process.env.CHROMIUM_MAX_PAGES)
+  : 4
+const pageSemaphore = new Semaphore(MAX_CONCURRENT_PAGES)
 
 let pooled: Browser | null = null
 
@@ -24,6 +34,23 @@ export async function getDiagramRasterBrowser(): Promise<Browser> {
     })
   }
   return pooled
+}
+
+/**
+ * Run `fn` with a fresh page under the global page cap. Always closes the page
+ * and releases the permit, even on throw. All raster/overlay/cover work must go
+ * through this rather than calling browser.newPage() directly.
+ */
+export async function withRasterPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
+  return pageSemaphore.run(async () => {
+    const browser = await getDiagramRasterBrowser()
+    const page = await browser.newPage()
+    try {
+      return await fn(page)
+    } finally {
+      await page.close().catch(() => {})
+    }
+  })
 }
 
 export async function closeDiagramRasterBrowser(): Promise<void> {

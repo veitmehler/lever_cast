@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import { getDiagramRasterBrowser } from './diagram-browser-pool'
+import { withRasterPage } from './diagram-browser-pool'
 
 export interface RasterizeResult {
   png: Buffer
@@ -23,12 +23,9 @@ export async function rasterizeSvg(
   targetWidth = 1200,
   background = '#ffffff',
 ): Promise<RasterizeResult> {
-  const browser = await getDiagramRasterBrowser()
-  const page = await browser.newPage()
-
   const scale = 2
 
-  try {
+  return withRasterPage(async (page) => {
     const dims = extractSvgDimensions(svg, targetWidth)
 
     await page.setViewport({
@@ -61,9 +58,7 @@ export async function rasterizeSvg(
     } finally {
       await unlink(tmpFile).catch(() => {})
     }
-  } finally {
-    await page.close()
-  }
+  })
 }
 
 function buildHtmlWrapper(svg: string, width: number, height: number, background: string): string {

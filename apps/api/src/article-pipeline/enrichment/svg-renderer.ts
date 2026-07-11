@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process'
 import { writeFile, readFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Semaphore } from '../../lib/concurrency'
 import { randomUUID } from 'node:crypto'
 
 const MMDC_TIMEOUT_MS = 30_000
@@ -64,7 +65,16 @@ export async function renderMermaidToSvg(
   }
 }
 
+// Each mmdc invocation launches its OWN full Chromium (~300-500MB). Under the
+// Phase-1 parallel diagram tail this must stay bounded — max 2 concurrent
+// renders (they're short-lived, a few seconds each).
+const mmdcSemaphore = new Semaphore(Number(process.env.MMDC_MAX_CONCURRENT) > 0 ? Number(process.env.MMDC_MAX_CONCURRENT) : 2)
+
 function runMmdc(inFile: string, outFile: string, background: string): Promise<void> {
+  return mmdcSemaphore.run(() => runMmdcUnbounded(inFile, outFile, background))
+}
+
+function runMmdcUnbounded(inFile: string, outFile: string, background: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       '-i', inFile,

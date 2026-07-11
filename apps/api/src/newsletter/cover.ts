@@ -8,7 +8,7 @@
  */
 import { prisma } from '@socioply/shared'
 import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
-import { getDiagramRasterBrowser } from '../article-pipeline/enrichment/diagram-browser-pool'
+import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'
@@ -131,9 +131,7 @@ async function generateIcon(headline: string, styleSuffix: string, model: string
 
 /** Screenshot the composed cover HTML and upload to S3. Returns the URL. */
 async function renderCover(html: string, key: string): Promise<string> {
-  const browser = await getDiagramRasterBrowser()
-  const page = await browser.newPage()
-  try {
+  return withRasterPage(async (page) => {
     await page.setViewport({ width: 680, height: 900, deviceScaleFactor: 2 })
     // Icons are embedded as data URIs, so 'load' (images decoded) is enough —
     // and 'networkidle0' isn't a valid setContent waitUntil in puppeteer-core v24.
@@ -143,9 +141,7 @@ async function renderCover(html: string, key: string): Promise<string> {
     const shot = await el.screenshot({ type: 'png' })
     const { url } = await uploadBufferWithKey(`newsletter/${key}-cover-${vtoken()}.png`, Buffer.from(shot), 'image/png')
     return url
-  } finally {
-    await page.close().catch(() => {})
-  }
+  })
 }
 
 export interface GenerateCoverParams {

@@ -78,6 +78,19 @@ describe('stripSafeDashes', () => {
     const clean = 'A normal sentence, with commas, and 2–4 week ranges.'
     expect(stripSafeDashes(clean)).toBe(clean)
   })
+
+  it('never pairs dashes across block boundaries (punctuation-less heading + paragraph)', () => {
+    // Without block-boundary splitting these two lone dashes would fuse into one
+    // span and get wrongly converted as a parenthetical pair.
+    const html = '<h2>Winter tea—a guide</h2><p>Chamomile soothes—ginger warms</p>'
+    const out = stripSafeDashes(html)
+    expect((out.match(/—/g) ?? []).length).toBe(2)
+  })
+
+  it('still pairs dashes within one paragraph after a heading', () => {
+    const html = '<h2>Title</h2><p>The spine—like any bridge—needs balance.</p>'
+    expect(stripSafeDashes(html)).toBe('<h2>Title</h2><p>The spine, like any bridge, needs balance.</p>')
+  })
 })
 
 describe('rewriteIsSafe (token-diff guard)', () => {

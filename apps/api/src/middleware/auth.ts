@@ -28,6 +28,21 @@ export async function requireAuth(
   }
 
   const token = authHeader.slice(7)
+
+  // Embedded-app tokens (onboarding plan Phase 0): `Bearer emb_<jwt>` carries a
+  // synthetic clerkId issued by /api/embed/session — no Clerk involved.
+  if (token.startsWith('emb_')) {
+    const { verifyEmbedToken } = await import('../lib/embed-auth')
+    const payload = verifyEmbedToken(token.slice(4))
+    if (!payload) {
+      reply.status(401).send({ error: 'Unauthorized' })
+      return undefined
+    }
+    request.clerkId = payload.sub
+    Sentry.setUser({ id: payload.sub })
+    return payload.sub
+  }
+
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) {
     request.log.error('CLERK_SECRET_KEY is not set')

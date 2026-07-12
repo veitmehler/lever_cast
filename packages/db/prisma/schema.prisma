@@ -42,6 +42,10 @@ model Account {
   // the GHL workflow posts to /api/ghl/billing-events/<token>.
   ghlBillingToken String?   @unique
   billingEvents   GhlBillingEvent[]
+  // Onboarding gate (.plans/ghl-onboarding.implementation-plan.md): first
+  // generation is blocked until the chat onboarding completes (validator green).
+  onboardingCompletedAt DateTime?
+  onboardingSession     OnboardingSession?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -58,6 +62,22 @@ model Account {
 
 // Owner-managed roster of teammate emails (no invitations). A user whose email
 // matches a roster entry is auto-joined to that account on sign-in.
+// Resumable chat-onboarding state (.plans/ghl-onboarding.implementation-plan.md
+// Phase 1). One session per account; every answer persists immediately so a
+// closed tab resumes mid-flow.
+model OnboardingSession {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  currentStep String   @default("welcome")
+  status      String   @default("in_progress") // in_progress | completed
+  stepData    Json? // per-step answers, extraction candidates, confirmations
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("onboarding_sessions")
+}
+
 // Audit log + idempotency window for GHL billing webhook events (multi-tenancy
 // plan Phase B). One row per received event, including suppressed duplicates.
 model GhlBillingEvent {
@@ -90,7 +110,11 @@ model AccountMember {
 
 model User {
   id        String   @id @default(cuid())
+  // GHL-SSO users carry a synthetic id ("ghl:<ghlUserId>") here so every
+  // clerkId-keyed code path works unchanged (onboarding plan Phase 0).
   clerkId   String   @unique
+  // Set for users who arrived via the embedded GHL app (SSO context userId).
+  ghlUserId String?  @unique
   name      String?
   email     String   @unique
   role      String   @default("user") // user | admin

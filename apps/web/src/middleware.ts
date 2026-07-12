@@ -24,6 +24,9 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/posts/publish-scheduled',
   '/api/posts/sync-analytics',
+  // Embedded GHL surface: authenticated by the SSO-derived embed token, not
+  // Clerk (onboarding plan Phase 0).
+  '/embed(.*)',
 ])
 
 function isSocioplyDomain(host: string) {

@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from 'react'
 import { establishEmbedSession, type EmbedSession } from '@/lib/embedSession'
+import { OnboardingChat } from './OnboardingChat'
 
 type State =
   | { phase: 'connecting' }
@@ -65,17 +66,7 @@ export default function EmbedEntry() {
 
   const { session } = state
   if (!session.onboardingCompleted) {
-    // Phase 1 replaces this stub with the chat onboarding flow.
-    return (
-      <Centered>
-        <p className="text-base font-medium text-foreground">
-          Welcome{session.user.name ? `, ${session.user.name.split(' ')[0]}` : ''}!
-        </p>
-        <p className="text-sm text-muted-foreground mt-2 max-w-sm text-center">
-          Let&apos;s set up your content engine. (Onboarding chat lands here — Phase 1.)
-        </p>
-      </Centered>
-    )
+    return <OnboardingChat onCompleted={() => setState({ phase: 'ready', session: { ...session, onboardingCompleted: true } })} />
   }
 
   return (

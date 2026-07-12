@@ -15,6 +15,7 @@ import {
   STEP_ORDER,
   type StepContext,
 } from '../onboarding/flow'
+import { bootstrapOnboarding } from '../onboarding/bootstrap'
 
 export async function onboardingRoutes(app: FastifyInstance) {
   async function ctxFor(clerkId: string) {
@@ -43,6 +44,12 @@ export async function onboardingRoutes(app: FastifyInstance) {
     if (acct?.onboardingCompletedAt) {
       return reply.send({ completed: true })
     }
+
+    // First entry: pull the GHL Business Profile + start the website crawl
+    // (idempotent; runs while the user answers the early questions).
+    await bootstrapOnboarding(r.account.accountId, r.account.ownerUserId, r.session.id, r.ctx.stepData).catch(
+      (err) => logger.warn({ err }, '[onboarding] bootstrap failed (manual fallbacks apply)'),
+    )
 
     const view = await currentStepView(r.ctx, r.session.currentStep)
     return reply.send({

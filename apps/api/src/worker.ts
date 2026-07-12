@@ -39,6 +39,7 @@ import { clientStorySpiderHandler, ClientStorySpiderJobData } from './handlers/c
 import { clientStoryAutoGenerateCheckHandler } from './handlers/client-story-auto-generate-check'
 import { accountLifecycleClockHandler } from './handlers/account-lifecycle-clock'
 import { accountDeleteHandler } from './handlers/account-delete'
+import { onboardingCrawlHandler } from './handlers/onboarding-crawl'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -311,6 +312,13 @@ async function main() {
     QUEUES.ACCOUNT_DELETE,
     { batchSize: 1 },
     withSentry('account-delete', accountDeleteHandler),
+  )
+
+  // Onboarding background website analysis (onboarding plan Phase 2).
+  await boss.work(
+    QUEUES.ONBOARDING_CRAWL,
+    { batchSize: 1 },
+    withSentry('onboarding-crawl', onboardingCrawlHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

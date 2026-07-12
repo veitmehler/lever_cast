@@ -105,6 +105,7 @@ export const QUEUES = {
   CLIENT_STORY_AUTO_GENERATE_CHECK: 'client-story-auto-generate-check',
   ACCOUNT_LIFECYCLE_CLOCK: 'account-lifecycle-clock',
   ACCOUNT_DELETE: 'account-delete',
+  ONBOARDING_CRAWL: 'onboarding-crawl',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -1,6 +1,13 @@
 # Non-ElevenLabs Accounts: Video Slots → Tinted Carousels — Implementation Plan
 
-**Status: PLANNED (decisions locked 2026-07-13). Not started.**
+**Status: IMPLEMENTED 2026-07-13.** As-built: `applyVoiceCapability` in weekly-matrix.ts
+(pure substitution, story derivation runs on transformed slots so pitch_hook→pitch_carousel
+falls out automatically — the story wave was already video-free otherwise);
+`accountHasVoice` in lib/elevenlabs/settings (voiceoverEnabled && apiKey && voiceId);
+`brand_tint_accent` variant threaded matrix→processor→generate-assets; theme gained
+`accentColor` = nlLinkColor (onboarding-approved) with diagramSecondaryColor fallback.
+Legacy config-driven quote_video specs untouched (matrix is the cadence truth). 6 tests.
+Remaining: staging flip-off/flip-on E2E eyeball at the next social test run.
 
 ## Decisions (user, 2026-07-13)
 

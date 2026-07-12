@@ -59,3 +59,14 @@ export async function updateVoiceSettings(
   })
   return getVoiceSettings(userId)
 }
+
+/**
+ * Does this account have a WORKING voice (key + cloned voice + toggle)?
+ * The weekly matrix substitutes ALL video slots with accent-tinted carousels
+ * when this is false — resolved per run, self-healing in both directions.
+ * See .plans/non-elevenlabs-carousel-conversion.implementation-plan.md.
+ */
+export async function accountHasVoice(userId: string): Promise<boolean> {
+  const v = await getVoiceSettings(userId)
+  return !!(v.voiceoverEnabled && v.apiKey && v.voiceId)
+}

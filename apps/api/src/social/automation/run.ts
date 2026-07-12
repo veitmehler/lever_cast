@@ -2,7 +2,8 @@ import { prisma, brandSettingsForUser } from '@socioply/shared'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from './log-context'
 import { ensureRunSlideCount } from './slide-count'
-import { matrixForDay, storySlotsForDay, type DaySlot } from './weekly-matrix'
+import { matrixForDay, storySlotsForDay, applyVoiceCapability, type DaySlot } from './weekly-matrix'
+import { accountHasVoice } from '../../lib/elevenlabs/settings'
 import { buildMatrixRunContext, processMatrixSlot } from './matrix-processor'
 import { processStorySlot } from './story-processor'
 import { finalizeGenerationCounts, updateGenerationProgress, loadPriorAssets } from './spec-processor'
@@ -26,8 +27,8 @@ interface SlotEntry {
 }
 
 /** The 3 matrix slots for a run, keyed P1/P2/P3 in time order. */
-function slotEntriesForRun(kind: 'article' | 'newsletter', scheduledDate: string): SlotEntry[] {
-  const slots = matrixForDay(kind, isoWeekdayOf(scheduledDate))
+function slotEntriesForRun(kind: 'article' | 'newsletter', scheduledDate: string, hasVoice: boolean): SlotEntry[] {
+  const slots = applyVoiceCapability(matrixForDay(kind, isoWeekdayOf(scheduledDate)), hasVoice)
   return slots.map((daySlot, i) => ({ slotKey: `P${i + 1}`, daySlot }))
 }
 
@@ -68,8 +69,15 @@ export async function runSocialAutomation(
   const timeZone = settings?.socialTimezone ?? 'America/New_York'
   const kind: 'article' | 'newsletter' = run.newsletterId ? 'newsletter' : 'article'
 
-  const feedEntries = slotEntriesForRun(kind, run.scheduledDate)
+  // No-voice accounts get NO video slots — accent-tinted carousels instead.
+  // Story derivation runs on the transformed entries, so pitch_hook companions
+  // become pitch_carousel automatically.
+  const hasVoice = await accountHasVoice(run.userId)
+  const feedEntries = slotEntriesForRun(kind, run.scheduledDate, hasVoice)
   const storySlots = storySlotsForDay(kind, feedEntries)
+  if (!hasVoice) {
+    logger.info({ runId }, '[social-automation] no working voice — video slots substituted with accent carousels')
+  }
 
   // Story slot keys are S1/S2/S3; feed keys are P1/P2/P3.
   const onlyStory = opts?.onlySlot?.startsWith('S') ? opts.onlySlot : null

@@ -47,8 +47,9 @@ export async function generateMatrixAsset(opts: {
   contextTitle: string
   slideCount: number
   diagramLogoVariant: 'light' | 'dark'
-  /** Wed/Sat brand-tinted carousel design (from the matrix DaySlot). */
-  designVariant?: 'brand_tint'
+  /** Brand-tinted carousel design (from the matrix DaySlot): Wed/Sat primary
+   *  tint, or the no-voice accent tint. */
+  designVariant?: 'brand_tint' | 'brand_tint_accent'
 }): Promise<SpecAssets> {
   const { userId, assetJobId, postType, resolved, contextTitle, slideCount, diagramLogoVariant } = opts
   const { slot } = resolved

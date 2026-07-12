@@ -125,7 +125,7 @@ export async function generateCarouselAssets(opts: {
   /** Watermark/arrow variant for diagram mode: 'light' (dark bg) → white arrows. */
   diagramLogoVariant?: 'light' | 'dark'
   /** Wed/Sat brand-tinted design (ignored when diagramBackground is set). */
-  designVariant?: 'brand_tint'
+  designVariant?: 'brand_tint' | 'brand_tint_accent'
   /** Fal.ai image model for AI slide backgrounds (admin-configurable). */
   imageModel?: string
 }): Promise<GeneratedCarousel> {
@@ -141,8 +141,8 @@ export async function generateCarouselAssets(opts: {
   // color once for the whole carousel. Diagram mode wins if both are set.
   let tint: TintScheme | undefined
   let tintLogoBuffer: Buffer | null = null
-  if (opts.designVariant === 'brand_tint' && !useDiagram) {
-    tint = tintScheme(brand.primaryColor)
+  if ((opts.designVariant === 'brand_tint' || opts.designVariant === 'brand_tint_accent') && !useDiagram) {
+    tint = tintScheme(opts.designVariant === 'brand_tint_accent' ? brand.accentColor : brand.primaryColor)
     tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
   }
   // Reserve one slot for the inserted explainer slide so the total stays within
@@ -298,7 +298,7 @@ export async function regenerateCarouselSlide(opts: {
   totalSlides: number
   jobId?: string
   /** Pass 'brand_tint' when regenerating a slide of a Wed/Sat tinted carousel. */
-  designVariant?: 'brand_tint'
+  designVariant?: 'brand_tint' | 'brand_tint_accent'
 }): Promise<{ imageUrl: string; mediaId: string }> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
@@ -309,8 +309,8 @@ export async function regenerateCarouselSlide(opts: {
   let tint: TintScheme | undefined
   let tintLogoBuffer: Buffer | null = null
   let tintArrowBuffer: Buffer | null = null
-  if (opts.designVariant === 'brand_tint') {
-    tint = tintScheme(brand.primaryColor)
+  if (opts.designVariant === 'brand_tint' || opts.designVariant === 'brand_tint_accent') {
+    tint = tintScheme(opts.designVariant === 'brand_tint_accent' ? brand.accentColor : brand.primaryColor)
     tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
     tintArrowBuffer = await loadContinuationArrow(tint.logoVariant)
   }

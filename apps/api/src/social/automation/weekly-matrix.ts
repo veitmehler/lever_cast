@@ -31,12 +31,16 @@ export interface DaySlot {
   /**
    * Optional per-slot design variant. 'brand_tint' (Wed/Sat carousels): slides
    * washed in the brand color at ~0.85 opacity, centered text, corner logo —
-   * see .plans/social-brand-tint-carousel.implementation-plan.md. The matrix is
-   * the single source of truth for WHERE this applies; downstream code only
-   * reads the flag.
+   * see .plans/social-brand-tint-carousel.implementation-plan.md.
+   * 'brand_tint_accent': same design in the ACCENT color — the no-voice
+   * substitution look (.plans/non-elevenlabs-carousel-conversion...md). The
+   * matrix is the single source of truth for WHERE these apply; downstream
+   * code only reads the flag.
    */
-  designVariant?: 'brand_tint'
+  designVariant?: CarouselDesignVariant
 }
+
+export type CarouselDesignVariant = 'brand_tint' | 'brand_tint_accent'
 
 /** ISO weekday: 1 = Mon … 6 = Sat (Sun = 0 has no posts). */
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6
@@ -154,6 +158,23 @@ export function storySlotsForDay(kind: SourceKind, feedEntries: FeedEntry[]): St
     // Article day: the remaining slot (video_reel/key-takeaways) → a pull-quote story.
     return { slotKey, storyType: 'quote', anchorHour: hour, source }
   })
+}
+
+/**
+ * No-ElevenLabs substitution (.plans/non-elevenlabs-carousel-conversion.implementation-plan.md):
+ * accounts without a working voice get NO video slots — every video post type
+ * becomes an accent-tinted carousel from the SAME content source. Resolved per
+ * run, so adding ElevenLabs later flips the slots back automatically. Story
+ * derivation runs on the TRANSFORMED slots, so pitch_hook companions become
+ * pitch_carousel with zero story-side special-casing.
+ */
+export function applyVoiceCapability(slots: DaySlot[], hasVoice: boolean): DaySlot[] {
+  if (hasVoice) return slots
+  return slots.map((s) =>
+    s.postType === 'hook_video' || s.postType === 'video_reel'
+      ? { ...s, postType: 'carousel', designVariant: 'brand_tint_accent' as const }
+      : s,
+  )
 }
 
 /** Resolve the slot list for a given source kind + ISO weekday, with sensible defaults. */

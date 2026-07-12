@@ -16,6 +16,19 @@ import { logger } from '../lib/logger'
 import { decryptGhlSso, signEmbedToken, ghlClerkId } from '../lib/embed-auth'
 
 export async function embedRoutes(app: FastifyInstance) {
+  // Install-flow landing stub: GHL app installs may require an OAuth redirect
+  // URL even for SSO-only custom-page apps. We don't exchange the code — data
+  // access rides the per-client Private Integration key — so this just
+  // acknowledges the install and points the user at the sidebar app.
+  app.get('/embed/oauth-callback', async (_request, reply) => {
+    reply.type('text/html')
+    return reply.send(
+      '<html><body style="font-family:sans-serif;text-align:center;padding-top:80px">' +
+        '<h2>App installed ✓</h2><p>You can close this tab and open the app from your sidebar.</p>' +
+        '</body></html>',
+    )
+  })
+
   app.post<{ Body: { encryptedData?: string } }>(
     '/embed/session',
     { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },

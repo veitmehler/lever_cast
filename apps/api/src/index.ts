@@ -13,6 +13,7 @@ import { ghlRoutes } from './routes/ghl'
 import { ghlBillingRoutes } from './routes/ghl-billing'
 import { embedRoutes } from './routes/embed'
 import { onboardingRoutes } from './routes/onboarding'
+import { onboardingVoiceRoutes } from './routes/onboarding-voice'
 import { socialRoutes } from './routes/social'
 import { socialAutomationRoutes } from './routes/social-automation'
 import { voiceRoutes } from './routes/voice'
@@ -82,6 +83,7 @@ async function main() {
   await app.register(ghlBillingRoutes, { prefix: '/api' })
   await app.register(embedRoutes, { prefix: '/api' })
   await app.register(onboardingRoutes, { prefix: '/api' })
+  await app.register(onboardingVoiceRoutes, { prefix: '/api' })
   await app.register(socialRoutes, { prefix: '/api' })
   await app.register(socialAutomationRoutes, { prefix: '/api' })
   await app.register(voiceRoutes, { prefix: '/api' })

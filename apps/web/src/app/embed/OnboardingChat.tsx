@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { embedFetch } from '@/lib/embedSession'
+import { VoiceRecorder } from './VoiceRecorder'
 
 interface StepView {
   id: string
@@ -173,7 +174,42 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
           </button>
         )}
 
-        {(step.kind === 'text' || step.kind === 'voice') && (
+        {step.kind === 'voice' && (
+          <div className="space-y-3">
+            <VoiceRecorder
+              step={step.id}
+              disabled={busy}
+              onConfirm={(answer) => void submit(answer, answer.text)}
+            />
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Prefer to type?</summary>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (input.trim()) void submit({ text: input.trim(), voice: false })
+                }}
+                className="mt-2 flex gap-2"
+              >
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  rows={2}
+                  className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  disabled={busy}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="self-end rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </form>
+            </details>
+          </div>
+        )}
+
+        {step.kind === 'text' && (
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -184,8 +220,8 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              rows={step.kind === 'voice' ? 2 : 4}
-              placeholder={step.kind === 'voice' ? 'Type your answer (voice recording coming in the next update)…' : 'Paste here…'}
+              rows={4}
+              placeholder="Paste here…"
               className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               disabled={busy}
             />

@@ -1,0 +1,149 @@
+'use client'
+
+/**
+ * MediaRecorder voice answer (onboarding plan Phase 3).
+ *
+ * Record → upload → editable transcript → confirm. The parent commits the
+ * confirmed transcript (+ audioKey) as the step answer. Falls back to typing
+ * whenever recording is unavailable or the user prefers it.
+ */
+import { useRef, useState } from 'react'
+import { embedApiUrl, currentEmbedSession, establishEmbedSession } from '@/lib/embedSession'
+
+const MIN_SECONDS = 5
+
+type Phase = 'idle' | 'recording' | 'uploading' | 'review'
+
+export function VoiceRecorder({
+  step,
+  disabled,
+  onConfirm,
+}: {
+  step: string
+  disabled: boolean
+  onConfirm: (answer: { text: string; audioKey?: string | null; voice: boolean }) => void
+}) {
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [seconds, setSeconds] = useState(0)
+  const [transcript, setTranscript] = useState('')
+  const [audioKey, setAudioKey] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  async function start() {
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      chunksRef.current = []
+      rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data)
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        void upload(new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' }))
+      }
+      rec.start()
+      recorderRef.current = rec
+      setSeconds(0)
+      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
+      setPhase('recording')
+    } catch {
+      setError("Couldn't access your microphone — type your answer below instead.")
+    }
+  }
+
+  function stop() {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (seconds < MIN_SECONDS) {
+      setError(`That was a bit short — aim for at least ${MIN_SECONDS} seconds so I really capture your voice.`)
+    }
+    recorderRef.current?.stop()
+    setPhase('uploading')
+  }
+
+  async function upload(blob: Blob) {
+    try {
+      if (!currentEmbedSession()) await establishEmbedSession()
+      const form = new FormData()
+      form.append('step', step)
+      form.append('audio', blob, `${step}.webm`)
+      const res = await fetch(embedApiUrl('/api/onboarding/voice-answer'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer emb_${currentEmbedSession()!.token}` },
+        body: form,
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Upload failed — you can type instead.')
+        setPhase('idle')
+        return
+      }
+      setTranscript(data.transcript)
+      setAudioKey(data.audioKey ?? null)
+      setPhase('review')
+    } catch {
+      setError('Upload failed — you can type instead.')
+      setPhase('idle')
+    }
+  }
+
+  if (phase === 'review') {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Here&apos;s what I heard — fix anything I got wrong:</p>
+        <textarea
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          rows={4}
+          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => onConfirm({ text: transcript.trim(), audioKey, voice: true })}
+            disabled={disabled || !transcript.trim()}
+            className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            That&apos;s right ✓
+          </button>
+          <button
+            onClick={() => setPhase('idle')}
+            disabled={disabled}
+            className="rounded-lg border border-border px-4 py-2.5 text-sm text-foreground"
+          >
+            Re-record
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {error && <p className="text-xs text-amber-600">{error}</p>}
+      <div className="flex items-center gap-2">
+        {phase === 'recording' ? (
+          <button
+            onClick={stop}
+            className="flex-1 animate-pulse rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white"
+          >
+            ⏹ Stop ({seconds}s)
+          </button>
+        ) : phase === 'uploading' ? (
+          <div className="flex-1 rounded-lg border border-border px-4 py-2.5 text-center text-sm text-muted-foreground">
+            Transcribing…
+          </div>
+        ) : (
+          <button
+            onClick={() => void start()}
+            disabled={disabled}
+            className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            🎙 Answer with your voice
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

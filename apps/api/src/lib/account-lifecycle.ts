@@ -133,7 +133,7 @@ async function redateStaleTopics(
  * days actually have planned content and skips the rest. Implements the
  * "generate when a cycle's payment clears" behavior.
  */
-async function burstCurrentWindow(accountId: string): Promise<{ batchId: string; itemCount: number } | null> {
+export async function burstCurrentWindow(accountId: string): Promise<{ batchId: string; itemCount: number } | null> {
   const acct = await prisma.account.findUnique({
     where: { id: accountId },
     select: { id: true, ownerUserId: true, subscriptionStartedAt: true },

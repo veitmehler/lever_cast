@@ -16,6 +16,9 @@ import {
   type StepContext,
 } from '../onboarding/flow'
 import { bootstrapOnboarding } from '../onboarding/bootstrap'
+import { generationReadiness } from '../lib/generation-readiness'
+import { resolveArticleCalendar, resolveNewsletterCalendar } from '../newsletter/calendar-routing'
+import { burstCurrentWindow } from '../lib/account-lifecycle'
 
 export async function onboardingRoutes(app: FastifyInstance) {
   async function ctxFor(clerkId: string) {
@@ -95,16 +98,24 @@ export async function onboardingRoutes(app: FastifyInstance) {
     return reply.send({ step: view })
   })
 
-  // POST /onboarding/complete — validator-gated (validator lands with Phase 7;
-  // until then this only flips when explicitly forced by an admin test flag).
+  // POST /onboarding/complete — validator-gated finale. Routes the calendars
+  // (specialization × hemisphere), re-validates, flips the gate, and starts
+  // the first month's burst (payment already cleared — Phase B semantics).
   app.post('/onboarding/complete', async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return
     const r = await ctxFor(clerkId)
     if (!r) return reply.status(404).send({ error: 'No account' })
 
-    // Phase 7 replaces this stub with generationReadiness(accountId).
-    const readiness = { ready: false, missing: [{ field: 'validator', why: 'Generation-readiness validator not yet implemented (Phase 7)' }] }
+    // Calendars are the two 'final'-step readiness rows — assign them now.
+    await resolveArticleCalendar(r.account.ownerUserId).catch((err: unknown) =>
+      logger.warn({ err }, '[onboarding] article calendar routing failed'),
+    )
+    await resolveNewsletterCalendar(r.account.ownerUserId).catch((err: unknown) =>
+      logger.warn({ err }, '[onboarding] newsletter calendar routing failed'),
+    )
+
+    const readiness = await generationReadiness(r.account.accountId)
     if (!readiness.ready) {
       return reply.status(409).send({ error: 'Onboarding incomplete', readiness })
     }
@@ -114,7 +125,21 @@ export async function onboardingRoutes(app: FastifyInstance) {
       data: { onboardingCompletedAt: new Date() },
     })
     await prisma.onboardingSession.update({ where: { id: r.session.id }, data: { status: 'completed' } })
-    logger.info({ accountId: r.account.accountId }, '[onboarding] completed')
-    return reply.send({ completed: true })
+    logger.info({ accountId: r.account.accountId }, '[onboarding] completed — starting first burst')
+
+    const burst = await burstCurrentWindow(r.account.accountId).catch((err: unknown) => {
+      logger.error({ err }, '[onboarding] first burst failed (dashboard generate available)')
+      return null
+    })
+    return reply.send({ completed: true, burst })
+  })
+
+  // GET /onboarding/readiness — the validator, for the chat + admin surface.
+  app.get('/onboarding/readiness', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const r = await ctxFor(clerkId)
+    if (!r) return reply.status(404).send({ error: 'No account' })
+    return reply.send(await generationReadiness(r.account.accountId))
   })
 }

@@ -106,6 +106,7 @@ export const QUEUES = {
   ACCOUNT_LIFECYCLE_CLOCK: 'account-lifecycle-clock',
   ACCOUNT_DELETE: 'account-delete',
   ONBOARDING_CRAWL: 'onboarding-crawl',
+  ONBOARDING_SYNTHESIS: 'onboarding-synthesis',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

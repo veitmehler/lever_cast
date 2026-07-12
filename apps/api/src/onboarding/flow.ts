@@ -13,6 +13,20 @@
  */
 import { prisma } from '@socioply/shared'
 import { logger } from '../lib/logger'
+import {
+  commitBusinessConfirm,
+  afterFifthQuestion,
+  commitLogoConfirm,
+  commitBrandProfile,
+  commitTemplateReveal,
+  commitOffers,
+  commitCta,
+  commitWritingSample,
+  commitWordpress,
+  commitSocials,
+  commitElevenLabs,
+  commitToggles,
+} from './commits'
 
 export type StepKind = 'info' | 'text' | 'choice' | 'confirm_card' | 'voice' | 'action'
 
@@ -72,7 +86,11 @@ const STEPS: StepDef[] = [
       messages: ["First — here's what I already know about your business from your account. Anything to fix?"],
       card: (ctx.stepData.ghlPrefill as Record<string, unknown>) ?? {},
     }),
-    commit: storeAnswer('business_confirm'),
+    commit: async (ctx, answer) => {
+      const err = await commitBusinessConfirm(ctx, answer)
+      if (!err) ctx.stepData.business_confirm = answer
+      return err
+    },
   },
   // Q1–Q5: the Manifesto-derived voice questions (Phase 3 adds recording).
   {
@@ -116,7 +134,11 @@ const STEPS: StepDef[] = [
     prepare: async () => ({
       messages: ["Last one: walk me through what actually happens in a patient's first visit and first month with you."],
     }),
-    commit: storeAnswer('q_proof'),
+    commit: async (ctx, answer) => {
+      ctx.stepData.q_proof = answer
+      await afterFifthQuestion(ctx)
+      return null
+    },
   },
   {
     id: 'logo_confirm',
@@ -126,7 +148,11 @@ const STEPS: StepDef[] = [
       card: { candidates: (ctx.stepData.logoCandidates as unknown[]) ?? [] },
       pending: !ctx.stepData.crawlDone,
     }),
-    commit: storeAnswer('logo_confirm'),
+    commit: async (ctx, answer) => {
+      const err = await commitLogoConfirm(ctx, answer)
+      if (!err) ctx.stepData.logo_confirm = answer
+      return err
+    },
   },
   {
     id: 'brand_profile_confirm',
@@ -138,7 +164,11 @@ const STEPS: StepDef[] = [
       card: (ctx.stepData.brandProfileDraft as Record<string, unknown>) ?? {},
       pending: !ctx.stepData.synthesisDone,
     }),
-    commit: storeAnswer('brand_profile_confirm'),
+    commit: async (ctx, answer) => {
+      const err = await commitBrandProfile(ctx, answer)
+      if (!err) ctx.stepData.brand_profile_confirm = answer
+      return err
+    },
   },
   {
     id: 'writing_sample',
@@ -148,7 +178,11 @@ const STEPS: StepDef[] = [
         'To write in your voice, I need a sample of your real writing — a blog post, a patient email, anything 500+ words. Paste it here (or type "skip" and I\'ll work from your spoken answers alone).',
       ],
     }),
-    commit: storeAnswer('writing_sample'),
+    commit: async (ctx, answer) => {
+      const err = await commitWritingSample(ctx, answer)
+      if (!err) ctx.stepData.writing_sample = answer
+      return err
+    },
   },
   {
     id: 'template_reveal',
@@ -158,7 +192,11 @@ const STEPS: StepDef[] = [
       card: (ctx.stepData.templateDraft as Record<string, unknown>) ?? {},
       pending: !ctx.stepData.templateReady,
     }),
-    commit: storeAnswer('template_reveal'),
+    commit: async (ctx, answer) => {
+      const err = await commitTemplateReveal(ctx, answer)
+      if (!err) ctx.stepData.template_reveal = answer
+      return err
+    },
   },
   {
     id: 'offers',
@@ -168,7 +206,11 @@ const STEPS: StepDef[] = [
       card: { offers: (ctx.stepData.offerDrafts as unknown[]) ?? [] },
       pending: !ctx.stepData.offersReady,
     }),
-    commit: storeAnswer('offers'),
+    commit: async (ctx, answer) => {
+      const err = await commitOffers(ctx, answer)
+      if (!err) ctx.stepData.offers = answer
+      return err
+    },
   },
   {
     id: 'cta',
@@ -181,7 +223,11 @@ const STEPS: StepDef[] = [
         { value: 'custom', label: 'Something else…' },
       ],
     }),
-    commit: storeAnswer('cta'),
+    commit: async (ctx, answer) => {
+      const err = await commitCta(ctx, answer)
+      if (!err) ctx.stepData.cta = answer
+      return err
+    },
   },
   {
     id: 'wordpress',
@@ -192,7 +238,11 @@ const STEPS: StepDef[] = [
       ],
       card: { type: 'wordpress_connect' },
     }),
-    commit: storeAnswer('wordpress'),
+    commit: async (ctx, answer) => {
+      const err = await commitWordpress(ctx, answer)
+      if (!err) ctx.stepData.wordpress = answer
+      return err
+    },
   },
   {
     id: 'socials',
@@ -201,7 +251,11 @@ const STEPS: StepDef[] = [
       messages: ['Now connect your social accounts (Facebook, Instagram, LinkedIn) — this opens your Social Planner. Come back here when done and I\'ll pick them up.'],
       card: { type: 'social_connect' },
     }),
-    commit: storeAnswer('socials'),
+    commit: async (ctx, answer) => {
+      const err = await commitSocials(ctx, answer)
+      if (!err) ctx.stepData.socials = answer
+      return err
+    },
   },
   {
     id: 'elevenlabs',
@@ -215,7 +269,11 @@ const STEPS: StepDef[] = [
         { value: 'later', label: 'Maybe later' },
       ],
     }),
-    commit: storeAnswer('elevenlabs'),
+    commit: async (ctx, answer) => {
+      const err = await commitElevenLabs(ctx, answer)
+      if (!err) ctx.stepData.elevenlabs = answer
+      return err
+    },
   },
   {
     id: 'toggles',
@@ -229,7 +287,11 @@ const STEPS: StepDef[] = [
         { value: 'manual', label: "I'll trigger each month myself" },
       ],
     }),
-    commit: storeAnswer('toggles'),
+    commit: async (ctx, answer) => {
+      const err = await commitToggles(ctx, answer)
+      if (!err) ctx.stepData.toggles = answer
+      return err
+    },
   },
   {
     id: 'final',

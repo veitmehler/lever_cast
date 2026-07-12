@@ -40,6 +40,7 @@ import { clientStoryAutoGenerateCheckHandler } from './handlers/client-story-aut
 import { accountLifecycleClockHandler } from './handlers/account-lifecycle-clock'
 import { accountDeleteHandler } from './handlers/account-delete'
 import { onboardingCrawlHandler } from './handlers/onboarding-crawl'
+import { onboardingSynthesisHandler } from './handlers/onboarding-synthesis'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -319,6 +320,11 @@ async function main() {
     QUEUES.ONBOARDING_CRAWL,
     { batchSize: 1 },
     withSentry('onboarding-crawl', onboardingCrawlHandler),
+  )
+  await boss.work(
+    QUEUES.ONBOARDING_SYNTHESIS,
+    { batchSize: 1 },
+    withSentry('onboarding-synthesis', onboardingSynthesisHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

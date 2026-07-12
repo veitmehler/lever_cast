@@ -37,12 +37,26 @@ async function billingRowForUser(userId: string): Promise<AccountBillingRow | nu
 export const GENERATION_BLOCKED_MESSAGE =
   'Content generation is paused on this account until the subscription payment is up to date.'
 
+export const ONBOARDING_BLOCKED_MESSAGE =
+  'Finish your setup chat first — content generation unlocks the moment onboarding completes.'
+
 /** May this user's account produce NEW content (articles, newsletters, social, ad-hoc posts)? */
 export async function generationGateForUser(userId: string): Promise<BillingGate> {
-  const row = await billingRowForUser(userId)
+  const accountId = await accountIdForUser(userId)
+  if (!accountId) return { allowed: true }
+  const row = await prisma.account.findUnique({
+    where: { id: accountId },
+    select: { status: true, paidThrough: true, billingExempt: true, onboardingCompletedAt: true },
+  })
   if (!row || row.billingExempt) return { allowed: true }
   if (row.status !== 'active') {
     return { allowed: false, reason: GENERATION_BLOCKED_MESSAGE }
+  }
+  // Onboarding gate (onboarding plan Phase 7): only accounts that HAVE an
+  // onboarding session are gated — legacy/pre-onboarding accounts unaffected.
+  if (!row.onboardingCompletedAt) {
+    const session = await prisma.onboardingSession.findUnique({ where: { accountId }, select: { id: true } })
+    if (session) return { allowed: false, reason: ONBOARDING_BLOCKED_MESSAGE }
   }
   return { allowed: true }
 }

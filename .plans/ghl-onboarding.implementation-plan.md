@@ -1,6 +1,10 @@
 # GHL-Embedded Chat Onboarding — Implementation Plan
 
-**Status: PLANNED (all product decisions locked in the 2026-07-12/13 brainstorm). Not started.**
+**Status: PHASES 0–7 IMPLEMENTED 2026-07-13 (commits a3eb5b9, 4b3a402, 3057fef, 9ced2ad + the
+Phase 4–7 batch). Remaining: Phase 8 staging E2E against a real GHL subaccount + real website
+(SSO decrypt in anger, crawl/vision quality, full chat walkthrough), the GHL-side app creation
+runbook, and polish items noted in code (true renderNewsletterHtml preview swap, richer
+confirm-card UIs beyond the JSON card).**
 
 ## Goal
 

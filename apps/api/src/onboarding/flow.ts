@@ -232,11 +232,14 @@ const STEPS: StepDef[] = [
   {
     id: 'wordpress',
     kind: 'confirm_card',
-    prepare: async () => ({
+    prepare: async (ctx) => ({
       messages: [
         "Let's connect your website so articles publish straight to it. I'll walk you through creating a WordPress Application Password — takes about 30 seconds.",
       ],
-      card: { type: 'wordpress_connect' },
+      card: {
+        type: 'wordpress_connect',
+        website: (ctx.stepData.ghlPrefill as { website?: string })?.website ?? '',
+      },
     }),
     commit: async (ctx, answer) => {
       const err = await commitWordpress(ctx, answer)

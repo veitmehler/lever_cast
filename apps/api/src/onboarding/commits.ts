@@ -127,6 +127,7 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
   ctx.stepData.templateDraft = {
     palette,
     logoUrl: logo,
+    organizationName: prefill.organizationName ?? 'Your Practice',
     previewHtml: buildTemplatePreviewHtml({
       organizationName: prefill.organizationName ?? 'Your Practice',
       logoUrl: logo,

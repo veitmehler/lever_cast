@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { embedFetch } from '@/lib/embedSession'
 import { VoiceRecorder } from './VoiceRecorder'
+import { BusinessCard, LogoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard } from './cards'
 
 interface StepView {
   id: string
@@ -236,34 +237,15 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
         )}
 
         {step.kind === 'choice' && (
-          <div className="flex flex-wrap gap-2">
-            {(step.options ?? []).map((o) => (
-              <button
-                key={o.value}
-                onClick={() => submit({ value: o.value, label: o.label }, o.label)}
-                disabled={busy}
-                className="rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          <ChoiceInput step={step} busy={busy} onSubmit={(answer, display) => void submit(answer, display)} />
         )}
 
-        {step.kind === 'confirm_card' && (
-          <div className="space-y-2">
-            <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              {JSON.stringify(step.card ?? {}, null, 2)}
-            </pre>
-            <button
-              onClick={() => submit({ confirmed: true }, 'Looks good ✓')}
-              disabled={busy || step.pending}
-              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              {step.pending ? 'Still working on this — one moment…' : 'Looks good'}
-            </button>
-          </div>
-        )}
+        {step.kind === 'confirm_card' &&
+          (step.pending ? (
+            <PendingCard onRefresh={() => void load()} />
+          ) : (
+            <ConfirmCard step={step} busy={busy} onSubmit={(answer, display) => void submit(answer, display)} />
+          ))}
 
         {step.kind === 'action' && (
           <button
@@ -275,6 +257,170 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Background job still running: friendly wait state with a manual refresh. */
+function PendingCard({ onRefresh }: { onRefresh: () => void }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border bg-card p-4 text-center">
+      <p className="text-sm text-muted-foreground">
+        <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent align-middle" />
+        Still working on this — usually under a minute…
+      </p>
+      <button onClick={onRefresh} className="text-xs text-primary underline">
+        Check again
+      </button>
+    </div>
+  )
+}
+
+/** Routes each confirm step to its dedicated card component. */
+function ConfirmCard({
+  step,
+  busy,
+  onSubmit,
+}: {
+  step: StepView
+  busy: boolean
+  onSubmit: (answer: unknown, display?: string) => void
+}) {
+  const card = (step.card ?? {}) as Record<string, unknown>
+  switch (step.id) {
+    case 'business_confirm':
+      return <BusinessCard card={card} disabled={busy} onSubmit={(a) => onSubmit(a, "That's correct ✓")} />
+    case 'logo_confirm':
+      return (
+        <LogoCard
+          card={card as { candidates?: string[] }}
+          disabled={busy}
+          onSubmit={(a) => onSubmit(a, a.none ? 'No logo' : 'Use this logo ✓')}
+        />
+      )
+    case 'brand_profile_confirm':
+      return <ProfileCard card={card} disabled={busy} onSubmit={(a) => onSubmit(a, 'This is my brand ✓')} />
+    case 'template_reveal':
+      return (
+        <TemplateCard
+          card={card as { palette?: Record<string, unknown>; logoUrl?: string | null; organizationName?: string }}
+          disabled={busy}
+          onSubmit={(a) => onSubmit(a, "I love it — that's my newsletter ✓")}
+        />
+      )
+    case 'offers':
+      return <OffersCard card={card as { offers?: never[] }} disabled={busy} onSubmit={(a) => onSubmit(a, 'Offers saved ✓')} />
+    case 'wordpress':
+      return (
+        <WordpressCard
+          card={card as { website?: string }}
+          disabled={busy}
+          onSubmit={(a) => onSubmit(a, a.mode === 'skip' ? 'No WordPress — HTML export' : 'Connect & verify ✓')}
+        />
+      )
+    case 'socials':
+      return <SocialsCard disabled={busy} onSubmit={(a) => onSubmit(a, "I've connected my accounts ✓")} />
+    default:
+      return (
+        <button
+          onClick={() => onSubmit({ confirmed: true }, 'Looks good ✓')}
+          disabled={busy}
+          className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          Looks good
+        </button>
+      )
+  }
+}
+
+/** Choice pills, with two special cases: custom CTA text and the ElevenLabs key. */
+function ChoiceInput({
+  step,
+  busy,
+  onSubmit,
+}: {
+  step: StepView
+  busy: boolean
+  onSubmit: (answer: unknown, display?: string) => void
+}) {
+  const [revealed, setRevealed] = useState<string | null>(null)
+  const [text, setText] = useState('')
+
+  if (revealed === 'custom') {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (text.trim()) onSubmit({ value: 'custom', customText: text.trim() }, text.trim())
+        }}
+        className="flex gap-2"
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Where should posts send people?"
+          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+          disabled={busy}
+          autoFocus
+        />
+        <button type="submit" disabled={busy || !text.trim()} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          Set CTA
+        </button>
+      </form>
+    )
+  }
+
+  if (revealed === 'elevenlabs_yes') {
+    return (
+      <div className="space-y-2 rounded-xl border border-border bg-card p-4">
+        <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+          <li>Create an account at elevenlabs.io (Creator plan, ~$22/mo)</li>
+          <li>Profile → API Keys → create a key</li>
+          <li>Paste it below — I&apos;ll build your voice from our chat recordings</li>
+        </ol>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (text.trim()) onSubmit({ value: 'yes', apiKey: text.trim() }, 'Voice setup — key added ✓')
+          }}
+          className="flex gap-2"
+        >
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            type="password"
+            placeholder="xi-…"
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            disabled={busy}
+            autoFocus
+          />
+          <button type="submit" disabled={busy || !text.trim()} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+            Create my voice
+          </button>
+        </form>
+        <button className="text-xs text-muted-foreground underline" onClick={() => setRevealed(null)} disabled={busy}>
+          back
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {(step.options ?? []).map((o) => (
+        <button
+          key={o.value}
+          onClick={() => {
+            if (step.id === 'cta' && o.value === 'custom') return setRevealed('custom')
+            if (step.id === 'elevenlabs' && o.value === 'yes') return setRevealed('elevenlabs_yes')
+            onSubmit({ value: o.value, label: o.label }, o.label)
+          }}
+          disabled={busy}
+          className="rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

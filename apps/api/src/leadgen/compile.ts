@@ -162,7 +162,7 @@ export async function compileLeadGenDocument(documentId: string): Promise<void> 
     // 2. Brand tokens + render to PDF.
     html = applyBrandTokens(html, tokens)
     const pdf = await withRasterPage(async (page) => {
-      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60_000 })
+      await page.setContent(html, { waitUntil: 'load', timeout: 60_000 })
       return (await page.pdf({ format: 'a4', printBackground: true })) as Buffer
     })
 

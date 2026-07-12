@@ -107,6 +107,8 @@ export const QUEUES = {
   ACCOUNT_DELETE: 'account-delete',
   ONBOARDING_CRAWL: 'onboarding-crawl',
   ONBOARDING_SYNTHESIS: 'onboarding-synthesis',
+  LEADGEN_PROPOSAL_POLL: 'leadgen-proposal-poll',
+  LEADGEN_COMPILE: 'leadgen-compile',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

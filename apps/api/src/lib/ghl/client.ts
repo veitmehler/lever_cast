@@ -443,3 +443,30 @@ export function formatLocalSendAt(utcDate: Date, timeZone: string): string {
   }).format(utcDate)
   return local.replace(' ', 'T')
 }
+
+// ── Contacts (lead-gen capture — leadgen plan Phase 3) ───────────────────────
+
+export interface UpsertContactResult {
+  contactId: string | null
+}
+
+/**
+ * Upsert a contact by email and apply tags (GHL creates unknown tag names on
+ * the fly). POST /contacts/upsert is the documented v2 dedupe-by-email path.
+ */
+export async function upsertGhlContact(
+  apiKey: string,
+  locationId: string,
+  input: { email: string; tags: string[]; source?: string },
+): Promise<UpsertContactResult> {
+  const data = await ghlRequest<{ contact?: { id?: string } }>(apiKey, '/contacts/upsert', {
+    method: 'POST',
+    body: {
+      locationId,
+      email: input.email,
+      tags: input.tags,
+      ...(input.source ? { source: input.source } : {}),
+    },
+  })
+  return { contactId: data.contact?.id ?? null }
+}

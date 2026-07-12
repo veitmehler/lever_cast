@@ -56,6 +56,7 @@ const ACCOUNT_SCOPED_MODELS = new Set([
   'OutputAttempt',
   'SyndicationArticle',
   'VideoGenerationJob',
+  'LeadGenDocument',
 ])
 
 const SCOPED_OPS = new Set([

@@ -25,6 +25,7 @@
  */
 import type PgBoss from 'pg-boss'
 import { prisma, deleteS3Prefix, extractFilePathFromUrl, deleteS3Keys } from '@socioply/shared'
+import { driveConfigured, deleteFile } from '../lib/gdrive/client'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 
@@ -62,7 +63,7 @@ export async function accountDeleteHandler(jobs: PgBoss.Job<AccountDeleteJobData
 async function deleteAccount(accountId: string, reason: string, dryRun: boolean): Promise<void> {
   const account = await prisma.account.findUnique({
     where: { id: accountId },
-    select: { id: true, name: true, status: true, statusChangedAt: true },
+    select: { id: true, name: true, status: true, statusChangedAt: true, driveFolderId: true },
   })
   if (!account) {
     logger.warn({ accountId }, '[account-delete] account not found — nothing to do')
@@ -140,6 +141,11 @@ async function deleteAccount(accountId: string, reason: string, dryRun: boolean)
   }
   // 4. The account row (cascades account-keyed tables).
   await prisma.account.delete({ where: { id: accountId } })
+
+  // 4b. Lead-gen Drive folder (leadgen plan): folder delete removes the docs.
+  if (account.driveFolderId && driveConfigured()) {
+    await deleteFile(account.driveFolderId)
+  }
 
   // 5. S3 sweep — after the DB so a failure here can't strand half-deleted rows.
   for (const uid of memberIds) {

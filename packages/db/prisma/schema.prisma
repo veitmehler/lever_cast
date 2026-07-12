@@ -46,6 +46,10 @@ model Account {
   // generation is blocked until the chat onboarding completes (validator green).
   onboardingCompletedAt DateTime?
   onboardingSession     OnboardingSession?
+  // Central lead-gen Drive folder for this account (leadgen plan Phase 1).
+  driveFolderId String?
+  leadGenDocuments LeadGenDocument[]
+  leadCaptures     LeadCapture[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -62,6 +66,69 @@ model Account {
 
 // Owner-managed roster of teammate emails (no invitations). A user whose email
 // matches a roster entry is auto-joined to that account on sign-in.
+// ── Lead-gen documents (.plans/leadgen-drive-documents.implementation-plan.md) ──
+
+// Admin-managed master template (Model B): designed HTML layout with
+// {{brand.*}} tokens and <slot name="..."> content slots.
+model LeadGenTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sourceHtml  String   @db.Text
+  slotMeta    Json? // per-slot: { maxChars, rewriteEligible }
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   LeadGenDocument[]
+
+  @@map("leadgen_templates")
+}
+
+model LeadGenDocument {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId      String // owner user (account-scoped queries broaden via extension)
+  templateId  String?
+  template    LeadGenTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  title       String
+  slug        String
+  kind        String   @default("template") // template | custom
+  status      String   @default("compiling") // compiling | pending_review | live | disabled | failed
+  driveFileId String?  @unique
+  driveLink   String? // webViewLink handed to marketing surfaces
+  pdfKey      String? // S3 copy (source of truth for re-uploads)
+  ghlTagNames String[] // applied to captured leads
+  lastError   String?
+  compiledAt  DateTime?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  captures    LeadCapture[]
+
+  @@unique([accountId, slug])
+  @@index([status])
+  @@map("leadgen_documents")
+}
+
+// Capture log: one row per access proposal (idempotency + analytics).
+model LeadCapture {
+  id             String   @id @default(cuid())
+  documentId     String
+  document       LeadGenDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  requesterEmail String
+  proposalId     String   @unique // dedupe across poll ticks
+  ghlContactId   String?
+  status         String   @default("captured") // captured | ghl_failed
+  createdAt      DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("lead_captures")
+}
+
 // Resumable chat-onboarding state (.plans/ghl-onboarding.implementation-plan.md
 // Phase 1). One session per account; every answer persists immediately so a
 // closed tab resumes mid-flow.

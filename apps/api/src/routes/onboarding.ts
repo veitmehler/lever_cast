@@ -19,6 +19,7 @@ import { bootstrapOnboarding } from '../onboarding/bootstrap'
 import { generationReadiness } from '../lib/generation-readiness'
 import { resolveArticleCalendar, resolveNewsletterCalendar } from '../newsletter/calendar-routing'
 import { burstCurrentWindow } from '../lib/account-lifecycle'
+import { getBoss, QUEUES } from '../queues/index'
 
 export async function onboardingRoutes(app: FastifyInstance) {
   async function ctxFor(clerkId: string) {
@@ -126,6 +127,34 @@ export async function onboardingRoutes(app: FastifyInstance) {
     })
     await prisma.onboardingSession.update({ where: { id: r.session.id }, data: { status: 'completed' } })
     logger.info({ accountId: r.account.accountId }, '[onboarding] completed — starting first burst')
+
+    // Starter lead-magnet library (leadgen plan Phase 7): compile every active
+    // template for this account — lands review-gated, never blocks generation.
+    try {
+      const templates = await prisma.leadGenTemplate.findMany({ where: { active: true }, select: { id: true, name: true, slug: true } })
+      if (templates.length > 0) {
+        const boss = await getBoss()
+        for (const t of templates) {
+          const doc = await prisma.leadGenDocument.upsert({
+            where: { accountId_slug: { accountId: r.account.accountId, slug: t.slug } },
+            create: {
+              accountId: r.account.accountId,
+              userId: r.account.ownerUserId,
+              templateId: t.id,
+              title: t.name,
+              slug: t.slug,
+              status: 'compiling',
+              ghlTagNames: [`leadgen-${t.slug}`],
+            },
+            update: {},
+          })
+          await boss.send(QUEUES.LEADGEN_COMPILE, { documentId: doc.id }, { singletonKey: `leadgen-compile-${doc.id}`, expireInSeconds: 1800 })
+        }
+        logger.info({ accountId: r.account.accountId, count: templates.length }, '[onboarding] starter lead-magnet library enqueued')
+      }
+    } catch (err: unknown) {
+      logger.warn({ err }, '[onboarding] starter library enqueue failed (non-fatal)')
+    }
 
     const burst = await burstCurrentWindow(r.account.accountId).catch((err: unknown) => {
       logger.error({ err }, '[onboarding] first burst failed (dashboard generate available)')

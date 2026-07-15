@@ -92,6 +92,18 @@ export function LeadMagnetsView({
     } else toast.error((await res.json()).error ?? 'Failed')
   }
 
+  async function uploadCustom(file: File, title: string, addCover: boolean) {
+    const form = new FormData()
+    form.append('pdf', file, file.name)
+    form.append('title', title || file.name.replace(/\.pdf$/i, ''))
+    form.append('addCover', String(addCover))
+    const res = await apiFetch('/api/leadgen/documents/upload', { method: 'POST', body: form })
+    if (res.ok) {
+      toast.success(addCover ? 'Uploading — adding your branded cover…' : 'Uploading…')
+      await load()
+    } else toast.error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
+  }
+
   async function saveTags(id: string, raw: string) {
     const tagNames = raw.split(',').map((t) => t.trim()).filter(Boolean)
     const res = await apiFetch(`/api/leadgen/documents/${id}`, {
@@ -196,6 +208,8 @@ export function LeadMagnetsView({
         ))}
       </div>
 
+      <UploadCard onUpload={uploadCustom} />
+
       {availableTemplates.length > 0 && (
         <div className="rounded-xl border border-dashed border-border p-4">
           <h3 className="text-sm font-medium text-foreground">Add from template</h3>
@@ -213,6 +227,61 @@ export function LeadMagnetsView({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+
+function UploadCard({ onUpload }: { onUpload: (file: File, title: string, addCover: boolean) => Promise<void> }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [title, setTitle] = useState('')
+  const [addCover, setAddCover] = useState(true)
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="rounded-xl border border-dashed border-border p-4">
+      <h3 className="text-sm font-medium text-foreground">Upload your own PDF</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Hosted as-is — we can add a branded cover page, but the document content stays exactly as designed.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null
+            setFile(f)
+            if (f && !title) setTitle(f.name.replace(/\.pdf$/i, ''))
+          }}
+          className="text-xs text-muted-foreground"
+        />
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Document title"
+          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground"
+        />
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" checked={addCover} onChange={(e) => setAddCover(e.target.checked)} />
+          Add branded cover
+        </label>
+        <button
+          disabled={!file || busy}
+          onClick={async () => {
+            if (!file) return
+            setBusy(true)
+            try {
+              await onUpload(file, title, addCover)
+              setFile(null)
+              setTitle('')
+            } finally {
+              setBusy(false)
+            }
+          }}
+          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+        >
+          Upload
+        </button>
+      </div>
     </div>
   )
 }

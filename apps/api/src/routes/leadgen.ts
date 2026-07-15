@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma, resolveAccountForClerkId } from '@socioply/shared'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
+import { uploadBufferWithKey } from '@socioply/shared'
 
 export async function leadgenRoutes(app: FastifyInstance) {
   async function accountFor(clerkId: string) {
@@ -162,6 +163,54 @@ export async function leadgenRoutes(app: FastifyInstance) {
       return reply.send(updated)
     },
   )
+
+
+  // POST /leadgen/documents/upload — custom PDF (Model A, leadgen plan Phase 6).
+  // multipart: file `pdf` + fields title, addCover ('true'|'false'), tagNames (csv).
+  app.post('/leadgen/documents/upload', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const account = await accountFor(clerkId)
+    if (!account) return reply.status(404).send({ error: 'No account' })
+
+    const file = await request.file()
+    if (!file) return reply.status(400).send({ error: 'PDF file required' })
+    if (!(file.mimetype ?? '').includes('pdf')) return reply.status(400).send({ error: 'Only PDF files are accepted' })
+    const buf = await file.toBuffer()
+    if (buf.length === 0 || buf.length > 15 * 1024 * 1024) {
+      return reply.status(400).send({ error: 'PDF missing or larger than 15 MB' })
+    }
+    const fields = file.fields as Record<string, { value?: string } | undefined>
+    const title = fields.title?.value?.trim() || file.filename.replace(/\.pdf$/i, '')
+    const addCover = fields.addCover?.value === 'true'
+    const tagNames = (fields.tagNames?.value ?? '').split(',').map((t) => t.trim()).filter(Boolean)
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || `custom-${Date.now()}`
+
+    const sourcePdfKey = `leadgen/${account.accountId}/src-${slug}-${Date.now()}.pdf`
+    await uploadBufferWithKey(sourcePdfKey, buf, 'application/pdf')
+
+    const doc = await prisma.leadGenDocument.upsert({
+      where: { accountId_slug: { accountId: account.accountId, slug } },
+      create: {
+        accountId: account.accountId,
+        userId: account.ownerUserId,
+        title,
+        slug,
+        kind: 'custom',
+        status: 'compiling',
+        sourcePdfKey,
+        ghlTagNames: tagNames.length ? tagNames : [`leadgen-${slug}`],
+      },
+      update: { status: 'compiling', sourcePdfKey, lastError: null },
+    })
+    const boss = await getBoss()
+    await boss.send(
+      QUEUES.LEADGEN_COMPILE,
+      { documentId: doc.id, custom: true, addCover },
+      { singletonKey: `leadgen-compile-${doc.id}-${Date.now()}`, expireInSeconds: 1800 },
+    )
+    return reply.status(202).send({ documentId: doc.id })
+  })
 
   // GET /leadgen/templates — active masters (for "add from template").
   app.get('/leadgen/templates', async (request, reply) => {

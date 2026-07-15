@@ -5,8 +5,7 @@ JWT, schema + migration, 2-min proposal poller w/ GHL upsert + ghl_failed retry 
 compiler w/ guard stack, Lead Magnets page + routes, onboarding starter-library hook,
 account-delete Drive cleanup, LeadGenDocument account-scoped). REMAINING: the live spike
 (needs GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON — unset both envs; poller is dormant until set),
-Phase 6 custom uploads (pdf-lib cover merge), admin template CRUD + the master template
-library content, staging E2E w/ manual access request.
+admin template CRUD DONE; Phase 6 custom uploads DONE 2026-07-15 (multipart route, pdf-lib cover merge, upload card). Still open: master template CONTENT (user drafting), Google key + spike, staging E2E w/ manual access request, deactivate demo template before prod onboarding.
 
 ## Goal + locked decisions
 

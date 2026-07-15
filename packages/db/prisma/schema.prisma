@@ -99,6 +99,7 @@ model LeadGenDocument {
   driveFileId String?  @unique
   driveLink   String? // webViewLink handed to marketing surfaces
   pdfKey      String? // S3 copy (source of truth for re-uploads)
+  sourcePdfKey String? // custom uploads: the original client PDF on S3
   ghlTagNames String[] // applied to captured leads
   lastError   String?
   compiledAt  DateTime?

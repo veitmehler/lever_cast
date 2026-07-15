@@ -206,3 +206,90 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
     })
   }
 }
+
+// ── Custom uploads (Model A — leadgen plan Phase 6) ──────────────────────────
+
+/** Minimal branded cover for a client-uploaded PDF. */
+function customCoverHtml(title: string, t: BrandTokens): string {
+  const esc = (s: string) => s.replace(/</g, '&lt;')
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; }
+  .cover { width: 210mm; height: 297mm; background: ${t.headerColor}; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 28mm 22mm; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  .logo img { max-height: 22mm; max-width: 60mm; }
+  .logo-fallback { font-size: 20px; font-weight: 700; }
+  h1 { font-size: 40px; line-height: 1.15; max-width: 150mm; }
+  .bar { width: 42mm; height: 2.5mm; background: ${t.accentColor}; margin-top: 10mm; border-radius: 2px; }
+  .foot { font-size: 13px; opacity: .85; }
+</style></head><body><div class="cover">
+  <div class="logo">${t.logoUrl ? `<img src="${t.logoUrl}"/>` : `<div class="logo-fallback">${esc(t.organizationName)}</div>`}</div>
+  <div><h1>${esc(title)}</h1><div class="bar"></div></div>
+  <div class="foot">Prepared for you by ${esc(t.organizationName)} · ${esc(t.website)}</div>
+</div></body></html>`
+}
+
+/**
+ * Custom upload path: original PDF as-is, optionally with a branded cover page
+ * merged in front (pdf-lib). NO text modification — baked layouts stay theirs.
+ */
+export async function compileCustomDocument(documentId: string, addCover: boolean): Promise<void> {
+  const doc = await prisma.leadGenDocument.findUnique({
+    where: { id: documentId },
+    include: { account: { select: { name: true, driveFolderId: true } } },
+  })
+  if (!doc?.sourcePdfKey) {
+    logger.warn({ documentId }, '[leadgen-compile] custom doc without sourcePdfKey')
+    return
+  }
+  try {
+    const cdn = (process.env.CDN_BASE ?? 'https://cdn.socioply.com').replace(/\/$/, '')
+    const srcRes = await fetch(`${cdn}/${doc.sourcePdfKey}`)
+    if (!srcRes.ok) throw new Error(`source PDF fetch ${srcRes.status}`)
+    const original = Buffer.from(await srcRes.arrayBuffer())
+
+    let finalPdf = original
+    if (addCover) {
+      const tokens = await brandTokensFor(doc.userId)
+      const coverPdf = await withRasterPage(async (page) => {
+        await page.setContent(customCoverHtml(doc.title, tokens), { waitUntil: 'load', timeout: 60_000 })
+        return (await page.pdf({ format: 'a4', printBackground: true })) as Buffer
+      })
+      const { PDFDocument } = await import('pdf-lib')
+      const merged = await PDFDocument.create()
+      const cover = await PDFDocument.load(coverPdf)
+      const body = await PDFDocument.load(original, { ignoreEncryption: true })
+      for (const p of await merged.copyPages(cover, cover.getPageIndices())) merged.addPage(p)
+      for (const p of await merged.copyPages(body, body.getPageIndices())) merged.addPage(p)
+      finalPdf = Buffer.from(await merged.save())
+    }
+
+    const pdfKey = `leadgen/${doc.accountId}/${doc.slug}-${Date.now()}.pdf`
+    await uploadBufferWithKey(pdfKey, finalPdf, 'application/pdf')
+
+    let driveFileId: string | null = null
+    let driveLink: string | null = null
+    if (driveConfigured()) {
+      let folderId = doc.account.driveFolderId
+      if (!folderId) {
+        folderId = await ensureAccountFolder(doc.accountId, doc.account.name ?? 'client')
+        await prisma.account.update({ where: { id: doc.accountId }, data: { driveFolderId: folderId } })
+      }
+      if (doc.driveFileId) await deleteFile(doc.driveFileId)
+      const uploaded = await uploadPdf(folderId, `${doc.title}.pdf`, finalPdf)
+      driveFileId = uploaded.fileId
+      driveLink = uploaded.webViewLink
+    }
+
+    await prisma.leadGenDocument.update({
+      where: { id: documentId },
+      data: { status: 'pending_review', pdfKey, driveFileId, driveLink, compiledAt: new Date(), lastError: null },
+    })
+    logger.info({ documentId, addCover }, '[leadgen-compile] custom upload processed → pending_review')
+  } catch (err) {
+    await prisma.leadGenDocument.update({
+      where: { id: documentId },
+      data: { status: 'failed', lastError: err instanceof Error ? err.message : String(err) },
+    })
+    logger.error({ documentId, err }, '[leadgen-compile] custom upload FAILED')
+  }
+}

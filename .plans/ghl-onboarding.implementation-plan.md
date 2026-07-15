@@ -195,6 +195,20 @@ inline ("fix anything I misheard").
 - Burst helper + cadence + content-plan generate gain the `onboardingCompletedAt` gate
   (belt-and-braces on top of the natural no-calendars no-op).
 
+## Post-launch-brainstorm additions (2026-07-15 — international PMS strategy)
+
+- **`bookingUrl` becomes a first-class onboarding field** (CTA step upgrade: "where should
+  bookings go?"): every clinic's PMS (Cliniko/Jane/ChiroTouch/…) provides an online-booking
+  URL — the one universal interface worldwide. All CTAs (social, newsletter buttons, lead-
+  magnet back pages, pipeline links) resolve against it. Storage: new brandSettings field
+  or reuse socialBioUrl — decide at build. Candidate validator row (a CTA without a
+  destination is half a CTA).
+- **PMS dropdown — pure data capture**: "Which practice-management system do you use?"
+  (Cliniko / Nookal / Jane / ChiroTouch / other / none). Stored, not acted on — after
+  20–30 clients this data decides which PMS connector gets built first
+  (see .plans/pms-connector-framework.implementation-plan.md). No integration at launch;
+  GHL never owns booking (double-booking risk).
+
 ## Phase 8 — Admin runbook + verification
 
 - **Admin checklist per client** (PM doc): create subaccount from snapshot → install

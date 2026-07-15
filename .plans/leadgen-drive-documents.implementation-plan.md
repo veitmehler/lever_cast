@@ -144,6 +144,17 @@ Drive. No text modification, communicated as such in the UI.
   Google account (proposals can't be created via API — the one manual step), poller
   captures + resolves + GHL contact appears with tags. Then the review-gate walkthrough.
 
+## Addition (2026-07-15): branded "Review us" QR counter card
+
+One more starter-library master — but a print CARD, not a guide: clinic colors + logo +
+"Enjoyed your visit?" + a QR code straight to their Google review link (derived from the
+GBP URL already captured in brand settings; Place-ID review deep link). Front desk prints
+it and props it by the terminal — the highest-converting review trigger in local business,
+zero integration required, and it feeds review velocity (the #1 Maps ranking lever) while
+the PMS connector framework stays unbuilt. Build notes: small `qrcode` dep for QR PNG
+(data-URI into the template); its own compact MasterDocSpec-style layout (A6/DL card,
+not A4); skips the voice-rewrite pass (fixed copy).
+
 ## Out of scope (tracked)
 
 - Gate/landing pages as an additional capture route (social-CTA-friendly) — future.

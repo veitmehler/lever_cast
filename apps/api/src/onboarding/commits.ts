@@ -363,3 +363,33 @@ export async function commitToggles(ctx: StepContext, answer: unknown): Promise<
   })
   return null
 }
+
+/** booking_url: the universal CTA destination (clinic's PMS booking page). */
+export async function commitBookingUrl(ctx: StepContext, answer: unknown): Promise<string | null> {
+  const a = (answer ?? {}) as { text?: string }
+  const raw = a.text?.trim()
+  if (!raw) return 'Paste your online booking link (the page patients use to book)'
+  const url = raw.startsWith('http') ? raw : `https://${raw}`
+  try {
+    new URL(url)
+  } catch {
+    return "That doesn't look like a link — try copying it straight from your booking page"
+  }
+  const brand = await prisma.brandSettings.findUnique({ where: { userId: ctx.userId }, select: { socialBioUrl: true } })
+  await brandUpsert(ctx.userId, {
+    bookingUrl: url,
+    // Existing CTA consumers read socialBioUrl — backfill it so the booking
+    // destination takes effect immediately without touching those call sites.
+    ...(brand?.socialBioUrl?.trim() ? {} : { socialBioUrl: url }),
+  })
+  return null
+}
+
+/** pms: market-research capture only (connector framework stays parked). */
+export async function commitPms(ctx: StepContext, answer: unknown): Promise<string | null> {
+  const a = (answer ?? {}) as { value?: string; customText?: string }
+  const value = a.value === 'other' ? (a.customText?.trim() || 'other') : a.value
+  if (!value) return 'Pick the closest option'
+  await brandUpsert(ctx.userId, { pmsSystem: value })
+  return null
+}

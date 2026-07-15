@@ -32,7 +32,7 @@ describe('onboarding flow', () => {
       expect(STEP_ORDER).toContain(q)
     }
     // Every required setup surface is a step.
-    for (const s of ['business_confirm', 'logo_confirm', 'brand_profile_confirm', 'writing_sample', 'template_reveal', 'offers', 'cta', 'wordpress', 'socials', 'elevenlabs', 'toggles']) {
+    for (const s of ['business_confirm', 'logo_confirm', 'brand_profile_confirm', 'writing_sample', 'template_reveal', 'offers', 'cta', 'booking_url', 'pms', 'wordpress', 'socials', 'elevenlabs', 'toggles']) {
       expect(STEP_ORDER).toContain(s)
     }
   })

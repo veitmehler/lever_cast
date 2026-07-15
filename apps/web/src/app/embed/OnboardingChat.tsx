@@ -346,6 +346,30 @@ function ChoiceInput({
   const [revealed, setRevealed] = useState<string | null>(null)
   const [text, setText] = useState('')
 
+  if (revealed === 'pms_other') {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (text.trim()) onSubmit({ value: 'other', customText: text.trim() }, text.trim())
+        }}
+        className="flex gap-2"
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What's it called?"
+          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+          disabled={busy}
+          autoFocus
+        />
+        <button type="submit" disabled={busy || !text.trim()} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          Send
+        </button>
+      </form>
+    )
+  }
+
   if (revealed === 'custom') {
     return (
       <form
@@ -412,6 +436,7 @@ function ChoiceInput({
           key={o.value}
           onClick={() => {
             if (step.id === 'cta' && o.value === 'custom') return setRevealed('custom')
+            if (step.id === 'pms' && o.value === 'other') return setRevealed('pms_other')
             if (step.id === 'elevenlabs' && o.value === 'yes') return setRevealed('elevenlabs_yes')
             onSubmit({ value: o.value, label: o.label }, o.label)
           }}

@@ -21,6 +21,8 @@ import {
   commitTemplateReveal,
   commitOffers,
   commitCta,
+  commitBookingUrl,
+  commitPms,
   commitWritingSample,
   commitWordpress,
   commitSocials,
@@ -226,6 +228,41 @@ const STEPS: StepDef[] = [
     commit: async (ctx, answer) => {
       const err = await commitCta(ctx, answer)
       if (!err) ctx.stepData.cta = answer
+      return err
+    },
+  },
+  {
+    id: 'booking_url',
+    kind: 'text',
+    prepare: async (ctx) => ({
+      messages: [
+        "Where should bookings go? Paste the link patients use to book with you online (your booking system's page).",
+      ],
+      card: { website: (ctx.stepData.ghlPrefill as { website?: string })?.website ?? '' },
+    }),
+    commit: async (ctx, answer) => {
+      const err = await commitBookingUrl(ctx, answer)
+      if (!err) ctx.stepData.booking_url = answer
+      return err
+    },
+  },
+  {
+    id: 'pms',
+    kind: 'choice',
+    prepare: async () => ({
+      messages: ['Which system does your practice run on day to day? (This just helps us build the right integrations next.)'],
+      options: [
+        { value: 'cliniko', label: 'Cliniko' },
+        { value: 'nookal', label: 'Nookal' },
+        { value: 'jane', label: 'Jane' },
+        { value: 'chirotouch', label: 'ChiroTouch' },
+        { value: 'none', label: 'None yet' },
+        { value: 'other', label: 'Something else…' },
+      ],
+    }),
+    commit: async (ctx, answer) => {
+      const err = await commitPms(ctx, answer)
+      if (!err) ctx.stepData.pms = answer
       return err
     },
   },

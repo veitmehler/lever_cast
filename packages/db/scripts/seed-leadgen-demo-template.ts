@@ -19,6 +19,8 @@ const spec: MasterDocSpec = {
   title: 'The Desk Worker’s 10-Minute Back Routine',
   subtitle:
     'Five simple movements you can do beside your desk to loosen a stiff back, ease tight hips and finish the workday feeling human.',
+  introHtml:
+    '<p>If you spend most of your day at a desk, your back has probably learned to complain about it. The good news: it responds quickly to the right kind of movement, and none of it requires a gym. This short guide gives you a simple daily routine plus the signs that tell you when stiffness deserves a closer look.</p>',
   sections: [
     {
       heading: 'Why sitting stiffens your spine',
@@ -31,7 +33,7 @@ const spec: MasterDocSpec = {
       heading: 'The 10-minute routine',
       slotName: 'routine',
       defaultHtml:
-        '<p>Do these five movements in order, once per workday. No equipment, office clothes are fine.</p><ol><li><strong>Standing back extensions</strong> — hands on hips, gently arch back. 10 slow reps.</li><li><strong>Hip flexor stretch</strong> — half-kneel beside your chair, tuck your tailbone, lean forward gently. 30 seconds each side.</li><li><strong>Thoracic rotations</strong> — seated, arms crossed, rotate to each side. 8 per side.</li><li><strong>Glute squeezes</strong> — standing, squeeze for 5 seconds. 10 reps.</li><li><strong>Neck resets</strong> — chin gently back (make a double chin), hold 5 seconds. 8 reps.</li></ol>',
+        '<p>Do these five movements in order, once per workday. No equipment, office clothes are fine.</p><ol><li><strong>Standing back extensions:</strong> hands on hips, gently arch back. 10 slow reps.</li><li><strong>Hip flexor stretch:</strong> half-kneel beside your chair, tuck your tailbone, lean forward gently. 30 seconds each side.</li><li><strong>Thoracic rotations:</strong> seated, arms crossed, rotate to each side. 8 per side.</li><li><strong>Glute squeezes:</strong> standing, squeeze for 5 seconds. 10 reps.</li><li><strong>Neck resets:</strong> chin gently back (make a double chin), hold 5 seconds. 8 reps.</li></ol>',
       tipHtml: 'Movements should feel like a stretch, never a strain. Mild is effective.',
     },
     {

@@ -24,6 +24,8 @@ export interface MasterSection {
 export interface MasterDocSpec {
   title: string
   subtitle: string
+  /** Opening paragraph(s); every real master should provide this. */
+  introHtml?: string
   sections: MasterSection[]
   /** Compliance/disclaimer text — ALWAYS rewriteEligible: false. */
   disclaimerHtml: string
@@ -104,7 +106,7 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
 
 <div class="content">
   <section class="content-section">
-    <div class="section-body"><slot name="intro">A short, warm introduction to this guide and who it helps.</slot></div>
+    <div class="section-body"><slot name="intro">${spec.introHtml ?? 'A short, warm introduction to this guide and who it helps.'}</slot></div>
   </section>
 ${sections}
 </div>

@@ -4,10 +4,12 @@ import { compileLeadGenDocument } from '../leadgen/compile'
 
 export interface LeadgenCompileJobData {
   documentId: string
+  /** Optional client feedback from a regenerate — folded into the rewrite prompt. */
+  note?: string
 }
 
 export async function leadgenCompileHandler(jobs: PgBoss.Job<LeadgenCompileJobData>[]): Promise<void> {
   for (const job of jobs) {
-    await compileLeadGenDocument(job.data.documentId)
+    await compileLeadGenDocument(job.data.documentId, job.data.note)
   }
 }

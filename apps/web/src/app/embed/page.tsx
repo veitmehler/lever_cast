@@ -8,8 +8,9 @@
  * inside the GHL iframe (frame-ancestors CSP scoped to /embed).
  */
 import { useEffect, useState } from 'react'
-import { establishEmbedSession, type EmbedSession } from '@/lib/embedSession'
+import { establishEmbedSession, embedFetch, type EmbedSession } from '@/lib/embedSession'
 import { OnboardingChat } from './OnboardingChat'
+import { LeadMagnetsView } from '@/components/LeadMagnetsView'
 
 type State =
   | { phase: 'connecting' }
@@ -69,12 +70,9 @@ export default function EmbedEntry() {
     return <OnboardingChat onCompleted={() => setState({ phase: 'ready', session: { ...session, onboardingCompleted: true } })} />
   }
 
-  return (
-    <Centered>
-      <p className="text-base font-medium text-foreground">You&apos;re all set.</p>
-      <p className="text-sm text-muted-foreground mt-2">Embedded dashboard surface lands here.</p>
-    </Centered>
-  )
+  // Post-onboarding embedded surface: the Lead Magnets review gate lives here
+  // (GHL-first clients have no Clerk login — this is their only path to it).
+  return <LeadMagnetsView apiFetch={(path, init) => embedFetch(path, init)} />
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

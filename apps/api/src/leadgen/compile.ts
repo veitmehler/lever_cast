@@ -80,6 +80,7 @@ async function rewriteSlot(
   geminiKey: string,
   slotText: string,
   writingStyle: string,
+  feedbackNote?: string,
 ): Promise<string | null> {
   try {
     const res = await instrumentCall({ provider: 'gemini', op: 'leadgen.rewrite' }, () =>
@@ -98,7 +99,7 @@ async function rewriteSlot(
 - Keep the length within ±20% of the original.
 - Keep any HTML tags exactly where they are.
 - No em-dashes.
-VOICE: ${writingStyle.slice(0, 1500)}
+VOICE: ${writingStyle.slice(0, 1500)}${feedbackNote ? `\nCLIENT FEEDBACK on the previous version (honor it within the rules above): ${feedbackNote}` : ''}
 
 PASSAGE:
 ${slotText}
@@ -124,7 +125,7 @@ Return ONLY the rewritten passage.`,
   }
 }
 
-export async function compileLeadGenDocument(documentId: string): Promise<void> {
+export async function compileLeadGenDocument(documentId: string, feedbackNote?: string): Promise<void> {
   const doc = await prisma.leadGenDocument.findUnique({
     where: { id: documentId },
     include: { template: true, account: { select: { name: true, driveFolderId: true } } },
@@ -149,7 +150,7 @@ export async function compileLeadGenDocument(documentId: string): Promise<void> 
       const meta = slotMeta[name] ?? {}
       let finalText = original
       if (meta.rewriteEligible !== false && geminiKey && settings?.writingStyle) {
-        const rewritten = await rewriteSlot(geminiKey, original, settings.writingStyle)
+        const rewritten = await rewriteSlot(geminiKey, original, settings.writingStyle, feedbackNote)
         if (rewritten && rewriteWithinGuards(original, rewritten, meta.maxChars)) {
           finalText = await sanitizeDashesText(rewritten, { surface: 'leadgen_slot' })
         } else if (rewritten) {

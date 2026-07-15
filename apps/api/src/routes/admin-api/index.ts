@@ -12,6 +12,7 @@ import { newslettersAdminRoutes } from './newsletters'
 import { specializationsAdminRoutes } from './specializations'
 import { articleCalendarsAdminRoutes } from './article-calendars'
 import { accountsAdminRoutes } from './accounts'
+import { leadgenTemplatesAdminRoutes } from './leadgen-templates'
 
 export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(llmKeysAdminRoutes)
@@ -27,4 +28,5 @@ export async function adminApiRoutes(app: FastifyInstance) {
   await app.register(newslettersAdminRoutes)
   await app.register(specializationsAdminRoutes)
   await app.register(articleCalendarsAdminRoutes)
+  await app.register(leadgenTemplatesAdminRoutes)
 }

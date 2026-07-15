@@ -134,7 +134,7 @@ export async function leadgenRoutes(app: FastifyInstance) {
       if (doc.kind !== 'template') return reply.status(400).send({ error: 'Custom uploads cannot be regenerated' })
       await prisma.leadGenDocument.update({ where: { id: doc.id }, data: { status: 'compiling', lastError: null } })
       const boss = await getBoss()
-      await boss.send(QUEUES.LEADGEN_COMPILE, { documentId: doc.id }, { singletonKey: `leadgen-compile-${doc.id}-${Date.now()}`, expireInSeconds: 1800 })
+      await boss.send(QUEUES.LEADGEN_COMPILE, { documentId: doc.id, note: request.body?.note?.slice(0, 500) }, { singletonKey: `leadgen-compile-${doc.id}-${Date.now()}`, expireInSeconds: 1800 })
       return reply.status(202).send({ documentId: doc.id })
     },
   )

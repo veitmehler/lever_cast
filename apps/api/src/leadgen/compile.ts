@@ -9,7 +9,6 @@
  * review gate is the AHPRA checkpoint (user decision).
  */
 import { prisma, uploadBufferWithKey } from '@socioply/shared'
-import { brandFooterTemplate } from './master-layout'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
@@ -95,6 +94,62 @@ export async function inlineLogo(t: BrandTokens): Promise<BrandTokens> {
     logger.warn({ err, logoUrl: t.logoUrl }, '[leadgen-compile] logo inline failed — org-name fallback')
     return { ...t, logoUrl: '' }
   }
+}
+
+const MM = 72 / 25.4 // pt per mm
+const STRIP_MM = 13
+const SIDE_INSET_MM = 22
+
+function hexToRgb01(hex: string): { r: number; g: number; b: number } {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return { r: 0.04, g: 0.15, b: 0.27 }
+  const n = parseInt(m[1], 16)
+  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 }
+}
+
+/**
+ * Two-pass assembly (print-geometry redesign, 2026-07-24): the cover renders
+ * full-bleed (margin 0, exactly one page); the content renders with honest
+ * print margins (18mm top / 26mm bottom) so Chromium GUARANTEES text never
+ * enters them; the brand strip is then stamped straight onto each content
+ * page with pdf-lib at the true paper bottom (Chromium's footerTemplate box
+ * is inset ~5.5mm from the edge and overlaps the content area — measured,
+ * unusable). 26mm bottom = 13mm guaranteed air + the 13mm strip.
+ */
+async function assemblePdf(coverPdf: Buffer, contentPdf: Buffer, t: BrandTokens): Promise<Buffer> {
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+  const merged = await PDFDocument.create()
+  const cover = await PDFDocument.load(coverPdf)
+  const content = await PDFDocument.load(contentPdf)
+  const font = await merged.embedFont(StandardFonts.Helvetica)
+  const navy = hexToRgb01(t.headerColor)
+
+  for (const pg of await merged.copyPages(cover, cover.getPageIndices())) merged.addPage(pg)
+  const contentPages = await merged.copyPages(content, content.getPageIndices())
+  const line = [t.phone, t.website.replace(/^https?:\/\//, '')].filter(Boolean).join(' · ')
+  for (const pg of contentPages) {
+    merged.addPage(pg)
+    const { width } = pg.getSize()
+    pg.drawRectangle({ x: 0, y: 0, width, height: STRIP_MM * MM, color: rgb(navy.r, navy.g, navy.b) })
+    const fontSize = 8.5
+    const baseline = (STRIP_MM * MM) / 2 - fontSize * 0.36
+    try {
+      pg.drawText(t.organizationName, { x: SIDE_INSET_MM * MM, y: baseline, size: fontSize, font, color: rgb(1, 1, 1) })
+      const lw = font.widthOfTextAtSize(line, fontSize)
+      pg.drawText(line, { x: width - SIDE_INSET_MM * MM - lw, y: baseline, size: fontSize, font, color: rgb(1, 1, 1) })
+    } catch (err) {
+      logger.warn({ err }, '[leadgen-compile] strip text encoding failed — strip drawn without text')
+    }
+  }
+  return Buffer.from(await merged.save())
+}
+
+/** Split the compiled single-html master at the cover marker into two full documents. */
+export function splitAtCover(html: string): { coverHtml: string; contentHtml: string } {
+  const [pre, post] = html.split('<!--SPLIT-->')
+  if (!post) return { coverHtml: '', contentHtml: html }
+  const bodyAt = pre.indexOf('<body>')
+  return { coverHtml: pre + '</body></html>', contentHtml: pre.slice(0, bodyAt + 6) + post }
 }
 
 function applyBrandTokens(html: string, t: BrandTokens): string {
@@ -202,22 +257,23 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
       html = html.replace(full, finalText)
     }
 
-    // 2. Brand tokens (logo inlined as data URI) + render to PDF. The brand
-    // strip renders as a Chromium footer template inside the page's bottom
-    // margin — flowed content can never overlap it.
+    // 2. Brand tokens (logo inlined as data URI) + two-pass render: full-bleed
+    // cover, margin-bounded content, brand strip stamped via pdf-lib.
     const inked = await inlineLogo(tokens)
     html = applyBrandTokens(html, inked)
-    const pdf = await withRasterPage(async (page) => {
-      await page.setContent(html, { waitUntil: 'load', timeout: 60_000 })
-      return (await page.pdf({
+    const { coverHtml, contentHtml } = splitAtCover(html)
+    const [coverPdf, contentPdf] = await withRasterPage(async (page) => {
+      await page.setContent(coverHtml || html, { waitUntil: 'load', timeout: 60_000 })
+      const c = (await page.pdf({ format: 'a4', printBackground: true })) as Buffer
+      await page.setContent(contentHtml, { waitUntil: 'load', timeout: 60_000 })
+      const b = (await page.pdf({
         format: 'a4',
         printBackground: true,
-        displayHeaderFooter: true,
-        headerTemplate: '<span></span>',
-        footerTemplate: brandFooterTemplate(inked),
-        margin: { top: '0', bottom: '15mm', left: '0', right: '0' },
+        margin: { top: '18mm', bottom: '26mm', left: '0', right: '0' },
       })) as Buffer
+      return [c, b]
     })
+    const pdf = coverHtml ? await assemblePdf(coverPdf, contentPdf, inked) : contentPdf
 
     // 3. S3 copy (source of truth) + Drive upload (when configured).
     const pdfKey = `leadgen/${doc.accountId}/${doc.slug}-${Date.now()}.pdf`

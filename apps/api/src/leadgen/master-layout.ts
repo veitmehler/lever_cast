@@ -120,7 +120,9 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
       if (b.kind === 'part')
         return `<h2 class="part-title">${esc(b.title)}</h2>${b.ledeHtml ? `<div class="section-body part-lede">${b.ledeHtml}</div>` : ''}`
       if (b.kind === 'stretchGrid')
-        return `<div class="stretch-grid">${b.cards.map((c) => stretchCardHtml(c, ++num)).join('\n')}</div>`
+        // Cards number locally (1..n) under their part title — a grid titled
+        // "the 6-stretch reset" must not open with card 4 (user decision).
+        return `<div class="stretch-grid">${b.cards.map((c, i) => stretchCardHtml(c, i + 1)).join('\n')}</div>`
       return sectionHtml(b, b.unnumbered ? null : ++num)
     })
     .join('\n')
@@ -138,7 +140,7 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: {{brand.fontColor}}; }
 
   /* ── Cover ── */
-  .cover { height: 284mm; background: {{brand.headerColor}}; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 24mm 22mm; page-break-after: always; }
+  .cover { height: 297mm; background: {{brand.headerColor}}; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 24mm 22mm; page-break-after: always; }
   .cover .logo img { max-height: 22mm; max-width: 60mm; }
   .cover .logo-fallback { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
   .cover .eyebrow { font-size: 12px; letter-spacing: 2.2px; text-transform: uppercase; opacity: .85; margin-bottom: 5mm; }
@@ -152,7 +154,7 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .cover .cover-footer { font-size: 13px; opacity: .85; }
 
   /* ── Content pages ── */
-  .content { padding: 18mm 22mm 10mm; }
+  .content { padding: 0 22mm; }
   .part-title { color: {{brand.headerColor}}; font-size: 15px; text-transform: uppercase; letter-spacing: 1.8px; border-bottom: 0.6mm solid {{brand.accentColor}}; padding-bottom: 2.5mm; margin: 10mm 0 8mm; page-break-after: avoid; }
   .part-lede { margin: -4mm 0 7mm; }
   .content-section { margin-bottom: 10mm; }
@@ -163,6 +165,9 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .section-body p { margin-bottom: 3.5mm; }
   .section-body ul, .section-body ol { margin: 2mm 0 3.5mm 6mm; }
   .section-body li { margin-bottom: 1.8mm; }
+  .section-body p, .section-body li { orphans: 3; widows: 3; }
+  .section-body table { page-break-inside: auto; }
+  .section-body tr { page-break-inside: avoid; }
   .section-body table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 3mm 0 4mm; }
   .section-body th, .section-body td { border: 0.3mm solid #dfe5e8; padding: 2.5mm 3mm; text-align: left; vertical-align: top; }
   .section-body th { background: color-mix(in srgb, {{brand.headerColor}} 8%, #ffffff); color: {{brand.headerColor}}; }
@@ -210,6 +215,8 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   </div>
   <div class="cover-footer">Prepared for you by {{brand.organizationName}} · {{brand.website}}</div>
 </div>
+
+<!--SPLIT-->
 
 <div class="content">
   <section class="content-section">
@@ -262,22 +269,3 @@ export function defaultSlotMeta(spec: MasterDocSpec): Record<string, { maxChars?
   return meta
 }
 
-/**
- * Chromium print-footer template (leadgen plan: the ONLY safe way to keep the
- * brand strip on every page — it renders inside the page's bottom margin, so
- * flowed content physically cannot overlap it). Inline styles only; Chromium
- * ignores external CSS in header/footer templates.
- */
-export function brandFooterTemplate(t: { organizationName: string; phone: string; website: string; headerColor: string }): string {
-  const line = [t.phone, t.website.replace(/^https?:\/\//, '')].filter(Boolean).join(' · ')
-  // Outer box fills the 15mm margin; the 13mm strip anchors to the paper's
-  // bottom edge, leaving 2mm of guaranteed breathing room above it so even
-  // a line whose box ends flush with the page area never touches the strip.
-  return (
-    `<div style="width:100%;height:15mm;margin:0;display:flex;flex-direction:column;justify-content:flex-end;">` +
-    `<div style="width:100%;height:13mm;background:${t.headerColor};color:#ffffff;` +
-    `font-family:Helvetica,Arial,sans-serif;font-size:10.5px;display:flex;justify-content:space-between;` +
-    `align-items:center;padding:0 22mm;-webkit-print-color-adjust:exact;">` +
-    `<span>${t.organizationName}</span><span>${line}</span></div></div>`
-  )
-}

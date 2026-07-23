@@ -13,7 +13,7 @@ export const spec: MasterDocSpec = {
     "The warning signs that mean it's time to get checked",
   ],
   introHtml:
-    "<p>If you work at a desk, you probably spend more time sitting than sleeping. Research consistently links prolonged sitting with neck pain, low-back pain, tension headaches, and tight hips. Most of us feel it long before we do anything about it: the stiff neck at 3 PM, the ache when you finally stand up, the shoulders that creep toward your ears during a deadline.</p><p>Here's the good news: the damage is not inevitable. Small, consistent changes to how you sit, how often you move, and how you reset your body make a measurable difference, usually within a couple of weeks.</p><p>This guide gives you 9 practical ways to fight back, in three groups: set up your space (ways 1 and 2), change your rhythm (way 3), and reset your body (ways 4 to 9). None of them require equipment, and every stretch fits into a two-minute break.</p>",
+    "<p>If you work at a desk, you probably spend more time sitting than sleeping. Research consistently links prolonged sitting with neck pain, low-back pain, tension headaches, and tight hips. Most of us feel it long before we do anything about it: the stiff neck at 3 PM, the ache when you finally stand up, the shoulders that creep toward your ears during a deadline.</p><p>Here's the good news: the damage is not inevitable. Small, consistent changes to how you sit, how often you move, and how you reset your body make a measurable difference, usually within a couple of weeks.</p><p>This guide gives you 9 practical ways to fight back, in three groups: set up your space (ways 1 and 2), change your rhythm (way 3), and reset your body with the 6-stretch desk reset. None of them require equipment, and every stretch fits into a two-minute break.</p>",
   blocks: [
     { kind: 'part', title: 'Why this matters' },
     {
@@ -46,7 +46,7 @@ export const spec: MasterDocSpec = {
     },
     {
       kind: 'part',
-      title: 'Ways 4 to 9: the 6-stretch desk reset',
+      title: 'The 6-stretch desk reset',
       ledeHtml:
         '<p>Do these in order and the full circuit takes under five minutes. Move gently into each position. You should feel a comfortable stretch, never pain. Breathe slowly throughout, and never bounce or force anything.</p>',
     },

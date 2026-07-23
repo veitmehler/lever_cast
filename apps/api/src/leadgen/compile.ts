@@ -9,6 +9,7 @@
  * review gate is the AHPRA checkpoint (user decision).
  */
 import { prisma, uploadBufferWithKey } from '@socioply/shared'
+import { brandFooterTemplate } from './master-layout'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
@@ -77,6 +78,21 @@ export function dropEmptyOptionalBlocks(html: string, t: BrandTokens): string {
     (m, _tag, key: string) =>
       String((t as unknown as Record<string, string>)[key] ?? '').trim() ? m : '',
   )
+}
+
+/** Inline the logo as a data URI so the print render never races a network fetch. */
+export async function inlineLogo(t: BrandTokens): Promise<BrandTokens> {
+  if (!t.logoUrl) return t
+  try {
+    const res = await fetch(t.logoUrl)
+    if (!res.ok) throw new Error(`logo fetch ${res.status}`)
+    const mime = res.headers.get('content-type') ?? 'image/png'
+    const b64 = Buffer.from(await res.arrayBuffer()).toString('base64')
+    return { ...t, logoUrl: `data:${mime};base64,${b64}` }
+  } catch (err) {
+    logger.warn({ err, logoUrl: t.logoUrl }, '[leadgen-compile] logo inline failed — org-name fallback')
+    return { ...t, logoUrl: '' }
+  }
 }
 
 function applyBrandTokens(html: string, t: BrandTokens): string {
@@ -184,11 +200,21 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
       html = html.replace(full, finalText)
     }
 
-    // 2. Brand tokens + render to PDF.
-    html = applyBrandTokens(html, tokens)
+    // 2. Brand tokens (logo inlined as data URI) + render to PDF. The brand
+    // strip renders as a Chromium footer template inside the page's bottom
+    // margin — flowed content can never overlap it.
+    const inked = await inlineLogo(tokens)
+    html = applyBrandTokens(html, inked)
     const pdf = await withRasterPage(async (page) => {
       await page.setContent(html, { waitUntil: 'load', timeout: 60_000 })
-      return (await page.pdf({ format: 'a4', printBackground: true })) as Buffer
+      return (await page.pdf({
+        format: 'a4',
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<span></span>',
+        footerTemplate: brandFooterTemplate(inked),
+        margin: { top: '0', bottom: '13mm', left: '0', right: '0' },
+      })) as Buffer
     })
 
     // 3. S3 copy (source of truth) + Drive upload (when configured).
@@ -273,7 +299,7 @@ export async function compileCustomDocument(documentId: string, addCover: boolea
 
     let finalPdf = original
     if (addCover) {
-      const tokens = await brandTokensFor(doc.userId)
+      const tokens = await inlineLogo(await brandTokensFor(doc.userId))
       const coverPdf = await withRasterPage(async (page) => {
         await page.setContent(customCoverHtml(doc.title, tokens), { waitUntil: 'load', timeout: 60_000 })
         return (await page.pdf({ format: 'a4', printBackground: true })) as Buffer

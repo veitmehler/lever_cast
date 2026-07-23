@@ -134,7 +134,6 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
 <head>
 <meta charset="utf-8"/>
 <style>
-  @page { size: A4; margin: 0 0 13mm 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: {{brand.fontColor}}; }
 
@@ -153,7 +152,7 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .cover .cover-footer { font-size: 13px; opacity: .85; }
 
   /* ── Content pages ── */
-  .content { padding: 18mm 22mm 34mm; }
+  .content { padding: 18mm 22mm 10mm; }
   .part-title { color: {{brand.headerColor}}; font-size: 15px; text-transform: uppercase; letter-spacing: 1.8px; border-bottom: 0.6mm solid {{brand.accentColor}}; padding-bottom: 2.5mm; margin: 10mm 0 8mm; page-break-after: avoid; }
   .part-lede { margin: -4mm 0 7mm; }
   .content-section { margin-bottom: 10mm; }
@@ -183,9 +182,6 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .stretch-card .how, .stretch-card .why { font-size: 11.5px; line-height: 1.55; margin-top: 2.5mm; }
   .mini-label { display: block; font-weight: 700; color: {{brand.accentColor}}; font-size: 10px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 1mm; }
 
-  /* ── Per-page footer strip ── */
-  .page-footer { position: fixed; bottom: 0; left: 0; right: 0; background: {{brand.headerColor}}; color: #fff; font-size: 10.5px; padding: 4mm 22mm; display: flex; justify-content: space-between; }
-
   /* ── Back page ── */
   .back-page { page-break-before: always; min-height: 240mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 26mm 25mm; }
   .back-page h2 { justify-content: center; font-size: 24px; }
@@ -213,11 +209,6 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
     ${checklist}
   </div>
   <div class="cover-footer">Prepared for you by {{brand.organizationName}} · {{brand.website}}</div>
-</div>
-
-<div class="page-footer">
-  <span>{{brand.organizationName}}</span>
-  <span>{{brand.phone}} · {{brand.website}}</span>
 </div>
 
 <div class="content">
@@ -269,4 +260,20 @@ export function defaultSlotMeta(spec: MasterDocSpec): Record<string, { maxChars?
       for (const c of b.cards) meta[`${c.slotName}_why`] = { maxChars: 380, rewriteEligible: true }
   }
   return meta
+}
+
+/**
+ * Chromium print-footer template (leadgen plan: the ONLY safe way to keep the
+ * brand strip on every page — it renders inside the page's bottom margin, so
+ * flowed content physically cannot overlap it). Inline styles only; Chromium
+ * ignores external CSS in header/footer templates.
+ */
+export function brandFooterTemplate(t: { organizationName: string; phone: string; website: string; headerColor: string }): string {
+  const line = [t.phone, t.website.replace(/^https?:\/\//, '')].filter(Boolean).join(' · ')
+  return (
+    `<div style="width:100%;height:13mm;background:${t.headerColor};color:#ffffff;` +
+    `font-family:Helvetica,Arial,sans-serif;font-size:10.5px;display:flex;justify-content:space-between;` +
+    `align-items:center;padding:0 22mm;margin:0;-webkit-print-color-adjust:exact;">` +
+    `<span>${t.organizationName}</span><span>${line}</span></div>`
+  )
 }

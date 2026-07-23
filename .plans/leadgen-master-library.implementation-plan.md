@@ -8,7 +8,7 @@ bookingUrl lines dropped when absent. REMAINING: Phase F (QR card) + GBP-URL cap
 Places hours lookup (needs GOOGLE_MAPS_API_KEY); note: two SVG assets carry em-dashes in
 their artwork text (d2_redflag, d2_scale) — user's call whether to edit.
 
-PRINT-GEOMETRY REDESIGN 2026-07-24 (505b3d4, after user review): Chromium footerTemplate
+ALL FIVE MASTERS USER-REVIEWED AND SIGNED OFF 2026-07-24 (per-doc page-break passes + brand-color fallback + branded back page). PRINT-GEOMETRY REDESIGN 2026-07-24 (505b3d4, after user review): Chromium footerTemplate
 MEASURED as unusable (box inset ~5.5mm from paper edge + overlaps content area ~5mm) —
 final architecture = two-pass render (full-bleed cover page, content with real 18mm top /
 26mm bottom print margins) + pdf-lib-stamped brand strip at the true paper bottom (13mm

@@ -58,7 +58,7 @@ export interface StretchCard {
 }
 
 export type MasterBlock =
-  | { kind: 'part'; title: string; ledeHtml?: string }
+  | { kind: 'part'; title: string; ledeHtml?: string; num?: number; startOnNewPage?: boolean }
   | ({ kind: 'section' } & MasterSection)
   | { kind: 'stretchGrid'; cards: StretchCard[] }
 
@@ -117,8 +117,11 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   let num = 0
   const body = blocks
     .map((b) => {
-      if (b.kind === 'part')
-        return `<h2 class="part-title">${esc(b.title)}</h2>${b.ledeHtml ? `<div class="section-body part-lede">${b.ledeHtml}</div>` : ''}`
+      if (b.kind === 'part') {
+        const cls = `part-title${b.num !== undefined ? ' part-numbered' : ''}${b.startOnNewPage ? ' part-break' : ''}`
+        const numeral = b.num !== undefined ? `<span class="section-num part-num">${b.num}</span>` : ''
+        return `<h2 class="${cls}">${numeral}${esc(b.title)}</h2>${b.ledeHtml ? `<div class="section-body part-lede">${b.ledeHtml}</div>` : ''}`
+      }
       if (b.kind === 'stretchGrid')
         // Cards number locally (1..n) under their part title — a grid titled
         // "the 6-stretch reset" must not open with card 4 (user decision).
@@ -157,6 +160,9 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .content { padding: 0 22mm; }
   .part-title { color: {{brand.headerColor}}; font-size: 15px; text-transform: uppercase; letter-spacing: 1.8px; border-bottom: 0.6mm solid {{brand.accentColor}}; padding-bottom: 2.5mm; margin: 10mm 0 8mm; page-break-after: avoid; }
   .part-lede { margin: -4mm 0 7mm; }
+  .part-break { page-break-before: always; }
+  .part-numbered { display: flex; align-items: center; gap: 4mm; text-transform: none; letter-spacing: 0; font-size: 20px; }
+  .part-num { width: 9.5mm; height: 9.5mm; font-size: 14px; }
   .content-section { margin-bottom: 10mm; }
   .section-head { page-break-inside: avoid; }
   h2 { color: {{brand.headerColor}}; font-size: 18px; margin-bottom: 4mm; display: flex; align-items: center; gap: 4mm; page-break-after: avoid; }
@@ -188,15 +194,19 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .mini-label { display: block; font-weight: 700; color: {{brand.accentColor}}; font-size: 10px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 1mm; }
 
   /* ── Back page ── */
-  .back-page { page-break-before: always; min-height: 240mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 26mm 25mm; }
-  .back-page h2 { justify-content: center; font-size: 24px; }
+  .back-page { page-break-before: always; height: 250mm; display: flex; flex-direction: column; text-align: center; padding: 10mm 25mm 0; }
+  .back-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .back-page h2 { justify-content: center; font-size: 26px; }
+  .back-page .accent-bar { width: 34mm; height: 2mm; background: {{brand.accentColor}}; border-radius: 2px; margin: 5mm auto 0; }
+  .back-logo { margin-top: 10mm; }
+  .back-logo img { max-height: 16mm; max-width: 55mm; }
   .offer-box { border: 0.5mm solid {{brand.accentColor}}; border-radius: 3mm; background: color-mix(in srgb, {{brand.accentColor}} 7%, #ffffff); padding: 7mm 10mm; margin-top: 8mm; max-width: 135mm; }
   .offer-box .offer-label { font-weight: 700; color: {{brand.accentColor}}; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
   .offer-box .offer-text { font-size: 14.5px; line-height: 1.5; margin-top: 2.5mm; font-weight: 600; }
   .offer-box .offer-note { font-size: 12px; color: #556; margin-top: 2.5mm; }
   .back-page .cta-btn { display: inline-block; margin-top: 8mm; background: {{brand.accentColor}}; color: #fff; padding: 5mm 12mm; border-radius: 3mm; font-size: 16px; font-weight: 600; }
   .back-page .contact { margin-top: 9mm; font-size: 13px; line-height: 1.9; color: {{brand.fontColor}}; }
-  .disclaimer { margin-top: 12mm; font-size: 9.5px; line-height: 1.5; color: #777; max-width: 150mm; }
+  .disclaimer { margin: 6mm auto 2mm; font-size: 9.5px; line-height: 1.5; color: #777; max-width: 160mm; }
 </style>
 </head>
 <body>
@@ -226,7 +236,9 @@ ${body}
 </div>
 
 <div class="back-page">
+  <div class="back-main">
   <h2>Ready for the next step?</h2>
+  <div class="accent-bar"></div>
   <p class="section-body" style="max-width:130mm"><slot name="cta_paragraph">If anything in this guide sounds like you, we'd love to help you get moving comfortably again.</slot></p>
   <div class="offer-box">
     <div class="offer-label">${esc(spec.offerHeadline ?? 'Reader offer')}</div>
@@ -241,6 +253,8 @@ ${body}
     <span data-optional="bookingUrl">Book online: {{brand.bookingUrl}}<br/></span>
     <span data-optional="openingHours">{{brand.openingHours}}<br/></span>
     {{brand.website}}
+  </div>
+  <div class="back-logo" data-optional="logoDarkUrl"><img src="{{brand.logoDarkUrl}}"/></div>
   </div>
   <p class="disclaimer">${spec.disclaimerHtml}</p>
 </div>

@@ -37,6 +37,7 @@ export interface BrandTokens {
   openingHours: string
   readerOffer: string
   logoUrl: string
+  logoDarkUrl: string
   headerColor: string
   accentColor: string
   fontColor: string
@@ -62,6 +63,8 @@ async function brandTokensFor(userId: string): Promise<BrandTokens> {
     // Cover renders on the dark brand color → the light (white-on-transparent)
     // processed variant; legacy single-logo field and org logo as fallbacks.
     logoUrl: brand?.nlLogoLightUrl ?? brand?.nlLogoUrl ?? brand?.organizationLogoUrl ?? '',
+    // Back page renders on white → the dark (navy-on-transparent) variant.
+    logoDarkUrl: brand?.nlLogoDarkUrl ?? brand?.organizationLogoUrl ?? '',
     headerColor: brand?.nlHeaderBgColor ?? '#0b2545',
     accentColor: brand?.nlLinkColor ?? '#2a6f97',
     fontColor: brand?.nlFontColor ?? '#222222',
@@ -81,19 +84,25 @@ export function dropEmptyOptionalBlocks(html: string, t: BrandTokens): string {
   )
 }
 
-/** Inline the logo as a data URI so the print render never races a network fetch. */
+/** Inline both logo variants as data URIs so the print render never races a network fetch. */
 export async function inlineLogo(t: BrandTokens): Promise<BrandTokens> {
-  if (!t.logoUrl) return t
-  try {
-    const res = await fetch(t.logoUrl)
+  const inline = async (url: string): Promise<string> => {
+    if (!url) return ''
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`logo fetch ${res.status}`)
     const mime = res.headers.get('content-type') ?? 'image/png'
-    const b64 = Buffer.from(await res.arrayBuffer()).toString('base64')
-    return { ...t, logoUrl: `data:${mime};base64,${b64}` }
-  } catch (err) {
-    logger.warn({ err, logoUrl: t.logoUrl }, '[leadgen-compile] logo inline failed — org-name fallback')
-    return { ...t, logoUrl: '' }
+    return `data:${mime};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`
   }
+  const out = { ...t }
+  for (const key of ['logoUrl', 'logoDarkUrl'] as const) {
+    try {
+      out[key] = await inline(t[key])
+    } catch (err) {
+      logger.warn({ err, url: t[key], key }, '[leadgen-compile] logo inline failed — fallback')
+      out[key] = ''
+    }
+  }
+  return out
 }
 
 const MM = 72 / 25.4 // pt per mm

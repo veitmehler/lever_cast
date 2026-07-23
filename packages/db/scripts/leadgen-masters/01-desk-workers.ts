@@ -47,6 +47,8 @@ export const spec: MasterDocSpec = {
     {
       kind: 'part',
       title: 'The 6-stretch desk reset',
+      num: 4,
+      startOnNewPage: true,
       ledeHtml:
         '<p>Do these in order and the full circuit takes under five minutes. Move gently into each position. You should feel a comfortable stretch, never pain. Breathe slowly throughout, and never bounce or force anything.</p>',
     },
@@ -109,7 +111,7 @@ export const spec: MasterDocSpec = {
         },
       ],
     },
-    { kind: 'part', title: 'An honest note' },
+    { kind: 'part', title: 'An honest note', startOnNewPage: true },
     {
       kind: 'section',
       heading: "When stretching isn't enough",

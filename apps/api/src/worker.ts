@@ -43,6 +43,7 @@ import { onboardingCrawlHandler } from './handlers/onboarding-crawl'
 import { onboardingSynthesisHandler } from './handlers/onboarding-synthesis'
 import { leadgenPollHandler } from './handlers/leadgen-poll'
 import { leadgenCompileHandler } from './handlers/leadgen-compile'
+import { placesReviewPollHandler, googleReviewsBackfillHandler } from './handlers/google-reviews'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -104,6 +105,7 @@ async function main() {
   await boss.schedule(QUEUES.CLIENT_STORY_AUTO_GENERATE_CHECK, '*/15 * * * *', {}) // every 15 min
   await boss.schedule(QUEUES.ACCOUNT_LIFECYCLE_CLOCK, '30 4 * * *', {}) // daily 04:30 UTC — 60/90d billing clocks
   await boss.schedule(QUEUES.LEADGEN_PROPOSAL_POLL, '*/2 * * * *', {}) // every 2 min — Drive access-proposal capture
+  await boss.schedule(QUEUES.PLACES_REVIEW_POLL, '0 4 * * 1', {}) // Monday 04:00 UTC — weekly dual-sort review harvest
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -335,6 +337,16 @@ async function main() {
     QUEUES.LEADGEN_PROPOSAL_POLL,
     { batchSize: 1 },
     withSentry('leadgen-proposal-poll', leadgenPollHandler),
+  )
+  await boss.work(
+    QUEUES.PLACES_REVIEW_POLL,
+    { batchSize: 1 },
+    withSentry('places-review-poll', placesReviewPollHandler),
+  )
+  await boss.work(
+    QUEUES.GOOGLE_REVIEWS_BACKFILL,
+    { batchSize: 1 },
+    withSentry('google-reviews-backfill', googleReviewsBackfillHandler),
   )
   await boss.work(
     QUEUES.LEADGEN_COMPILE,

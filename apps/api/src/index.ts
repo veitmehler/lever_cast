@@ -11,6 +11,8 @@ import { imageRoutes } from './routes/images'
 import { mediaRoutes } from './routes/media'
 import { ghlRoutes } from './routes/ghl'
 import { ghlBillingRoutes } from './routes/ghl-billing'
+import { ghlReviewRoutes } from './routes/ghl-reviews'
+import { googleOauthRoutes } from './routes/google-oauth'
 import { embedRoutes } from './routes/embed'
 import { onboardingRoutes } from './routes/onboarding'
 import { onboardingVoiceRoutes } from './routes/onboarding-voice'
@@ -82,6 +84,8 @@ async function main() {
   await app.register(mediaRoutes, { prefix: '/api' })
   await app.register(ghlRoutes, { prefix: '/api' })
   await app.register(ghlBillingRoutes, { prefix: '/api' })
+  await app.register(ghlReviewRoutes, { prefix: '/api' })
+  await app.register(googleOauthRoutes, { prefix: '/api' })
   await app.register(embedRoutes, { prefix: '/api' })
   await app.register(onboardingRoutes, { prefix: '/api' })
   await app.register(onboardingVoiceRoutes, { prefix: '/api' })

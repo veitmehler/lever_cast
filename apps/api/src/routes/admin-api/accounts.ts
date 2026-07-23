@@ -138,4 +138,18 @@ export async function accountsAdminRoutes(app: FastifyInstance) {
     await prisma.account.update({ where: { id: request.params.id }, data: { ghlBillingToken: token } })
     return reply.send({ token, path: `/api/ghl/billing-events/${token}` })
   })
+
+  // Mint (or rotate) the account's GHL Review-Received webhook token (google-reviews
+  // plan Tier 3 runbook) — becomes the custom value `socioply_review_token`.
+  app.post<{ Params: { id: string } }>('/accounts/:id/review-token', async (request, reply) => {
+    const admin = await requireAdmin(request, reply)
+    if (!admin) return
+
+    const existing = await prisma.account.findUnique({ where: { id: request.params.id }, select: { id: true } })
+    if (!existing) return reply.status(404).send({ error: 'Account not found' })
+
+    const token = randomBytes(24).toString('base64url')
+    await prisma.account.update({ where: { id: request.params.id }, data: { ghlReviewToken: token } })
+    return reply.send({ token, path: `/api/ghl/reviews/${token}` })
+  })
 }

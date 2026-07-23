@@ -470,3 +470,37 @@ export async function upsertGhlContact(
   })
   return { contactId: data.contact?.id ?? null }
 }
+
+// ── Trigger links (QR review card, leadgen plan Phase F option C) ────────────
+
+export interface GhlTriggerLink {
+  id: string
+  name: string
+  redirectTo?: string
+  fieldKey?: string
+}
+
+/** List the location's trigger links; returns [] on any failure (defensive). */
+export async function listTriggerLinks(apiKey: string, locationId: string): Promise<GhlTriggerLink[]> {
+  try {
+    const data = await ghlRequest<{ links?: GhlTriggerLink[] }>(apiKey, `/links/?locationId=${locationId}`)
+    return data.links ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Point a trigger link at a new destination (the clinic's Google review deep link). */
+export async function updateTriggerLink(
+  apiKey: string,
+  linkId: string,
+  name: string,
+  redirectTo: string,
+): Promise<boolean> {
+  try {
+    await ghlRequest(apiKey, `/links/${linkId}`, { method: 'PUT', body: { name, redirectTo } })
+    return true
+  } catch {
+    return false
+  }
+}

@@ -393,3 +393,71 @@ export async function commitPms(ctx: StepContext, answer: unknown): Promise<stri
   await brandUpsert(ctx.userId, { pmsSystem: value })
   return null
 }
+
+/** gbp: capture the Google Business Profile / Maps link; resolve place + probe (best-effort). */
+export async function commitGbp(ctx: StepContext, answer: unknown): Promise<string | null> {
+  const a = (answer ?? {}) as { text?: string }
+  const raw = a.text?.trim() ?? ''
+  if (!raw) return 'Paste your Google listing link, or type "skip" if you don\'t have one'
+  if (/^(skip|none|no)$/i.test(raw)) {
+    ctx.stepData.gbpSkipped = true
+    return null
+  }
+  const url = raw.startsWith('http') ? raw : `https://${raw}`
+  try {
+    new URL(url)
+  } catch {
+    return 'That doesn\'t look like a link — use the Share button on your Google Business Profile, or type "skip"'
+  }
+  await brandUpsert(ctx.userId, { googleBusinessProfileUrl: url })
+
+  // Best-effort place resolution + review/hours probe — NEVER blocks onboarding.
+  try {
+    const { placesConfigured, resolvePlaceId, probePlace } = await import('../lib/google/places')
+    if (placesConfigured()) {
+      const brand = await prisma.brandSettings.findUnique({
+        where: { userId: ctx.userId },
+        select: { organizationName: true, geolocation: true, openingHours: true },
+      })
+      const placeId = await resolvePlaceId(url, [brand?.organizationName, brand?.geolocation].filter(Boolean).join(' '))
+      if (placeId) {
+        await brandUpsert(ctx.userId, { googlePlaceId: placeId })
+        const probe = await probePlace(placeId)
+        if (probe) {
+          if (probe.openingHours && !brand?.openingHours?.trim()) {
+            await brandUpsert(ctx.userId, { openingHours: probe.openingHours })
+          }
+          const { ingestReviews } = await import('../lib/google/review-ingest')
+          await ingestReviews(ctx.accountId, 'places-probe', probe.reviews)
+        }
+        // Option C provisioning: point the snapshot's `socioply-review` trigger
+        // link at the clinic's Google review deep link (best-effort).
+        try {
+          const { getGhlCredentials } = await import('../lib/ghl/settings')
+          const creds = await getGhlCredentials(ctx.userId)
+          if (creds) {
+            const { listTriggerLinks, updateTriggerLink } = await import('../lib/ghl/client')
+            const { reviewDeepLink } = await import('../lib/google/places')
+            const link = (await listTriggerLinks(creds.apiKey, creds.locationId)).find(
+              (l) => l.name?.toLowerCase() === 'socioply-review',
+            )
+            if (link) await updateTriggerLink(creds.apiKey, link.id, link.name, reviewDeepLink(placeId))
+          }
+        } catch (err) {
+          logger.warn({ err }, '[onboarding] trigger-link provisioning failed (non-fatal)')
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, '[onboarding] places probe failed (non-fatal)')
+  }
+  return null
+}
+
+/** google_reviews: record the OAuth decision (the popup does the actual connect). */
+export async function commitGoogleReviews(ctx: StepContext, answer: unknown): Promise<string | null> {
+  const a = (answer ?? {}) as { value?: string }
+  if (!a.value) return 'Pick an option'
+  ctx.stepData.googleReviews = a.value
+  return null
+}

@@ -23,6 +23,8 @@ import {
   commitCta,
   commitBookingUrl,
   commitPms,
+  commitGbp,
+  commitGoogleReviews,
   commitWritingSample,
   commitWordpress,
   commitSocials,
@@ -294,6 +296,46 @@ const STEPS: StepDef[] = [
     commit: async (ctx, answer) => {
       const err = await commitSocials(ctx, answer)
       if (!err) ctx.stepData.socials = answer
+      return err
+    },
+  },
+  {
+    id: 'gbp',
+    kind: 'text',
+    prepare: async () => ({
+      messages: [
+        "Almost there. Paste the link to your Google Business Profile (your Google Maps listing) — it powers your review QR card and lets us celebrate real patient wins. Type \"skip\" if you don't have one yet.",
+      ],
+    }),
+    commit: async (ctx, answer) => {
+      const err = await commitGbp(ctx, answer)
+      if (!err) ctx.stepData.gbp = answer
+      return err
+    },
+  },
+  {
+    id: 'google_reviews',
+    kind: 'choice',
+    prepare: async (ctx) => {
+      const configured = Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID)
+      return {
+        messages: [
+          configured
+            ? 'Want to connect your Google account so we can pull in ALL your reviews? Real patient stories make the strongest content. (You can disconnect anytime.)'
+            : "One more thing for later: we'll be able to pull in your Google reviews to power patient-story content. Nothing needed from you today.",
+        ],
+        options: configured
+          ? [
+              { value: 'connect', label: 'Connect Google' },
+              { value: 'skip', label: 'Skip for now' },
+            ]
+          : [{ value: 'skip', label: 'Continue' }],
+        card: configured ? { type: 'google_oauth', startPath: `/api/google/oauth/start?account=${ctx.accountId}` } : undefined,
+      }
+    },
+    commit: async (ctx, answer) => {
+      const err = await commitGoogleReviews(ctx, answer)
+      if (!err) ctx.stepData.google_reviews = answer
       return err
     },
   },

@@ -437,6 +437,10 @@ function ChoiceInput({
           onClick={() => {
             if (step.id === 'cta' && o.value === 'custom') return setRevealed('custom')
             if (step.id === 'pms' && o.value === 'other') return setRevealed('pms_other')
+            if (step.id === 'google_reviews' && o.value === 'connect') {
+              const startPath = (step.card as { startPath?: string } | undefined)?.startPath
+              if (startPath) window.open(`${process.env.NEXT_PUBLIC_API_URL ?? ''}${startPath}`, '_blank', 'width=520,height=680')
+            }
             if (step.id === 'elevenlabs' && o.value === 'yes') return setRevealed('elevenlabs_yes')
             onSubmit({ value: o.value, label: o.label }, o.label)
           }}

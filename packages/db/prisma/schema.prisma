@@ -42,6 +42,9 @@ model Account {
   // the GHL workflow posts to /api/ghl/billing-events/<token>.
   ghlBillingToken String?   @unique
   billingEvents   GhlBillingEvent[]
+  // Per-account URL token for the GHL Review-Received webhook receiver
+  // (google-reviews plan Tier 3) — workflow posts to /api/ghl/reviews/<token>.
+  ghlReviewToken  String?   @unique
   // Onboarding gate (.plans/ghl-onboarding.implementation-plan.md): first
   // generation is blocked until the chat onboarding completes (validator green).
   onboardingCompletedAt DateTime?
@@ -1079,6 +1082,9 @@ model BrandSettings {
   // Weekly opening hours (Places API lookup at onboarding, owner-editable).
   // Optional everywhere: consumers DROP the hours line when null.
   openingHours             String? @db.Text
+  // Google Place ID (resolved once from googleBusinessProfileUrl or name+address).
+  // Drives the review deep link (QR card) + the weekly Places review probe.
+  googlePlaceId            String?
   socialPrimaryGoal        String? // link-in-bio CTA goal: 'newsletter' | 'booking' | 'custom' (null → use socialCallToAction verbatim)
   socialBioUrl             String? @db.Text // the business's link-in-bio page URL (reference; posts say "link in bio")
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD

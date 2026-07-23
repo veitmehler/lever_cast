@@ -15,6 +15,7 @@ import { spec as painWarning } from './leadgen-masters/02-pain-warning-sign'
 import { spec as morningHabits } from './leadgen-masters/03-morning-habits'
 import { spec as betterSleep } from './leadgen-masters/04-better-sleep'
 import { spec as firstVisit } from './leadgen-masters/05-first-visit'
+import { buildReviewCardHtml } from '../../../apps/api/src/leadgen/review-card'
 
 const prisma = new PrismaClient()
 
@@ -60,6 +61,24 @@ async function main() {
     })
     console.log(`seeded ${m.slug} (${t.id}) — ${Math.round(sourceHtml.length / 1024)}KB`)
   }
+  // Master #6: the QR review counter card (Phase F) — special compile path,
+  // flagged via slotMeta.__kind; fixed copy, no rewrite slots.
+  const cardHtml = buildReviewCardHtml()
+  assertDashFree('review-counter-card', cardHtml)
+  const card = await prisma.leadGenTemplate.upsert({
+    where: { slug: 'review-counter-card' },
+    create: {
+      name: 'Review Counter Card (QR)',
+      slug: 'review-counter-card',
+      description: 'A6 front-desk card: scan to leave a Google review',
+      sourceHtml: cardHtml,
+      slotMeta: { __kind: 'review_card' },
+      active: true,
+    },
+    update: { sourceHtml: cardHtml, slotMeta: { __kind: 'review_card' }, active: true },
+  })
+  console.log(`seeded review-counter-card (${card.id})`)
+
   const demo = await prisma.leadGenTemplate.updateMany({
     where: { slug: 'demo-desk-back-routine' },
     data: { active: false },

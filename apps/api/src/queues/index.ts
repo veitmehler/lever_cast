@@ -109,6 +109,8 @@ export const QUEUES = {
   ONBOARDING_SYNTHESIS: 'onboarding-synthesis',
   LEADGEN_PROPOSAL_POLL: 'leadgen-proposal-poll',
   LEADGEN_COMPILE: 'leadgen-compile',
+  PLACES_REVIEW_POLL: 'places-review-poll',
+  GOOGLE_REVIEWS_BACKFILL: 'google-reviews-backfill',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

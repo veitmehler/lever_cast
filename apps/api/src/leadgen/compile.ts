@@ -243,6 +243,15 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
     return
   }
 
+  // Special master: the QR review counter card (Phase F) — no rewrite pass,
+  // A6 geometry, QR generated per clinic at compile time.
+  if ((doc.template.slotMeta as { __kind?: string } | null)?.__kind === 'review_card') {
+    return compileReviewCard(doc.id, doc.userId, doc.accountId, doc.template.sourceHtml, {
+      name: doc.account.name,
+      driveFolderId: doc.account.driveFolderId,
+    })
+  }
+
   try {
     const tokens = await brandTokensFor(doc.userId)
     const settings = await prisma.settings.findUnique({ where: { userId: doc.userId }, select: { writingStyle: true } })
@@ -410,5 +419,94 @@ export async function compileCustomDocument(documentId: string, addCover: boolea
       data: { status: 'failed', lastError: err instanceof Error ? err.message : String(err) },
     })
     logger.error({ documentId, err }, '[leadgen-compile] custom upload FAILED')
+  }
+}
+
+/** Phase F: compile the A6 QR review card (see review-card.ts for the design). */
+async function compileReviewCard(
+  documentId: string,
+  userId: string,
+  accountId: string,
+  sourceHtml: string,
+  account: { name: string | null; driveFolderId: string | null },
+): Promise<void> {
+  try {
+    const brand = await prisma.brandSettings.findUnique({
+      where: { userId },
+      select: { googlePlaceId: true },
+    })
+    if (!brand?.googlePlaceId) {
+      await prisma.leadGenDocument.update({
+        where: { id: documentId },
+        data: { status: 'disabled', lastError: 'No Google listing captured — card skipped (re-enable after adding the GBP link)' },
+      })
+      logger.info({ documentId }, '[leadgen-compile] review card skipped — no place id')
+      return
+    }
+    const { reviewDeepLink } = await import('../lib/google/places')
+    const directUrl = reviewDeepLink(brand.googlePlaceId)
+
+    // Prefer the snapshot trigger link (GHL scan stats); fall back to the direct link.
+    let target = directUrl
+    try {
+      const { getGhlCredentials } = await import('../lib/ghl/settings')
+      const creds = await getGhlCredentials(userId)
+      if (creds) {
+        const { listTriggerLinks } = await import('../lib/ghl/client')
+        const links = await listTriggerLinks(creds.apiKey, creds.locationId)
+        const link = links.find((l) => l.name?.toLowerCase() === 'socioply-review')
+        if (link?.fieldKey || link?.id) {
+          // The public trigger-link URL lives in the link record; shape verified at
+          // first real use — fall back to the direct URL when absent.
+          const url = (link as { url?: string; shareUrl?: string }).url ?? (link as { shareUrl?: string }).shareUrl
+          if (url) target = url
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, documentId }, '[leadgen-compile] trigger-link lookup failed — direct review URL used')
+    }
+
+    const { qrSvg } = await import('./review-card')
+    const inked = await inlineLogo(await brandTokensFor(userId))
+    const withQr = { ...inked, reviewQrSvg: await qrSvg(target) } as BrandTokens & { reviewQrSvg: string }
+    const html = applyBrandTokens(sourceHtml, withQr as unknown as BrandTokens).replace(
+      /\{\{brand\.reviewQrSvg\}\}/g,
+      withQr.reviewQrSvg,
+    )
+
+    const pdf = await withRasterPage(async (page) => {
+      await page.setContent(html, { waitUntil: 'load', timeout: 60_000 })
+      return (await page.pdf({ width: '105mm', height: '148mm', printBackground: true })) as Buffer
+    })
+
+    const pdfKey = `leadgen/${accountId}/review-counter-card-${Date.now()}.pdf`
+    await uploadBufferWithKey(pdfKey, pdf, 'application/pdf')
+
+    let driveFileId: string | null = null
+    let driveLink: string | null = null
+    if (driveConfigured()) {
+      let folderId = account.driveFolderId
+      if (!folderId) {
+        folderId = await ensureAccountFolder(accountId, account.name ?? 'client')
+        await prisma.account.update({ where: { id: accountId }, data: { driveFolderId: folderId } })
+      }
+      const doc = await prisma.leadGenDocument.findUnique({ where: { id: documentId }, select: { driveFileId: true, title: true } })
+      if (doc?.driveFileId) await deleteFile(doc.driveFileId)
+      const uploaded = await uploadPdf(folderId, `${doc?.title ?? 'Review card'}.pdf`, pdf)
+      driveFileId = uploaded.fileId
+      driveLink = uploaded.webViewLink
+    }
+
+    await prisma.leadGenDocument.update({
+      where: { id: documentId },
+      data: { status: 'pending_review', pdfKey, driveFileId, driveLink, compiledAt: new Date(), lastError: null },
+    })
+    logger.info({ documentId, target: target === directUrl ? 'direct' : 'trigger-link' }, '[leadgen-compile] review card compiled')
+  } catch (err) {
+    await prisma.leadGenDocument.update({
+      where: { id: documentId },
+      data: { status: 'failed', lastError: err instanceof Error ? err.message : String(err) },
+    })
+    logger.error({ documentId, err }, '[leadgen-compile] review card FAILED')
   }
 }

@@ -41,12 +41,14 @@
     "pino": "^10.3.1",
     "prisma": "^6.19.3",
     "puppeteer-core": "^24",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
     "turndown": "^7.2.4",
     "undici": "^6"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "tsx": "^4.19.3",
     "typescript": "^5",
     "vitest": "^3.2.4"

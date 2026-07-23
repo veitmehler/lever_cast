@@ -65,9 +65,11 @@ async function brandTokensFor(userId: string): Promise<BrandTokens> {
     logoUrl: brand?.nlLogoLightUrl ?? brand?.nlLogoUrl ?? brand?.organizationLogoUrl ?? '',
     // Back page renders on white → the dark (navy-on-transparent) variant.
     logoDarkUrl: brand?.nlLogoDarkUrl ?? brand?.organizationLogoUrl ?? '',
-    headerColor: brand?.nlHeaderBgColor ?? '#0b2545',
-    accentColor: brand?.nlLinkColor ?? '#2a6f97',
-    fontColor: brand?.nlFontColor ?? '#222222',
+    // Platform convention (matches social/carousel theming): newsletter palette
+    // first, then the settings-page brand colors (diagram* fields), then defaults.
+    headerColor: brand?.nlHeaderBgColor ?? brand?.diagramPrimaryColor ?? '#0b2545',
+    accentColor: brand?.nlLinkColor ?? brand?.diagramSecondaryColor ?? '#2a6f97',
+    fontColor: brand?.nlFontColor ?? brand?.diagramTextColor ?? '#222222',
   }
 }
 

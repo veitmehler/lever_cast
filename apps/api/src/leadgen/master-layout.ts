@@ -92,8 +92,8 @@ function figureHtml(f: FigureRef): string {
 function sectionHtml(s: MasterSection, num: number | null): string {
   return `
     <section class="content-section">
-      <h2>${num !== null ? `<span class="section-num">${num}</span>` : ''}${esc(s.heading)}</h2>
-      ${s.figure ? figureHtml(s.figure) : ''}
+      <div class="section-head"><h2>${num !== null ? `<span class="section-num">${num}</span>` : ''}${esc(s.heading)}</h2>
+      ${s.figure ? figureHtml(s.figure) : ''}</div>
       <div class="section-body"><slot name="${s.slotName}">${s.defaultHtml}</slot></div>
       ${s.frozenHtml ? `<div class="section-body frozen">${s.frozenHtml}</div>` : ''}
       ${s.tipHtml ? `<aside class="tip-box"><span class="tip-label">Quick tip</span><slot name="${s.slotName}_tip">${s.tipHtml}</slot></aside>` : ''}
@@ -134,7 +134,8 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
 <head>
 <meta charset="utf-8"/>
 <style>
-  @page { size: A4; margin: 0; }
+  @page { size: A4; margin: 0 0 13mm 0; }
+  @page :first { margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: {{brand.fontColor}}; }
 
@@ -156,7 +157,8 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .content { padding: 18mm 22mm 34mm; }
   .part-title { color: {{brand.headerColor}}; font-size: 15px; text-transform: uppercase; letter-spacing: 1.8px; border-bottom: 0.6mm solid {{brand.accentColor}}; padding-bottom: 2.5mm; margin: 10mm 0 8mm; page-break-after: avoid; }
   .part-lede { margin: -4mm 0 7mm; }
-  .content-section { margin-bottom: 10mm; page-break-inside: avoid; }
+  .content-section { margin-bottom: 10mm; }
+  .section-head { page-break-inside: avoid; }
   h2 { color: {{brand.headerColor}}; font-size: 18px; margin-bottom: 4mm; display: flex; align-items: center; gap: 4mm; page-break-after: avoid; }
   .section-num { display: inline-flex; align-items: center; justify-content: center; width: 8.5mm; height: 8.5mm; border-radius: 50%; background: {{brand.accentColor}}; color: #fff; font-size: 13px; flex-shrink: 0; }
   .section-body { font-size: 13px; line-height: 1.62; }
@@ -178,6 +180,7 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
   .stretch-card h3 { color: {{brand.headerColor}}; font-size: 14px; display: flex; align-items: center; gap: 3mm; margin-bottom: 3mm; }
   .stretch-card .section-num { width: 7mm; height: 7mm; font-size: 11.5px; }
   .stretch-card .doc-figure { margin: 0 0 3mm; }
+  .stretch-card .doc-figure svg { max-height: 44mm; width: auto; max-width: 100%; margin: 0 auto; }
   .stretch-card .how, .stretch-card .why { font-size: 11.5px; line-height: 1.55; margin-top: 2.5mm; }
   .mini-label { display: block; font-weight: 700; color: {{brand.accentColor}}; font-size: 10px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 1mm; }
 

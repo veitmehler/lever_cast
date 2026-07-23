@@ -1,5 +1,13 @@
 # Lead-Gen Master Library — Implementation Plan
 
+**STATUS: PHASES A-E COMPLETE 2026-07-23 (commits 32eaf29, 5a6009e, 916e2f7). All five
+masters ACTIVE on staging, demo deactivated, five branded PDFs compiled to pending_review
+for the test account and page-verified (footer margin + density + 2x2 stretch grids fixed
+across three compile rounds). Verified working: reader offer from NewsletterOffer, hours +
+bookingUrl lines dropped when absent. REMAINING: Phase F (QR card) + GBP-URL capture +
+Places hours lookup (needs GOOGLE_MAPS_API_KEY); note: two SVG assets carry em-dashes in
+their artwork text (d2_redflag, d2_scale) — user's call whether to edit.**
+
 **Goal: the five drafted lead-magnet documents (+ the QR review card) become the active
 master library, so every clinic that completes onboarding automatically receives its own
 branded, review-gated document set.** Source material: `.documentation/Lead Gen Docs/`

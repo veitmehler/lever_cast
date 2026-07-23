@@ -25,7 +25,7 @@ export const spec: MasterDocSpec = {
   introHtml:
     "<p>Most people wait far longer than they need to before seeing a chiropractor. Not because the pain isn't real, but because of uncertainty. Will it hurt? What actually happens? Will I be pressured into endless appointments? Is it even safe?</p><p>Those are fair questions, and they deserve straight answers, not sales pitches. This guide walks you through exactly what happens at a first visit, explains the famous 'crack,' clears up the most common myths, and arms you with the questions that help you judge any provider for yourself.</p><p><strong>The one-sentence version:</strong> a first chiropractic visit is mostly listening, examining, and explaining, and nothing happens to your body without your understanding and consent.</p>",
   blocks: [
-    { kind: 'part', title: 'The walkthrough' },
+    { kind: 'part', title: 'The walkthrough', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'Your first visit, step by step',
@@ -44,7 +44,7 @@ export const spec: MasterDocSpec = {
       frozenHtml:
         '<ul><li>Comfortable clothes you can move in (you typically stay dressed)</li><li>Any recent imaging reports (X-ray, MRI) or a list of medications, if you have them</li><li>Your symptom notes: when it started, what makes it better or worse</li><li>Your insurance details, if applicable</li></ul>',
     },
-    { kind: 'part', title: 'The famous sound' },
+    { kind: 'part', title: 'The famous sound', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'That popping sound, explained',
@@ -56,7 +56,7 @@ export const spec: MasterDocSpec = {
       frozenHtml:
         "<ul><li>It is <strong>not</strong> bones cracking or 'going back into place.' It's a pressure change in fluid, the same phenomenon as knuckle cracking.</li><li>The sound is not the treatment. A perfectly effective adjustment can be silent; a loud one isn't 'working better.'</li><li>Prefer no popping at all? Say so. Low-force techniques (instrument-assisted, mobilization, drop-table) exist precisely for this, and any good chiropractor offers them.</li></ul>",
     },
-    { kind: 'part', title: 'Sorting fact from fiction' },
+    { kind: 'part', title: 'Sorting fact from fiction', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'Six myths, six facts',
@@ -67,7 +67,7 @@ export const spec: MasterDocSpec = {
         "<p>These six beliefs stop more people from getting help than pain ever does. Here's how they hold up:</p>",
       frozenHtml: mythsTable,
     },
-    { kind: 'part', title: 'A 60-second anatomy lesson' },
+    { kind: 'part', title: 'A 60-second anatomy lesson', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'Your spine at a glance',
@@ -77,7 +77,7 @@ export const spec: MasterDocSpec = {
       defaultHtml:
         '<p>It helps to know the map when your chiropractor explains what they found.</p>',
     },
-    { kind: 'part', title: 'Be an empowered patient' },
+    { kind: 'part', title: 'Be an empowered patient', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'Questions worth asking, and answers worth hearing',

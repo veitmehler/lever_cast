@@ -144,6 +144,14 @@ Drive. No text modification, communicated as such in the UI.
   Google account (proposals can't be created via API — the one manual step), poller
   captures + resolves + GHL contact appears with tags. Then the review-gate walkthrough.
 
+## Master library (2026-07-23): five drafted docs become the active library
+
+User delivered 5 DOCX/PDF drafts + 30 SVG assets (.documentation/Lead Gen Docs/).
+Recoloring DECIDED AGAINST (assets stay as-is). Full build plan:
+.plans/leadgen-master-library.implementation-plan.md (layout v2 w/ figures, DOCX-to-spec
+conversion w/ frozen clinical slots, bookingUrl+reader-offer tokens, seed+verify,
+QR card as master #6). Per-clinic provisioning already live via onboarding complete.
+
 ## Addition (2026-07-15): branded "Review us" QR counter card
 
 One more starter-library master — but a print CARD, not a guide: clinic colors + logo +

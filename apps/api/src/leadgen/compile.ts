@@ -215,7 +215,7 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
         displayHeaderFooter: true,
         headerTemplate: '<span></span>',
         footerTemplate: brandFooterTemplate(inked),
-        margin: { top: '0', bottom: '13mm', left: '0', right: '0' },
+        margin: { top: '0', bottom: '15mm', left: '0', right: '0' },
       })) as Buffer
     })
 

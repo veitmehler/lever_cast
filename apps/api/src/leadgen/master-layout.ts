@@ -270,10 +270,14 @@ export function defaultSlotMeta(spec: MasterDocSpec): Record<string, { maxChars?
  */
 export function brandFooterTemplate(t: { organizationName: string; phone: string; website: string; headerColor: string }): string {
   const line = [t.phone, t.website.replace(/^https?:\/\//, '')].filter(Boolean).join(' · ')
+  // Outer box fills the 15mm margin; the 13mm strip anchors to the paper's
+  // bottom edge, leaving 2mm of guaranteed breathing room above it so even
+  // a line whose box ends flush with the page area never touches the strip.
   return (
+    `<div style="width:100%;height:15mm;margin:0;display:flex;flex-direction:column;justify-content:flex-end;">` +
     `<div style="width:100%;height:13mm;background:${t.headerColor};color:#ffffff;` +
     `font-family:Helvetica,Arial,sans-serif;font-size:10.5px;display:flex;justify-content:space-between;` +
-    `align-items:center;padding:0 22mm;margin:0;-webkit-print-color-adjust:exact;">` +
-    `<span>${t.organizationName}</span><span>${line}</span></div>`
+    `align-items:center;padding:0 22mm;-webkit-print-color-adjust:exact;">` +
+    `<span>${t.organizationName}</span><span>${line}</span></div></div>`
   )
 }

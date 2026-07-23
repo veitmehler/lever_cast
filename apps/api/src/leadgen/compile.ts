@@ -60,7 +60,9 @@ async function brandTokensFor(userId: string): Promise<BrandTokens> {
     // Reader offer = the account's first enabled newsletter offer (locked
     // decision 2026-07-23); neutral fallback when none exists yet.
     readerOffer: offer?.title?.trim() || 'Ask about our new-patient assessment when you book',
-    logoUrl: brand?.nlLogoUrl ?? '',
+    // Cover renders on the dark brand color → the light (white-on-transparent)
+    // processed variant; legacy single-logo field and org logo as fallbacks.
+    logoUrl: brand?.nlLogoLightUrl ?? brand?.nlLogoUrl ?? brand?.organizationLogoUrl ?? '',
     headerColor: brand?.nlHeaderBgColor ?? '#0b2545',
     accentColor: brand?.nlLinkColor ?? '#2a6f97',
     fontColor: brand?.nlFontColor ?? '#222222',

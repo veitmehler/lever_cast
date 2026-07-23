@@ -33,6 +33,9 @@ export interface BrandTokens {
   website: string
   address: string
   bookingCta: string
+  bookingUrl: string
+  openingHours: string
+  readerOffer: string
   logoUrl: string
   headerColor: string
   accentColor: string
@@ -40,7 +43,10 @@ export interface BrandTokens {
 }
 
 async function brandTokensFor(userId: string): Promise<BrandTokens> {
-  const brand = await prisma.brandSettings.findUnique({ where: { userId } })
+  const [brand, offer] = await Promise.all([
+    prisma.brandSettings.findUnique({ where: { userId } }),
+    prisma.newsletterOffer.findFirst({ where: { userId, enabled: true }, orderBy: { createdAt: 'asc' } }),
+  ])
   return {
     organizationName: brand?.organizationName ?? 'Your Practice',
     phone: brand?.organizationPhone ?? '',
@@ -48,6 +54,11 @@ async function brandTokensFor(userId: string): Promise<BrandTokens> {
     website: brand?.organizationWebsite ?? '',
     address: brand?.geolocation ?? '',
     bookingCta: brand?.socialCallToAction ?? 'Book an appointment',
+    bookingUrl: brand?.bookingUrl ?? '',
+    openingHours: brand?.openingHours ?? '',
+    // Reader offer = the account's first enabled newsletter offer (locked
+    // decision 2026-07-23); neutral fallback when none exists yet.
+    readerOffer: offer?.title?.trim() || 'Ask about our new-patient assessment when you book',
     logoUrl: brand?.nlLogoUrl ?? '',
     headerColor: brand?.nlHeaderBgColor ?? '#0b2545',
     accentColor: brand?.nlLinkColor ?? '#2a6f97',
@@ -55,8 +66,21 @@ async function brandTokensFor(userId: string): Promise<BrandTokens> {
   }
 }
 
+/**
+ * Elements marked data-optional="<tokenKey>" are removed entirely when that
+ * brand token is empty (opening hours, booking URL, …) — a document must never
+ * render an empty label. Keep optional wrappers flat (no nested same-tag).
+ */
+export function dropEmptyOptionalBlocks(html: string, t: BrandTokens): string {
+  return html.replace(
+    /<(\w+)[^>]*\bdata-optional="(\w+)"[^>]*>[\s\S]*?<\/\1>/g,
+    (m, _tag, key: string) =>
+      String((t as unknown as Record<string, string>)[key] ?? '').trim() ? m : '',
+  )
+}
+
 function applyBrandTokens(html: string, t: BrandTokens): string {
-  return html.replace(/\{\{brand\.(\w+)\}\}/g, (_m, key: string) =>
+  return dropEmptyOptionalBlocks(html, t).replace(/\{\{brand\.(\w+)\}\}/g, (_m, key: string) =>
     String((t as unknown as Record<string, string>)[key] ?? ''),
   )
 }

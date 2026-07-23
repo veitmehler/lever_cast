@@ -135,12 +135,11 @@ export function buildMasterHtml(spec: MasterDocSpec): string {
 <meta charset="utf-8"/>
 <style>
   @page { size: A4; margin: 0 0 13mm 0; }
-  @page :first { margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: {{brand.fontColor}}; }
 
   /* ── Cover ── */
-  .cover { height: 297mm; background: {{brand.headerColor}}; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 24mm 22mm; page-break-after: always; }
+  .cover { height: 284mm; background: {{brand.headerColor}}; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 24mm 22mm; page-break-after: always; }
   .cover .logo img { max-height: 22mm; max-width: 60mm; }
   .cover .logo-fallback { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
   .cover .eyebrow { font-size: 12px; letter-spacing: 2.2px; text-transform: uppercase; opacity: .85; margin-bottom: 5mm; }

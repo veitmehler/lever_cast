@@ -6,7 +6,16 @@ for the test account and page-verified (footer margin + density + 2x2 stretch gr
 across three compile rounds). Verified working: reader offer from NewsletterOffer, hours +
 bookingUrl lines dropped when absent. REMAINING: Phase F (QR card) + GBP-URL capture +
 Places hours lookup (needs GOOGLE_MAPS_API_KEY); note: two SVG assets carry em-dashes in
-their artwork text (d2_redflag, d2_scale) — user's call whether to edit.**
+their artwork text (d2_redflag, d2_scale) — user's call whether to edit.
+
+PRINT-GEOMETRY REDESIGN 2026-07-24 (505b3d4, after user review): Chromium footerTemplate
+MEASURED as unusable (box inset ~5.5mm from paper edge + overlaps content area ~5mm) —
+final architecture = two-pass render (full-bleed cover page, content with real 18mm top /
+26mm bottom print margins) + pdf-lib-stamped brand strip at the true paper bottom (13mm
+strip + 13mm guaranteed air), widows/orphans control, tables break at row boundaries,
+stretch cards numbered locally 1..6 (option a). Verified by per-page PIXEL MEASUREMENT
+(verify-geometry: strip flush to bottom edge, air zone + top margin ink-free, cover
+full-bleed) across all 35 pages — ALL PASSED.**
 
 **Goal: the five drafted lead-magnet documents (+ the QR review card) become the active
 master library, so every clinic that completes onboarding automatically receives its own

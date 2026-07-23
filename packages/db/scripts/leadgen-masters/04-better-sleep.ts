@@ -51,7 +51,7 @@ export const spec: MasterDocSpec = {
       frozenHtml:
         "<ul><li><strong>Age check:</strong> most mattresses support poorly after 7 to 10 years, even if they still 'look fine.'</li><li><strong>The hotel test:</strong> if you consistently sleep better away from home, your bed is a suspect.</li><li><strong>Medium-firm</strong> is the best-supported starting point in research on back pain: firm enough to keep hips level, soft enough to let shoulders sink slightly.</li></ul>",
     },
-    { kind: 'part', title: 'The routine' },
+    { kind: 'part', title: 'The routine', startOnNewPage: true },
     {
       kind: 'section',
       heading: 'The 90-minute wind-down',
@@ -70,7 +70,7 @@ export const spec: MasterDocSpec = {
       frozenHtml:
         "<ul><li>Same wake-up time every day (yes, weekends too); it anchors your body clock</li><li>Bedroom cool (around 18&nbsp;&deg;C / 65&nbsp;&deg;F), dark, and quiet</li><li>Caffeine ends at lunchtime: its half-life is 5 to 6 hours</li><li>Alcohol may start sleep faster, but it fragments the second half of the night</li><li>Finish intense exercise 2 to 3 hours before bed; gentle stretching is fine anytime</li><li>Big meals 3 hours out; a light snack is fine</li><li>Phone charges outside the bedroom (an old-school alarm clock costs very little)</li><li>If you can't sleep after about 20 minutes, get up and read something dull in dim light</li><li>Warm shower or bath 1 to 2 hours before bed: the cool-down afterwards is a natural sleep signal</li><li>Write tomorrow's to-do list before you lie down, so your brain can put it down</li></ul>",
     },
-    { kind: 'part', title: 'An honest note' },
+    { kind: 'part', title: 'An honest note', startOnNewPage: true },
     {
       kind: 'section',
       heading: "When sleep isn't the whole story",

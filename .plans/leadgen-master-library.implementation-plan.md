@@ -102,12 +102,26 @@ exporting a `MasterDocSpec`. Conversion rules:
 - Deliverable to user: five branded PDFs on the staging Lead Magnets page + rendered
   previews in chat for sign-off.
 
-## Phase F — QR review counter card (master #6, separate small build)
+## Phase F — QR review counter card (master #6) — OPTION C locked (user, 2026-07-24)
 
-- `qrcode` dep (SVG QR output, inlined — stays vector), compact A6/DL card layout (own
-  small template, not the A4 guide skeleton), fixed copy (skips the rewrite pass
-  entirely), QR → Google review deep link derived from the GBP URL in brand settings;
-  card SKIPPED (not failed) for accounts without a GBP URL.
+Decision: our branded card + a SNAPSHOT-BORNE TRIGGER LINK as the QR destination
+(GHL click stats without manual QR steps); user will DISABLE GHL's native Reviews QR
+in the snapshot for cleanliness (added to snapshot guide OFF-list).
+
+1. **Snapshot**: trigger link named `socioply-review` (fixed placeholder destination).
+   Snapshot guide additions: this trigger link + native Reviews QR disabled.
+2. **Provisioning wiring**: after onboarding captures the GBP URL → resolve Place ID →
+   Google review deep link (search.google.com/local/writereview?placeid=…) → API-update
+   the subaccount's `socioply-review` trigger link destination (GHL links API: verify
+   GET /links + PUT /links/:id shapes at build). Store the trigger-link URL per account.
+3. **Card compile**: own compact builder (A6/DL, NOT the A4 skeleton): clinic colors +
+   light/dark logo + "Enjoyed your visit?" fixed copy (NO rewrite pass) + QR (new
+   `qrcode` dep, SVG inline, stays vector) encoding the TRIGGER-LINK URL.
+4. **Fallbacks**: no GBP URL → card skipped (not failed); trigger link missing →
+   QR falls back to the direct Google review URL; both logged.
+5. Compiled via the existing LEADGEN_COMPILE path (kind or template flag switches the
+   page geometry); review-gated like every master.
+
 
 ## Explicitly out of scope here
 

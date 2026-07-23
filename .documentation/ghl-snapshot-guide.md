@@ -69,6 +69,15 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 6. **New Patient pipeline** (the one in section A).
 7. **Booking calendar template** (one service type, placeholder hours) + email reminder
    workflow — hidden with the calendar feature; ready for PMS-less clinics.
+7b. **Trigger link `socioply-review`** (placeholder destination) — the QR review card
+   encodes its URL; provisioning points it at the clinic's Google review deep link via
+   API (leadgen master-library plan Phase F, option C).
+7c. **Review Received workflow → Custom Webhook** to our review receiver
+   (`{{custom_values.socioply_review_token}}` pattern) — feeds review mining
+   (google-reviews-acquisition plan Tier 3). Requires the clinic's Google connection in
+   GHL Reputation (runbook step).
+7d. **Native Reviews QR: do NOT create / disable where possible** (user decision —
+   our branded QR card + trigger link replaces it; avoids two competing QR codes).
 8. NOT in the snapshot but part of client provisioning around it (onboarding runbook):
    Private Integration key (scopes per the onboarding testing guide), marketplace app
    install, SaaS Configurator settings (auto-suspend ON, auto-cancel OFF, 30-day cycle),

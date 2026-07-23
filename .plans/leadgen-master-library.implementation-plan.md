@@ -98,11 +98,16 @@ exporting a `MasterDocSpec`. Conversion rules:
 - Asset recoloring (decided against 2026-07-23).
 - Prod rollout (rides the existing one-batch staging→main plan).
 
-## Open decisions for the user
+## Decisions (user, 2026-07-23)
 
-1. Reader-offer mapping: first enabled NewsletterOffer OK, or a dedicated per-account
-   "lead-magnet offer" text instead?
-2. Opening hours: fine to omit when unknown, or add capture (onboarding step / GHL
-   location business-hours prefill) later?
-3. Slot policy above freezes all exercise instructions from brand-voice rewriting —
-   confirm.
+1. **Reader offer = first enabled NewsletterOffer** (neutral fallback) — confirmed.
+2. **Opening hours from the GBP listing via the Places API** (NOT the OAuth'd Business
+   Profile API): one-time Place Details lookup per clinic at onboarding —
+   resolve place from googleBusinessProfileUrl (fallback: text search on name+address),
+   store regularOpeningHours weekly text in new `brandSettings.openingHours`, surface in
+   the business-confirm card for owner edit, DROP the line when absent. New env:
+   `GOOGLE_MAPS_API_KEY` (Places API (New) enabled in the existing GCP project — user
+   creates alongside the Drive service-account key; feature dormant until set).
+   Gap to close first: onboarding does not yet capture googleBusinessProfileUrl — add to
+   the socials step (crawl-extracted candidate + confirm), it also feeds the QR card.
+3. **Exercise instructions + warning lists frozen verbatim** — confirmed.

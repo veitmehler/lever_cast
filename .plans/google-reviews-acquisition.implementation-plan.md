@@ -1,5 +1,7 @@
 # Google Reviews Acquisition Ladder — Implementation Plan
 
+**STATUS: FULLY IMPLEMENTED 2026-07-25 (a89450d, staging). Tiers 1+2 dormant behind env keys; Tier 3 live once snapshot workflow + token exist. QR card (Phase F) implemented same commit, visual-verified.**
+
 **Locked (user, 2026-07-24): per-clinic OAuth is the PRIMARY path; clinics that decline
 during onboarding fall back to the Places-API probe (6-10 reviews via dual sort) plus
 GHL Review-Received webhooks for everything new.** Feeds the existing client-story

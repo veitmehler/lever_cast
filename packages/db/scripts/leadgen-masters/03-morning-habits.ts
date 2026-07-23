@@ -74,6 +74,7 @@ export const spec: MasterDocSpec = {
     {
       kind: 'part',
       title: 'Put it together',
+      startOnNewPage: true,
       ledeHtml: '<p>Stick this on the fridge or bathroom mirror:</p>',
     },
     {

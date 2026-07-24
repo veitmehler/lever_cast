@@ -214,8 +214,46 @@ async function geminiGenerate(apiKey: string, parts: unknown[], op: string): Pro
     ),
   )
   if (!res.ok) throw new Error(`gemini ${op} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
-  return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[]
+  }
+  return (
+    data.candidates?.[0]?.content?.parts
+      ?.filter((p) => !p.thought)
+      .map((p) => p.text ?? '')
+      .join('') ?? ''
+  )
+}
+
+/**
+ * Parse the first balanced JSON value in LLM output. Even in JSON response
+ * mode Gemini occasionally appends trailing content after the object (seen
+ * live: "Unexpected non-whitespace character after JSON at position N").
+ */
+function parseFirstJson<T>(text: string): T {
+  const cleaned = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '')
+  const start = cleaned.search(/[[{]/)
+  if (start === -1) throw new Error('no JSON value in LLM output')
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i]
+    if (escaped) {
+      escaped = false
+    } else if (ch === '\\') {
+      if (inString) escaped = true
+    } else if (ch === '"') {
+      inString = !inString
+    } else if (!inString) {
+      if (ch === '{' || ch === '[') depth++
+      else if (ch === '}' || ch === ']') {
+        depth--
+        if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)) as T
+      }
+    }
+  }
+  return JSON.parse(cleaned.slice(start)) as T // unbalanced — let JSON.parse report it
 }
 
 export async function extractPaletteFromScreenshot(
@@ -237,7 +275,7 @@ CSS hints found in the page source (frequency-ordered, may be noise): ${cssHints
       ],
       'onboarding.palette',
     )
-    return JSON.parse(text) as SemanticPalette
+    return parseFirstJson<SemanticPalette>(text)
   } catch (err) {
     logger.warn({ err }, '[onboarding/site] palette extraction failed')
     return null
@@ -273,7 +311,7 @@ ${corpus.slice(0, 24_000)}`,
       ],
       'onboarding.specialization',
     )
-    return JSON.parse(text) as SpecializationDraft
+    return parseFirstJson<SpecializationDraft>(text)
   } catch (err) {
     logger.warn({ err }, '[onboarding/site] specialization detection failed')
     return null

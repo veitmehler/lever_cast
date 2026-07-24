@@ -11,7 +11,7 @@
  * with the content populated.
  */
 import { Prisma } from '@prisma/client'
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'

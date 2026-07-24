@@ -8,7 +8,7 @@
  */
 
 import sharp from 'sharp'
-import { generateWithGeminiImage, prisma, DEFAULT_DIAGRAM_STYLE_GUIDE } from '@socioply/shared'
+import { generateWithGeminiImage, prisma, DEFAULT_DIAGRAM_STYLE_GUIDE } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 
 export const RESTYLE_MODEL = 'gemini-3.1-flash-image'

@@ -4,7 +4,7 @@
  * spot (multi-tenancy plan Phase D1). Never throws — cost accounting must not
  * fail content generation.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from './logger'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 

@@ -16,7 +16,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const DO_API_BASE = process.env.DO_API_BASE ?? 'https://api.socioply.com'
+const DO_API_BASE = process.env.DO_API_BASE ?? 'https://svc.omniply.io'
 
 export async function proxyToApi(
   request: NextRequest,

@@ -109,7 +109,7 @@ async function checkUrl(
       method: 'HEAD',
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; SocioplyBot/1.0; +https://socioply.com)',
+          'Mozilla/5.0 (compatible; OmniplyBot/1.0; +https://omniply.io)',
       },
       redirect: 'follow',
       signal: controller.signal,

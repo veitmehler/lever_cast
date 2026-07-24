@@ -1,10 +1,13 @@
-import { prisma, brandSettingsForUser } from '@socioply/shared'
-import { downloadImageFromStorage } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
+import { downloadImageFromStorage } from '@omniply/shared'
 import { themeFromBrand } from '../article-pipeline/enrichment/diagram-theme'
 
 export interface SocialBrandTheme {
   primaryColor: string
   secondaryColor: string
+  /** The brand accent (onboarding-approved nlLinkColor first) — the "secondary
+   *  brand color" used by the non-EL accent-tinted carousels. */
+  accentColor: string
   textColor: string
   fontFamily: string
   organizationName: string
@@ -77,6 +80,7 @@ export async function loadSocialBrandTheme(userId: string): Promise<SocialBrandT
   return {
     primaryColor: theme.primaryColor,
     secondaryColor: theme.secondaryColor,
+    accentColor: brand?.nlLinkColor?.trim() || theme.secondaryColor,
     textColor: brand?.diagramTextColor?.trim() || '#1F2937',
     fontFamily,
     organizationName,

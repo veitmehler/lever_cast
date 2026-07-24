@@ -8,7 +8,7 @@ vi.mock('../../middleware/auth', () => ({
 
 const userFindUnique = vi.fn()
 const runFindFirst = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     socialAutomationRun: { findFirst: (...a: unknown[]) => runFindFirst(...a) },

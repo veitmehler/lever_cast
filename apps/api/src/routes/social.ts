@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma, accountMemberIdsForUser } from '@socioply/shared'
+import { prisma, accountMemberIdsForUser } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import {
   generateCarouselAssets,

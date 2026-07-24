@@ -11,7 +11,7 @@ const jobFindMany = vi.fn()
 const jobFindFirst = vi.fn()
 const sitePageFindFirst = vi.fn()
 const sitePageUpdate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     articleJob: {

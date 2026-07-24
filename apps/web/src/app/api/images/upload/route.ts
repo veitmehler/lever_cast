@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { uploadImageToStorage } from '@socioply/shared'
-import { prisma } from '@socioply/shared'
+import { uploadImageToStorage } from '@omniply/shared'
+import { prisma } from '@omniply/shared'
 
 /**
  * POST /api/images/upload - Upload an image to Supabase Storage
@@ -160,7 +160,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Extract path from URL if needed
-    const { deleteImageFromStorage, extractFilePathFromUrl } = await import('@socioply/shared')
+    const { deleteImageFromStorage, extractFilePathFromUrl } = await import('@omniply/shared')
     const finalPath = filePath || extractFilePathFromUrl(url)
 
     if (!finalPath) {

@@ -9,7 +9,7 @@
  * the whole account. Regenerating content for an existing draft creates no new
  * draft and never counts.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 const DEFAULT_CAP = 3

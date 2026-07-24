@@ -10,7 +10,7 @@
  * Orchestration (enqueue → approve | rewrite | needs_review) lives in the
  * handler; this module holds the model calls + the pure, testable helpers.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getLLMAdapter } from './llm/factory'
 import { logger } from '../lib/logger'
 

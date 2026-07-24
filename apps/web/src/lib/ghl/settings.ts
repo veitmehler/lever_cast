@@ -1,5 +1,5 @@
-import { ghlSettingsForUser } from '@socioply/shared'
-import { decrypt, encrypt } from '@socioply/shared'
+import { ghlSettingsForUser } from '@omniply/shared'
+import { decrypt, encrypt } from '@omniply/shared'
 import type { GhlAccountIds } from './types'
 
 export interface GhlCredentials {

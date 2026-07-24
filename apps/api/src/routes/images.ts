@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import {
   generateImagePromptWithLLM,
@@ -7,7 +7,7 @@ import {
   generateWithFalAI,
   generateWithOpenAIDALLE,
   generateWithReplicate,
-} from '@socioply/shared'
+} from '@omniply/shared'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { requireAuth } from '../middleware/auth'
 import { sniffImageMime, extForImageMime } from '../lib/image-sniff'

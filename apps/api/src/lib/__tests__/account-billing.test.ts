@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const accountFindUnique = vi.fn()
 const accountIdForUser = vi.fn()
-vi.mock('@socioply/shared', () => ({
-  prisma: { account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) } },
+const sessionFindUnique = vi.fn()
+vi.mock('@omniply/shared', () => ({
+  prisma: {
+    account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) },
+    onboardingSession: { findUnique: (...a: unknown[]) => sessionFindUnique(...a) },
+  },
   accountIdForUser: (...a: unknown[]) => accountIdForUser(...a),
 }))
 
@@ -14,6 +18,8 @@ const DAY = 24 * 60 * 60 * 1000
 beforeEach(() => {
   vi.clearAllMocks()
   accountIdForUser.mockResolvedValue('acct_1')
+  // Default: no onboarding session → legacy accounts stay ungated.
+  sessionFindUnique.mockResolvedValue(null)
 })
 
 describe('generationGateForUser', () => {
@@ -79,5 +85,26 @@ describe('publishingGateForUser', () => {
       billingExempt: true,
     })
     expect((await publishingGateForUser('u1')).allowed).toBe(true)
+  })
+})
+
+describe('onboarding gate (onboarding plan Phase 7)', () => {
+  it('blocks generation while an onboarding session is unfinished', async () => {
+    accountFindUnique.mockResolvedValue({ status: 'active', paidThrough: null, billingExempt: false, onboardingCompletedAt: null })
+    sessionFindUnique.mockResolvedValue({ id: 'sess_1' })
+    const gate = await generationGateForUser('u1')
+    expect(gate.allowed).toBe(false)
+    expect(gate.reason).toContain('setup chat')
+  })
+
+  it('allows once onboarding completed', async () => {
+    accountFindUnique.mockResolvedValue({ status: 'active', paidThrough: null, billingExempt: false, onboardingCompletedAt: new Date() })
+    sessionFindUnique.mockResolvedValue({ id: 'sess_1' })
+    expect((await generationGateForUser('u1')).allowed).toBe(true)
+  })
+
+  it('legacy accounts without a session are unaffected', async () => {
+    accountFindUnique.mockResolvedValue({ status: 'active', paidThrough: null, billingExempt: false, onboardingCompletedAt: null })
+    expect((await generationGateForUser('u1')).allowed).toBe(true)
   })
 })

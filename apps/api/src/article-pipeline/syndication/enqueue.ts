@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { logger } from '../../lib/logger'
 

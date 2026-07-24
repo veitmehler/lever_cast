@@ -14,7 +14,7 @@ import {
 import type { ArticleContentContext, SlotContent } from './content'
 import { resolveSlotContent, H2_SLOT_SECTION_INDEX } from './content'
 import type { AutomationLogContext } from './log-context'
-import { prisma, readS3Object, brandSettingsForUser } from '@socioply/shared'
+import { prisma, readS3Object, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 
 /**

@@ -11,7 +11,7 @@ import { loadPromptTemplate } from './enrichment/prompt-template'
 import { withTimeout } from '../lib/net/with-timeout'
 import { isRetryableNetworkError } from '../lib/net/retry'
 import { instrumentCall } from '../lib/net/instrument'
-import { generateWithGeminiImage, uploadBufferWithKey } from '@socioply/shared'
+import { generateWithGeminiImage, uploadBufferWithKey } from '@omniply/shared'
 
 const DEFAULT_FAL_MODEL = 'fal-ai/flux-pro'
 const MAX_RETRIES = 3

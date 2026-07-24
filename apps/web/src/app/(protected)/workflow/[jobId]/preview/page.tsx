@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { notFound, redirect } from 'next/navigation'
 import { ArticleEditor } from '@/components/ArticleEditor'
 
-const API_URL = process.env.DO_API_BASE ?? process.env.NEXT_PUBLIC_API_URL ?? 'https://api.socioply.com'
+const API_URL = process.env.DO_API_BASE ?? process.env.NEXT_PUBLIC_API_URL ?? 'https://svc.omniply.io'
 
 type RawStep = { stepNumber: number; status: string; output?: string | null }
 

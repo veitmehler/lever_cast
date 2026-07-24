@@ -58,7 +58,7 @@
 | D7 | Reverse proxy + TLS | **Caddy** (auto Let's Encrypt). | Zero-config TLS. |
 | D8 | Container registry | **GitHub Container Registry (ghcr.io)**. | Free for our usage, same auth as the repo. |
 | D9 | Network security | **Tailscale** on droplet. SSH closed publicly; admin tools accessible only over Tailscale. | Free for solo dev. Eliminates SSH brute-force surface. |
-| D10 | Domain strategy | Frontend: `app.socioply.com` (Vercel) · API: `api.socioply.com` (DO) · CDN: `cdn.socioply.com` (CloudFront) | Avoids re-configuring all 6 OAuth providers' redirect URIs more than once. |
+| D10 | Domain strategy | Frontend: `app.socioply.com` (Vercel) · API: `svc.omniply.io` (DO) · CDN: `cdn.omniply.io` (CloudFront) | Avoids re-configuring all 6 OAuth providers' redirect URIs more than once. |
 | D11 | Cutover style | Dual-write-then-flip with a 30-min read-only maintenance window for final DB delta sync. | Minimizes downtime, allows rollback. |
 | D12 | Encryption | **AES-256-GCM** for `ApiKey.encryptedKey`, `SocialConnection.accessToken/refreshToken`. Key in env var, rotated via two-key window. | Current Base64 in `src/lib/encryption.ts` is not encryption. |
 | D13 | Concurrency control | **`pg-boss` `teamSize` per queue**: `article-pipeline=5`, `article-translation=3`, `article-enrichment=2`, `publish=10`, `publish-scheduled=10`, `analytics-sync=2`. | Caps DB connection use, isolates workloads, prevents one feature from starving another. |
@@ -119,7 +119,7 @@ Cost delta vs reuse: **+$15/mo**. LLM spend at "Medium" load is **$300–900/day
                                     │ HTTPS, Clerk JWT
                                     ▼
                        ┌──────────────────────────────┐
-                       │ DO Droplet (api.socioply.com)│
+                       │ DO Droplet (svc.omniply.io)│
                        │  Caddy → Fastify "API"       │
                        │  Fastify "Worker" (pg-boss)  │
                        │  + Tailscale (admin/SSH)     │
@@ -130,7 +130,7 @@ Cost delta vs reuse: **+$15/mo**. LLM spend at "Medium" load is **$300–900/day
              │ db-s-1vcpu-1gb       │  │ socioply-prod          │
              │ (NEW, dedicated)     │  │   ↑ OAC                │
              │ DB: socioply         │  │ AWS CloudFront         │
-             │ Schema: public,      │  │ cdn.socioply.com       │
+             │ Schema: public,      │  │ cdn.omniply.io       │
              │   pgboss             │  │                        │
              └──────────────────────┘  └────────────────────────┘
 ```
@@ -196,7 +196,7 @@ This migration plan provisions the **infrastructure** (DO droplet, Postgres clus
 |---|---|
 | DO droplet + Fastify worker (Phase 8) | Pipeline executor + step runner code that runs *on* the worker |
 | Postgres `socioply` DB + `pgboss` schema | `Topic`, `ArticleJob`, `PipelineStep`, `SitePage`, `ArticleDiagram`, `WordPressConnection` table definitions |
-| S3 bucket `socioply-images-prod` + CloudFront `cdn.socioply.com` | Image upload paths (`/diagrams/{jobId}/...`, `/exports/{userId}/{jobId}/...`) |
+| S3 bucket `socioply-images-prod` + CloudFront `cdn.omniply.io` | Image upload paths (`/diagrams/{jobId}/...`, `/exports/{userId}/{jobId}/...`) |
 | `pg-boss` queue topology (§3.2) | Which queue each pipeline phase enqueues onto |
 | AES-256-GCM encryption (Phase 3 — already shipped) | `WordPressConnection.appPassword` and `ApiKey.encryptedKey` encryption |
 
@@ -285,8 +285,8 @@ Before any provisioning:
      - Default cache behavior: GET/HEAD; cache key includes nothing user-specific; long TTL (we use immutable + content-addressed-ish keys).
      - Compress objects automatically.
      - Price class: **PriceClass_100** (NA + EU only) — cheapest, fine for launch; bump to All later if needed.
-   - **ACM certificate** for `cdn.socioply.com` in **`us-east-1`** (CF only accepts certs from that region). DNS validation.
-   - Add `cdn.socioply.com` as alternate domain on the CloudFront distribution.
+   - **ACM certificate** for `cdn.omniply.io` in **`us-east-1`** (CF only accepts certs from that region). DNS validation.
+   - Add `cdn.omniply.io` as alternate domain on the CloudFront distribution.
    - **IAM user** `socioply-app` with a programmatic access key, scoped policy:
      ```json
      { "Version": "2012-10-17", "Statement": [
@@ -294,7 +294,7 @@ Before any provisioning:
          "Action": ["s3:PutObject","s3:GetObject","s3:DeleteObject","s3:ListBucket"],
          "Resource": ["arn:aws:s3:::socioply-prod","arn:aws:s3:::socioply-prod/*"] } ] }
      ```
-   - Save `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET=socioply-prod`, `S3_REGION=us-east-1`, `CDN_BASE=https://cdn.socioply.com` to 1Password.
+   - Save `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET=socioply-prod`, `S3_REGION=us-east-1`, `CDN_BASE=https://cdn.omniply.io` to 1Password.
 3. On the new Postgres cluster, in the DO console:
    - Add a database `socioply`.
    - Add a user `socioply_app` (record password in 1Password / DO secrets vault).
@@ -311,8 +311,8 @@ Before any provisioning:
    -- pgboss schema will be auto-created by pg-boss on first start
    ```
 5. Configure DNS (whichever provider you confirmed in Phase 0):
-   - `api.socioply.com` A → droplet reserved IP
-   - `cdn.socioply.com` CNAME → CloudFront distribution domain (e.g. `dxxxxxx.cloudfront.net`)
+   - `svc.omniply.io` A → droplet reserved IP
+   - `cdn.omniply.io` CNAME → CloudFront distribution domain (e.g. `dxxxxxx.cloudfront.net`)
    - DNS-validation CNAME for the ACM cert (one-time, can be deleted after issuance — but AWS recommends leaving it for renewals)
    - (`app.socioply.com` already on Vercel — unchanged)
 6. Bootstrap droplet:
@@ -336,7 +336,7 @@ Before any provisioning:
    ```
    Save as `ENCRYPTION_KEY` in 1Password and add to droplet's `.env.production` plus Vercel env (Preview + Production).
 
-**Deliverable**: empty droplet ready, dedicated Postgres ready, S3 + CloudFront ready and serving a 1×1 test image at `https://cdn.socioply.com/healthcheck.png`, DNS pointing correctly, SSH only via Tailscale.
+**Deliverable**: empty droplet ready, dedicated Postgres ready, S3 + CloudFront ready and serving a 1×1 test image at `https://cdn.omniply.io/healthcheck.png`, DNS pointing correctly, SSH only via Tailscale.
 
 **Rollback**: destroy droplet/cluster/bucket/distribution — no production traffic touches them yet.
 
@@ -599,7 +599,7 @@ boss.work('oauth-state-cleanup', { teamSize: 1 }, async () => {
 
 Today: `src/lib/supabase.ts` uploads to bucket `post-images`, returns `https://<project>.supabase.co/storage/v1/object/public/post-images/<userId>/<file>`. URLs are stored in `Draft.attachedImage` and `Post.imageUrl`.
 
-After this phase: uploads go to a private S3 bucket; reads go through CloudFront at `https://cdn.socioply.com/<key>`. The bucket is **private** (no public ACLs); CloudFront's Origin Access Control is the only thing allowed to read it.
+After this phase: uploads go to a private S3 bucket; reads go through CloudFront at `https://cdn.omniply.io/<key>`. The bucket is **private** (no public ACLs); CloudFront's Origin Access Control is the only thing allowed to read it.
 
 #### 5.1 New module — `packages/storage/src/s3.ts`
 
@@ -615,7 +615,7 @@ const s3 = new S3Client({
   },
 })
 const BUCKET = process.env.S3_BUCKET!
-const CDN = process.env.CDN_BASE!   // e.g. https://cdn.socioply.com
+const CDN = process.env.CDN_BASE!   // e.g. https://cdn.omniply.io
 
 export async function uploadImage(buffer: Buffer, mimeType: string, userId: string, opts?: { prefix?: string }) {
   const ext = mimeType.split('/')[1]?.split('+')[0] ?? 'jpg'
@@ -668,7 +668,7 @@ AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 S3_BUCKET=socioply-prod
 S3_REGION=us-east-1
-CDN_BASE=https://cdn.socioply.com
+CDN_BASE=https://cdn.omniply.io
 ```
 
 > **Why no `ACL: 'public-read'`**: with CloudFront + OAC, S3 best practice is to keep the bucket fully private and let only the distribution read it. This is the default S3 security baseline since 2023 and avoids the entire class of "open S3 bucket" leaks. Reads still work for end users via the CloudFront URL.
@@ -680,7 +680,7 @@ Add the CloudFront CDN host to `remotePatterns`:
 ```ts
 remotePatterns.push({
   protocol: 'https',
-  hostname: 'cdn.socioply.com',
+  hostname: 'cdn.omniply.io',
 })
 ```
 
@@ -894,7 +894,7 @@ Per route, replace the Vercel handler body with a thin proxy that forwards to DO
 ```ts
 import { auth } from '@clerk/nextjs/server'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE!  // https://api.socioply.com
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE!  // https://svc.omniply.io
 
 export async function proxy(request: Request, path: string) {
   const { getToken } = await auth()
@@ -944,15 +944,15 @@ export async function POST(req: Request) { return proxy(req, '/ai/generate') }
 | `GET /api/social/connections` | `GET /social/connections` | 5 |
 | `GET /api/api-keys/*` | `GET /api-keys/*` | 6 |
 
-**OAuth callback URL change** (cutover step 5): For each provider (LinkedIn personal, LinkedIn company, Twitter, Facebook, Instagram, Threads) update redirect URIs in their developer console **from** `https://app.socioply.com/api/social/{platform}/callback` **to** `https://api.socioply.com/social/{platform}/callback`. **Do this in a low-traffic window** so existing live OAuth flows aren't broken mid-flight. Keep the Vercel proxy for callbacks active for 24 h as fallback.
+**OAuth callback URL change** (cutover step 5): For each provider (LinkedIn personal, LinkedIn company, Twitter, Facebook, Instagram, Threads) update redirect URIs in their developer console **from** `https://app.socioply.com/api/social/{platform}/callback` **to** `https://svc.omniply.io/social/{platform}/callback`. **Do this in a low-traffic window** so existing live OAuth flows aren't broken mid-flight. Keep the Vercel proxy for callbacks active for 24 h as fallback.
 
 Per-route env additions on DO:
 
 ```env
-LINKEDIN_REDIRECT_URI=https://api.socioply.com/social/linkedin/callback
-LINKEDIN_COMPANY_REDIRECT_URI=https://api.socioply.com/social/linkedin/callback
-TWITTER_REDIRECT_URI=https://api.socioply.com/social/twitter/callback
-THREADS_REDIRECT_URI=https://api.socioply.com/social/threads/callback
+LINKEDIN_REDIRECT_URI=https://svc.omniply.io/social/linkedin/callback
+LINKEDIN_COMPANY_REDIRECT_URI=https://svc.omniply.io/social/linkedin/callback
+TWITTER_REDIRECT_URI=https://svc.omniply.io/social/twitter/callback
+THREADS_REDIRECT_URI=https://svc.omniply.io/social/threads/callback
 # (Facebook & Instagram redirect URIs as configured)
 ```
 
@@ -1024,7 +1024,7 @@ volumes:
 
 `/opt/socioply/Caddyfile`:
 ```
-api.socioply.com {
+svc.omniply.io {
   encode gzip
   reverse_proxy api:3001
 }
@@ -1117,7 +1117,7 @@ KPIs to track:
 | **OAuth flows break during cutover** (redirect URI change) | Medium | High | Update redirect URIs in low-traffic window (Phase 8 step 5); keep Vercel callback proxies active for 24 h fallback |
 | **Encryption key rotation corrupts tokens** | Low | Critical | Decrypt has dual-key fallback (`ENCRYPTION_KEY` + `ENCRYPTION_KEY_OLD`); test on DB copy first; idempotent migration script; worst-case force users to reconnect |
 | **`pg-boss` job loss on droplet restart** | Low | High | Jobs are durable in Postgres; pg-boss auto-recovers; idempotent platform handlers |
-| **CloudFront propagation delay or OAC misconfig** | Medium | Medium | Test serving from `cdn.socioply.com` before flipping public traffic; pre-warm by hitting each migrated URL once; have S3 direct-URL fallback ready in code |
+| **CloudFront propagation delay or OAC misconfig** | Medium | Medium | Test serving from `cdn.omniply.io` before flipping public traffic; pre-warm by hitting each migrated URL once; have S3 direct-URL fallback ready in code |
 | **Unexpected CloudFront egress bill** | Low | Medium | Set AWS budget alert at $50/mo; cache headers on all uploads (`max-age=31536000, immutable`); review CloudFront free-tier expiration date |
 | **Tailscale outage locks us out of SSH** | Low | Medium | Keep DO web console as emergency access; document break-glass procedure |
 | **Vercel proxy adds latency to UI flows** | Low | Low | For latency-sensitive flows (calendar GET) consider keeping them on Vercel directly to DO Postgres via pooler |

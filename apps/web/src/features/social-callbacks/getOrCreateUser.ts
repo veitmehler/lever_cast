@@ -1,5 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 // Helper function to get or create user
 export async function getOrCreateUser(clerkId: string) {

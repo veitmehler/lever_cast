@@ -11,7 +11,7 @@
  * (x-billing-secret) that all workflows send. No Clerk (GHL is the caller).
  */
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import {
   applyBillingEvent,

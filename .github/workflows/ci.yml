@@ -35,14 +35,14 @@ jobs:
       # default location.
       - name: Generate Prisma client
         run: |
-          pnpm --filter @socioply/api exec prisma generate
-          pnpm --filter @socioply/web exec prisma generate
+          pnpm --filter @omniply/api exec prisma generate
+          pnpm --filter @omniply/web exec prisma generate
 
       # Build the shared package so both apps can typecheck against its .d.ts.
       # Must run AFTER prisma generate: shared imports @prisma/client, whose
       # types only exist once the client is generated.
       - name: Build shared package
-        run: pnpm --filter @socioply/shared build
+        run: pnpm --filter @omniply/shared build
 
       - name: Typecheck
         run: pnpm -r typecheck

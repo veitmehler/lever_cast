@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAdmin } from '../../middleware/admin'
 
 interface UpdateFrameworkBody {

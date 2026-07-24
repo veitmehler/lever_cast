@@ -4,7 +4,7 @@
  */
 
 import TurndownService from 'turndown'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import type { OutputPayload } from './types'
 
 const CDN_BASE = (process.env.CDN_BASE ?? '').replace(/\/$/, '')

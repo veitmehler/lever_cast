@@ -2,7 +2,7 @@ import type { Post } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { getGhlPost } from '../lib/ghl/client'
 import { getGhlCredentials } from '../lib/ghl/settings'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 function extractGhlPostPayload(data: Record<string, unknown>): Record<string, unknown> {
   const results = data.results as Record<string, unknown> | undefined

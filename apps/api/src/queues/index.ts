@@ -105,6 +105,12 @@ export const QUEUES = {
   CLIENT_STORY_AUTO_GENERATE_CHECK: 'client-story-auto-generate-check',
   ACCOUNT_LIFECYCLE_CLOCK: 'account-lifecycle-clock',
   ACCOUNT_DELETE: 'account-delete',
+  ONBOARDING_CRAWL: 'onboarding-crawl',
+  ONBOARDING_SYNTHESIS: 'onboarding-synthesis',
+  LEADGEN_PROPOSAL_POLL: 'leadgen-proposal-poll',
+  LEADGEN_COMPILE: 'leadgen-compile',
+  PLACES_REVIEW_POLL: 'places-review-poll',
+  GOOGLE_REVIEWS_BACKFILL: 'google-reviews-backfill',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

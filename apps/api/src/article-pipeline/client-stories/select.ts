@@ -6,7 +6,7 @@
  * mirrors how the newsletter override plan's ensureTopicDraft hooks in before
  * ensureTopicResearch.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 
 const ONCE_A_MONTH_MS = 30 * 24 * 60 * 60 * 1000

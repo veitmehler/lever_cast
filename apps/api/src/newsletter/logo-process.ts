@@ -10,7 +10,7 @@
  * Then recolour to white / navy via the alpha, crop to content, upload.
  */
 import sharp from 'sharp'
-import { downloadImageFromUrl, uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
+import { downloadImageFromUrl, uploadBufferWithKey, deleteOldVersions } from '@omniply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { vtoken } from './image-overlay'
 import { logger } from '../lib/logger'

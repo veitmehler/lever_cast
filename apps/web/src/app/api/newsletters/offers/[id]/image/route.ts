@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 // Manual offer banner upload (alternative to AI generation). Persists
 // NewsletterOffer.imageUrl. Verifies the offer belongs to the caller.

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
-import { decrypt } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { decrypt } from '@omniply/shared'
 import OpenAI from 'openai'
 // Anthropic and GoogleGenerativeAI are reserved for future use
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

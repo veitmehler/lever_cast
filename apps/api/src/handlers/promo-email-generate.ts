@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss'
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { generatePromoEmail, htmlToPreviewText } from '../article-pipeline/promo-email/generate'

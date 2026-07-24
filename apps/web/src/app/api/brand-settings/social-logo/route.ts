@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { prisma, brandSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
+import { prisma, brandSettingsForUser, canonicalAccountUserId } from '@omniply/shared'
 
 function getS3Client(): S3Client {
   const accessKeyId = process.env.ACCESS_KEY_ID

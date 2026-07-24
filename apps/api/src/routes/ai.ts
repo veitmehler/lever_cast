@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { cleanText } from '../lib/utils'
 import { requireAuth } from '../middleware/auth'
 import { getSystemApiKey } from '../lib/system-keys'
@@ -194,7 +194,7 @@ async function generateWithOpenRouter(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.APP_URL || 'https://app.socioply.com',
+      'HTTP-Referer': process.env.APP_URL || 'https://chiro.omniply.io',
       'X-Title': 'Levercast',
     },
     body: JSON.stringify({
@@ -559,7 +559,7 @@ Return ONLY a clear, concise description (2 paragraphs) that can be used as writ
             headers: {
               Authorization: `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
-              'HTTP-Referer': process.env.APP_URL || 'https://app.socioply.com',
+              'HTTP-Referer': process.env.APP_URL || 'https://chiro.omniply.io',
               'X-Title': 'Levercast',
             },
             body: JSON.stringify({

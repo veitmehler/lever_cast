@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { prisma, ACCOUNT_SEAT_LIMIT } from '@socioply/shared'
+import { prisma, ACCOUNT_SEAT_LIMIT } from '@omniply/shared'
 import { getOrCreateUser } from '@/lib/user'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/

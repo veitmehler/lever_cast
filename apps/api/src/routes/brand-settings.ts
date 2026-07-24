@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma, resolveAccountForClerkId, brandSettingsForUser } from '@socioply/shared'
+import { prisma, resolveAccountForClerkId, brandSettingsForUser } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { searchBusinessKnowledgePanel } from '../newsletter/oxylabs'
 

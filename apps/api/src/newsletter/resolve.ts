@@ -6,7 +6,7 @@
  * for perf (one range query each, not per-day). See
  * .plans/newsletter-topic-override.implementation-plan.md.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 export interface ResolvedNewsletterTopic {
   id: string

@@ -13,7 +13,7 @@
  * email) — nothing irreversible happens silently.
  */
 import type PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { getBoss, QUEUES } from '../queues/index'

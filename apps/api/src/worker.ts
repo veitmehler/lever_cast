@@ -5,7 +5,7 @@ initSentry('worker')
 import PgBoss from 'pg-boss'
 import { logger } from './lib/logger'
 import { getBoss, stopBoss, QUEUES } from './queues/index'
-import { assertEncryptionConfigured } from '@socioply/shared'
+import { assertEncryptionConfigured } from '@omniply/shared'
 import {
   publishHandler,
   publishScheduledHandler,
@@ -39,6 +39,11 @@ import { clientStorySpiderHandler, ClientStorySpiderJobData } from './handlers/c
 import { clientStoryAutoGenerateCheckHandler } from './handlers/client-story-auto-generate-check'
 import { accountLifecycleClockHandler } from './handlers/account-lifecycle-clock'
 import { accountDeleteHandler } from './handlers/account-delete'
+import { onboardingCrawlHandler } from './handlers/onboarding-crawl'
+import { onboardingSynthesisHandler } from './handlers/onboarding-synthesis'
+import { leadgenPollHandler } from './handlers/leadgen-poll'
+import { leadgenCompileHandler } from './handlers/leadgen-compile'
+import { placesReviewPollHandler, googleReviewsBackfillHandler } from './handlers/google-reviews'
 
 /**
  * Number of concurrent social-generation runs across ALL clients. Bounded to
@@ -99,6 +104,8 @@ async function main() {
   await boss.schedule(QUEUES.CONTENT_BATCH_MONITOR, '* * * * *', {})      // every minute
   await boss.schedule(QUEUES.CLIENT_STORY_AUTO_GENERATE_CHECK, '*/15 * * * *', {}) // every 15 min
   await boss.schedule(QUEUES.ACCOUNT_LIFECYCLE_CLOCK, '30 4 * * *', {}) // daily 04:30 UTC — 60/90d billing clocks
+  await boss.schedule(QUEUES.LEADGEN_PROPOSAL_POLL, '*/2 * * * *', {}) // every 2 min — Drive access-proposal capture
+  await boss.schedule(QUEUES.PLACES_REVIEW_POLL, '0 4 * * 1', {}) // Monday 04:00 UTC — weekly dual-sort review harvest
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -311,6 +318,40 @@ async function main() {
     QUEUES.ACCOUNT_DELETE,
     { batchSize: 1 },
     withSentry('account-delete', accountDeleteHandler),
+  )
+
+  // Onboarding background website analysis (onboarding plan Phase 2).
+  await boss.work(
+    QUEUES.ONBOARDING_CRAWL,
+    { batchSize: 1 },
+    withSentry('onboarding-crawl', onboardingCrawlHandler),
+  )
+  await boss.work(
+    QUEUES.ONBOARDING_SYNTHESIS,
+    { batchSize: 1 },
+    withSentry('onboarding-synthesis', onboardingSynthesisHandler),
+  )
+
+  // Lead-gen documents (leadgen plan Phases 3-4).
+  await boss.work(
+    QUEUES.LEADGEN_PROPOSAL_POLL,
+    { batchSize: 1 },
+    withSentry('leadgen-proposal-poll', leadgenPollHandler),
+  )
+  await boss.work(
+    QUEUES.PLACES_REVIEW_POLL,
+    { batchSize: 1 },
+    withSentry('places-review-poll', placesReviewPollHandler),
+  )
+  await boss.work(
+    QUEUES.GOOGLE_REVIEWS_BACKFILL,
+    { batchSize: 1 },
+    withSentry('google-reviews-backfill', googleReviewsBackfillHandler),
+  )
+  await boss.work(
+    QUEUES.LEADGEN_COMPILE,
+    { batchSize: 1 },
+    withSentry('leadgen-compile', leadgenCompileHandler),
   )
 
   logger.info('[worker] all queues registered, crons scheduled — ready')

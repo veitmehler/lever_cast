@@ -1,5 +1,5 @@
 import { clerkClient } from '@clerk/nextjs/server'
-import { getOrCreateUserWithAccount } from '@socioply/shared'
+import { getOrCreateUserWithAccount } from '@omniply/shared'
 import type { User } from '@prisma/client'
 
 /**
@@ -32,7 +32,7 @@ export async function getOrCreateUser(clerkId: string): Promise<User> {
 
 /** Fast path: skip the Clerk round-trip when the user already exists. */
 async function tryExisting(clerkId: string): Promise<User | null> {
-  const { prisma, ensureAccount, ensureRosterMembership } = await import('@socioply/shared')
+  const { prisma, ensureAccount, ensureRosterMembership } = await import('@omniply/shared')
   const user = await prisma.user.findUnique({ where: { clerkId } })
   if (!user) return null
   if (!user.accountId) await ensureAccount(user)

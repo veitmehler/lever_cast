@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAuth } from './auth'
 
 /**

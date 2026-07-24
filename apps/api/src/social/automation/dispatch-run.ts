@@ -1,5 +1,5 @@
 import type { Post } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { dispatchPublish, isGhlManagedPlatform } from '../dispatcher'
 import { sendFailureAlert } from '../../lib/alerts'

@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { getBoss, QUEUES } from '../queues'
 import { sendFailureAlert } from '../lib/alerts'

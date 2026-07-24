@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { dispatchPublish } from '../social/dispatcher'
 import { publishingGateForUser } from '../lib/account-billing'

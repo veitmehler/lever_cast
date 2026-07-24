@@ -10,12 +10,12 @@
  *
  * Modes:
  *   1. Fingerprint the DB that DATABASE_URL points at (staging locally):
- *        pnpm --filter @socioply/db exec tsx scripts/diff-prompt-rows.ts --out staging.json
+ *        pnpm --filter @omniply/db exec tsx scripts/diff-prompt-rows.ts --out staging.json
  *   2. Fingerprint prod from inside the api container (no tsx there — the
  *      inline equivalent, kept in sync with fingerprintRow below):
  *        docker compose exec -T api node -e '<see FINGERPRINT_SNIPPET at bottom>' > prod.json
  *   3. Diff two fingerprint files:
- *        pnpm --filter @socioply/db exec tsx scripts/diff-prompt-rows.ts --diff staging.json prod.json --labels staging,prod
+ *        pnpm --filter @omniply/db exec tsx scripts/diff-prompt-rows.ts --diff staging.json prod.json --labels staging,prod
  */
 
 import { createHash } from 'node:crypto'
@@ -134,7 +134,7 @@ if (args[0] === '--diff') {
 /* FINGERPRINT_SNIPPET — inline equivalent for containers without tsx (keep in
  * sync with fingerprintRow/Fingerprint above):
 
-const {prisma}=require("@socioply/shared");const {createHash}=require("crypto");
+const {prisma}=require("@omniply/shared");const {createHash}=require("crypto");
 (async()=>{const rows=await prisma.promptTemplate.findMany({orderBy:{stepNumber:"asc"},select:{stepNumber:true,key:true,stepName:true,defaultProvider:true,defaultModel:true,isActive:true,maxTokens:true,systemPrompt:true,userPrompt:true}});
 console.log(JSON.stringify(rows.map(r=>({id:r.key?"key:"+r.key:"step:"+r.stepNumber,stepNumber:r.stepNumber,key:r.key,stepName:r.stepName,provider:r.defaultProvider,model:r.defaultModel,isActive:r.isActive,maxTokens:r.maxTokens,textHash:createHash("md5").update((r.systemPrompt||"")+"\x00"+r.userPrompt).digest("hex"),sysLen:(r.systemPrompt||"").length,userLen:r.userPrompt.length})),null,1));
 process.exit(0)})().catch(e=>{console.error(e);process.exit(1)})

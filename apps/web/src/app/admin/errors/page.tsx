@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { KpiCard } from '@/components/admin/KpiCard'
 import { ResolveButton } from './ResolveButton'
 import Link from 'next/link'

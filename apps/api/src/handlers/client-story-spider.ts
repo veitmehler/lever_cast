@@ -7,8 +7,8 @@
  * .plans/client-story-review-mining.implementation-plan.md Phases 5-6.
  */
 import PgBoss from 'pg-boss'
-import { prisma, type ResolvedAccount } from '@socioply/shared'
-import { accountMemberIds } from '@socioply/shared'
+import { prisma, type ResolvedAccount } from '@omniply/shared'
+import { accountMemberIds } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { billingWindows } from '../article-pipeline/billing-window'

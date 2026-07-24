@@ -108,7 +108,7 @@ CSV upload  ──────────────┘                       
         ├─ validate via mermaid.parse()  (1 retry on parse failure)
         ├─ render Mermaid → SVG  (mmdc)
         ├─ rasterize SVG → PNG  (resvg-js)
-        ├─ upload PNG to S3 (cdn.socioply.com/diagrams/{jobId}/{n}.png)
+        ├─ upload PNG to S3 (cdn.omniply.io/diagrams/{jobId}/{n}.png)
         ├─ INSERT ArticleDiagram { mermaidSyntax, svgContent, pngS3Key }
         └─ replace section anchor in bodyHtml with <img src="{cdn}/diagrams/…">
       SitePage.enrichmentStatus = "completed"
@@ -2042,7 +2042,7 @@ Produces a single self-contained `.html` file uploaded to `s3://socioply-images-
 </html>
 ```
 
-Diagram `<img>` tags continue to point at `cdn.socioply.com/diagrams/...` rather than being inlined as base64 — keeps the file small and lets users see fresh diagrams if you ever regenerate them.
+Diagram `<img>` tags continue to point at `cdn.omniply.io/diagrams/...` rather than being inlined as base64 — keeps the file small and lets users see fresh diagrams if you ever regenerate them.
 
 **Config options** (per request):
 - `inlineDiagrams: boolean` — if true, embed SVGs as inline `<svg>` instead of `<img>` references. Defaults to `false` (smaller, more portable file).
@@ -2177,7 +2177,7 @@ export class WordPressTarget implements OutputTarget {
     const featuredMediaId = await uploadFeaturedImage(conn.siteUrl, auth, payload.featuredImage)
 
     // 2. Upload diagram images to WP media library — ensures broken WP site doesn't accidentally
-    //    serve broken Levercast CDN refs years later. Replace cdn.socioply.com URLs in bodyHtml
+    //    serve broken Levercast CDN refs years later. Replace cdn.omniply.io URLs in bodyHtml
     //    with the new WP-hosted URLs.
     const diagramMap = new Map<string, { wpMediaId: number; wpSourceUrl: string }>()
     for (const d of payload.diagrams) {
@@ -2222,7 +2222,7 @@ export class WordPressTarget implements OutputTarget {
 | Auth invalid (401) | WP returns `rest_cannot_create` | "Connection rejected — generate a new application password" + link to settings |
 | Slug collision (409 from WP, or `wp_post_revision`) | response body inspection | Auto-append `-${jobId.slice(0,8)}` and retry once |
 | Featured image upload failed but post would succeed | exception in step 1 | Fail whole publish (retry button); never publish post without image |
-| Diagram image upload failed | exception in step 2 (per diagram) | Skip that diagram, log to ErrorLog, continue with `cdn.socioply.com` URL fallback for that one |
+| Diagram image upload failed | exception in step 2 (per diagram) | Skip that diagram, log to ErrorLog, continue with `cdn.omniply.io` URL fallback for that one |
 | WP site offline / DNS | network error | Mark `OutputAttempt.failed`, surface "WordPress site unreachable; try again" |
 
 ### 14b.4 What WordPress integration does NOT do in v1
@@ -2315,7 +2315,7 @@ When the user picks a diagram, `attachDiagramToPost()` from §14.6 is invoked, r
 
 ## 15. API Surface (Levercast v1)
 
-> All routes live on the DO Fastify API (`api.socioply.com`). The Vercel Next.js app calls them via the `@socioply/api-client` package built in Phase 2 of the migration plan. Auth = Clerk JWT in `Authorization: Bearer …` header; tenant is `userId` from the JWT.
+> All routes live on the DO Fastify API (`svc.omniply.io`). The Vercel Next.js app calls them via the `@socioply/api-client` package built in Phase 2 of the migration plan. Auth = Clerk JWT in `Authorization: Bearer …` header; tenant is `userId` from the JWT.
 
 ### 15.1 Topic / pipeline routes
 
@@ -2387,7 +2387,7 @@ When the user picks a diagram, `attachDiagramToPost()` from §14.6 is invoked, r
 
 ### 16.1 Infrastructure (largely covered by migration plan)
 1. ✅ DO Managed Postgres (`socioply` DB) — already provisioned per migration plan Phase 1.
-2. ✅ AWS S3 + CloudFront (`cdn.socioply.com`) — already live per migration plan Phase 5.
+2. ✅ AWS S3 + CloudFront (`cdn.omniply.io`) — already live per migration plan Phase 5.
 3. ✅ DO Droplet + Fastify worker — must be live per migration plan Phase 8 (hard prerequisite).
 4. ✅ `pg-boss` queues — registered per migration plan Phase 8; add the new `article-pipeline`, `article-enrichment`, `article-output`, `generate-social-from-article` queues.
 5. ✅ Encrypted `ApiKey` rows for `gemini`, `openai`, `anthropic`, `fal-ai` — already in place since migration plan Phase 3.

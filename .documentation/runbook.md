@@ -9,9 +9,9 @@
 | Component | Location | URL / Access |
 |---|---|---|
 | Frontend | Vercel | `app.socioply.com`, `www.socioply.com` |
-| API + Worker | DO Droplet `socioply-api-01` | `api.socioply.com` |
+| API + Worker | DO Droplet `socioply-api-01` | `svc.omniply.io` |
 | Database | DO Managed Postgres `azavea-omniply-db` | Port 25061 (pool), 25060 (direct) |
-| Object storage | AWS S3 `socioply-images-prod` | `cdn.socioply.com` |
+| Object storage | AWS S3 `socioply-images-prod` | `cdn.omniply.io` |
 | DB Backups | AWS S3 `socioply-backups` | `db/socioply-YYYY-MM-DD.sql.gz` |
 | Logs | Better Stack | https://betterstack.com/logs |
 | Errors | Sentry `socioply-api` project | https://sentry.io |
@@ -86,7 +86,7 @@ psql "$DIRECT_URL"   # from .env.do or 1Password
 
 ### "Database connection errors"
 
-1. Check `/health/deep`: `curl https://api.socioply.com/health/deep`
+1. Check `/health/deep`: `curl https://svc.omniply.io/health/deep`
    - Look at `db.ok` and `db.error` fields
 2. If pool exhausted, open Admin UI → PG Connections table
 3. Emergency relief (restart frees idle connections):
@@ -111,7 +111,7 @@ psql "$DIRECT_URL"   # from .env.do or 1Password
 
 ### "S3 / CDN images not loading"
 
-1. Check `curl https://api.socioply.com/health/deep` → `s3.ok`
+1. Check `curl https://svc.omniply.io/health/deep` → `s3.ok`
 2. Check AWS Console → CloudFront distribution status
 3. If CloudFront is down, images still directly in S3 (private, but can generate signed URLs for emergency access)
 4. If S3 bucket ACL / OAC changed accidentally, re-apply Origin Access Control in CloudFront console
@@ -143,7 +143,7 @@ psql "$DIRECT_URL"   # from .env.do or 1Password
 ### "OAuth flow broken for a platform"
 
 1. Check the platform's developer console — credentials still active?
-2. Verify redirect URI: must be `https://api.socioply.com/social/<platform>/callback`
+2. Verify redirect URI: must be `https://svc.omniply.io/social/<platform>/callback`
 3. Check Sentry for errors tagged with the platform name
 4. Clear stale OAuth state rows if needed:
    ```sql
@@ -253,8 +253,8 @@ The code is deployed via CI. The following **5 manual steps** must be completed 
 
 ### Step 3 — Set up Better Stack uptime monitors
 1. Go to https://betterstack.com/uptime → New Monitor
-2. Monitor 1: `https://api.socioply.com/health` — interval 3 min — alert: email
-3. Monitor 2: `https://api.socioply.com/health/deep` — interval 5 min — alert: email on 503
+2. Monitor 1: `https://svc.omniply.io/health` — interval 3 min — alert: email
+3. Monitor 2: `https://svc.omniply.io/health/deep` — interval 5 min — alert: email on 503
 
 ### Step 4 — Create AWS S3 backup bucket and set `S3_BACKUP_BUCKET`
 1. AWS Console → S3 → Create bucket `socioply-backups` (same region as prod bucket)
@@ -272,11 +272,11 @@ The code is deployed via CI. The following **5 manual steps** must be completed 
 1. SSH to droplet → `sudo nano /opt/socioply/.env.production` → add: `ADMIN_ENABLED=true`
 2. Update Caddyfile to block `/admin*` externally:
    ```
-   api.socioply.com {
+   svc.omniply.io {
      handle /admin* { respond 403 }
      handle { reverse_proxy api:3001 }
    }
    ```
 3. `docker compose restart caddy api`
-4. Test external block: `curl https://api.socioply.com/admin` → should return 403
+4. Test external block: `curl https://svc.omniply.io/admin` → should return 403
 5. Test Tailscale access: `tailscale ssh socioply@socioply-api-01 -L 3001:localhost:3001` → open `http://localhost:3001/admin`

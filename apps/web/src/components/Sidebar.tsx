@@ -17,6 +17,7 @@ import {
   Images,
   Mail,
   Lightbulb,
+  Magnet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { label: 'Social Posts', href: '/posts', icon: <FileText className="w-5 h-5" /> },
   { label: 'Calendar', href: '/calendar', icon: <Calendar className="w-5 h-5" /> },
   { label: 'Image Library', href: '/images', icon: <Images className="w-5 h-5" /> },
+  { label: 'Lead Magnets', href: '/lead-magnets', icon: <Magnet className="w-5 h-5" /> },
   { label: 'Templates', href: '/templates', icon: <Sparkles className="w-5 h-5" /> },
   { label: 'Settings', href: '/settings', icon: <Settings className="w-5 h-5" /> },
   { label: 'Account', href: '/account', icon: <User className="w-5 h-5" /> },
@@ -132,7 +134,7 @@ export function Sidebar() {
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center border-b border-sidebar-border px-4">
             <h1 className="text-xl font-semibold text-foreground">
-              Socioply
+              Omniply
             </h1>
           </div>
         </div>
@@ -153,7 +155,7 @@ export function Sidebar() {
         <div className="flex h-16 items-center border-b border-sidebar-border px-4">
           {!shouldBeCollapsed && (
             <h1 className="text-xl font-semibold text-foreground">
-              Socioply
+              Omniply
             </h1>
           )}
           {shouldBeCollapsed && (

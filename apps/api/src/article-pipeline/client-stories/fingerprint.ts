@@ -9,7 +9,7 @@
  * separate "since last run" tracking needed.
  */
 import { createHash } from 'crypto'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { TranscribedReview } from './capture'
 

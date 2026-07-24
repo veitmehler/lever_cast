@@ -16,7 +16,7 @@
  * Re-upload is idempotent (upsert), so fixing a CSV and re-uploading is safe.
  */
 import { parse as parseCsv } from 'csv-parse/sync'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 // Accepted CSV header variations → normalised field name.
 const CSV_ALIASES: Record<string, string> = {

@@ -14,7 +14,7 @@
  * MUST be run on BOTH staging and prod after their deploys: the automatic
  * seed step is create-only and will NOT propagate changed prompt text.
  *
- * Run: set -a; . ./.env; set +a; pnpm --filter @socioply/db exec tsx scripts/reseed-deai-prompts.ts
+ * Run: set -a; . ./.env; set +a; pnpm --filter @omniply/db exec tsx scripts/reseed-deai-prompts.ts
  */
 import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from '../prisma/newsletter-prompts'

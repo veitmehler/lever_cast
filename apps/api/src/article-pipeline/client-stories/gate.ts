@@ -5,7 +5,7 @@
  * exists yet, so there's no dependency on the auto-generate cron having ticked
  * first. See .plans/client-story-review-mining.implementation-plan.md Phase 6.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import type { ClientStorySpiderJobData } from '../../handlers/client-story-spider'
 

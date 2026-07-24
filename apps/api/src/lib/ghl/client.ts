@@ -443,3 +443,64 @@ export function formatLocalSendAt(utcDate: Date, timeZone: string): string {
   }).format(utcDate)
   return local.replace(' ', 'T')
 }
+
+// ── Contacts (lead-gen capture — leadgen plan Phase 3) ───────────────────────
+
+export interface UpsertContactResult {
+  contactId: string | null
+}
+
+/**
+ * Upsert a contact by email and apply tags (GHL creates unknown tag names on
+ * the fly). POST /contacts/upsert is the documented v2 dedupe-by-email path.
+ */
+export async function upsertGhlContact(
+  apiKey: string,
+  locationId: string,
+  input: { email: string; tags: string[]; source?: string },
+): Promise<UpsertContactResult> {
+  const data = await ghlRequest<{ contact?: { id?: string } }>(apiKey, '/contacts/upsert', {
+    method: 'POST',
+    body: {
+      locationId,
+      email: input.email,
+      tags: input.tags,
+      ...(input.source ? { source: input.source } : {}),
+    },
+  })
+  return { contactId: data.contact?.id ?? null }
+}
+
+// ── Trigger links (QR review card, leadgen plan Phase F option C) ────────────
+
+export interface GhlTriggerLink {
+  id: string
+  name: string
+  redirectTo?: string
+  fieldKey?: string
+}
+
+/** List the location's trigger links; returns [] on any failure (defensive). */
+export async function listTriggerLinks(apiKey: string, locationId: string): Promise<GhlTriggerLink[]> {
+  try {
+    const data = await ghlRequest<{ links?: GhlTriggerLink[] }>(apiKey, `/links/?locationId=${locationId}`)
+    return data.links ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Point a trigger link at a new destination (the clinic's Google review deep link). */
+export async function updateTriggerLink(
+  apiKey: string,
+  linkId: string,
+  name: string,
+  redirectTo: string,
+): Promise<boolean> {
+  try {
+    await ghlRequest(apiKey, `/links/${linkId}`, { method: 'PUT', body: { name, redirectTo } })
+    return true
+  } catch {
+    return false
+  }
+}

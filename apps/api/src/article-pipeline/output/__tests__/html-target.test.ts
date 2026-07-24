@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 
 // buildHtmlBody doesn't use it, but the module imports it from the shared package.
-vi.mock('@socioply/shared', () => ({ uploadBufferWithKey: vi.fn() }))
+vi.mock('@omniply/shared', () => ({ uploadBufferWithKey: vi.fn() }))
 
 import { buildHtmlBody } from '../html-target'
 import type { OutputPayload } from '../types'

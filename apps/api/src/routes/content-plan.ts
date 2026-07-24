@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma, resolveAccountForClerkId } from '@socioply/shared'
+import { prisma, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'
 import { billingWindows } from '../article-pipeline/billing-window'

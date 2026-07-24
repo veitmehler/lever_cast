@@ -1,7 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-const APP_HOST = 'app.socioply.com'
+// Canonical app host is env-driven (flips to chiro.omniply.io in the rename's
+// Phase 3); BOTH omniply and legacy socioply hosts serve during the transition.
+const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? 'chiro.omniply.io'
+const APP_HOSTS = new Set([APP_HOST, 'chiro.omniply.io', 'staging.chiro.omniply.io', 'app.socioply.com'])
 const WWW_HOST = 'www.socioply.com'
 
 // Routes that belong exclusively to the authenticated app (not the marketing site)
@@ -24,9 +27,12 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/posts/publish-scheduled',
   '/api/posts/sync-analytics',
+  // Embedded GHL surface: authenticated by the SSO-derived embed token, not
+  // Clerk (onboarding plan Phase 0).
+  '/embed(.*)',
 ])
 
-function isSocioplyDomain(host: string) {
+function isOmniplyDomain(host: string) {
   return host === APP_HOST || host === WWW_HOST
 }
 
@@ -35,7 +41,7 @@ export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl
 
   // ── Domain routing (production only — skipped on localhost / preview URLs) ──
-  if (isSocioplyDomain(host)) {
+  if (isOmniplyDomain(host)) {
     if (host === WWW_HOST) {
       // www only serves the marketing site. Any app path → redirect to app domain.
       const isAppPath = APP_PATHS.some(
@@ -50,7 +56,7 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.next()
     }
 
-    if (host === APP_HOST) {
+    if (APP_HOSTS.has(host)) {
       // app domain: root path → redirect to dashboard
       if (pathname === '/') {
         const url = new URL(request.url)

@@ -8,8 +8,8 @@
  * This allows managing keys via the admin panel after initial deploy.
  */
 
-import { prisma } from '@socioply/shared'
-import { decrypt, encrypt } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { decrypt, encrypt } from '@omniply/shared'
 
 const ENV_VAR_MAP: Record<string, string> = {
   gemini: 'GEMINI_API_KEY',

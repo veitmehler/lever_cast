@@ -19,7 +19,7 @@ import {
   uploadBufferWithKey,
   deleteOldVersions,
   brandSettingsForUser,
-} from '@socioply/shared'
+} from '@omniply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'
 import { logger } from '../lib/logger'

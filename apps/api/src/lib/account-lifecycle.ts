@@ -11,8 +11,8 @@
  * - cancelled: status → cancelled. paidThrough is left untouched — publishing
  *   runs out the paid period naturally (paidThrough governs publishing).
  */
-import { prisma } from '@socioply/shared'
-import type { ResolvedAccount } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import type { ResolvedAccount } from '@omniply/shared'
 import { logger } from './logger'
 import { billingWindows } from '../article-pipeline/billing-window'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'
@@ -133,7 +133,7 @@ async function redateStaleTopics(
  * days actually have planned content and skips the rest. Implements the
  * "generate when a cycle's payment clears" behavior.
  */
-async function burstCurrentWindow(accountId: string): Promise<{ batchId: string; itemCount: number } | null> {
+export async function burstCurrentWindow(accountId: string): Promise<{ batchId: string; itemCount: number } | null> {
   const acct = await prisma.account.findUnique({
     where: { id: accountId },
     select: { id: true, ownerUserId: true, subscriptionStartedAt: true },

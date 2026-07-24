@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getBoss, QUEUES } from '../queues/index'
 import { finalizeDispatchCounts, reconcileRunDispatchState } from '../social/automation/dispatch-run'

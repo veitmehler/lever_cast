@@ -6,7 +6,7 @@
  * webhooks exist. See
  * .plans/client-story-review-mining.implementation-plan.md Phase 5.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getBoss, QUEUES } from '../queues/index'
 import { billingWindows } from '../article-pipeline/billing-window'

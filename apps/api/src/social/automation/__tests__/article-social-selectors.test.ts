@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const findMany = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: { articleDiagram: { findMany: (...a: unknown[]) => findMany(...a) } },
   readS3Object: vi.fn(),
 }))

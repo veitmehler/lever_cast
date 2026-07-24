@@ -82,7 +82,7 @@ describe('proxyToApi (characterization)', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://api.socioply.com/api/ai/generate')
+    expect(url).toBe('https://svc.omniply.io/api/ai/generate')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok123')
     // No Clerk fallback should have run when a client token is present.
     expect(authMock).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe('proxyToApi (characterization)', () => {
     )
 
     const [url] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://api.socioply.com/api/articles?status=published&limit=20')
+    expect(url).toBe('https://svc.omniply.io/api/articles?status=published&limit=20')
   })
 
   it('returns 503 when the upstream fetch throws (network failure)', async () => {

@@ -14,7 +14,7 @@ for (const m of ['videoGenerationJob', 'syndicationArticle', 'articleEmailCampai
   deleteManys[m] = vi.fn().mockResolvedValue({ count: 0 })
 }
 
-vi.mock('@socioply/shared', () => {
+vi.mock('@omniply/shared', () => {
   const modelStub = (name: string) => ({
     count: (...a: unknown[]) => counts(name, ...a),
     deleteMany: (...a: unknown[]) => deleteManys[name]?.(...a) ?? { count: 0 },
@@ -68,7 +68,7 @@ beforeEach(() => {
   userDeleteMany.mockResolvedValue({ count: 1 })
   llmUpdateMany.mockResolvedValue({ count: 0 })
   accountDelete.mockResolvedValue({})
-  mediaFindMany.mockResolvedValue([{ url: 'https://cdn.socioply.com/tmp/featured/x.png' }])
+  mediaFindMany.mockResolvedValue([{ url: 'https://cdn.omniply.io/tmp/featured/x.png' }])
   postFindMany.mockResolvedValue([])
 })
 

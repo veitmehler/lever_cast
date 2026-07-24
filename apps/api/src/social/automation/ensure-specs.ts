@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { DEFAULT_SOCIAL_POST_SPECS } from './default-specs'
 
 /** Seed the per-user slot CONFIG rows (idempotent). Which slots actually run

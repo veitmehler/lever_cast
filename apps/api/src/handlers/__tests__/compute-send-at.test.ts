@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Mock the handler's heavy/db deps; keep ../../social/automation/schedule real
 // so the tz + time math is genuinely exercised.
-vi.mock('@socioply/shared', () => ({ prisma: {} }))
+vi.mock('@omniply/shared', () => ({ prisma: {} }))
 vi.mock('../../lib/alerts', () => ({ sendFailureAlert: vi.fn() }))
 vi.mock('../../lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('../../article-pipeline/promo-email/generate', () => ({ generatePromoEmail: vi.fn() }))

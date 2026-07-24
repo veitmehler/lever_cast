@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
-import { decrypt, maskApiKey } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { decrypt, maskApiKey } from '@omniply/shared'
 
 // Valid provider names
 const VALID_PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter']

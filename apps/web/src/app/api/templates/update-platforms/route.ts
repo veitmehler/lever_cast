@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 // Default platform templates to add to existing templates
 const PLATFORM_TEMPLATES_BY_TONE: Record<string, {

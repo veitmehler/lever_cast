@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { SOCIAL_GENERATE_EXPIRE_SECONDS } from './enqueue'
 import { publishingGateForUser } from '../../lib/account-billing'

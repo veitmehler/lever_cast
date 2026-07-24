@@ -7,7 +7,7 @@
  * safe on staging/prod where those are tuned.
  *
  * Run (env must point at the target DB):
- *   pnpm --filter @socioply/db exec tsx scripts/seed-promo-email-prompt.ts
+ *   pnpm --filter @omniply/db exec tsx scripts/seed-promo-email-prompt.ts
  *
  * Keep this template identical to PROMO_EMAIL_TEMPLATE in prisma/seed.ts.
  */

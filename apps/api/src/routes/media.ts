@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
-import { uploadImageToStorage } from '@socioply/shared'
+import { uploadImageToStorage } from '@omniply/shared'
 import { sniffImageMime } from '../lib/image-sniff'
 
 const MEDIA_SELECT = {

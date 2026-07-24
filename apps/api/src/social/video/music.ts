@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { downloadToFile, hasAudioStream, runFfmpeg } from './ffmpeg'
 import { logger } from '../../lib/logger'
 

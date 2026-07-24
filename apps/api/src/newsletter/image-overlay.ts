@@ -7,7 +7,7 @@
  * Source can be an http(s) URL or a data: URI (used for freshly-generated Fal
  * buffers, avoiding a throwaway upload). Output is a 16:9 JPEG in S3.
  */
-import { uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
+import { uploadBufferWithKey, deleteOldVersions } from '@omniply/shared'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { logger } from '../lib/logger'
 
@@ -22,7 +22,7 @@ function esc(s: string): string {
  * A short, time-ordered token used to make each generation's S3 keys unique.
  *
  * Cache-busting via a `?v=` query string does NOT work here: CloudFront
- * (cdn.socioply.com) ignores the query string in its cache key, so a stable key
+ * (cdn.omniply.io) ignores the query string in its cache key, so a stable key
  * keeps serving the previously-cached object until its TTL expires. The KEY
  * itself must change, so the URL points at an object the CDN has never seen.
  */

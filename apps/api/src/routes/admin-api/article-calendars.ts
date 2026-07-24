@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAdmin } from '../../middleware/admin'
 import { logger } from '../../lib/logger'
 import { parseArticleCalendarCsv, commitArticleCalendarTopics } from '../../article-pipeline/calendar-csv'

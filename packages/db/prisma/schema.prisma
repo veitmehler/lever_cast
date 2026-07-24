@@ -42,6 +42,17 @@ model Account {
   // the GHL workflow posts to /api/ghl/billing-events/<token>.
   ghlBillingToken String?   @unique
   billingEvents   GhlBillingEvent[]
+  // Per-account URL token for the GHL Review-Received webhook receiver
+  // (google-reviews plan Tier 3) — workflow posts to /api/ghl/reviews/<token>.
+  ghlReviewToken  String?   @unique
+  // Onboarding gate (.plans/ghl-onboarding.implementation-plan.md): first
+  // generation is blocked until the chat onboarding completes (validator green).
+  onboardingCompletedAt DateTime?
+  onboardingSession     OnboardingSession?
+  // Central lead-gen Drive folder for this account (leadgen plan Phase 1).
+  driveFolderId String?
+  leadGenDocuments LeadGenDocument[]
+  leadCaptures     LeadCapture[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -58,6 +69,86 @@ model Account {
 
 // Owner-managed roster of teammate emails (no invitations). A user whose email
 // matches a roster entry is auto-joined to that account on sign-in.
+// ── Lead-gen documents (.plans/leadgen-drive-documents.implementation-plan.md) ──
+
+// Admin-managed master template (Model B): designed HTML layout with
+// {{brand.*}} tokens and <slot name="..."> content slots.
+model LeadGenTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sourceHtml  String   @db.Text
+  slotMeta    Json? // per-slot: { maxChars, rewriteEligible }
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   LeadGenDocument[]
+
+  @@map("leadgen_templates")
+}
+
+model LeadGenDocument {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId      String // owner user (account-scoped queries broaden via extension)
+  templateId  String?
+  template    LeadGenTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  title       String
+  slug        String
+  kind        String   @default("template") // template | custom
+  status      String   @default("compiling") // compiling | pending_review | live | disabled | failed
+  driveFileId String?  @unique
+  driveLink   String? // webViewLink handed to marketing surfaces
+  pdfKey      String? // S3 copy (source of truth for re-uploads)
+  sourcePdfKey String? // custom uploads: the original client PDF on S3
+  ghlTagNames String[] // applied to captured leads
+  lastError   String?
+  compiledAt  DateTime?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  captures    LeadCapture[]
+
+  @@unique([accountId, slug])
+  @@index([status])
+  @@map("leadgen_documents")
+}
+
+// Capture log: one row per access proposal (idempotency + analytics).
+model LeadCapture {
+  id             String   @id @default(cuid())
+  documentId     String
+  document       LeadGenDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  requesterEmail String
+  proposalId     String   @unique // dedupe across poll ticks
+  ghlContactId   String?
+  status         String   @default("captured") // captured | ghl_failed
+  createdAt      DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("lead_captures")
+}
+
+// Resumable chat-onboarding state (.plans/ghl-onboarding.implementation-plan.md
+// Phase 1). One session per account; every answer persists immediately so a
+// closed tab resumes mid-flow.
+model OnboardingSession {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  currentStep String   @default("welcome")
+  status      String   @default("in_progress") // in_progress | completed
+  stepData    Json? // per-step answers, extraction candidates, confirmations
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("onboarding_sessions")
+}
+
 // Audit log + idempotency window for GHL billing webhook events (multi-tenancy
 // plan Phase B). One row per received event, including suppressed duplicates.
 model GhlBillingEvent {
@@ -90,7 +181,11 @@ model AccountMember {
 
 model User {
   id        String   @id @default(cuid())
+  // GHL-SSO users carry a synthetic id ("ghl:<ghlUserId>") here so every
+  // clerkId-keyed code path works unchanged (onboarding plan Phase 0).
   clerkId   String   @unique
+  // Set for users who arrived via the embedded GHL app (SSO context userId).
+  ghlUserId String?  @unique
   name      String?
   email     String   @unique
   role      String   @default("user") // user | admin
@@ -978,6 +1073,18 @@ model BrandSettings {
   instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards
   videoSpecialInstructions String? @db.Text // client-specific instructions injected into the Fal.ai video prompt (e.g. style, restrictions)
   socialCallToAction       String? @db.Text // what the social posts should promote / drive toward (injected as {{call_to_action}})
+  // Universal CTA destination (onboarding "where should bookings go?") — the
+  // clinic's PMS online-booking URL. GHL never owns booking (snapshot guide).
+  bookingUrl               String?
+  // Practice-management system (onboarding dropdown) — market-research capture
+  // that decides which PMS connector gets built first (pms-connector plan).
+  pmsSystem                String?
+  // Weekly opening hours (Places API lookup at onboarding, owner-editable).
+  // Optional everywhere: consumers DROP the hours line when null.
+  openingHours             String? @db.Text
+  // Google Place ID (resolved once from googleBusinessProfileUrl or name+address).
+  // Drives the review deep link (QR card) + the weekly Places review probe.
+  googlePlaceId            String?
   socialPrimaryGoal        String? // link-in-bio CTA goal: 'newsletter' | 'booking' | 'custom' (null → use socialCallToAction verbatim)
   socialBioUrl             String? @db.Text // the business's link-in-bio page URL (reference; posts say "link in bio")
   googleBusinessProfileUrl String? // GBP / g.page / Maps share URL → sameAs + hasMap in JSON-LD

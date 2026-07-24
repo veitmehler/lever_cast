@@ -9,7 +9,7 @@
  * rest of the pipeline run completely unchanged afterward. No review step: the
  * user only ever sees the final generated newsletter.
  */
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { runNewsletterJsonPrompt } from './llm'
 import { specializationLabel } from './calendar-routing'

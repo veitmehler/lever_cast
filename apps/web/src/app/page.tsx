@@ -12,15 +12,15 @@ export default function Home() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold">Socioply</h1>
+            <h1 className="text-2xl font-bold">Omniply</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="https://app.socioply.com/sign-in">
+            <Link href="https://chiro.omniply.io/sign-in">
               <Button variant="outline" className="hover:bg-primary/20 hover:border-primary/50">
                 Sign In
               </Button>
             </Link>
-            <Link href="https://app.socioply.com/sign-up">
+            <Link href="https://chiro.omniply.io/sign-up">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Get Started
               </Button>
@@ -48,7 +48,7 @@ export default function Home() {
           </p>
 
           <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="https://app.socioply.com/sign-up">
+            <Link href="https://chiro.omniply.io/sign-up">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
                 <Sparkles className="w-5 h-5 mr-2" />
                 Get Started Free
@@ -109,7 +109,7 @@ export default function Home() {
       <section className="container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto">
           <h3 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            Why creators love Socioply
+            Why creators love Omniply
           </h3>
 
           <div className="space-y-6">
@@ -139,7 +139,7 @@ export default function Home() {
           <p className="text-xl text-muted-foreground mb-8">
             Join entrepreneurs turning ideas into engagement
           </p>
-          <Link href="https://app.socioply.com/sign-up">
+          <Link href="https://chiro.omniply.io/sign-up">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-6">
               <Sparkles className="w-5 h-5 mr-2" />
               Get Started Free
@@ -156,10 +156,10 @@ export default function Home() {
               <div className="w-6 h-6 rounded-lg bg-primary flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">Socioply</span>
+              <span className="font-semibold">Omniply</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 Socioply. All rights reserved.
+              © 2024 Omniply. All rights reserved.
             </p>
           </div>
         </div>

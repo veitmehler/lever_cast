@@ -77,6 +77,24 @@ export async function afterFifthQuestion(ctx: StepContext): Promise<void> {
   )
 }
 
+/** Relative luminance of a #rrggbb color (0 = black, 1 = white). */
+function hexLuminance(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return 1
+  const n = parseInt(m[1], 16)
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255
+}
+
+/**
+ * Ink for the logo's DARK variant (shown on light backgrounds). Light-header
+ * brands (cream sites) must not yield a light "dark" logo, so take the first
+ * genuinely dark brand color, not the header color blindly.
+ */
+function darkInkFromPalette(p: SemanticPalette): string {
+  const candidates = [p.headerBackground, p.button, p.accent].filter((c): c is string => Boolean(c))
+  return candidates.find((c) => hexLuminance(c) < 0.4) ?? '#011328'
+}
+
 /** logo_confirm: chosen/uploaded URL → light/dark variants → nlLogoUrl. */
 export async function commitLogoConfirm(ctx: StepContext, answer: unknown): Promise<string | null> {
   const a = (answer ?? {}) as { chosenUrl?: string; none?: boolean }
@@ -88,7 +106,7 @@ export async function commitLogoConfirm(ctx: StepContext, answer: unknown): Prom
   if (!source) return 'Pick a logo or choose "no logo"'
   const palette = (ctx.stepData.palette as SemanticPalette) ?? {}
   try {
-    const processed = await processLogo(ctx.userId, source, palette.headerBackground ?? '#011328', `onboarding/${ctx.accountId}/logo`)
+    const processed = await processLogo(ctx.userId, source, darkInkFromPalette(palette), `onboarding/${ctx.accountId}/logo`)
     ctx.stepData.logoVariants = processed as unknown as Record<string, unknown>
     const light = (processed as { lightUrl?: string }).lightUrl
     const dark = (processed as { darkUrl?: string }).darkUrl

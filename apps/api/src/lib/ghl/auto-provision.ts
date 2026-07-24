@@ -53,8 +53,25 @@ async function setCustomValues(locationId: string, token: string, values: Record
   }
 }
 
+/** Internal locations (the selling subaccount etc.) must never become client accounts. */
+function isExcluded(locationId: string): boolean {
+  return (process.env.GHL_INTERNAL_LOCATIONS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(locationId)
+}
+
 /** Idempotent: provision a location into a ready-to-onboard Omniply account. */
-export async function provisionLocation(locationId: string, source: string): Promise<string | null> {
+export async function provisionLocation(
+  locationId: string,
+  source: string,
+  preMinted?: { token: string; expiresAt: Date; userId?: string },
+): Promise<string | null> {
+  if (isExcluded(locationId)) {
+    logger.info({ locationId, source }, '[auto-provision] internal location — skipped')
+    return null
+  }
   const existing = await prisma.ghlSettings.findFirst({ where: { ghlLocationId: locationId }, select: { id: true } })
   if (existing) {
     logger.info({ locationId, source }, '[auto-provision] location already provisioned')
@@ -62,8 +79,9 @@ export async function provisionLocation(locationId: string, source: string): Pro
   }
 
   // Minting the token doubles as install verification — it fails for
-  // locations that don't actually have the app.
-  const minted = await mintLocationToken(locationId)
+  // locations that don't actually have the app. Per-location consent flows
+  // hand us the token directly instead.
+  const minted = preMinted ?? (await mintLocationToken(locationId))
   if (!minted) {
     logger.warn({ locationId, source }, '[auto-provision] token mint failed — not provisioning')
     return null

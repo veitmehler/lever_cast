@@ -84,6 +84,7 @@ export interface RenderBrand {
   nlHeadingFontWeight?: string | null
   nlBodyFontWeight?: string | null
   nlLinkColor?: string | null
+  nlButtonColor?: string | null
 }
 
 export interface RenderOffer {
@@ -120,6 +121,7 @@ interface Theme {
   headingWeight: string
   bodyWeight: string
   linkColor: string
+  buttonColor: string // CTA/read-more buttons; falls back to linkColor
   headerLogoUrl: string | null
   headerLogoWidth: number
   footerLogoUrl: string | null
@@ -181,6 +183,7 @@ function resolveTheme(brand: RenderBrand): Theme {
     headingWeight: brand.nlHeadingFontWeight?.trim() || '700',
     bodyWeight: brand.nlBodyFontWeight?.trim() || '400',
     linkColor: brand.nlLinkColor?.trim() || '#fa00bb',
+    buttonColor: brand.nlButtonColor?.trim() || brand.nlLinkColor?.trim() || '#fa00bb',
     headerLogoUrl: pickLogo(brand, brand.nlHeaderLogoVariant, headerBg),
     headerLogoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
     footerLogoUrl: pickLogo(brand, brand.nlFooterLogoVariant, footerBg),
@@ -255,7 +258,7 @@ function bulletList(items: string[], theme: Theme): string {
 }
 
 function readMoreButton(link: string, theme: Theme, label = 'Read full article →'): string {
-  return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.linkColor};text-decoration:none;border:2px solid ${theme.linkColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
+  return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.buttonColor};text-decoration:none;border:2px solid ${theme.buttonColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
 }
 
 /** A promotional offer card: accent band + optional 16:9 banner + headline + pitch + filled CTA. */

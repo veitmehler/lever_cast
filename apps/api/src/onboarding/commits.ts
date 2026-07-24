@@ -181,6 +181,7 @@ export async function commitTemplateReveal(ctx: StepContext, answer: unknown): P
     nlHeaderBgColor: palette.headerBackground ?? '#0b2545',
     nlFooterBgColor: palette.headerBackground ?? '#0b2545',
     nlLinkColor: palette.accent ?? '#2a6f97',
+    nlButtonColor: palette.button ?? null,
     nlFontColor: '#222222',
     nlSectionColor1: tints[0],
     nlSectionColor2: tints[1] ?? tints[0],

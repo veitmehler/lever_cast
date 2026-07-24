@@ -167,6 +167,15 @@ export default function HomePage() {
           come back the week your newsletter reminds them you exist.
         </P>
         <ReactivationLoop />
+        <P>
+          And there is a third lever most owners never connect to content at all:{' '}
+          <strong>being found in the first place.</strong> When someone searches for what you do plus your
+          suburb, Google ranks the local pack by proximity, relevance and reputation. Reputation means
+          reviews: how many, how recent, how steady. A business collecting reviews systematically, week after
+          week, climbs above competitors who collected a burst two years ago and stopped.{' '}
+          <strong>Omniply makes the asking automatic,</strong> so your review count and your map ranking
+          compound alongside your content.
+        </P>
       </Section>
 
       {/* ── Bencivenga bullets ── */}

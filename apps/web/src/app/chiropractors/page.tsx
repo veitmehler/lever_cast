@@ -177,6 +177,17 @@ export default function ChiropractorsPage() {
           already know and trust you.
         </P>
         <ReactivationLoop />
+        <P>
+          And the third lever decides whether new patients ever find you at all:{' '}
+          <strong>the Google map pack.</strong> When someone in pain types chiropractor near me, three
+          practices get shown and everyone else gets scrolled past. Google picks those three largely on
+          reviews: how many, how recent, and whether they keep coming. A practice that collects reviews
+          systematically, every single week, outranks the practice with a burst of reviews from two years
+          ago. Every time. <strong>Omniply makes the asking automatic,</strong> with the front-desk QR card
+          and well-timed follow-ups, so your map ranking climbs while you adjust patients.{' '}
+          <strong>That ranking is the most valuable screen real estate in your town,</strong> and it is
+          rented with review consistency.
+        </P>
       </Section>
 
       {/* ── Bencivenga bullets ── */}

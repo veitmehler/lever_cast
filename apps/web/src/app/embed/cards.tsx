@@ -5,7 +5,8 @@
  * Each card receives the step's `card` payload and calls `onSubmit(answer)`
  * with exactly the shape the matching server commit expects.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { HexColorInput, HexColorPicker } from 'react-colorful'
 
 const inputCls =
   'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground'
@@ -252,38 +253,49 @@ function HexSwatch({
   disabled: boolean
   onChange: (hex: string) => void
 }) {
-  // Free-typing needs a local draft: only valid #RRGGBB values propagate.
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  const commitDraft = (raw: string) => {
-    const hex = raw.trim().startsWith('#') ? raw.trim() : `#${raw.trim()}`
-    if (/^#[0-9a-fA-F]{6}$/.test(hex)) onChange(hex.toLowerCase())
-    setDraft(hex)
-  }
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+  const valid = /^#[0-9a-fA-F]{6}$/.test(value)
   return (
-    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-      <input
-        type="color"
-        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#888888'}
-        onChange={(e) => onChange(e.target.value)}
+    <div ref={ref} className="relative">
+      <button
+        type="button"
         disabled={disabled}
-        className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent"
-      />
-      <input
-        type="text"
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          commitDraft(e.target.value)
-        }}
-        onBlur={() => setDraft(value)}
-        disabled={disabled}
-        spellCheck={false}
-        className="w-20 rounded border border-border bg-background px-1.5 py-1 font-mono text-xs uppercase"
-        aria-label={`${label} hex color`}
-      />
-      {label}
-    </label>
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground"
+        aria-expanded={open}
+        aria-label={`${label} color`}
+      >
+        <span
+          className="h-5 w-5 rounded border border-border"
+          style={{ background: valid ? value : '#888888' }}
+        />
+        <span className="font-mono uppercase">{valid ? value : '——'}</span>
+        <span>{label}</span>
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 z-20 mb-2 rounded-xl border border-border bg-card p-3 shadow-lg">
+          <HexColorPicker color={valid ? value : '#888888'} onChange={(hex) => onChange(hex.toLowerCase())} />
+          <div className="mt-2 flex items-center gap-1">
+            <span className="font-mono text-xs text-muted-foreground">#</span>
+            <HexColorInput
+              color={valid ? value : '#888888'}
+              onChange={(hex) => onChange(hex.toLowerCase())}
+              className="w-full rounded border border-border bg-background px-1.5 py-1 font-mono text-xs uppercase"
+              aria-label={`${label} hex value`}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

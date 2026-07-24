@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server'
 // Phase 3); BOTH omniply and legacy socioply hosts serve during the transition.
 const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? 'chiro.omniply.io'
 const APP_HOSTS = new Set([APP_HOST, 'chiro.omniply.io', 'staging.chiro.omniply.io', 'app.socioply.com'])
+// Marketing hosts serve the public sales pages (apex omniply.io + www; legacy www.socioply).
+const MARKETING_HOSTS = new Set(['omniply.io', 'www.omniply.io', 'www.socioply.com'])
 const WWW_HOST = 'www.socioply.com'
 
 // Routes that belong exclusively to the authenticated app (not the marketing site)
@@ -30,6 +32,9 @@ const isPublicRoute = createRouteMatcher([
   // Embedded GHL surface: authenticated by the SSO-derived embed token, not
   // Clerk (onboarding plan Phase 0).
   '/embed(.*)',
+  // Public marketing pages (reviewable on any host).
+  '/home(.*)',
+  '/chiropractors(.*)',
 ])
 
 function isOmniplyDomain(host: string) {
@@ -52,7 +57,12 @@ export default clerkMiddleware(async (auth, request) => {
         url.host = APP_HOST
         return NextResponse.redirect(url, 301)
       }
-      // www serves marketing pages without Clerk auth enforcement
+      // Marketing hosts: apex/www serve the sales pages without Clerk.
+      if (pathname === '/') {
+        const url = new URL(request.url)
+        url.pathname = '/home'
+        return NextResponse.rewrite(url)
+      }
       return NextResponse.next()
     }
 

@@ -308,3 +308,47 @@ export function FaqJsonLd({ items }: { items: FaqEntry[] }) {
   }
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
 }
+
+/* ── Diagram 6: the Google map pack ─────────────────────────────────────── */
+export function MapPackDiagram({ query }: { query?: string }) {
+  const q = query ?? 'chiropractor near me'
+  return (
+    <figure className="my-10">
+      <svg viewBox="0 0 560 330" className="w-full">
+        {/* search bar */}
+        <rect x="60" y="14" width="440" height="44" rx="22" fill="#fff" stroke={TOKENS.line} strokeWidth="2" />
+        <circle cx="92" cy="36" r="9" fill="none" stroke={TOKENS.muted} strokeWidth="2.5" />
+        <line x1="98" y1="43" x2="106" y2="51" stroke={TOKENS.muted} strokeWidth="2.5" />
+        <text x="122" y="42" fontSize="15" fill={TOKENS.body}>{q}</text>
+        {/* map pack container */}
+        <rect x="60" y="76" width="440" height="168" rx="12" fill="#fff" stroke={TOKENS.line} strokeWidth="2" />
+        <text x="76" y="100" fontSize="11" fill={TOKENS.muted} fontWeight="700" letterSpacing="1">THE MAP PACK · ONLY 3 GET SHOWN</text>
+        {/* result 1 — you */}
+        <rect x="72" y="110" width="416" height="38" rx="8" fill="none" stroke={TOKENS.accent} strokeWidth="3" />
+        <rect x="82" y="120" width="90" height="10" rx="5" fill={TOKENS.ink} />
+        <text x="182" y="130" fontSize="13" fill={TOKENS.accentDeep}>★★★★★</text>
+        <text x="248" y="130" fontSize="12" fill={TOKENS.accentDeep} fontWeight="700">214 reviews · newest this week</text>
+        <text x="452" y="131" fontSize="11" fill="#fff" fontWeight="800" textAnchor="middle">YOU</text>
+        <rect x="432" y="118" width="40" height="18" rx="9" fill={TOKENS.accent} />
+        <text x="452" y="131" fontSize="11" fill="#fff" fontWeight="800" textAnchor="middle">YOU</text>
+        {/* results 2-3 */}
+        <rect x="72" y="154" width="416" height="36" rx="8" fill="none" stroke={TOKENS.line} strokeWidth="2" />
+        <rect x="82" y="164" width="80" height="9" rx="4.5" fill={TOKENS.line} />
+        <text x="182" y="174" fontSize="13" fill={TOKENS.muted}>★★★★☆</text>
+        <text x="248" y="174" fontSize="12" fill={TOKENS.muted}>41 reviews · newest 2 years ago</text>
+        <rect x="72" y="196" width="416" height="36" rx="8" fill="none" stroke={TOKENS.line} strokeWidth="2" />
+        <rect x="82" y="206" width="96" height="9" rx="4.5" fill={TOKENS.line} />
+        <text x="182" y="216" fontSize="13" fill={TOKENS.muted}>★★★★☆</text>
+        <text x="248" y="216" fontSize="12" fill={TOKENS.muted}>28 reviews · newest last year</text>
+        {/* below the fold */}
+        <line x1="60" y1="262" x2="500" y2="262" stroke={TOKENS.line} strokeWidth="2" strokeDasharray="7 7" />
+        <rect x="72" y="276" width="416" height="18" rx="6" fill={TOKENS.line} opacity="0.45" />
+        <rect x="72" y="302" width="416" height="18" rx="6" fill={TOKENS.line} opacity="0.25" />
+        <text x="280" y="259" textAnchor="middle" fontSize="11.5" fill={TOKENS.muted} fontWeight="700">EVERYONE ELSE · SCROLLED PAST</text>
+      </svg>
+      <figcaption className="mt-2 text-center text-sm" style={{ color: TOKENS.muted }}>
+        Google fills these three spots largely on reviews: how many, how recent, how steady.
+      </figcaption>
+    </figure>
+  )
+}

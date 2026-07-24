@@ -41,12 +41,25 @@ export async function embedRoutes(app: FastifyInstance) {
       const encrypted = request.body?.encryptedData
       if (!encrypted) return reply.status(400).send({ error: 'encryptedData required' })
 
+      // Key rotation: try the current secret, then the previous one (set
+      // GHL_SSO_SECRET_PREVIOUS during app re-creation / key rotation windows).
       let ctx
       try {
         ctx = decryptGhlSso(encrypted, ssoSecret)
       } catch (err) {
-        logger.warn({ err }, '[embed] SSO decrypt failed')
-        return reply.status(401).send({ error: 'Invalid SSO payload' })
+        const previous = process.env.GHL_SSO_SECRET_PREVIOUS
+        if (previous) {
+          try {
+            ctx = decryptGhlSso(encrypted, previous)
+            logger.warn('[embed] SSO decrypted with PREVIOUS secret — GHL is still encrypting under the old app key; update GHL_SSO_SECRET')
+          } catch {
+            logger.warn({ err }, '[embed] SSO decrypt failed with current AND previous secrets')
+            return reply.status(401).send({ error: 'Invalid SSO payload' })
+          }
+        } else {
+          logger.warn({ err }, '[embed] SSO decrypt failed')
+          return reply.status(401).send({ error: 'Invalid SSO payload' })
+        }
       }
 
       const locationId = ctx.activeLocation

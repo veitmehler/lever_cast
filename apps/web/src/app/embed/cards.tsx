@@ -5,7 +5,7 @@
  * Each card receives the step's `card` payload and calls `onSubmit(answer)`
  * with exactly the shape the matching server commit expects.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 const inputCls =
   'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground'
@@ -241,19 +241,75 @@ function previewHtml(orgName: string, logoUrl: string | null, p: Palette): strin
 </div></body></html>`
 }
 
+function HexSwatch({
+  value,
+  label,
+  disabled,
+  onChange,
+}: {
+  value: string
+  label: string
+  disabled: boolean
+  onChange: (hex: string) => void
+}) {
+  // Free-typing needs a local draft: only valid #RRGGBB values propagate.
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  const commitDraft = (raw: string) => {
+    const hex = raw.trim().startsWith('#') ? raw.trim() : `#${raw.trim()}`
+    if (/^#[0-9a-fA-F]{6}$/.test(hex)) onChange(hex.toLowerCase())
+    setDraft(hex)
+  }
+  return (
+    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <input
+        type="color"
+        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#888888'}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent"
+      />
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          commitDraft(e.target.value)
+        }}
+        onBlur={() => setDraft(value)}
+        disabled={disabled}
+        spellCheck={false}
+        className="w-20 rounded border border-border bg-background px-1.5 py-1 font-mono text-xs uppercase"
+        aria-label={`${label} hex color`}
+      />
+      {label}
+    </label>
+  )
+}
+
 export function TemplateCard({
   card,
   disabled,
   onSubmit,
 }: {
-  card: { palette?: Palette; logoUrl?: string | null; organizationName?: string }
+  card: {
+    palette?: Palette
+    logoUrl?: string | null
+    logoVariants?: { lightUrl?: string; darkUrl?: string }
+    organizationName?: string
+  }
   disabled: boolean
   onSubmit: (answer: Record<string, unknown>) => void
 }) {
   const [palette, setPalette] = useState<Palette>(card.palette ?? {})
+  const [logoVariant, setLogoVariant] = useState<'light' | 'dark'>('light')
+  const variants = card.logoVariants ?? {}
+  const hasBothVariants = Boolean(variants.lightUrl && variants.darkUrl)
+  const activeLogo =
+    (logoVariant === 'dark' ? variants.darkUrl : variants.lightUrl) ?? card.logoUrl ?? null
   const html = useMemo(
-    () => previewHtml(card.organizationName ?? 'Your Practice', card.logoUrl ?? null, palette),
-    [card.organizationName, card.logoUrl, palette],
+    () => previewHtml(card.organizationName ?? 'Your Practice', activeLogo, palette),
+    [card.organizationName, activeLogo, palette],
   )
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-4">
@@ -263,21 +319,44 @@ export function TemplateCard({
         className="h-96 w-full rounded-lg border border-border bg-white"
         sandbox=""
       />
+      {hasBothVariants && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Logo on header:</span>
+          {(['light', 'dark'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              disabled={disabled}
+              onClick={() => setLogoVariant(v)}
+              className={`rounded-lg border px-2 py-1.5 ${
+                logoVariant === v ? 'border-primary ring-2 ring-primary/40' : 'border-border'
+              }`}
+              style={{ background: (palette.headerBackground as string) ?? '#0b2545' }}
+              aria-pressed={logoVariant === v}
+              title={v === 'light' ? 'Light logo (for dark headers)' : 'Dark logo (for light headers)'}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={v === 'light' ? variants.lightUrl : variants.darkUrl} alt={`${v} logo`} className="h-6" />
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         {SWATCHES.map((s) => (
-          <label key={s.key} className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="color"
-              value={(palette[s.key] as string) ?? '#888888'}
-              onChange={(e) => setPalette((p) => ({ ...p, [s.key]: e.target.value }))}
-              disabled={disabled}
-              className="h-7 w-9 cursor-pointer rounded border border-border bg-transparent"
-            />
-            {s.label}
-          </label>
+          <HexSwatch
+            key={s.key}
+            value={(palette[s.key] as string) ?? '#888888'}
+            label={s.label}
+            disabled={disabled}
+            onChange={(hex) => setPalette((p) => ({ ...p, [s.key]: hex }))}
+          />
         ))}
       </div>
-      <button className={`${primaryBtn} w-full`} disabled={disabled} onClick={() => onSubmit({ palette, confirmed: true })}>
+      <button
+        className={`${primaryBtn} w-full`}
+        disabled={disabled}
+        onClick={() => onSubmit({ palette, logoVariant, confirmed: true })}
+      >
         I love it — that&apos;s my newsletter ✓
       </button>
     </div>

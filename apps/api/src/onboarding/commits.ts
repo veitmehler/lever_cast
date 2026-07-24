@@ -91,7 +91,13 @@ export async function commitLogoConfirm(ctx: StepContext, answer: unknown): Prom
     const processed = await processLogo(ctx.userId, source, palette.headerBackground ?? '#011328', `onboarding/${ctx.accountId}/logo`)
     ctx.stepData.logoVariants = processed as unknown as Record<string, unknown>
     const light = (processed as { lightUrl?: string }).lightUrl
-    await brandUpsert(ctx.userId, { nlLogoUrl: light ?? source, nlLogoWidth: 180 })
+    const dark = (processed as { darkUrl?: string }).darkUrl
+    await brandUpsert(ctx.userId, {
+      nlLogoUrl: light ?? source,
+      nlLogoLightUrl: light ?? null,
+      nlLogoDarkUrl: dark ?? null,
+      nlLogoWidth: 180,
+    })
   } catch (err) {
     logger.warn({ err }, '[onboarding] logo processing failed — using source as-is')
     await brandUpsert(ctx.userId, { nlLogoUrl: source, nlLogoWidth: 180 })
@@ -123,10 +129,12 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
   // Ready "the reveal": preview from palette + logo (manual palette fallback).
   const palette = (ctx.stepData.palette as SemanticPalette) ?? {}
   const prefill = (ctx.stepData.ghlPrefill as Record<string, string>) ?? {}
-  const logo = (ctx.stepData.logoVariants as { lightUrl?: string })?.lightUrl ?? (ctx.stepData.logoChosen as string | null)
+  const variants = (ctx.stepData.logoVariants as { lightUrl?: string; darkUrl?: string } | undefined) ?? {}
+  const logo = variants.lightUrl ?? (ctx.stepData.logoChosen as string | null)
   ctx.stepData.templateDraft = {
     palette,
     logoUrl: logo,
+    logoVariants: variants,
     organizationName: prefill.organizationName ?? 'Your Practice',
     previewHtml: buildTemplatePreviewHtml({
       organizationName: prefill.organizationName ?? 'Your Practice',
@@ -140,9 +148,14 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
 
 /** template_reveal: write the nl* template fields; pre-generate the offer drafts. */
 export async function commitTemplateReveal(ctx: StepContext, answer: unknown): Promise<string | null> {
-  const a = (answer ?? {}) as { palette?: SemanticPalette; confirmed?: boolean }
+  const a = (answer ?? {}) as { palette?: SemanticPalette; logoVariant?: 'light' | 'dark'; confirmed?: boolean }
   const draft = (ctx.stepData.templateDraft as { palette?: SemanticPalette }) ?? {}
   const palette: SemanticPalette = { ...(draft.palette ?? {}), ...(a.palette ?? {}) }
+
+  // Honor the light/dark logo choice against the (possibly recolored) header.
+  const variants = (ctx.stepData.logoVariants as { lightUrl?: string; darkUrl?: string } | undefined) ?? {}
+  const pickedLogo = a.logoVariant === 'dark' ? variants.darkUrl : a.logoVariant === 'light' ? variants.lightUrl : null
+  if (pickedLogo) await brandUpsert(ctx.userId, { nlLogoUrl: pickedLogo })
   const tints = palette.sectionTints?.length ? palette.sectionTints : ['#f2f6fa', '#fdf6ee']
   const fonts = ((ctx.stepData.crawl as { fontHints?: string[] })?.fontHints ?? [])[0]
 

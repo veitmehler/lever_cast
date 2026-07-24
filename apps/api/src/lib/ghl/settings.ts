@@ -11,9 +11,25 @@ export interface GhlCredentials {
 
 export async function getGhlCredentials(userId: string): Promise<GhlCredentials | null> {
   const row = await ghlSettingsForUser(userId)
-  if (!row?.ghlApiKey || !row.ghlLocationId || !row.ghlUserId) {
+  if (!row?.ghlApiKey || !row.ghlLocationId) {
     return null
   }
+
+  // OAuth-provisioned locations: mint a fresh location token when the stored
+  // one is near expiry (agency grant does the heavy lifting).
+  if (row.ghlAuthType === 'oauth' && row.ghlTokenExpiresAt && row.ghlTokenExpiresAt.getTime() - Date.now() < 10 * 60 * 1000) {
+    const { mintLocationToken } = await import('./app-oauth')
+    const minted = await mintLocationToken(row.ghlLocationId)
+    if (minted) {
+      const { prisma } = await import('@omniply/shared')
+      await prisma.ghlSettings.update({
+        where: { id: row.id },
+        data: { ghlApiKey: encrypt(minted.token), ghlTokenExpiresAt: minted.expiresAt },
+      })
+      row.ghlApiKey = encrypt(minted.token)
+    }
+  }
+  if (!row.ghlUserId) return null
 
   const apiKey = decrypt(row.ghlApiKey)
   if (!apiKey) return null

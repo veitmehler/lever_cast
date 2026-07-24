@@ -149,6 +149,20 @@ model OnboardingSession {
   @@map("onboarding_sessions")
 }
 
+// Agency-level OAuth grant from the marketplace app install (auto-provisioning).
+// One row per GHL company; the agency access token mints per-location tokens.
+model GhlAppToken {
+  id           String   @id @default(cuid())
+  companyId    String   @unique
+  accessToken  String   @db.Text // encrypted
+  refreshToken String   @db.Text // encrypted
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("ghl_app_tokens")
+}
+
 // Audit log + idempotency window for GHL billing webhook events (multi-tenancy
 // plan Phase B). One row per received event, including suppressed duplicates.
 model GhlBillingEvent {
@@ -377,7 +391,11 @@ model GhlSettings {
   id                  String    @id @default(cuid())
   userId              String    @unique
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ghlApiKey           String?   @db.Text // AES-256-GCM encrypted Private Integration key
+  ghlApiKey           String?   @db.Text // AES-256-GCM encrypted Private Integration key OR OAuth location token
+  // 'pi' = permanent Private Integration key; 'oauth' = app location token
+  // auto-minted from the agency grant (auto-provisioning), refreshed on expiry.
+  ghlAuthType         String    @default("pi")
+  ghlTokenExpiresAt   DateTime?
   ghlLocationId       String?
   ghlUserId           String? // GHL team member who owns created posts
   accountIds          Json? // { facebook?: string, instagram?: string, linkedin?: string }

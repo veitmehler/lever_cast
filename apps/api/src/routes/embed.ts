@@ -20,7 +20,27 @@ export async function embedRoutes(app: FastifyInstance) {
   // URL even for SSO-only custom-page apps. We don't exchange the code — data
   // access rides the per-client Private Integration key — so this just
   // acknowledges the install and points the user at the sidebar app.
-  app.get('/embed/oauth-callback', async (_request, reply) => {
+  app.get<{ Querystring: { code?: string } }>('/embed/oauth-callback', async (request, reply) => {
+    // Exchange the install code for the agency grant (auto-provisioning
+    // foundation), then backfill-provision every installed location. Fire and
+    // forget — the page responds immediately either way.
+    const code = request.query.code
+    if (code) {
+      void (async () => {
+        try {
+          const { exchangeInstallCode, listInstalledLocations } = await import('../lib/ghl/app-oauth')
+          const { provisionLocation } = await import('../lib/ghl/auto-provision')
+          const grant = await exchangeInstallCode(code)
+          if (grant) {
+            const locations = await listInstalledLocations()
+            logger.info({ count: locations.length }, '[embed] backfill-provisioning installed locations')
+            for (const loc of locations) await provisionLocation(loc, 'install-backfill')
+          }
+        } catch (err) {
+          logger.error({ err }, '[embed] install-code exchange/backfill failed')
+        }
+      })()
+    }
     reply.type('text/html')
     return reply.send(
       '<html><body style="font-family:sans-serif;text-align:center;padding-top:80px">' +
@@ -117,10 +137,35 @@ export async function embedRoutes(app: FastifyInstance) {
         }
       }
 
-      const account = await prisma.account.findUnique({
+      // Auto-provisioned accounts have a placeholder owner until the buyer's
+      // first open: promote this user to owner and re-home the GHL settings.
+      const accountRow = await prisma.account.findUnique({
         where: { id: accountId },
-        select: { onboardingCompletedAt: true, status: true },
+        select: { onboardingCompletedAt: true, status: true, ownerUserId: true },
       })
+      try {
+        if (accountRow?.ownerUserId && accountRow.ownerUserId !== user.id) {
+          const owner = await prisma.user.findUnique({
+            where: { id: accountRow.ownerUserId },
+            select: { id: true, clerkId: true },
+          })
+          if (owner?.clerkId.startsWith('ghlowner:')) {
+            await prisma.ghlSettings.updateMany({ where: { userId: owner.id }, data: { userId: user.id } })
+            await prisma.settings.updateMany({ where: { userId: owner.id }, data: { userId: user.id } })
+            await prisma.account.update({ where: { id: accountId }, data: { ownerUserId: user.id } })
+            await prisma.user.delete({ where: { id: owner.id } }).catch(() => {})
+            logger.info({ accountId, userId: user.id }, '[embed] promoted first SSO user to account owner')
+          }
+        }
+        await prisma.ghlSettings.updateMany({
+          where: { userId: user.id, ghlUserId: null },
+          data: { ghlUserId: ctx.userId },
+        })
+      } catch (err) {
+        // Best-effort — a promotion hiccup must never block the session.
+        logger.warn({ err, accountId }, '[embed] owner promotion skipped')
+      }
+      const account = accountRow
 
       const token = signEmbedToken({ sub: user.clerkId, accountId })
       return reply.send({

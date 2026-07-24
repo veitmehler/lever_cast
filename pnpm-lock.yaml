@@ -226,6 +226,9 @@ importers:
       react-calendar:
         specifier: ^6.0.0
         version: 6.0.1(@types/react@19.2.14)(react-dom@19.1.6(react@19.1.6))(react@19.1.6)
+      react-colorful:
+        specifier: ^5.8.0
+        version: 5.8.0(react-dom@19.1.6(react@19.1.6))(react@19.1.6)
       react-datepicker:
         specifier: ^8.8.0
         version: 8.10.0(react-dom@19.1.6(react@19.1.6))(react@19.1.6)
@@ -4351,6 +4354,12 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  react-colorful@5.8.0:
+    resolution: {integrity: sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   react-datepicker@8.10.0:
     resolution: {integrity: sha512-JIXuA+g+qP3c4MVJpx24o7n1gnv3WV/8A/D6964HucY1FlSEc30+ITPNUfbKZXYHl5rruCtxYCwi2lzn7gaz7g==}
@@ -9998,6 +10007,11 @@ snapshots:
       warning: 4.0.3
     optionalDependencies:
       '@types/react': 19.2.14
+
+  react-colorful@5.8.0(react-dom@19.1.6(react@19.1.6))(react@19.1.6):
+    dependencies:
+      react: 19.1.6
+      react-dom: 19.1.6(react@19.1.6)
 
   react-datepicker@8.10.0(react-dom@19.1.6(react@19.1.6))(react@19.1.6):
     dependencies:

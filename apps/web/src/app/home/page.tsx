@@ -83,6 +83,39 @@ export default function HomePage() {
         <Cta sub="Onboarding capped at 74 practices this quarter">Set up your account right now</Cta>
       </Section>
 
+
+      {/* ── The Big Idea ── */}
+      <Section>
+        <Eyebrow>Read this first</Eyebrow>
+        <H2>The big idea in 202 words.</H2>
+        <P lead>
+          Think for a moment about what happens in the instant a person finally needs what you sell. The
+          problem they ignored for months is suddenly urgent, and nothing matters more than solving it.
+        </P>
+        <P lead><strong>What happens next? They reach for their phone.</strong></P>
+        <P>
+          And here is where the science gets uncomfortable. Princeton psychologists found that people form
+          trust judgments in <strong>a tenth of a second</strong>, long before a single rational thought.
+          Everything after that instant is justification, not evaluation.
+        </P>
+        <P>
+          Your future customer works the same way. They do not run a careful comparison.{' '}
+          <strong>They call the name that already feels familiar and trusted.</strong>
+        </P>
+        <P>
+          And familiarity cannot be built in the moment of need. It is built in the months before it, one
+          useful article, one email, one post at a time, by whoever kept showing up.
+        </P>
+        <P>
+          Which means <strong>the customer is won before they even know they are choosing.</strong> That is
+          the whole game. Not a better product pitch. Not a prettier logo. Presence, accumulated in advance,
+          so when the moment comes you are not one option among ten. You are the obvious call.
+        </P>
+        <P>
+          This page is dedicated to the economics of being the obvious call, and to the machine that makes
+          it automatic.
+        </P>
+      </Section>
       {/* ── Problem reframe ── */}
       <Section>
         <Eyebrow>The real problem</Eyebrow>

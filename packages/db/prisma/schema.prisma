@@ -199,7 +199,9 @@ model User {
   // clerkId-keyed code path works unchanged (onboarding plan Phase 0).
   clerkId   String   @unique
   // Set for users who arrived via the embedded GHL app (SSO context userId).
-  ghlUserId String?  @unique
+  // NOT globally unique: the same GHL human (agency admin, multi-clinic owner)
+  // gets one row per account — see @@unique([accountId, ghlUserId]).
+  ghlUserId String?
   name      String?
   email     String   @unique
   role      String   @default("user") // user | admin
@@ -236,6 +238,8 @@ model User {
   newsletters          Newsletter[]
   newsletterOffers     NewsletterOffer[]
 
+  @@unique([accountId, ghlUserId])
+  @@index([ghlUserId])
   @@index([newsletterCalendarId])
   @@index([accountId])
   @@map("users")

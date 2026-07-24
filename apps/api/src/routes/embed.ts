@@ -15,6 +15,17 @@ import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { decryptGhlSso, signEmbedToken, ghlClerkId } from '../lib/embed-auth'
 
+/**
+ * Synthetic clerkId for a per-account SSO user row. The bare "ghl:<uid>" form
+ * is kept for the user's first account (and all pre-existing rows); additional
+ * accounts get an account-suffixed id so the global clerkId unique holds.
+ */
+async function freeGhlClerkId(ghlUserId: string, accountId: string): Promise<string> {
+  const base = ghlClerkId(ghlUserId)
+  const taken = await prisma.user.findUnique({ where: { clerkId: base }, select: { id: true } })
+  return taken ? `${base}:${accountId}` : base
+}
+
 export async function embedRoutes(app: FastifyInstance) {
   // Install-flow landing stub: GHL app installs may require an OAuth redirect
   // URL even for SSO-only custom-page apps. We don't exchange the code — data
@@ -112,39 +123,48 @@ export async function embedRoutes(app: FastifyInstance) {
       }
       const accountId = ownerUser.accountId
 
-      // Resolve or create the user (synthetic clerkId keeps every existing
-      // clerkId-keyed code path working unchanged).
-      let user = await prisma.user.findUnique({ where: { ghlUserId: ctx.userId } })
+      // Resolve or create the user, SCOPED TO THIS ACCOUNT. The same GHL human
+      // (agency admin, multi-clinic owner) may open several sub-accounts, each
+      // its own tenant — one User row per (account, ghlUserId). Authorization
+      // comes from GHL: the signed SSO payload proves this user may access this
+      // location, and the account is derived from the location, so cross-tenant
+      // sessions are impossible by construction.
+      let user = await prisma.user.findFirst({ where: { ghlUserId: ctx.userId, accountId } })
+      if (!user) {
+        // Legacy row from the pre-account rollout — adopt it into this account.
+        const orphan = await prisma.user.findFirst({ where: { ghlUserId: ctx.userId, accountId: null } })
+        if (orphan) user = await prisma.user.update({ where: { id: orphan.id }, data: { accountId } })
+      }
       if (!user && ctx.email) {
-        // Join key for someone who already exists via the open web.
-        user = await prisma.user.findUnique({ where: { email: ctx.email } })
-        if (user && !user.ghlUserId) {
-          user = await prisma.user.update({ where: { id: user.id }, data: { ghlUserId: ctx.userId } })
+        // Join key within this account: an auto-provisioned placeholder owner
+        // or an open-web user with the same email IS this person.
+        const match = await prisma.user.findFirst({ where: { email: ctx.email, accountId } })
+        if (match?.clerkId.startsWith('ghlowner:')) {
+          // Buyer claiming their placeholder — take it over in place.
+          user = await prisma.user.update({
+            where: { id: match.id },
+            data: { clerkId: await freeGhlClerkId(ctx.userId, accountId), ghlUserId: ctx.userId, name: ctx.userName ?? match.name },
+          })
+          logger.info({ userId: user.id, accountId }, '[embed] buyer claimed placeholder owner via email match')
+        } else if (match && !match.ghlUserId) {
+          user = await prisma.user.update({ where: { id: match.id }, data: { ghlUserId: ctx.userId } })
         }
       }
       if (!user) {
+        const email =
+          ctx.email && !(await prisma.user.findUnique({ where: { email: ctx.email }, select: { id: true } }))
+            ? ctx.email
+            : `${ctx.userId}.${accountId}@ghl.local`
         user = await prisma.user.create({
           data: {
-            clerkId: ghlClerkId(ctx.userId),
+            clerkId: await freeGhlClerkId(ctx.userId, accountId),
             ghlUserId: ctx.userId,
-            email: ctx.email ?? `${ctx.userId}@ghl.local`,
+            email,
             name: ctx.userName ?? null,
             accountId,
           },
         })
         logger.info({ userId: user.id, accountId }, '[embed] created user from SSO context')
-      } else if (user.accountId !== accountId) {
-        // A known user opening a different (their) location — keep their account
-        // binding authoritative; do NOT silently re-home users across tenants.
-        if (!user.accountId) {
-          user = await prisma.user.update({ where: { id: user.id }, data: { accountId } })
-        } else {
-          logger.warn(
-            { userId: user.id, userAccountId: user.accountId, locationAccountId: accountId },
-            '[embed] SSO location belongs to a different account than the user — refusing',
-          )
-          return reply.status(403).send({ error: 'This sub-account belongs to a different workspace' })
-        }
       }
 
       // Auto-provisioned accounts have a placeholder owner until the buyer's

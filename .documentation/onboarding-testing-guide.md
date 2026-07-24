@@ -3,8 +3,8 @@
 Everything needed to test the GHL-embedded chat onboarding end to end (Phase 8 of
 `.plans/ghl-onboarding.implementation-plan.md`). Code state: Phases 0–7 + UI polish +
 non-ElevenLabs carousel conversion are implemented and deployed to STAGING (through
-`ac83835`). Nothing onboarding-related is on prod yet — this entire test runs against
-staging.
+`ac83835`). Nothing onboarding-related is on prod yet — this test now runs against
+PROD (batch 7400e96 shipped 2026-07-25; no customers).
 
 ---
 
@@ -15,7 +15,7 @@ with the agency account → My Apps → **Create App**.
 
 1. **Identity**
    - [ ] Name: the whitelabel-facing name (clients see it in their sidebar), e.g.
-     "Socioply Content Engine"
+     "Omniply Content Engine"
    - [ ] App type / target: **Sub-Account** (it must surface inside subaccounts, not the
      agency view — our session exchange rejects agency-context opens by design)
    - [ ] Distribution: **Private** (agency-only; no GHL review queue)
@@ -27,14 +27,15 @@ with the agency account → My Apps → **Create App**.
    app never exchanges its OAuth code.
 
 3. **Redirect / OAuth URL** (if the form requires one):
-   - [ ] `https://staging-svc.omniply.io/api/embed/oauth-callback`
+   - [ ] `https://svc.omniply.io/api/embed/oauth-callback`
    - This is a live acknowledgment stub ("App installed ✓") — installs can't dead-end.
      Expect one of two behaviors at install time: GHL either skips OAuth entirely for
      SSO-only custom-page apps, or bounces through this URL once. Both are fine.
 
 4. **Custom Page module**
-   - [ ] Add a Custom Page pointing at: **`https://staging.socioply.com/embed`**
-     (⚠️ staging for this test — swap to `https://chiro.omniply.io/embed` at prod rollout)
+   - [ ] Add a Custom Page pointing at: **`https://chiro.omniply.io/embed`** (PROD — the
+     2026-07-25 batch shipped everything; testing runs directly on prod, no customers).
+     Staging variant (only if ever needed): `https://staging.chiro.omniply.io/embed?x-vercel-protection-bypass=<secret>&x-vercel-set-bypass-cookie=samesitenone`
    - [ ] Sidebar label + icon (client-facing)
 
 5. **SSO key (the critical piece)**

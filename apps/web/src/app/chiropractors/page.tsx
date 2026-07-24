@@ -17,6 +17,7 @@ import {
   TouchpointGraph,
   ReactivationLoop,
   PricingBlock,
+  MapPackDiagram,
   Faq,
   FaqJsonLd,
   type FaqEntry,
@@ -177,16 +178,29 @@ export default function ChiropractorsPage() {
           already know and trust you.
         </P>
         <ReactivationLoop />
+      </Section>
+
+      {/* ── Local SEO / reviews ── */}
+      <Section>
+        <Eyebrow>The third lever: getting found</Eyebrow>
+        <H2>Three practices get shown on the map. The rest get scrolled past.</H2>
         <P>
-          And the third lever decides whether new patients ever find you at all:{' '}
-          <strong>the Google map pack.</strong> When someone in pain types chiropractor near me, three
-          practices get shown and everyone else gets scrolled past. Google picks those three largely on
-          reviews: how many, how recent, and whether they keep coming. A practice that collects reviews
-          systematically, every single week, outranks the practice with a burst of reviews from two years
-          ago. Every time. <strong>Omniply makes the asking automatic,</strong> with the front-desk QR card
-          and well-timed follow-ups, so your map ranking climbs while you adjust patients.{' '}
-          <strong>That ranking is the most valuable screen real estate in your town,</strong> and it is
-          rented with review consistency.
+          When someone in pain types <strong>chiropractor near me</strong>, Google shows exactly three
+          practices above the fold. Everyone else might as well not exist. And Google fills those three spots
+          largely on reviews: how many, how recent, and whether they keep coming.
+        </P>
+        <MapPackDiagram />
+        <P>
+          A practice that collects reviews <strong>systematically, every single week,</strong> outranks the
+          practice with a burst of reviews from two years ago. Every time. It is the same law that governs
+          your content: consistency beats bursts, except here the prize is the most valuable screen real
+          estate in your town.
+        </P>
+        <P>
+          <strong>Omniply makes the asking automatic.</strong> The printed QR card sits at your front desk,
+          so the patient who just said they feel amazing becomes a five-star review before they reach the car
+          park. Well-timed follow-ups catch the rest. The reviews are real, they are yours, and they arrive
+          every week, which is exactly what the map rewards.
         </P>
       </Section>
 

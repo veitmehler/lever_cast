@@ -19,6 +19,7 @@ import {
   TouchpointGraph,
   ReactivationLoop,
   PricingBlock,
+  MapPackDiagram,
   Faq,
   FaqJsonLd,
   type FaqEntry,
@@ -167,14 +168,28 @@ export default function HomePage() {
           come back the week your newsletter reminds them you exist.
         </P>
         <ReactivationLoop />
+      </Section>
+
+      {/* ── Local SEO / reviews ── */}
+      <Section>
+        <Eyebrow>The third lever</Eyebrow>
+        <H2>Reviews decide who gets found. Consistency decides the reviews.</H2>
         <P>
-          And there is a third lever most owners never connect to content at all:{' '}
-          <strong>being found in the first place.</strong> When someone searches for what you do plus your
-          suburb, Google ranks the local pack by proximity, relevance and reputation. Reputation means
-          reviews: how many, how recent, how steady. A business collecting reviews systematically, week after
-          week, climbs above competitors who collected a burst two years ago and stopped.{' '}
-          <strong>Omniply makes the asking automatic,</strong> so your review count and your map ranking
-          compound alongside your content.
+          There is a lever most owners never connect to content at all:{' '}
+          <strong>being found in the first place.</strong> When someone searches for what you do plus their
+          suburb, Google shows a map with three businesses on it, and reputation is a huge part of how those
+          three get picked. Reputation means reviews: how many, how recent, and whether they keep coming.
+        </P>
+        <MapPackDiagram query="best practice near me" />
+        <P>
+          A business collecting reviews <strong>systematically, week after week,</strong> climbs above
+          competitors who collected a burst two years ago and stopped. Same principle as the content curve:
+          consistency beats bursts, here with rankings instead of attention.
+        </P>
+        <P>
+          <strong>Omniply makes the asking automatic.</strong> Happy customers get an effortless path to your
+          Google review form, at the moment they are happiest, every single week. Your review count and your
+          map ranking compound alongside your content, on the same autopilot.
         </P>
       </Section>
 

@@ -79,9 +79,11 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 7d. **Native Reviews QR: do NOT create / disable where possible** (user decision —
    our branded QR card + trigger link replaces it; avoids two competing QR codes).
 8. NOT in the snapshot but part of client provisioning around it (onboarding runbook):
-   Private Integration key (scopes per the onboarding testing guide), marketplace app
-   install, SaaS Configurator settings (auto-suspend ON, auto-cancel OFF, 30-day cycle),
-   billing token custom value.
+   Private Integration key (scopes per the onboarding testing guide), SaaS Configurator
+   settings (auto-suspend ON, auto-cancel OFF, 30-day cycle), billing token custom value.
+   The marketplace app AUTO-INSTALLS via the SaaS plan (bundled 2026-07-25 — private
+   white-label app, distribution Agency & Sub-Account, free; auto-install fires for NEW
+   subaccounts created under the plan; existing subaccounts need the install link once).
 
 ## C. Decisions this spec encodes (from the 2026-07-15 brainstorm)
 

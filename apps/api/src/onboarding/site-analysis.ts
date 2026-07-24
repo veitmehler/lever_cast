@@ -13,6 +13,7 @@ import { logger } from '../lib/logger'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { instrumentCall } from '../lib/net/instrument'
 import { withTimeout } from '../lib/net/with-timeout'
+import { normalizeHex, type BrandColor, type BrandInventory } from './palette-compose'
 
 const PAGE_FETCH_TIMEOUT_MS = 15_000
 const MAX_PAGES = 6
@@ -168,17 +169,56 @@ export async function crawlSite(websiteUrl: string): Promise<CrawlResult> {
   return result
 }
 
+/**
+ * FULL-PAGE homepage screenshot (palette v2 Phase A). The whole page is the
+ * evidence — a mid-page band color the viewport never showed is exactly what
+ * distinguishes a supporting color from a main one. Downscaled for the vision
+ * call: color regions survive resizing; text legibility is not needed.
+ */
 export async function screenshotHomepage(websiteUrl: string): Promise<Buffer | null> {
   try {
-    return await withRasterPage(async (page) => {
+    const raw = await withRasterPage(async (page) => {
       await page.setViewport({ width: 1440, height: 1200 })
       await page.goto(websiteUrl, { waitUntil: 'networkidle2', timeout: 30_000 })
-      return (await page.screenshot({ type: 'png' })) as Buffer
+      return (await page.screenshot({ type: 'png', fullPage: true })) as Buffer
     })
+    const sharp = (await import('sharp')).default
+    const resized = await sharp(raw)
+      .resize({ width: 1080, height: 12_000, fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer()
+    // Inline-data guard (Gemini limit 20MB; base64 adds ~33%).
+    return resized.length <= 14_000_000 ? resized : await sharp(resized).jpeg({ quality: 80 }).toBuffer()
   } catch (err) {
     logger.warn({ websiteUrl, err }, '[onboarding/site] screenshot failed')
     return null
   }
+}
+
+/**
+ * Deterministic pixel clusters from the screenshot (palette v2 Phase B).
+ * Coverage percentages come from counted pixels, never from LLM estimates.
+ */
+export async function pixelClusters(screenshot: Buffer): Promise<{ hex: string; coverage: number }[]> {
+  const sharp = (await import('sharp')).default
+  const { data, info } = await sharp(screenshot)
+    .resize({ width: 160, withoutEnlargement: true })
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const counts = new Map<string, number>()
+  const q = 24 // quantization bucket size per channel
+  for (let i = 0; i + 2 < data.length; i += info.channels) {
+    const r = Math.min(255, Math.round(data[i] / q) * q)
+    const g = Math.min(255, Math.round(data[i + 1] / q) * q)
+    const b = Math.min(255, Math.round(data[i + 2] / q) * q)
+    const key = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const total = [...counts.values()].reduce((a, b) => a + b, 0) || 1
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 24)
+    .map(([hex, n]) => ({ hex, coverage: n / total }))
 }
 
 export interface SemanticPalette {
@@ -193,7 +233,12 @@ export interface SemanticPalette {
 
 const GEMINI_TEXT_MODEL = 'gemini-3-flash-preview'
 
-async function geminiGenerate(apiKey: string, parts: unknown[], op: string): Promise<string> {
+async function geminiGenerate(
+  apiKey: string,
+  parts: unknown[],
+  op: string,
+  opts: { temperature?: number; responseSchema?: object } = {},
+): Promise<string> {
   const res = await instrumentCall({ provider: 'gemini', op }, () =>
     withTimeout(
       (signal) =>
@@ -204,7 +249,11 @@ async function geminiGenerate(apiKey: string, parts: unknown[], op: string): Pro
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts }],
-              generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: opts.temperature ?? 0.2,
+                ...(opts.responseSchema ? { responseSchema: opts.responseSchema } : {}),
+              },
             }),
             signal,
           },
@@ -280,6 +329,111 @@ CSS hints found in the page source (frequency-ordered, may be noise): ${cssHints
     logger.warn({ err }, '[onboarding/site] palette extraction failed')
     return null
   }
+}
+
+// ── brand inventory (palette v2 Phase B) ──────────────────────────────────────
+
+const INVENTORY_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    colors: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          hex: { type: 'STRING' },
+          name: { type: 'STRING' },
+          prominence: { type: 'STRING', enum: ['main', 'supporting', 'ground'] },
+          observedRoles: {
+            type: 'ARRAY',
+            items: {
+              type: 'STRING',
+              enum: [
+                'nav_background',
+                'hero_background',
+                'band',
+                'button_fill',
+                'link_text',
+                'icon_accent',
+                'footer_background',
+              ],
+            },
+          },
+          confidence: { type: 'NUMBER' },
+        },
+        required: ['hex', 'prominence', 'observedRoles'],
+      },
+    },
+  },
+  required: ['colors'],
+}
+
+/**
+ * Extract the brand color INVENTORY from a full-page screenshot: which hues
+ * exist, where they were observed, how prominent they are. Role assignment is
+ * NOT the model's job — palette-compose.ts does that deterministically.
+ * Returned hexes are validated against measured pixel clusters (snap or drop),
+ * and coverage comes from the clusters, never the model.
+ */
+export async function extractBrandInventory(
+  geminiKey: string,
+  screenshot: Buffer,
+  cssHints: string[],
+  clusters: { hex: string; coverage: number }[],
+): Promise<BrandInventory | null> {
+  try {
+    const mime = screenshot.subarray(0, 3).toString('latin1') === '\x89PN' ? 'image/png' : 'image/jpeg'
+    const text = await geminiGenerate(
+      geminiKey,
+      [
+        {
+          text: `You are a brand designer reading a FULL-PAGE screenshot of a business website. List the site's brand color inventory: 5-8 colors that define its identity.
+For each color report: hex (as rendered), a short name, prominence, and every role you actually SEE it play.
+Prominence rules: "ground" = page/base backgrounds; "main" = colors carrying the identity across large or structurally important areas (hero, nav, buttons, major bands); "supporting" = colors that appear only in one or two smaller areas (a single mid-page band, small icons) — present but not identity-carrying.
+Report only colors genuinely rendered on the page — no inventions, no logo-derived guesses.
+CSS color hints from the page source (frequency-ordered, may include noise): ${cssHints.join(', ') || 'none'}`,
+        },
+        { inlineData: { mimeType: mime, data: screenshot.toString('base64') } },
+      ],
+      'onboarding.brandInventory',
+      { temperature: 0, responseSchema: INVENTORY_SCHEMA },
+    )
+    const raw = parseFirstJson<BrandInventory>(text)
+    const valid: BrandColor[] = []
+    for (const c of raw.colors ?? []) {
+      const hex = normalizeHex(c.hex)
+      if (!hex) continue
+      // Snap to the nearest measured cluster; drop colors with no pixel evidence.
+      let best: { hex: string; coverage: number } | null = null
+      let bestD = Infinity
+      for (const cl of clusters) {
+        const d = rgbDistance(hex, cl.hex)
+        if (d < bestD) {
+          bestD = d
+          best = cl
+        }
+      }
+      if (!best || bestD > 90) {
+        logger.warn({ hex, bestD: Math.round(bestD) }, '[onboarding/site] inventory color has no pixel evidence — dropped')
+        continue
+      }
+      valid.push({ ...c, hex, coverage: best.coverage })
+    }
+    if (!valid.length) return null
+    return { colors: valid }
+  } catch (err) {
+    logger.warn({ err }, '[onboarding/site] brand inventory extraction failed')
+    return null
+  }
+}
+
+function rgbDistance(a: string, b: string): number {
+  const na = parseInt(a.slice(1), 16)
+  const nb = parseInt(b.slice(1), 16)
+  const dr = ((na >> 16) & 255) - ((nb >> 16) & 255)
+  const dg = ((na >> 8) & 255) - ((nb >> 8) & 255)
+  const db = (na & 255) - (nb & 255)
+  return Math.sqrt(dr * dr + dg * dg + db * db)
 }
 
 export interface SpecializationDraft {

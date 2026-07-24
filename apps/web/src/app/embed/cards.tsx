@@ -242,16 +242,37 @@ function previewHtml(orgName: string, logoUrl: string | null, p: Palette): strin
 </div></body></html>`
 }
 
+/** WCAG relative luminance / contrast (mirrors the server-side palette rules). */
+function relLuminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = (c: number) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+}
+
+function contrastRatio(a: string, b: string): number {
+  const la = relLuminance(a)
+  const lb = relLuminance(b)
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
 function HexSwatch({
   value,
   label,
   disabled,
   onChange,
+  alternates,
+  lowContrast,
 }: {
   value: string
   label: string
   disabled: boolean
   onChange: (hex: string) => void
+  alternates?: string[]
+  lowContrast?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -279,6 +300,11 @@ function HexSwatch({
           style={{ background: valid ? value : '#888888' }}
         />
         <span>{label}</span>
+        {lowContrast && (
+          <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium text-amber-600" title="Hard to read on your background color">
+            low contrast
+          </span>
+        )}
       </button>
       {open && (
         <div className="absolute bottom-full left-0 z-20 mb-2 rounded-xl border border-border bg-card p-3 shadow-lg">
@@ -292,6 +318,22 @@ function HexSwatch({
               aria-label={`${label} hex value`}
             />
           </div>
+          {(alternates?.length ?? 0) > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">Suggested:</span>
+              {alternates!.map((alt) => (
+                <button
+                  key={alt}
+                  type="button"
+                  onClick={() => onChange(alt)}
+                  className="h-5 w-5 rounded-full border border-border"
+                  style={{ background: alt }}
+                  title={alt}
+                  aria-label={`use ${alt}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -355,15 +397,27 @@ export function TemplateCard({
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        {SWATCHES.map((s) => (
-          <HexSwatch
-            key={s.key}
-            value={(palette[s.key] as string) ?? '#888888'}
-            label={s.label}
-            disabled={disabled}
-            onChange={(hex) => setPalette((p) => ({ ...p, [s.key]: hex }))}
-          />
-        ))}
+        {SWATCHES.map((s) => {
+          const value = (palette[s.key] as string) ?? '#888888'
+          const bg = (palette.bodyBackground as string) ?? '#ffffff'
+          // Readability warning for the roles that render as text/controls on the body.
+          const checkContrast = s.key === 'accent' || s.key === 'button'
+          const lowContrast =
+            checkContrast && /^#[0-9a-fA-F]{6}$/.test(value) && /^#[0-9a-fA-F]{6}$/.test(bg)
+              ? contrastRatio(value, bg) < 4.5
+              : false
+          return (
+            <HexSwatch
+              key={s.key}
+              value={value}
+              label={s.label}
+              disabled={disabled}
+              onChange={(hex) => setPalette((p) => ({ ...p, [s.key]: hex }))}
+              alternates={((palette as { alternates?: Record<string, string[]> }).alternates?.[s.key] ?? []).slice(0, 3)}
+              lowContrast={lowContrast}
+            />
+          )
+        })}
       </div>
       <button
         className={`${primaryBtn} w-full`}

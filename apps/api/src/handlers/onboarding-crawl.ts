@@ -15,9 +15,12 @@ import {
   crawlSite,
   screenshotHomepage,
   extractPaletteFromScreenshot,
+  extractBrandInventory,
+  pixelClusters,
   detectSpecialization,
   specializationRegistryKeys,
 } from '../onboarding/site-analysis'
+import { composePalette } from '../onboarding/palette-compose'
 
 export interface OnboardingCrawlJobData {
   accountId: string
@@ -50,8 +53,30 @@ export async function onboardingCrawlHandler(jobs: PgBoss.Job<OnboardingCrawlJob
           screenshotHomepage(websiteUrl),
           specializationRegistryKeys(),
         ])
+        // Palette v2: full-page screenshot → measured pixel clusters → brand
+        // inventory (perception) → deterministic role composition (arithmetic).
+        // The single-shot extractor remains as fallback.
+        const paletteTask = (async () => {
+          if (!screenshot) return null
+          try {
+            const clusters = await pixelClusters(screenshot)
+            const inventory = await extractBrandInventory(geminiKey, screenshot, crawl.cssColorHints, clusters)
+            if (inventory) {
+              const composed = composePalette(inventory)
+              stepData.paletteInventory = inventory as unknown as Record<string, unknown>
+              logger.info(
+                { colors: inventory.colors.length, provenance: composed.provenance },
+                '[onboarding-crawl] palette composed from inventory',
+              )
+              return composed
+            }
+          } catch (err) {
+            logger.warn({ err }, '[onboarding-crawl] inventory pipeline failed — falling back to single-shot palette')
+          }
+          return extractPaletteFromScreenshot(geminiKey, screenshot, crawl.cssColorHints)
+        })()
         const [palette, specialization] = await Promise.all([
-          screenshot ? extractPaletteFromScreenshot(geminiKey, screenshot, crawl.cssColorHints) : null,
+          paletteTask,
           stepData.corpus ? detectSpecialization(geminiKey, stepData.corpus as string, registryKeys) : null,
         ])
         if (palette) stepData.palette = palette

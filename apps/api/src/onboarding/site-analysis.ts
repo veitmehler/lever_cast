@@ -45,21 +45,34 @@ function stripHtml(html: string): string {
     .trim()
 }
 
+// A plain browser UA: common WP hosts (SiteGround et al) hard-403 anything
+// with a "bot" marker in the UA, and we're fetching the client's own site
+// with their consent during onboarding.
+const CRAWL_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
 async function fetchHtml(url: string): Promise<string | null> {
   try {
     const res = await withTimeout(
       (signal) =>
         fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OmniplyBot/1.0)' },
+          headers: { 'User-Agent': CRAWL_USER_AGENT },
           redirect: 'follow',
           signal,
         }),
       PAGE_FETCH_TIMEOUT_MS,
       `fetch ${url}`,
     )
-    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('html')) return null
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('html')) {
+      logger.warn(
+        { url, status: res.status, contentType: res.headers.get('content-type') },
+        '[site-analysis] page fetch rejected',
+      )
+      return null
+    }
     return await res.text()
-  } catch {
+  } catch (err) {
+    logger.warn({ url, err }, '[site-analysis] page fetch failed')
     return null
   }
 }

@@ -278,7 +278,6 @@ function HexSwatch({
           className="h-5 w-5 rounded border border-border"
           style={{ background: valid ? value : '#888888' }}
         />
-        <span className="font-mono uppercase">{valid ? value : '——'}</span>
         <span>{label}</span>
       </button>
       {open && (
@@ -343,7 +342,9 @@ export function TemplateCard({
               className={`rounded-lg border px-2 py-1.5 ${
                 logoVariant === v ? 'border-primary ring-2 ring-primary/40' : 'border-border'
               }`}
-              style={{ background: (palette.headerBackground as string) ?? '#0b2545' }}
+              // Each variant on the ground it's made for — a dark logo on the
+              // dark header swatch would be invisible.
+              style={{ background: v === 'light' ? ((palette.headerBackground as string) ?? '#0b2545') : '#ffffff' }}
               aria-pressed={logoVariant === v}
               title={v === 'light' ? 'Light logo (for dark headers)' : 'Dark logo (for light headers)'}
             >

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../../middleware/admin'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 interface PatchUserBody {
   role: 'user' | 'admin'

@@ -6,7 +6,7 @@
  * em/en dash — masters are the rewrite-guard fallback, so they must comply
  * with the de-AI rule themselves.
  *
- * Run: pnpm --filter @socioply/db exec tsx scripts/seed-leadgen-masters.ts
+ * Run: pnpm --filter @omniply/db exec tsx scripts/seed-leadgen-masters.ts
  */
 import { PrismaClient } from '@prisma/client'
 import { buildMasterHtml, defaultSlotMeta, type MasterDocSpec } from '../../../apps/api/src/leadgen/master-layout'

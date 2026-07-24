@@ -6,6 +6,7 @@ const FRAME_ANCESTORS = [
   "'self'",
   'https://app.gohighlevel.com',
   'https://*.gohighlevel.com',
+  'https://crm.omniply.io', // Omniply whitelabel portal
   ...(process.env.EMBED_FRAME_ANCESTORS?.split(/\s+/).filter(Boolean) ?? []),
 ].join(' ')
 

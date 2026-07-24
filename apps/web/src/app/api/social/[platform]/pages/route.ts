@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { getSocialConnection } from '@socioply/shared'
-import { decrypt } from '@socioply/shared'
+import { getSocialConnection } from '@omniply/shared'
+import { decrypt } from '@omniply/shared'
 
 const LINKEDIN_API_BASE = 'https://api.linkedin.com/v2'
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v24.0'
@@ -37,7 +37,7 @@ export async function GET(
     }
 
     // Get user from Clerk ID
-    const { prisma } = await import('@socioply/shared')
+    const { prisma } = await import('@omniply/shared')
     const user = await prisma.user.findUnique({
       where: { clerkId },
     })

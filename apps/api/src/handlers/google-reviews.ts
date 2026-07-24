@@ -10,7 +10,7 @@
  * use — the whole tier is dormant until Google approves our API access.
  */
 import type PgBoss from 'pg-boss'
-import { prisma, decrypt } from '@socioply/shared'
+import { prisma, decrypt } from '@omniply/shared'
 import { placesConfigured, probePlace } from '../lib/google/places'
 import { ingestReviews } from '../lib/google/review-ingest'
 import { logger } from '../lib/logger'

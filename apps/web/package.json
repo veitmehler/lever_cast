@@ -1,5 +1,5 @@
 {
-  "name": "@socioply/web",
+  "name": "@omniply/web",
   "version": "0.1.0",
   "private": true,
   "prisma": {
@@ -7,10 +7,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && pnpm --filter @socioply/shared build && next build",
+    "build": "prisma generate && pnpm --filter @omniply/shared build && next build",
     "start": "next start",
     "lint": "eslint",
-    "vercel-build": "prisma generate && pnpm --filter @socioply/shared build && next build",
+    "vercel-build": "prisma generate && pnpm --filter @omniply/shared build && next build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -24,7 +24,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-slot": "^1.2.3",
-    "@socioply/shared": "workspace:*",
+    "@omniply/shared": "workspace:*",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.0",

@@ -11,8 +11,8 @@
  * - cancelled: status → cancelled. paidThrough is left untouched — publishing
  *   runs out the paid period naturally (paidThrough governs publishing).
  */
-import { prisma } from '@socioply/shared'
-import type { ResolvedAccount } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import type { ResolvedAccount } from '@omniply/shared'
 import { logger } from './logger'
 import { billingWindows } from '../article-pipeline/billing-window'
 import { createBatchFromDates, advanceBatch } from '../article-pipeline/content-batch'

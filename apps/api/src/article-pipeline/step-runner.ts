@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getLLMAdapter } from './llm/factory'
 import { LLMError } from './llm/adapter'

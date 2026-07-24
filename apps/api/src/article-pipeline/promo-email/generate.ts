@@ -7,7 +7,7 @@
  * Campaign from it.
  */
 
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'

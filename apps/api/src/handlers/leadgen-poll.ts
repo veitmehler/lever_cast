@@ -8,7 +8,7 @@
  * the capture is recorded as ghl_failed and retried on later ticks.
  */
 import type PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { driveConfigured, listAccessProposals, resolveAccessProposal } from '../lib/gdrive/client'

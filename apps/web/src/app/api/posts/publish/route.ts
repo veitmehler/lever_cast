@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { dispatchPublish } from '@/lib/social/dispatcher'
 
 async function getOrCreateUser(clerkId: string) {

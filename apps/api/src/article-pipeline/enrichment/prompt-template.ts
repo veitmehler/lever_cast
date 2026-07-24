@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 export interface LoadedPrompt {
   systemPrompt: string | null

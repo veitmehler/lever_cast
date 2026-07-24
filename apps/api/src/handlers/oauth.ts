@@ -1,5 +1,5 @@
 import PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 export interface OAuthCleanupJobData {
   _cron?: true

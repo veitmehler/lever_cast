@@ -10,7 +10,7 @@ const userFindUnique = vi.fn()
 const userCreate = vi.fn()
 const mediaCreate = vi.fn()
 const generateSimpleImagePrompt = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),

@@ -379,7 +379,7 @@ export function WordpressCard({
       <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
         <li>Log in to your WordPress admin</li>
         <li>Users → Profile → scroll to <b>Application Passwords</b></li>
-        <li>Name it &quot;Socioply&quot;, click <b>Add New</b>, copy the generated password</li>
+        <li>Name it &quot;Omniply&quot;, click <b>Add New</b>, copy the generated password</li>
       </ol>
       <div>
         <label className={labelCls}>WordPress site URL</label>

@@ -458,7 +458,7 @@ User can generate, review, click Approve, see featured image + SEO meta + slug. 
 - ☐ For each section, LLM generates Mermaid syntax
 - ☐ `mermaid.parse()` validates syntax — 1 retry on failure
 - ☐ `mmdc` renders SVG; `resvg-js` rasterizes to PNG
-- ☐ PNG uploaded to `cdn.socioply.com/diagrams/{jobId}/{n}.png`
+- ☐ PNG uploaded to `cdn.omniply.io/diagrams/{jobId}/{n}.png`
 - ☐ `ArticleDiagram` row stores Mermaid syntax + SVG + PNG S3 key
 - ☐ bodyHtml rewritten with `<figure><img>...<figcaption>` blocks
 - ☐ Status transitions `approved → enriched`

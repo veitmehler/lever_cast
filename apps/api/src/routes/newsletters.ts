@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { Prisma } from '@prisma/client'
-import { prisma, brandSettingsForUser, ghlSettingsForUser, canonicalAccountUserId } from '@socioply/shared'
+import { prisma, brandSettingsForUser, ghlSettingsForUser, canonicalAccountUserId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
 import {
@@ -13,7 +13,7 @@ import { getNewsletterEmailConfig, type NewsletterEmailConfig } from '../lib/ghl
 import { renderNewsletterHtml, type RenderBrand, type RenderInput } from '../newsletter/render'
 import { processLogo } from '../newsletter/logo-process'
 import { maybeEnqueueNewsletterSocialAutomation } from '../social/automation/enqueue'
-import { generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions, deleteS3Keys } from '@socioply/shared'
+import { generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions, deleteS3Keys } from '@omniply/shared'
 import { getSystemApiKey } from '../lib/system-keys'
 import { vtoken } from '../newsletter/image-overlay'
 import { runNewsletterPrompt } from '../newsletter/llm'

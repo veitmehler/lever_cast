@@ -9,7 +9,7 @@
  *  - article enrichment (runPlainLanguagePass, hooked after the GEO restructure)
  *  - newsletter articles (runNewsletterPlainLanguage, hooked after the writer)
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import { runNewsletterPrompt, runNewsletterJsonPrompt } from '../../newsletter/llm'

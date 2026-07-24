@@ -3,10 +3,10 @@
  * Works in both auth modes (Clerk / embed token) like the onboarding routes.
  */
 import type { FastifyInstance } from 'fastify'
-import { prisma, resolveAccountForClerkId } from '@socioply/shared'
+import { prisma, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
-import { uploadBufferWithKey } from '@socioply/shared'
+import { uploadBufferWithKey } from '@omniply/shared'
 
 export async function leadgenRoutes(app: FastifyInstance) {
   async function accountFor(clerkId: string) {
@@ -33,7 +33,7 @@ export async function leadgenRoutes(app: FastifyInstance) {
         kind: d.kind,
         status: d.status,
         driveLink: d.driveLink,
-        pdfUrl: d.pdfKey ? `${(process.env.CDN_BASE ?? 'https://cdn.socioply.com').replace(/\/$/, '')}/${d.pdfKey}` : null,
+        pdfUrl: d.pdfKey ? `${(process.env.CDN_BASE ?? 'https://cdn.omniply.io').replace(/\/$/, '')}/${d.pdfKey}` : null,
         ghlTagNames: d.ghlTagNames,
         templateName: d.template?.name ?? null,
         captureCount: d._count.captures,

@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 // Edge Runtime: no 60-second Serverless Function cap, streams SSE indefinitely.
 export const runtime = 'edge'
 
-const DO_API_BASE = process.env.DO_API_BASE ?? 'https://api.socioply.com'
+const DO_API_BASE = process.env.DO_API_BASE ?? 'https://svc.omniply.io'
 
 export async function GET(
   request: NextRequest,

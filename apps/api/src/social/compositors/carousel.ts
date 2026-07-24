@@ -10,7 +10,7 @@ import type { TintScheme } from './brand-tint'
 import { centeredTextLines, escapeXml, leftAlignedTextLines, wrapText } from '../svg-utils'
 import { withTimeout } from '../../lib/net/with-timeout'
 import { withRetry } from '../../lib/net/retry'
-import { generateWithGeminiImage, prisma } from '@socioply/shared'
+import { generateWithGeminiImage, prisma } from '@omniply/shared'
 
 /** Per-image cost for Gemini image models (~1290 output tokens), mirrored from diagram-restyle. */
 const GEMINI_IMAGE_COST_USD = 0.039

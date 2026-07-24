@@ -152,7 +152,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             BUSY=$(ssh staging-droplet 'cd /opt/socioply-staging && docker compose ps --status running -q api 2>/dev/null | grep -q . && docker compose exec -T api node -e "
-              const {prisma}=require(\"@socioply/shared\");
+              const {prisma}=require(\"@omniply/shared\");
               (async()=>{
                 const runs=await prisma.socialAutomationRun.count({where:{status:{in:[\"pending\",\"processing\",\"scheduling\"]}}});
                 const jobs=await prisma.articleJob.count({where:{status:\"in_progress\"}});

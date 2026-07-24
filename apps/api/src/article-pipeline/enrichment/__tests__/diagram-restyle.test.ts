@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const generateWithGeminiImage = vi.fn()
 const llmUsageCreate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   generateWithGeminiImage: (...a: unknown[]) => generateWithGeminiImage(...a),
   prisma: { lLMUsage: { create: (...a: unknown[]) => llmUsageCreate(...a) } },
   DEFAULT_DIAGRAM_STYLE_GUIDE: 'DEFAULT-GUIDE-BODY',

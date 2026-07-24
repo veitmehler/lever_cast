@@ -108,11 +108,11 @@ Decision: our branded card + a SNAPSHOT-BORNE TRIGGER LINK as the QR destination
 (GHL click stats without manual QR steps); user will DISABLE GHL's native Reviews QR
 in the snapshot for cleanliness (added to snapshot guide OFF-list).
 
-1. **Snapshot**: trigger link named `socioply-review` (fixed placeholder destination).
+1. **Snapshot**: trigger link named `omniply-review` (fixed placeholder destination).
    Snapshot guide additions: this trigger link + native Reviews QR disabled.
 2. **Provisioning wiring**: after onboarding captures the GBP URL → resolve Place ID →
    Google review deep link (search.google.com/local/writereview?placeid=…) → API-update
-   the subaccount's `socioply-review` trigger link destination (GHL links API: verify
+   the subaccount's `omniply-review` trigger link destination (GHL links API: verify
    GET /links + PUT /links/:id shapes at build). Store the trigger-link URL per account.
 3. **Card compile**: own compact builder (A6/DL, NOT the A4 skeleton): clinic colors +
    light/dark logo + "Enjoyed your visit?" fixed copy (NO rewrite pass) + QR (new

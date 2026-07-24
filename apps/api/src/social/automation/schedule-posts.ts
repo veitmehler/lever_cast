@@ -1,5 +1,5 @@
 import type { SocialPostSpec } from '@prisma/client'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { isGhlManagedPlatform } from '../dispatcher'
 import { trimSlidesForPlatform } from '../platform-limits'

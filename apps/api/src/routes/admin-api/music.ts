@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../../middleware/admin'
-import { prisma, uploadBufferWithKey, deleteS3Keys } from '@socioply/shared'
+import { prisma, uploadBufferWithKey, deleteS3Keys } from '@omniply/shared'
 import { withTempDir, runFfmpeg, probeVideo } from '../../social/video/ffmpeg'
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024

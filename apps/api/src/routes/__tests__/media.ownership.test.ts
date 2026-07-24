@@ -13,7 +13,7 @@ const mediaFindMany = vi.fn()
 const mediaCount = vi.fn()
 const mediaFindFirst = vi.fn()
 const mediaUpdate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   uploadImageToStorage: vi.fn(),
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },

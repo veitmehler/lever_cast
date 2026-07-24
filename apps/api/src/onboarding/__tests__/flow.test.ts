@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const sessionUpsert = vi.fn()
 const sessionUpdate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     onboardingSession: {
       upsert: (...a: unknown[]) => sessionUpsert(...a),

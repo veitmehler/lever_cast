@@ -38,7 +38,7 @@ source. Supersedes the parked "GBP OAuth someday" note.
 
 - Snapshot: **Review Received workflow → Custom Webhook** to our receiver
   (per-account URL token, same pattern as billing events; custom value
-  `socioply_review_token`). Payload → RawReview ingest.
+  `omniply_review_token`). Payload → RawReview ingest.
 - Dependency: the clinic's Google account connected in GHL Reputation (onboarding
   runbook step — this is GHL's own Google connection, independent of our Tier-1 OAuth).
 

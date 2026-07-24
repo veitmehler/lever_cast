@@ -8,7 +8,7 @@
  * it does NOT run the seed step (prod does, via deploy-api.yml).
  *
  * Run (env must point at the target DB — root .env points at socioply_staging):
- *   set -a; . ./.env; set +a; pnpm --filter @socioply/db exec tsx scripts/seed-client-story-prompts.ts
+ *   set -a; . ./.env; set +a; pnpm --filter @omniply/db exec tsx scripts/seed-client-story-prompts.ts
  *
  * Source of truth for the templates: prisma/client-story-prompts.ts.
  */

@@ -1,4 +1,4 @@
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from './log-context'
 import { ensureRunSlideCount } from './slide-count'

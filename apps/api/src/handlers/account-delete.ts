@@ -24,7 +24,7 @@
  * Published client websites live on client servers — out of scope by design.
  */
 import type PgBoss from 'pg-boss'
-import { prisma, deleteS3Prefix, extractFilePathFromUrl, deleteS3Keys } from '@socioply/shared'
+import { prisma, deleteS3Prefix, extractFilePathFromUrl, deleteS3Keys } from '@omniply/shared'
 import { driveConfigured, deleteFile } from '../lib/gdrive/client'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'

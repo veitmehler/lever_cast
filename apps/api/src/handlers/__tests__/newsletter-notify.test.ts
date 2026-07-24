@@ -7,7 +7,7 @@ const { count, findMany, updateMany, sendNewsletterReadyEmail } = vi.hoisted(() 
   sendNewsletterReadyEmail: vi.fn(),
 }))
 
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: { newsletter: { count, findMany, updateMany } },
 }))
 vi.mock('../../lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))

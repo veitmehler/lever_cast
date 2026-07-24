@@ -4,7 +4,7 @@
  * ClientStory. See .plans/client-story-review-mining.implementation-plan.md
  * Phase 4.
  */
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { runNewsletterJsonPrompt } from '../../newsletter/llm'
 

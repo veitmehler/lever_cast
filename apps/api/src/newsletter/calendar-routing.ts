@@ -11,7 +11,7 @@ import {
   canonicalAccountUserId,
   accountIdForUser,
   type Hemisphere,
-} from '@socioply/shared'
+} from '@omniply/shared'
 import { logger } from '../lib/logger'
 
 /** Resolve a specialization key to its display label (for {{specialization}} in prompts). */

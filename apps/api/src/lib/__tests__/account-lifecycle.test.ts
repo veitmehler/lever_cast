@@ -8,7 +8,7 @@ const topicFindMany = vi.fn()
 const ntFindMany = vi.fn()
 const userFindMany = vi.fn()
 const brandFindFirst = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     account: {
       findUnique: (...a: unknown[]) => accountFindUnique(...a),

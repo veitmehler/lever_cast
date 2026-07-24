@@ -10,7 +10,7 @@ const userFindUnique = vi.fn()
 const ghlFindUnique = vi.fn()
 const ghlUpsert = vi.fn()
 const ghlUpdate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     ghlSettings: {

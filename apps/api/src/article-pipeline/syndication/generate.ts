@@ -6,7 +6,7 @@
  * needed since the two LLM calls complete in ~10–20 s.
  */
 
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'

@@ -6,7 +6,7 @@ const userFindUnique = vi.fn()
 const userCreate = vi.fn()
 const userUpdate = vi.fn()
 const accountFindUnique = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     ghlSettings: { findFirst: (...a: unknown[]) => ghlSettingsFindFirst(...a) },
     user: {

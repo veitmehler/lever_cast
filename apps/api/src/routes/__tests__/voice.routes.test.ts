@@ -10,7 +10,7 @@ const userFindUnique = vi.fn()
 const apiKeyFindFirst = vi.fn()
 const apiKeyUpdate = vi.fn()
 const apiKeyCreate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     apiKey: {

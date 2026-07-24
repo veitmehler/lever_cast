@@ -1,9 +1,9 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from './logger'
 import { Prisma } from '@prisma/client'
 import { getSystemApiKey } from './system-keys'
 
-const DEFAULT_FROM = 'hello@socioply.com'
+const DEFAULT_FROM = 'hello@omniply.com'
 
 /** Resend API key — env (RESEND_API_KEY) first, else the admin-managed DB key. */
 async function getResendApiKey(): Promise<string | null> {
@@ -51,7 +51,7 @@ export async function sendFailureAlert(input: FailureAlertInput): Promise<void> 
     })
 
   const resendKey = await getResendApiKey()
-  const from = process.env.ALERT_EMAIL_FROM ?? 'alerts@socioply.com'
+  const from = process.env.ALERT_EMAIL_FROM ?? 'alerts@omniply.com'
   const adminTo = process.env.ALERT_EMAIL_TO
 
   const recipients = new Set<string>()
@@ -67,7 +67,7 @@ export async function sendFailureAlert(input: FailureAlertInput): Promise<void> 
 
   if (!resendKey || recipients.size === 0) return
 
-  const subject = `[Socioply] ${input.errorType}`
+  const subject = `[Omniply] ${input.errorType}`
   const body = `${input.message}\n\n${JSON.stringify(input.context ?? {}, null, 2)}`
 
   for (const to of recipients) {
@@ -137,7 +137,7 @@ export async function sendNewsletterReadyEmail(userId: string, count: number): P
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
   if (!user?.email) return false
 
-  const base = process.env.APP_URL ?? 'https://app.socioply.com'
+  const base = process.env.APP_URL ?? 'https://chiro.omniply.io'
   const reviewUrl = `${base}/newsletter`
   const greeting = user.name ? `Hi ${user.name},` : 'Hi,'
   const plural = count === 1 ? 'edition is' : 'editions are'

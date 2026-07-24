@@ -11,7 +11,7 @@
  * data-heavy prepare/commit bodies (crawl, vision, synthesis, offers,
  * connections) are filled in by Phases 2–7 behind the same interface.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import {
   commitBusinessConfirm,

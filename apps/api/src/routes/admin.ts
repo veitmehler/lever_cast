@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { timingSafeEqual } from 'node:crypto'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 
 /**
@@ -36,7 +36,7 @@ async function adminBasicAuth(request: FastifyRequest, reply: FastifyReply): Pro
 
   if (!ok) {
     await reply
-      .header('WWW-Authenticate', 'Basic realm="Socioply Admin"')
+      .header('WWW-Authenticate', 'Basic realm="Omniply Admin"')
       .status(401)
       .send('Authentication required')
   }
@@ -49,7 +49,7 @@ const HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Socioply Admin</title>
+  <title>Omniply Admin</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; background: #0f172a; color: #e2e8f0; }
     h1 { color: #38bdf8; }
@@ -62,7 +62,7 @@ const HTML = `<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <h1>Socioply Admin</h1>
+  <h1>Omniply Admin</h1>
   <p id="ts">Loading…</p>
   <h2>Queue Depths</h2>
   <table id="queues"><tr><th>Queue</th><th>Depth</th></tr></table>

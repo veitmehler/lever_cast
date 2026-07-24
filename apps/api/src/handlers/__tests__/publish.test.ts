@@ -21,7 +21,7 @@ const draftUpdate = vi.fn()
 const settingsFindUnique = vi.fn()
 const accountFindUnique = vi.fn()
 const accountIdForUserMock = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     post: {
       findMany: (...a: unknown[]) => postFindMany(...a),

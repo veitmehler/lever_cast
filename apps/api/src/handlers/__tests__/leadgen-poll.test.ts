@@ -6,7 +6,7 @@ const captureFindUnique = vi.fn()
 const captureCreate = vi.fn()
 const captureUpdate = vi.fn()
 const captureFindMany = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     leadGenDocument: { findMany: (...a: unknown[]) => docFindMany(...a) },
     leadCapture: {

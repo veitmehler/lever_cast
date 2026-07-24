@@ -2,14 +2,14 @@
  * GHL Review-Received webhook receiver (google-reviews plan Tier 3).
  *
  * The snapshot's "Review Received → Custom Webhook" workflow posts here with
- * the per-account URL token (custom value `socioply_review_token`, minted by
+ * the per-account URL token (custom value `omniply_review_token`, minted by
  * the admin endpoint — same pattern as billing events). Payload shapes vary
  * by GHL workflow config, so parsing is defensive: we accept several common
  * field names and always keep the text. Everything funnels through the shared
  * dedup ingest, so overlap with the Places probe or a GBP backfill is safe.
  */
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { ingestReviews } from '../lib/google/review-ingest'
 import { logger } from '../lib/logger'
 

@@ -40,10 +40,10 @@ function requestEncryptedUserData(timeoutMs = 8000): Promise<string> {
   })
 }
 
-// The iframe page is served from app.socioply.com, which the API's CORS
+// The iframe page is served from chiro.omniply.io, which the API's CORS
 // already allows — so embedded mode talks to the DO API directly (no Clerk-
 // coupled Vercel proxy in the path).
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.socioply.com'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://svc.omniply.io'
 
 export function embedApiUrl(path: string): string {
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`

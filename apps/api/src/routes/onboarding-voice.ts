@@ -8,7 +8,7 @@
  * and return the transcript for inline correction before the answer commits.
  */
 import type { FastifyInstance } from 'fastify'
-import { uploadBufferWithKey, resolveAccountForClerkId } from '@socioply/shared'
+import { uploadBufferWithKey, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'

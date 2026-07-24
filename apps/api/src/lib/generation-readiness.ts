@@ -6,7 +6,7 @@
  * reads it as the account-health check. Every row names the field, why it
  * matters, and which onboarding step owns it.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 export interface ReadinessGap {
   field: string

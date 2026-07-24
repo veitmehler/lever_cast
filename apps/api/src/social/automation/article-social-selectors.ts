@@ -1,4 +1,4 @@
-import { prisma, readS3Object } from '@socioply/shared'
+import { prisma, readS3Object } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { ArticleContentContext, H2Section, SlotContent } from './content'
 import type { PostSource } from './weekly-matrix'

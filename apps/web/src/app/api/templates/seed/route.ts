@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 // Default templates to seed
 const DEFAULT_TEMPLATES = [

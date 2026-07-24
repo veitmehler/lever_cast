@@ -7,7 +7,7 @@
  * into the session so the confirm steps go live.
  */
 import type PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import { getBoss, QUEUES } from '../queues/index'

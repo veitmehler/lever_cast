@@ -2,7 +2,7 @@
 
 **Locked decisions (user, 2026-07-25):** brand = Omniply (aligns with the GHL whitelabel);
 vertical slug = `chiro`; prod web `chiro.omniply.io`, staging web `staging.chiro.omniply.io`;
-platform services on the root: `api.omniply.io`, `staging-api.omniply.io`, `cdn.omniply.io`;
+platform services on the root: `svc.omniply.io`, `staging-svc.omniply.io`, `cdn.omniply.io` (api.omniply.io + link.omniply.io are CLAIMED by the GHL whitelabel — our platform namespace avoids GHL's set);
 whitelabel portal `crm.omniply.io` (exists); repo: old `omniply` → `omniply-2025-backup`,
 then this repo → `omniply`; internal package scope `@socioply/*` → `@omniply/*` (full rename);
 all email sender identities move to omniply.io. DNS = Cloudflare, user-controlled.
@@ -20,8 +20,8 @@ URLs are about to be registered externally — they must be born on omniply.io.
   middleware hosts, alert from-addresses, SocioplyBot UA, social icon base, landing links)
 - UI "Socioply" strings: 13 · workflows: cosmetic only (tailscale hostnames stay)
 - Current hosts: app/www.socioply.com (Vercel prod, main), staging web (Vercel, staging
-  branch — record exact current domain in Phase 0), api.socioply.com (prod droplet),
-  staging-api.socioply.com (staging droplet Caddy), cdn.socioply.com (DO Spaces)
+  branch — record exact current domain in Phase 0), svc.omniply.io (prod droplet),
+  staging-svc.omniply.io (staging droplet Caddy), cdn.omniply.io (DO Spaces)
 
 ## Phase 0 — DNS + dual-serve (nothing switches)
 
@@ -33,8 +33,8 @@ Cloudflare's Universal SSL wildcard; grey-cloud sidesteps the Advanced Certifica
 |---|---|
 | `chiro` CNAME | Vercel (prod web project) |
 | `staging.chiro` CNAME | Vercel (staging web project) |
-| `api` A | prod droplet IP |
-| `staging-api` A | staging droplet IP |
+| `svc` A | prod droplet IP |
+| `staging-svc` A | staging droplet IP |
 | `cdn` CNAME | DO Spaces custom-domain endpoint (DO-managed cert) |
 
 - Vercel: add the new domains to both projects (old ones REMAIN).
@@ -59,18 +59,18 @@ Cloudflare's Universal SSL wildcard; grey-cloud sidesteps the Advanced Certifica
   - CORS origins → env-driven (`WEB_ORIGINS`, comma list) with defaults covering BOTH
     new and old web origins during transition.
   - `middleware.ts` hosts → chiro.omniply.io canonical (+ redirect from old).
-  - Default swaps: `api.socioply.com`→`api.omniply.io`, `cdn.socioply.com`→
+  - Default swaps: `svc.omniply.io`→`svc.omniply.io`, `cdn.omniply.io`→
     `cdn.omniply.io`, APP_BASE_URL/APP_URL defaults, SOCIAL_ICON_BASE, `SocioplyBot`→
     `OmniplyBot`, alert froms → `alerts@omniply.io` / `hello@omniply.io`.
   - Embed CSP `frame-ancestors`: add `https://crm.omniply.io`.
   - UI strings Socioply→Omniply; landing links; **introduce `NEXT_PUBLIC_VERTICAL=chiro`**
     (brand-config module; no new hardcoded vertical strings in web).
-- **2c docs sweep**: payment checklist + snapshot guide (webhook URLs → api.omniply.io),
+- **2c docs sweep**: payment checklist + snapshot guide (webhook URLs → svc.omniply.io),
   onboarding testing guide (embed URL → chiro.omniply.io/embed), PM doc, README.
 
 ## Phase 3 — Env flips + verification (staging first)
 
-- Vercel staging env: `NEXT_PUBLIC_API_URL=https://staging-api.omniply.io`, DO_API_BASE,
+- Vercel staging env: `NEXT_PUBLIC_API_URL=https://staging-svc.omniply.io`, DO_API_BASE,
   APP_BASE_URL → staging.chiro.omniply.io. Staging droplet .env: `CDN_BASE=
   https://cdn.omniply.io`, APP_URL, ALERT_EMAIL_FROM.
 - Verify on staging: web loads on the new domain, embed CORS, a lead-gen compile emits
@@ -87,14 +87,14 @@ Cloudflare's Universal SSL wildcard; grey-cloud sidesteps the Advanced Certifica
 
 - Marketplace app: Custom Page → `https://chiro.omniply.io/embed` (staging app variant →
   staging.chiro), SSO secret handover.
-- Google OAuth redirect URIs: `https://api.omniply.io/api/google/oauth/callback`
-  (+ staging-api variant).
-- Snapshot custom values: billing + review webhook URLs on api.omniply.io.
+- Google OAuth redirect URIs: `https://svc.omniply.io/api/google/oauth/callback`
+  (+ staging-svc variant).
+- Snapshot custom values: billing + review webhook URLs on svc.omniply.io.
 
 ## Phase 6 — Cutover + cleanup (after a comfortable window)
 
 - Cloudflare redirect rules: www/app.socioply.com → chiro.omniply.io.
-- `cdn.socioply.com` stays alive INDEFINITELY as an alias (old newsletters/PDFs embed
+- `cdn.omniply.io` stays alive INDEFINITELY as an alias (old newsletters/PDFs embed
   it) — cheapest correct choice; optionally recompile the lead-gen library to refresh
   its stored URLs.
 - Drop old CORS origins/Vercel domains/Caddy hosts only after the window.

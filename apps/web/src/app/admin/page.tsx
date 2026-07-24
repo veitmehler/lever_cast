@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { KpiCard } from '@/components/admin/KpiCard'
 import Link from 'next/link'
 import { AlertTriangle, FileText, Clock } from 'lucide-react'

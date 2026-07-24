@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'node:crypto'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAccount } from '../middleware/account'
 import { sendTransactionalEmail } from '../lib/alerts'
 import { logger } from '../lib/logger'
@@ -13,7 +13,7 @@ interface NewRequest {
 }
 
 function baseUrl(): string {
-  return process.env.APP_BASE_URL ?? 'https://app.socioply.com'
+  return process.env.APP_BASE_URL ?? 'https://chiro.omniply.io'
 }
 
 export async function editRequestRoutes(app: FastifyInstance) {

@@ -11,7 +11,7 @@
  *                   ready = ArticleJob.status 'enriched'; flagged = 'needs_review'
  *   newsletter item → Newsletter → ready = status 'ready_for_review'
  */
-import { prisma, type ResolvedAccount } from '@socioply/shared'
+import { prisma, type ResolvedAccount } from '@omniply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
 import { sendTransactionalEmail } from '../lib/alerts'
@@ -281,7 +281,7 @@ async function sendBatchReadyEmail(userId: string, ready: number, flagged: numbe
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
   if (!user?.email) return
 
-  const base = process.env.APP_BASE_URL ?? 'https://app.socioply.com'
+  const base = process.env.APP_BASE_URL ?? 'https://chiro.omniply.io'
   const lines = [`${ready} item(s) are ready for you to review and approve.`]
   if (flagged) lines.push(`${flagged} need a closer look (flagged by the quality check).`)
   if (failed) lines.push(`${failed} failed to generate.`)

@@ -11,7 +11,7 @@
  * staging-deploy-inflight-check memory.
  *
  * Run (env must point at the target DB — root .env points at socioply_staging):
- *   set -a; . ./.env; set +a; pnpm --filter @socioply/db exec tsx scripts/seed-newsletter-prompts.ts
+ *   set -a; . ./.env; set +a; pnpm --filter @omniply/db exec tsx scripts/seed-newsletter-prompts.ts
  *
  * Source of truth for the templates: prisma/newsletter-prompts.ts.
  */

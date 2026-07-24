@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
-import { encrypt, maskApiKey } from '@socioply/shared'
+import { encrypt, maskApiKey } from '@omniply/shared'
 import {
   cloneElevenLabsVoice,
   listElevenLabsVoices,
   verifyElevenLabsKey,
 } from '../lib/elevenlabs/client'
 import { getVoiceSettings, updateVoiceSettings, getUserElevenLabsApiKey } from '../lib/elevenlabs/settings'
-import { uploadBufferWithKey, deleteS3Prefix } from '@socioply/shared'
+import { uploadBufferWithKey, deleteS3Prefix } from '@omniply/shared'
 
 async function resolveUser(clerkId: string) {
   return prisma.user.findUnique({ where: { clerkId } })

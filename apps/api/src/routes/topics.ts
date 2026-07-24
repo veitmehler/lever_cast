@@ -1,6 +1,6 @@
 import { parse as parseCsv } from 'csv-parse/sync'
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'

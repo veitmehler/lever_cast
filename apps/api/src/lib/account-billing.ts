@@ -11,7 +11,7 @@
  *   pre-billing behavior is unchanged until GHL events drive these fields
  *   (Phase B). Until then the admin accounts page drives them manually.
  */
-import { prisma, accountIdForUser } from '@socioply/shared'
+import { prisma, accountIdForUser } from '@omniply/shared'
 
 export interface BillingGate {
   allowed: boolean

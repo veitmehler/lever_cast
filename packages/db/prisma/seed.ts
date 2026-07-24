@@ -1672,7 +1672,7 @@ async function main() {
       where: { stepNumber: template.stepNumber },
       create: template,
       // Never overwrite admin edits or production prompt content on re-seed.
-      // To bulk-update prompts, run: pnpm --filter @socioply/db reseed:v3
+      // To bulk-update prompts, run: pnpm --filter @omniply/db reseed:v3
       update: {},
     })
     console.log(`  ✓ Step ${template.stepNumber}: ${template.stepName}`)

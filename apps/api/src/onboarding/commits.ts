@@ -2,7 +2,7 @@
  * Real commit bodies for the onboarding steps (onboarding plan Phases 4–7).
  * Kept out of flow.ts so the step machine stays readable.
  */
-import { prisma, encrypt } from '@socioply/shared'
+import { prisma, encrypt } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getBoss, QUEUES } from '../queues/index'
 import { getSystemApiKey } from '../lib/system-keys'
@@ -316,7 +316,7 @@ export async function commitElevenLabs(ctx: StepContext, answer: unknown): Promi
 
   // Voice clone from the archived answers (best-effort; settings page can redo).
   try {
-    const cdn = (process.env.CDN_BASE ?? 'https://cdn.socioply.com').replace(/\/$/, '')
+    const cdn = (process.env.CDN_BASE ?? 'https://cdn.omniply.io').replace(/\/$/, '')
     const audioKeys = ['q_declaration', 'q_enemy', 'q_tribe', 'q_line', 'q_proof']
       .map((k) => (ctx.stepData[k] as { audioKey?: string })?.audioKey)
       .filter((k): k is string => !!k)
@@ -430,7 +430,7 @@ export async function commitGbp(ctx: StepContext, answer: unknown): Promise<stri
           const { ingestReviews } = await import('../lib/google/review-ingest')
           await ingestReviews(ctx.accountId, 'places-probe', probe.reviews)
         }
-        // Option C provisioning: point the snapshot's `socioply-review` trigger
+        // Option C provisioning: point the snapshot's `omniply-review` trigger
         // link at the clinic's Google review deep link (best-effort).
         try {
           const { getGhlCredentials } = await import('../lib/ghl/settings')
@@ -439,7 +439,7 @@ export async function commitGbp(ctx: StepContext, answer: unknown): Promise<stri
             const { listTriggerLinks, updateTriggerLink } = await import('../lib/ghl/client')
             const { reviewDeepLink } = await import('../lib/google/places')
             const link = (await listTriggerLinks(creds.apiKey, creds.locationId)).find(
-              (l) => l.name?.toLowerCase() === 'socioply-review',
+              (l) => l.name?.toLowerCase() === 'omniply-review',
             )
             if (link) await updateTriggerLink(creds.apiKey, link.id, link.name, reviewDeepLink(placeId))
           }

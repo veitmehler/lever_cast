@@ -10,7 +10,7 @@
  * context exists (per-customer generation, Phase 1c). Shared topic-level research
  * has no user, so it just logs the cost.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getLLMAdapter } from '../article-pipeline/llm/factory'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { cleanAndParseJSON } from '../article-pipeline/output-cleaner'

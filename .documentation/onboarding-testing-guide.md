@@ -27,14 +27,14 @@ with the agency account → My Apps → **Create App**.
    app never exchanges its OAuth code.
 
 3. **Redirect / OAuth URL** (if the form requires one):
-   - [ ] `https://staging-api.socioply.com/api/embed/oauth-callback`
+   - [ ] `https://staging-svc.omniply.io/api/embed/oauth-callback`
    - This is a live acknowledgment stub ("App installed ✓") — installs can't dead-end.
      Expect one of two behaviors at install time: GHL either skips OAuth entirely for
      SSO-only custom-page apps, or bounces through this URL once. Both are fine.
 
 4. **Custom Page module**
    - [ ] Add a Custom Page pointing at: **`https://staging.socioply.com/embed`**
-     (⚠️ staging for this test — swap to `https://app.socioply.com/embed` at prod rollout)
+     (⚠️ staging for this test — swap to `https://chiro.omniply.io/embed` at prod rollout)
    - [ ] Sidebar label + icon (client-facing)
 
 5. **SSO key (the critical piece)**
@@ -57,7 +57,7 @@ with the agency account → My Apps → **Create App**.
   (I can do this if you paste me the key, same as the billing secret.)
 
 **Vercel — staging web project:**
-- [ ] `NEXT_PUBLIC_API_URL=https://staging-api.socioply.com` must be set. ⚠️ If unset,
+- [ ] `NEXT_PUBLIC_API_URL=https://staging-svc.omniply.io` must be set. ⚠️ If unset,
   the embed page calls the PROD API, where the onboarding endpoints don't exist yet —
   the symptom would be 404s right after "Connecting to your workspace…".
 - [ ] If the whitelabel portal domain is not `*.gohighlevel.com`: add it to
@@ -151,7 +151,7 @@ video slots and accent-tinted carousels instead (the conversion's first live tes
 - [ ] `GHL_SSO_SECRET` into `/opt/socioply/.env.production` BEFORE the deploy (container
   recreation picks it up)
 - [ ] Prod Vercel: confirm `NEXT_PUBLIC_API_URL` (or rely on the default
-  `https://api.socioply.com`) + `EMBED_FRAME_ANCESTORS` for the whitelabel domain
-- [ ] Marketplace app Custom Page URL → `https://app.socioply.com/embed`
+  `https://svc.omniply.io`) + `EMBED_FRAME_ANCESTORS` for the whitelabel domain
+- [ ] Marketplace app Custom Page URL → `https://chiro.omniply.io/embed`
 - [ ] The per-client onboarding runbook (provisioning + billing token + workflows + app
   install) gets finalized with whatever Part A/6 taught us about snapshot installs

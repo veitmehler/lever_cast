@@ -13,7 +13,7 @@ const articleJobCreate = vi.fn()
 const outlineFindMany = vi.fn()
 const accountFindUnique = vi.fn()
 const accountIdForUserMock = vi.fn().mockResolvedValue(null)
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     topic: {

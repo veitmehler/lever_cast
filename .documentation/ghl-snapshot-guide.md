@@ -48,10 +48,10 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 
 1. **Three billing workflows** (Subscription trigger × Active / Overdue / Canceled →
    Custom Webhook, per the payment checklist) — with the webhook URL referencing a
-   **Custom Value**: `https://api.socioply.com/api/ghl/billing-events/{{custom_values.socioply_billing_token}}`
+   **Custom Value**: `https://svc.omniply.io/api/ghl/billing-events/{{custom_values.omniply_billing_token}}`
    → snapshot deploys untouched; per-client setup = paste ONE custom value (the token from
    `POST /api/admin/accounts/:id/billing-token`) instead of editing three workflows.
-2. **Custom Values**: `socioply_billing_token` (empty placeholder) + any future webhook
+2. **Custom Values**: `omniply_billing_token` (empty placeholder) + any future webhook
    tokens follow the same pattern.
 3. **Tag taxonomy** (pre-created so workflows reference them from day one):
    - `leadgen-<template-slug>` per starter lead magnet
@@ -69,11 +69,11 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 6. **New Patient pipeline** (the one in section A).
 7. **Booking calendar template** (one service type, placeholder hours) + email reminder
    workflow — hidden with the calendar feature; ready for PMS-less clinics.
-7b. **Trigger link `socioply-review`** (placeholder destination) — the QR review card
+7b. **Trigger link `omniply-review`** (placeholder destination) — the QR review card
    encodes its URL; provisioning points it at the clinic's Google review deep link via
    API (leadgen master-library plan Phase F, option C).
 7c. **Review Received workflow → Custom Webhook** to our review receiver
-   (`{{custom_values.socioply_review_token}}` pattern) — feeds review mining
+   (`{{custom_values.omniply_review_token}}` pattern) — feeds review mining
    (google-reviews-acquisition plan Tier 3). Requires the clinic's Google connection in
    GHL Reputation (runbook step).
 7d. **Native Reviews QR: do NOT create / disable where possible** (user decision —

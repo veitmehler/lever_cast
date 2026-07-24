@@ -1,5 +1,5 @@
-import { prisma } from '@socioply/shared'
-import { decrypt } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { decrypt } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { assertSafeWpUrl } from '../../lib/ssrf'
 import { selectWordPressCategory } from '../enrichment/wp-category-selector'

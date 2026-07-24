@@ -6,8 +6,8 @@
  * Chrome already used for diagrams (diffusion can't render legible headlines, so
  * the text is composited, not generated). Returns the S3 URL.
  */
-import { prisma } from '@socioply/shared'
-import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions } from '@omniply/shared'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'

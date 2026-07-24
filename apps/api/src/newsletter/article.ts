@@ -10,7 +10,7 @@ import {
   generateWithFalAI,
   uploadBufferWithKey,
   deleteOldVersions,
-} from '@socioply/shared'
+} from '@omniply/shared'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { getSystemApiKey } from '../lib/system-keys'
 import { cleanTextOutput } from '../article-pipeline/output-cleaner'

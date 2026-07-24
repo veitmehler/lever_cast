@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 
 export type VideoPostType = 'video_reel' | 'hook_video' | 'quote_video'

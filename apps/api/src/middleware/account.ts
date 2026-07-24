@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { resolveAccountForClerkId, type ResolvedAccount } from '@socioply/shared'
+import { resolveAccountForClerkId, type ResolvedAccount } from '@omniply/shared'
 import { requireAuth } from './auth'
 
 /**

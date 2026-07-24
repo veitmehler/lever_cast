@@ -48,6 +48,9 @@ importers:
       '@logtail/pino':
         specifier: ^0.5.8
         version: 0.5.8(pino@10.3.1)
+      '@omniply/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@prisma/client':
         specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
@@ -57,9 +60,6 @@ importers:
       '@sentry/profiling-node':
         specifier: ^10.51.0
         version: 10.51.0
-      '@socioply/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@types/archiver':
         specifier: ^7.0.0
         version: 7.0.0
@@ -148,15 +148,15 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.74.0(react@19.1.6))
+      '@omniply/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@prisma/client':
         specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       '@radix-ui/react-slot':
         specifier: ^1.2.3
         version: 1.2.4(@types/react@19.2.14)(react@19.1.6)
-      '@socioply/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@supabase/auth-helpers-nextjs':
         specifier: ^0.10.0
         version: 0.10.0(@supabase/supabase-js@2.105.1)

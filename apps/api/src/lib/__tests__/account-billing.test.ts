@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const accountFindUnique = vi.fn()
 const accountIdForUser = vi.fn()
 const sessionFindUnique = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     account: { findUnique: (...a: unknown[]) => accountFindUnique(...a) },
     onboardingSession: { findUnique: (...a: unknown[]) => sessionFindUnique(...a) },

@@ -13,7 +13,7 @@ const wpUpdate = vi.fn()
 const wpDelete = vi.fn()
 const wpCreate = vi.fn()
 const topicUpdateMany = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     wordPressConnection: {

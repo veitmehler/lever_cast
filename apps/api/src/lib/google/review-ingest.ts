@@ -7,7 +7,7 @@
  * uses) → RawReview upsert-by-fingerprint. Feeds the existing client-story
  * triage pipeline untouched.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { reviewFingerprint } from '../../article-pipeline/client-stories/fingerprint'
 import { logger } from '../logger'
 

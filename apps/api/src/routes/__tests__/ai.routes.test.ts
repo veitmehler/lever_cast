@@ -18,7 +18,7 @@ const platformSettingsFindUnique = vi.fn()
 const draftFindMany = vi.fn()
 const accountFindUnique = vi.fn()
 const accountIdForUserMock = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),

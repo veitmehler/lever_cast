@@ -8,7 +8,7 @@
  * to S3 + the account's Drive folder, and parked as pending_review — the
  * review gate is the AHPRA checkpoint (user decision).
  */
-import { prisma, uploadBufferWithKey } from '@socioply/shared'
+import { prisma, uploadBufferWithKey } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
@@ -370,7 +370,7 @@ export async function compileCustomDocument(documentId: string, addCover: boolea
     return
   }
   try {
-    const cdn = (process.env.CDN_BASE ?? 'https://cdn.socioply.com').replace(/\/$/, '')
+    const cdn = (process.env.CDN_BASE ?? 'https://cdn.omniply.io').replace(/\/$/, '')
     const srcRes = await fetch(`${cdn}/${doc.sourcePdfKey}`)
     if (!srcRes.ok) throw new Error(`source PDF fetch ${srcRes.status}`)
     const original = Buffer.from(await srcRes.arrayBuffer())
@@ -454,7 +454,7 @@ async function compileReviewCard(
       if (creds) {
         const { listTriggerLinks } = await import('../lib/ghl/client')
         const links = await listTriggerLinks(creds.apiKey, creds.locationId)
-        const link = links.find((l) => l.name?.toLowerCase() === 'socioply-review')
+        const link = links.find((l) => l.name?.toLowerCase() === 'omniply-review')
         if (link?.fieldKey || link?.id) {
           // The public trigger-link URL lives in the link record; shape verified at
           // first real use — fall back to the direct URL when absent.

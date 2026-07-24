@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { StepRunner } from './step-runner'
 import { DuplicateKeywordError, validatePrimaryKeywordUniqueness } from './keyword-validator'

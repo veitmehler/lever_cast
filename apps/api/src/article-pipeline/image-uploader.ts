@@ -4,8 +4,8 @@
  */
 
 import sharp from 'sharp'
-import { uploadBufferWithKey } from '@socioply/shared'
-import { prisma } from '@socioply/shared'
+import { uploadBufferWithKey } from '@omniply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 
 const MAX_RETRIES = 3

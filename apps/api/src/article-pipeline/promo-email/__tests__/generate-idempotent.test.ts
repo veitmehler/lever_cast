@@ -6,7 +6,7 @@ const campaignUpsert = vi.fn()
 const sitePageFindUnique = vi.fn()
 const promptFindUnique = vi.fn()
 
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     articleEmailCampaign: {
       findUnique: (...a: unknown[]) => campaignFindUnique(...a),

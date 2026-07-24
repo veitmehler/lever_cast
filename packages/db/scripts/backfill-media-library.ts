@@ -2,13 +2,13 @@
  * One-time backfill: populate the image library from existing S3-backed assets.
  * Idempotent — skips rows whose s3Key already exists for the user.
  *
- * Run after migration: pnpm --filter @socioply/db backfill:media
+ * Run after migration: pnpm --filter @omniply/db backfill:media
  */
 
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
-const CDN_BASE = (process.env.CDN_BASE ?? 'https://cdn.socioply.com').replace(/\/$/, '')
+const CDN_BASE = (process.env.CDN_BASE ?? 'https://cdn.omniply.io').replace(/\/$/, '')
 
 function s3KeyFromUrl(url: string): string | null {
   try {

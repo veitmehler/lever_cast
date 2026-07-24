@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@socioply/shared', () => ({ prisma: {} }))
+vi.mock('@omniply/shared', () => ({ prisma: {} }))
 vi.mock('../../llm/factory', () => ({ getLLMAdapter: vi.fn() }))
 vi.mock('../../../lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 

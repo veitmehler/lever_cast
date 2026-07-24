@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { requireAdmin } from '../../middleware/admin'
 import { getBoss, QUEUES } from '../../queues/index'
 

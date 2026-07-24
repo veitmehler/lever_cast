@@ -34,7 +34,7 @@ import { newsletterRoutes } from './routes/newsletters'
 import { adminApiRoutes } from './routes/admin-api/index'
 import { populateClerkId } from './middleware/clerk-context'
 import { handleError } from './lib/error-handler'
-import { assertEncryptionConfigured } from '@socioply/shared'
+import { assertEncryptionConfigured } from '@omniply/shared'
 
 async function main() {
   // Fail fast if encryption isn't configured (never boot prod on the dev key).
@@ -48,12 +48,16 @@ async function main() {
 
   // ── CORS ───────────────────────────────────────────────────────────────────
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 /* 25 MB for voice samples */ } })
+  // WEB_ORIGINS env (comma list) overrides; defaults cover the omniply hosts
+  // plus the legacy socioply hosts during the rename transition window.
+  const webOrigins = process.env.WEB_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? [
+    'https://chiro.omniply.io',
+    'https://staging.chiro.omniply.io',
+    'https://app.socioply.com',
+    'https://www.socioply.com',
+  ]
   await app.register(cors, {
-    origin: [
-      'https://app.socioply.com',
-      'https://www.socioply.com',
-      ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : []),
-    ],
+    origin: [...webOrigins, ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : [])],
     credentials: true,
   })
 

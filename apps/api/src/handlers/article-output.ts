@@ -1,7 +1,7 @@
 import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { sendFailureAlert } from '../lib/alerts'
 import { buildOutputPayload } from '../article-pipeline/output/payload-builder'
 import { getOutputTarget } from '../article-pipeline/output/registry'

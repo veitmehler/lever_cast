@@ -2,7 +2,7 @@ import PgBoss from 'pg-boss'
 import { logger } from '../lib/logger'
 import { Sentry } from '../lib/sentry'
 import { runArticleEnrichment } from '../article-pipeline/enrichment/index'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { sendFailureAlert } from '../lib/alerts'
 
 export interface ArticleEnrichmentJobData {

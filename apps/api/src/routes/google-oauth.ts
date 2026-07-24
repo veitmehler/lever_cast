@@ -12,7 +12,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
-import { prisma, encrypt } from '@socioply/shared'
+import { prisma, encrypt } from '@omniply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
 

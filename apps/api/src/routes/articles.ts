@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
-import { prisma, ghlSettingsForUser } from '@socioply/shared'
+import { prisma, ghlSettingsForUser } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { runPipelinePhaseA } from '../article-pipeline/executor'
 import { approveArticleJob } from '../article-pipeline/approval-service'
@@ -13,7 +13,7 @@ import {
   buildTocHtml,
   findFirstH2Index,
 } from '../article-pipeline/enrichment/html-parser'
-import { readS3Object } from '@socioply/shared'
+import { readS3Object } from '@omniply/shared'
 import { enqueueSyndication } from '../article-pipeline/syndication/enqueue'
 import { enqueuePromoEmail } from '../article-pipeline/promo-email/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'

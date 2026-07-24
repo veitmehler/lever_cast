@@ -8,7 +8,7 @@
  * blocking the flow.
  */
 import type PgBoss from 'pg-boss'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import {

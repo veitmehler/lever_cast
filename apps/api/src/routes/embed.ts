@@ -11,7 +11,7 @@
  * anything, so a stray install can't spawn orphan accounts.
  */
 import type { FastifyInstance } from 'fastify'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { decryptGhlSso, signEmbedToken, ghlClerkId } from '../lib/embed-auth'
 

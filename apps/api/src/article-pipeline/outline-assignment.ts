@@ -9,7 +9,7 @@
  * If the LLM call fails for any reason we fall back to framework #1 silently.
  */
 
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getLLMAdapter } from './llm/factory'
 import { getSystemApiKey } from '../lib/system-keys'

@@ -1,4 +1,4 @@
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { Sentry } from '../lib/sentry'
 import { logger } from '../lib/logger'
 

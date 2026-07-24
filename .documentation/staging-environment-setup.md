@@ -66,7 +66,7 @@ or git.
 
 ### 4. DNS + TLS
 
-Point a staging hostname (e.g. `staging-api.socioply.com`) at the staging droplet
+Point a staging hostname (e.g. `staging-svc.omniply.io`) at the staging droplet
 IP. Caddy will auto-provision a TLS cert on first start. Update the domain in
 `/opt/socioply-staging/Caddyfile` to match.
 
@@ -76,7 +76,7 @@ Add under **Settings → Secrets and variables → Actions**:
 
 - `STAGING_DROPLET_PUBLIC_IP` — staging droplet IP
 - `STAGING_DEPLOY_SSH_KEY` — private key for the staging `socioply` deploy user
-- `STAGING_HEALTH_URL` — e.g. `https://staging-api.socioply.com/health`
+- `STAGING_HEALTH_URL` — e.g. `https://staging-svc.omniply.io/health`
 
 ## Deploying to staging
 

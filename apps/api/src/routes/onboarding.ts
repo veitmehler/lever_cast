@@ -5,7 +5,7 @@
  * either to a clerkId. State is per-account and resumable.
  */
 import type { FastifyInstance } from 'fastify'
-import { prisma, resolveAccountForClerkId } from '@socioply/shared'
+import { prisma, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
 import {

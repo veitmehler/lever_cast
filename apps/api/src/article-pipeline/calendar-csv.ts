@@ -12,7 +12,7 @@
  * Re-upload is idempotent (upsert).
  */
 import { parse as parseCsv } from 'csv-parse/sync'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 const CSV_ALIASES: Record<string, string> = {
   date: 'date',

@@ -13,7 +13,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Welcome to Socioply</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Welcome to Omniply</h1>
         <p className="text-muted-foreground">
           Capture article ideas, plan your month, and review what&apos;s ready to publish.
         </p>

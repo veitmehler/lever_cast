@@ -60,7 +60,7 @@ per account (replaces the manual "account health" idea — this IS the enforceme
 
 ## Phase 0 — Marketplace app shell + embedded auth
 
-- **Private GHL marketplace app** with a Custom Page pointing at `app.socioply.com/embed`.
+- **Private GHL marketplace app** with a Custom Page pointing at `chiro.omniply.io/embed`.
   Distribution: agency-level install to subaccounts (verify at build whether snapshot can
   carry the install or it's a bulk/per-subaccount agency click — runbook either way).
 - **SSO session**: frontend `postMessage REQUEST_USER_DATA` → encrypted payload → new

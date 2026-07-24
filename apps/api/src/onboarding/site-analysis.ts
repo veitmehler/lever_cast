@@ -8,7 +8,7 @@
  * are a cross-check. Specialization detection runs over the text corpus
  * against the Specialization registry.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { instrumentCall } from '../lib/net/instrument'
@@ -50,7 +50,7 @@ async function fetchHtml(url: string): Promise<string | null> {
     const res = await withTimeout(
       (signal) =>
         fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SocioplyBot/1.0)' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OmniplyBot/1.0)' },
           redirect: 'follow',
           signal,
         }),

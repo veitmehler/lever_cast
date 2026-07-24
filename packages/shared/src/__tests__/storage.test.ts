@@ -4,13 +4,13 @@ import { extractFilePathFromUrl } from '../storage'
 // Pins the behavior of the (formerly duplicated) URL helper after consolidation.
 describe('extractFilePathFromUrl', () => {
   it('returns the key from a CloudFront/CDN URL', () => {
-    expect(extractFilePathFromUrl('https://cdn.socioply.com/user_1/123-abc.png')).toBe(
+    expect(extractFilePathFromUrl('https://cdn.omniply.io/user_1/123-abc.png')).toBe(
       'user_1/123-abc.png',
     )
   })
 
   it('returns null for the CDN root', () => {
-    expect(extractFilePathFromUrl('https://cdn.socioply.com/')).toBeNull()
+    expect(extractFilePathFromUrl('https://cdn.omniply.io/')).toBeNull()
   })
 
   it('extracts the object path from a legacy Supabase storage URL', () => {

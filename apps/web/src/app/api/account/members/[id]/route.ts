@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getOrCreateUser } from '@/lib/user'
 
 type Ctx = { params: Promise<{ id: string }> }

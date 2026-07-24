@@ -134,7 +134,7 @@ export function Sidebar() {
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center border-b border-sidebar-border px-4">
             <h1 className="text-xl font-semibold text-foreground">
-              Socioply
+              Omniply
             </h1>
           </div>
         </div>
@@ -155,7 +155,7 @@ export function Sidebar() {
         <div className="flex h-16 items-center border-b border-sidebar-border px-4">
           {!shouldBeCollapsed && (
             <h1 className="text-xl font-semibold text-foreground">
-              Socioply
+              Omniply
             </h1>
           )}
           {shouldBeCollapsed && (

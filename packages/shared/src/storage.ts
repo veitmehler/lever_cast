@@ -8,7 +8,7 @@
  *   {userId}/{timestamp}-{randomId}.{ext}
  *
  * Public URL pattern (served via CloudFront OAC):
- *   https://cdn.socioply.com/{userId}/{timestamp}-{randomId}.{ext}
+ *   https://cdn.omniply.io/{userId}/{timestamp}-{randomId}.{ext}
  *
  * Backward compatibility:
  *   extractFilePathFromUrl() and downloadImageFromStorage() transparently handle
@@ -119,7 +119,7 @@ export async function deleteImageFromStorage(filePath: string): Promise<void> {
  * Extract the storage path from a full image URL.
  * Handles both new CloudFront URLs and legacy Supabase Storage URLs.
  *
- * CloudFront:  https://cdn.socioply.com/userId/file.jpg  → "userId/file.jpg"
+ * CloudFront:  https://cdn.omniply.io/userId/file.jpg  → "userId/file.jpg"
  * Supabase:    https://xxx.supabase.co/storage/v1/object/public/post-images/userId/file.jpg
  *              → "userId/file.jpg"
  */

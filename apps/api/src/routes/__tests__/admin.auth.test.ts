@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 
 // Keep the heavy deps inert — these tests only exercise the Basic Auth hook on
 // the HTML route, which touches neither.
-vi.mock('@socioply/shared', () => ({ prisma: {} }))
+vi.mock('@omniply/shared', () => ({ prisma: {} }))
 vi.mock('../../queues/index', () => ({ getBoss: vi.fn(), QUEUES: {} }))
 
 import { adminRoutes } from '../admin'
@@ -56,7 +56,7 @@ describe('admin Basic Auth (L2)', () => {
       headers: { authorization: basic('admin', 's3cret') },
     })
     expect(res.statusCode).toBe(200)
-    expect(res.body).toContain('Socioply Admin')
+    expect(res.body).toContain('Omniply Admin')
     await app.close()
   })
 

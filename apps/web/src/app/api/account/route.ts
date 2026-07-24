@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { prisma, ACCOUNT_SEAT_LIMIT } from '@socioply/shared'
+import { prisma, ACCOUNT_SEAT_LIMIT } from '@omniply/shared'
 import { getOrCreateUser } from '@/lib/user'
 
 // GET /api/account — team overview (owner + roster, no invitations)

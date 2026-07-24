@@ -9,11 +9,11 @@
  */
 
 import sharp from 'sharp'
-import { prisma, brandSettingsForUser } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import { Sentry } from '../../lib/sentry'
-import { decrypt } from '@socioply/shared'
-import { uploadBufferWithKey, deleteS3Prefix, downloadImageFromUrl } from '@socioply/shared'
+import { decrypt } from '@omniply/shared'
+import { uploadBufferWithKey, deleteS3Prefix, downloadImageFromUrl } from '@omniply/shared'
 import { getSystemApiKey } from '../../lib/system-keys'
 import { specializationLabel } from '../../newsletter/calendar-routing'
 import {

@@ -16,7 +16,7 @@ vi.mock('../../generate-video-assets', () => ({
 vi.mock('../../../article-pipeline/enrichment/prompt-template', () => ({
   loadPromptTemplate: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@socioply/shared', () => ({ prisma: {} }))
+vi.mock('@omniply/shared', () => ({ prisma: {} }))
 vi.mock('../../../lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import { generateMatrixAsset } from '../matrix-processor'

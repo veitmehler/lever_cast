@@ -8,7 +8,7 @@ import {
   canonicalAccountUserId,
   accountIdForUser,
   DEFAULT_DIAGRAM_STYLE_GUIDE,
-} from '@socioply/shared'
+} from '@omniply/shared'
 
 const SPECIALIZATIONS_FIELD = 'specializations'
 

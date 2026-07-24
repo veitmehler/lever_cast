@@ -6,7 +6,7 @@
  * BEFORE question one, so the confirm steps are ready when the user reaches
  * them. Idempotent: a `bootstrapped` flag makes re-entry a no-op.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getBoss, QUEUES } from '../queues/index'
 import { getGhlCredentials } from '../lib/ghl/settings'

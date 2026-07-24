@@ -5,7 +5,7 @@ initSentry('worker')
 import PgBoss from 'pg-boss'
 import { logger } from './lib/logger'
 import { getBoss, stopBoss, QUEUES } from './queues/index'
-import { assertEncryptionConfigured } from '@socioply/shared'
+import { assertEncryptionConfigured } from '@omniply/shared'
 import {
   publishHandler,
   publishScheduledHandler,

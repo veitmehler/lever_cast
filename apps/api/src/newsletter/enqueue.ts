@@ -6,7 +6,7 @@
  * non-failed, non-pending state are skipped (don't clobber reviewed/approved
  * editions). The same fn is the future billing-webhook entry point.
  */
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../queues/index'
 import { logger } from '../lib/logger'
 import { generationGateForUser } from '../lib/account-billing'

@@ -14,7 +14,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { prisma } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
 
 const TTL_MS = 10 * 60 * 1000 // 10 minutes
 

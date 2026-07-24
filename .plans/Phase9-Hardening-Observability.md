@@ -22,7 +22,7 @@ We are explicitly NOT building:
 |---|---|
 | Any uncaught exception in API or worker hits Sentry within 30s | Manually throw test error → see in Sentry |
 | Logs from any container searchable for 7+ days | Search `req.url:"/health"` in Better Stack UI |
-| Outage of `api.socioply.com` triggers email within 60s | Stop API container → receive alert |
+| Outage of `svc.omniply.io` triggers email within 60s | Stop API container → receive alert |
 | Connection budget warnings hit Sentry before pool is exhausted | Inject test alert → see in Sentry |
 | Postgres has 4 weeks of off-DO backups | Run manual backup → list in `s3://socioply-backups/` |
 | One user cannot DoS LLM endpoints with 1000 requests/min | Test with `siege` → see 429s after 100 req/min |
@@ -234,16 +234,16 @@ Strict order — each step builds on the previous:
    ```
 2. Sign up for **Better Stack Uptime** (same account as Better Stack Logs — free tier: 10 monitors, 3-min interval)
 3. Create monitor:
-   - URL: `https://api.socioply.com/health`
+   - URL: `https://svc.omniply.io/health`
    - Method: GET
    - Expected status: 200
    - Check interval: 3 min
    - Notification: email + (optional) SMS
-4. Create second monitor for `https://api.socioply.com/health/deep` — alert if it returns 503 (degraded ≠ down, but alert anyway)
+4. Create second monitor for `https://svc.omniply.io/health/deep` — alert if it returns 503 (degraded ≠ down, but alert anyway)
 5. Add public status page (optional, free) at `status.socioply.com`
 
 **Verification:**
-- `curl https://api.socioply.com/health/deep` — verify shape + 200
+- `curl https://svc.omniply.io/health/deep` — verify shape + 200
 - Stop the worker container temporarily — verify `publish_queue_depth: null` and `status: degraded`
 - Block DB (e.g., temporarily change DB password): verify `db: {ok: false}` and 503
 
@@ -534,7 +534,7 @@ Strict order — each step builds on the previous:
 5. Add `ADMIN_ENABLED=true` to droplet's `.env.production`
 6. Confirm via Caddyfile that `/admin*` is **not** in the proxy whitelist (or explicitly deny it). Update Caddyfile:
    ```caddy
-   api.socioply.com {
+   svc.omniply.io {
      handle /admin* { respond 403 }
      handle { reverse_proxy api:3001 }
    }
@@ -546,7 +546,7 @@ Strict order — each step builds on the previous:
 3. See live queue depths, recent failures, PG stats
 
 **Verification:**
-- Verify `curl https://api.socioply.com/admin` → 403
+- Verify `curl https://svc.omniply.io/admin` → 403
 - Verify Tailscale SSH port-forward → admin loads correctly
 
 **Rollback:** Set `ADMIN_ENABLED=false` and restart container.
@@ -599,9 +599,9 @@ Strict order — each step builds on the previous:
 
 ## Where things live
 - Frontend: Vercel (app.socioply.com, www.socioply.com)
-- API + Worker: DO Droplet socioply-api-01 (api.socioply.com)
+- API + Worker: DO Droplet socioply-api-01 (svc.omniply.io)
 - Database: DO Managed Postgres azavea-omniply-db
-- Object storage: AWS S3 socioply-prod + CloudFront cdn.socioply.com
+- Object storage: AWS S3 socioply-prod + CloudFront cdn.omniply.io
 - Backups: AWS S3 socioply-backups
 - Logs: Better Stack (link)
 - Errors: Sentry (link to project)
@@ -647,7 +647,7 @@ Strict order — each step builds on the previous:
 ### "OAuth flow broken for platform X"
 1. Check that platform's developer console — credentials still active?
 2. Check Sentry filtered by `platform:linkedin` (etc.)
-3. Verify redirect URIs match `https://api.socioply.com/social/X/callback`
+3. Verify redirect URIs match `https://svc.omniply.io/social/X/callback`
 4. Manually delete stale `oauth_states` rows older than 1 hour
 
 ## How to deploy

@@ -3,7 +3,7 @@ import type PgBoss from 'pg-boss'
 
 const accountFindMany = vi.fn()
 const accountUpdate = vi.fn()
-vi.mock('@socioply/shared', () => ({
+vi.mock('@omniply/shared', () => ({
   prisma: {
     account: {
       findMany: (...a: unknown[]) => accountFindMany(...a),

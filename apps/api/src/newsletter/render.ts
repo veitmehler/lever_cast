@@ -204,7 +204,7 @@ function band(title: string, bg: string, theme: Theme): string {
 // ── Footer: social icons + unsubscribe ───────────────────────────────────────
 
 /** White monochrome platform icons live at a stable S3/CDN path. */
-const SOCIAL_ICON_BASE = 'https://cdn.socioply.com/newsletter/social'
+const SOCIAL_ICON_BASE = 'https://cdn.omniply.io/newsletter/social'
 const SOCIAL_ICONS = new Set([
   'facebook', 'instagram', 'x', 'linkedin', 'youtube', 'tiktok', 'pinterest', 'threads',
 ])

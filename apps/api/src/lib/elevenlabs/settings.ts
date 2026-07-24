@@ -1,5 +1,5 @@
-import { prisma } from '@socioply/shared'
-import { decrypt } from '@socioply/shared'
+import { prisma } from '@omniply/shared'
+import { decrypt } from '@omniply/shared'
 
 export interface VoiceSettings {
   voiceId: string | null

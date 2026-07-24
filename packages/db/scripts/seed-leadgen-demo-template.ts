@@ -6,7 +6,7 @@
  * delete before prod client onboarding (the starter-library hook compiles
  * every ACTIVE template).
  *
- * Run: pnpm --filter @socioply/db exec tsx scripts/seed-leadgen-demo-template.ts
+ * Run: pnpm --filter @omniply/db exec tsx scripts/seed-leadgen-demo-template.ts
  */
 import { PrismaClient } from '@prisma/client'
 // Layout builder lives in the API app; scripts run from the repo via tsx, so a

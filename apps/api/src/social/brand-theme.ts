@@ -1,5 +1,5 @@
-import { prisma, brandSettingsForUser } from '@socioply/shared'
-import { downloadImageFromStorage } from '@socioply/shared'
+import { prisma, brandSettingsForUser } from '@omniply/shared'
+import { downloadImageFromStorage } from '@omniply/shared'
 import { themeFromBrand } from '../article-pipeline/enrichment/diagram-theme'
 
 export interface SocialBrandTheme {

@@ -41,7 +41,24 @@ function isOmniplyDomain(host: string) {
   return host === APP_HOST || host === WWW_HOST
 }
 
-export default clerkMiddleware(async (auth, request) => {
+/** Marketing hosts never touch Clerk — pure public pages, no session handshake. */
+function marketingResponse(request: Request & { nextUrl: URL }) {
+  const { pathname } = request.nextUrl
+  if (pathname === '/') {
+    const url = new URL(request.url)
+    url.pathname = '/home'
+    return NextResponse.rewrite(url)
+  }
+  const isAppPath = APP_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  if (isAppPath) {
+    const url = new URL(request.url)
+    url.host = APP_HOST
+    return NextResponse.redirect(url, 301)
+  }
+  return NextResponse.next()
+}
+
+const withClerk = clerkMiddleware(async (auth, request) => {
   const host = request.headers.get('host') ?? ''
   const { pathname } = request.nextUrl
 
@@ -57,12 +74,7 @@ export default clerkMiddleware(async (auth, request) => {
         url.host = APP_HOST
         return NextResponse.redirect(url, 301)
       }
-      // Marketing hosts: apex/www serve the sales pages without Clerk.
-      if (pathname === '/') {
-        const url = new URL(request.url)
-        url.pathname = '/home'
-        return NextResponse.rewrite(url)
-      }
+      // Legacy www marketing host (still Clerk-wrapped; harmless).
       return NextResponse.next()
     }
 
@@ -86,6 +98,12 @@ export default clerkMiddleware(async (auth, request) => {
     await auth.protect()
   }
 })
+
+export default function middleware(request: Parameters<typeof withClerk>[0], event: Parameters<typeof withClerk>[1]) {
+  const host = request.headers.get('host') ?? ''
+  if (MARKETING_HOSTS.has(host)) return marketingResponse(request)
+  return withClerk(request, event)
+}
 
 export const config = {
   matcher: [

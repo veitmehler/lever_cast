@@ -89,6 +89,13 @@ export default function HomePage() {
           <strong>A system is only a system if the output is dependable enough that checking it takes minutes,
           not hours.</strong>
         </P>
+        <P>
+          And here is the part nobody says out loud: <strong>most people get mediocre results from AI because
+          prompting is a craft, and they are beginners at it.</strong> We have spent years inside these models,
+          engineering the prompts, the research chains and the guardrails that force AI to do deep, careful
+          work instead of confident guessing. That expertise is baked into every generator in Omniply. You get
+          expert-level output every single time, without spending your evenings becoming a prompt engineer.
+        </P>
       </Section>
 
       {/* ── The Omniply frame ── */}

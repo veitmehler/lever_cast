@@ -86,6 +86,13 @@ export default function ChiropractorsPage() {
           <strong>A real system produces dependable output with guardrails built in,</strong> so your review
           takes two minutes over coffee, not an evening with a red pen.
         </P>
+        <P>
+          There is also a quieter reason your ChatGPT experiments disappointed you: <strong>prompting is a
+          craft, and you never had time to master it.</strong> We have spent years inside these models,
+          engineering the prompts and research chains that force AI to do deep, careful clinical-grade work
+          instead of confident guessing. All of that is baked into Omniply. You get the output of an AI
+          expert who knows chiropractic marketing cold, without ever writing a prompt yourself.
+        </P>
       </Section>
 
       {/* ── The Omniply frame ── */}

@@ -36,8 +36,13 @@ interface TokenResponse {
   userId?: string
 }
 
-/** Exchange the install code for the agency grant and persist it. */
-export async function exchangeInstallCode(code: string): Promise<{ companyId: string } | null> {
+export type InstallGrant =
+  | { type: 'company'; companyId: string }
+  | { type: 'location'; locationId: string; token: string; expiresAt: Date; userId?: string }
+
+/** Exchange the install code. Company codes become the persisted agency grant;
+ *  Location codes (per-account update/consent flows) return a direct token. */
+export async function exchangeInstallCode(code: string): Promise<InstallGrant | null> {
   if (!clientId() || !clientSecret()) {
     logger.error('[ghl-oauth] client keys not configured')
     return null
@@ -54,8 +59,24 @@ export async function exchangeInstallCode(code: string): Promise<{ companyId: st
     }),
   })
   const data = (await res.json()) as TokenResponse
-  if (!res.ok || !data.access_token || !data.refresh_token || !data.companyId) {
+  if (!res.ok || !data.access_token || !data.companyId) {
     logger.error({ status: res.status, data }, '[ghl-oauth] code exchange failed')
+    return null
+  }
+  // Per-account consent flows return Location-class tokens despite the
+  // requested user_type — usable directly for that one location.
+  if (data.userType === 'Location' || data.locationId) {
+    logger.info({ locationId: data.locationId }, '[ghl-oauth] location-class grant (direct provisioning token)')
+    return {
+      type: 'location',
+      locationId: data.locationId ?? '',
+      token: data.access_token,
+      expiresAt: new Date(Date.now() + (data.expires_in ?? 86400) * 1000),
+      userId: data.userId,
+    }
+  }
+  if (!data.refresh_token) {
+    logger.error('[ghl-oauth] company grant without refresh token')
     return null
   }
   await prisma.ghlAppToken.upsert({
@@ -73,7 +94,7 @@ export async function exchangeInstallCode(code: string): Promise<{ companyId: st
     },
   })
   logger.info({ companyId: data.companyId }, '[ghl-oauth] agency grant stored')
-  return { companyId: data.companyId }
+  return { type: 'company', companyId: data.companyId }
 }
 
 /** Valid agency access token (refreshes when near expiry). */

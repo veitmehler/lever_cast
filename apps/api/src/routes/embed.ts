@@ -31,21 +31,31 @@ export async function embedRoutes(app: FastifyInstance) {
           const { exchangeInstallCode, listInstalledLocations } = await import('../lib/ghl/app-oauth')
           const { provisionLocation } = await import('../lib/ghl/auto-provision')
           const grant = await exchangeInstallCode(code)
-          if (grant) {
+          if (grant?.type === 'company') {
             const locations = await listInstalledLocations()
             logger.info({ count: locations.length }, '[embed] backfill-provisioning installed locations')
             for (const loc of locations) await provisionLocation(loc, 'install-backfill')
+          } else if (grant?.type === 'location' && grant.locationId) {
+            await provisionLocation(grant.locationId, 'location-consent', {
+              token: grant.token,
+              expiresAt: grant.expiresAt,
+              userId: grant.userId,
+            })
           }
         } catch (err) {
           logger.error({ err }, '[embed] install-code exchange/backfill failed')
         }
       })()
     }
-    reply.type('text/html')
+    reply.type('text/html; charset=utf-8')
     return reply.send(
-      '<html><body style="font-family:sans-serif;text-align:center;padding-top:80px">' +
-        '<h2>App installed ✓</h2><p>You can close this tab and open the app from your sidebar.</p>' +
-        '</body></html>',
+      `<!doctype html><html><head><meta charset="utf-8"/><title>Omniply</title></head>
+<body style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#0A1826,#05090F);color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center">
+<div style="max-width:420px;padding:40px">
+<div style="width:64px;height:64px;margin:0 auto 24px;border:3px solid #38A8F8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;color:#38A8F8">&#10003;</div>
+<h1 style="font-size:26px;margin:0 0 12px">Omniply is connected</h1>
+<p style="font-size:16px;line-height:1.6;color:rgba(255,255,255,.75);margin:0">Your workspace is being prepared. Close this tab and open <strong style="color:#fff">Omniply</strong> from your sidebar.</p>
+</div></body></html>`,
     )
   })
 

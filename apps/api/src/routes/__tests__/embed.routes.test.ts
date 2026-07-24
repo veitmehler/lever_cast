@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 
 const ghlSettingsFindFirst = vi.fn()
 const userFindUnique = vi.fn()
+const userFindFirst = vi.fn()
 const userCreate = vi.fn()
 const userUpdate = vi.fn()
 const accountFindUnique = vi.fn()
@@ -11,6 +12,7 @@ vi.mock('@omniply/shared', () => ({
     ghlSettings: { findFirst: (...a: unknown[]) => ghlSettingsFindFirst(...a) },
     user: {
       findUnique: (...a: unknown[]) => userFindUnique(...a),
+      findFirst: (...a: unknown[]) => userFindFirst(...a),
       create: (...a: unknown[]) => userCreate(...a),
       update: (...a: unknown[]) => userUpdate(...a),
     },
@@ -42,11 +44,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   process.env.GHL_SSO_SECRET = SECRET
   ghlSettingsFindFirst.mockResolvedValue({ userId: 'owner_1' })
-  // user.findUnique is called with different wheres — default: owner lookup
+  // user.findUnique: owner lookup + clerkId/email availability checks
   userFindUnique.mockImplementation(async (args: { where?: Record<string, unknown> }) => {
     if (args?.where?.id === 'owner_1') return { accountId: 'acct_1' }
-    return null // no existing ghl/email user
+    return null // clerkId/email free
   })
+  userFindFirst.mockResolvedValue(null) // no row in this account
   userCreate.mockResolvedValue({ id: 'u_new', clerkId: 'ghl:ghluser_1', email: 'dr@clinic.com', name: 'Dr. Who', accountId: 'acct_1', ghlUserId: 'ghluser_1' })
   accountFindUnique.mockResolvedValue({ onboardingCompletedAt: null, status: 'active' })
 })
@@ -98,15 +101,50 @@ describe('POST /embed/session', () => {
     await app.close()
   })
 
-  it('refuses a user whose account differs from the location account', async () => {
+  it('creates a second per-account row for a user already known in another account', async () => {
+    // Same GHL human exists in acct_OTHER: base clerkId and real email are taken.
     userFindUnique.mockImplementation(async (args: { where?: Record<string, unknown> }) => {
       if (args?.where?.id === 'owner_1') return { accountId: 'acct_1' }
-      if (args?.where?.ghlUserId) return { id: 'u_x', clerkId: 'ghl:ghluser_1', accountId: 'acct_OTHER', ghlUserId: 'ghluser_1', email: 'dr@clinic.com', name: null }
+      if (args?.where?.clerkId === 'ghl:ghluser_1') return { id: 'u_x' }
+      if (args?.where?.email === 'dr@clinic.com') return { id: 'u_x' }
       return null
     })
+    userCreate.mockResolvedValue({ id: 'u_2', clerkId: 'ghl:ghluser_1:acct_1', email: 'ghluser_1.acct_1@ghl.local', name: 'Dr. Who', accountId: 'acct_1', ghlUserId: 'ghluser_1' })
     const app = await build()
     const res = await app.inject({ method: 'POST', url: '/embed/session', payload: { encryptedData: payload() } })
-    expect(res.statusCode).toBe(403)
+    expect(res.statusCode).toBe(200)
+    expect(userCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clerkId: 'ghl:ghluser_1:acct_1',
+          email: 'ghluser_1.acct_1@ghl.local',
+          accountId: 'acct_1',
+        }),
+      }),
+    )
+    expect(verifyEmbedToken(res.json().token)).toMatchObject({ sub: 'ghl:ghluser_1:acct_1', accountId: 'acct_1' })
+    await app.close()
+  })
+
+  it('lets the buyer claim the placeholder owner row via email match', async () => {
+    userFindFirst.mockImplementation(async (args: { where?: Record<string, unknown> }) => {
+      if (args?.where?.email === 'dr@clinic.com') {
+        return { id: 'owner_1', clerkId: 'ghlowner:loc_1', ghlUserId: null, email: 'dr@clinic.com', name: null, accountId: 'acct_1' }
+      }
+      return null
+    })
+    userUpdate.mockResolvedValue({ id: 'owner_1', clerkId: 'ghl:ghluser_1', ghlUserId: 'ghluser_1', email: 'dr@clinic.com', name: 'Dr. Who', accountId: 'acct_1' })
+    accountFindUnique.mockResolvedValue({ onboardingCompletedAt: null, status: 'active', ownerUserId: 'owner_1' })
+    const app = await build()
+    const res = await app.inject({ method: 'POST', url: '/embed/session', payload: { encryptedData: payload() } })
+    expect(res.statusCode).toBe(200)
+    expect(userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'owner_1' },
+        data: expect.objectContaining({ clerkId: 'ghl:ghluser_1', ghlUserId: 'ghluser_1' }),
+      }),
+    )
+    expect(userCreate).not.toHaveBeenCalled()
     await app.close()
   })
 

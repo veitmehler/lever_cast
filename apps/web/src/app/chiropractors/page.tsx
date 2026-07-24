@@ -92,34 +92,31 @@ export default function ChiropractorsPage() {
 
       {/* ── The Big Idea ── */}
       <Section>
-        <Eyebrow>Read this first</Eyebrow>
-        <H2>The big idea in 213 words.</H2>
         <P lead>
-          Think for a moment about what happens when a person&apos;s back finally gives out. Bent over a
-          bathroom sink, one small twist, and suddenly nothing in their life matters more than making the
-          pain stop.
+          A person&apos;s back gives out over a bathroom sink. One small twist. For the next hour nothing in
+          their life matters except making the pain stop.
         </P>
-        <P lead><strong>What happens next? They reach for their phone.</strong></P>
+        <P lead><strong>They grab their phone. And the choice is already made.</strong></P>
         <P>
-          And here is where the science gets uncomfortable. Princeton psychologists found that people form
-          trust judgments in <strong>a tenth of a second</strong>, long before a single rational thought. All
-          the time that follows is spent justifying that instant verdict, not revising it.
-        </P>
-        <P>
-          Your future patient works the same way. In that moment they do not compare credentials or read
-          three websites. <strong>They call the name that already feels familiar and trusted.</strong>
+          Princeton researchers proved that people form trust judgments in <strong>a tenth of a
+          second</strong>. Before a single rational thought. Every second after that gets spent justifying
+          the verdict, not questioning it.
         </P>
         <P>
-          And familiarity cannot be built in the moment of pain. It is built in the months before it, one
-          useful article, one email, one post at a time, by whoever kept showing up.
+          So your future patient does not compare credentials. They do not read three websites.{' '}
+          <strong>They call the name they already know.</strong>
         </P>
         <P>
-          Which means <strong>the patient is won before they even know they are choosing.</strong> That is
-          the whole game. Not better adjustments. Not a prettier logo. Presence, accumulated in advance, so
-          when the moment comes you are not one option among ten. You are the obvious call.
+          And you cannot build familiarity in the moment of pain. It gets built in the months before. One
+          article. One email. One post. By whoever kept showing up.
         </P>
         <P>
-          This page is dedicated to the economics of being the obvious call, and to the machine that makes
+          <strong>The patient is won before they know they are choosing.</strong> That is the whole game. Not
+          better adjustments. Not a prettier logo. Presence, banked in advance, until you are not one of ten
+          options. You are the obvious call.
+        </P>
+        <P>
+          The rest of this page is about the economics of being the obvious call, and the machine that makes
           it automatic.
         </P>
       </Section>

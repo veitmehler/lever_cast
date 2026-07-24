@@ -17,6 +17,9 @@ import {
   TouchpointGraph,
   ReactivationLoop,
   PricingBlock,
+  Faq,
+  FaqJsonLd,
+  type FaqEntry,
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
@@ -24,6 +27,49 @@ export const metadata: Metadata = {
   description:
     'The content system elite chiropractic coaches teach, fully automated: articles, newsletters, social, lead magnets and Google reviews in your voice. $397/mo flat.',
 }
+
+const FAQ_ITEMS: FaqEntry[] = [
+  {
+    q: 'Is the content compliant for healthcare advertising?',
+    a: 'Compliance guardrails are built into every generator: no overclaiming, no miracle cures, no guarantees of outcomes, nothing that promises what an adjustment cannot promise. And because you approve every piece before it ships, the final word on anything carrying your name is always yours.',
+  },
+  {
+    q: 'Will it really sound like me, not like AI?',
+    a: 'Yes, and this is the part practices doubt until they see it. During onboarding you simply talk about your practice, your patients and what you believe about care. The system learns how you actually speak. The first newsletter reads like you dictated it on a good day, because in a real sense you did.',
+  },
+  {
+    q: 'How much of my week does this take?',
+    a: 'A few minutes over coffee. Content arrives in one approval inbox, you read it, you click approve, and the week is handled. The setup itself is a ten to fifteen minute guided conversation you do once.',
+  },
+  {
+    q: 'Does it work with my booking system?',
+    a: 'Yes. Omniply does not replace your practice software. Every call to action points patients at your existing online booking page, whatever system you use. No migrations, no double bookings, no IT project.',
+  },
+  {
+    q: 'Do I have to come up with the topics?',
+    a: 'No. Your content runs on a chiropractic calendar built around the seasons of a real practice: new year resolutions, gardening season backs, school posture, holiday stress. Sciatica content lands when people are digging, not in February.',
+  },
+  {
+    q: 'How does the review engine work? Is it ethical?',
+    a: 'Completely. We never write, buy or fake reviews. The system makes it effortless for genuinely happy patients to leave one: a printed QR card for your front desk that opens your Google review form, plus well-timed follow-ups. The reviews are real. There are simply more of them, because asking finally happens consistently.',
+  },
+  {
+    q: 'What exactly does $397 include? Any hidden costs?',
+    a: 'Everything: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, and the review engine. No per-piece fees, no content credits, no surprises.',
+  },
+  {
+    q: 'How fast will I see results?',
+    a: 'Honest answer: reactivation is fastest, because past patients who get reminded tend to rebook within weeks. Google visibility and new-patient flow compound over months, which is exactly why consistency beats bursts. Anyone promising overnight patients from content is selling you something else.',
+  },
+  {
+    q: 'Can I cancel? What happens to everything?',
+    a: 'Cancel any month. Your articles stay on your website, your list stays your list, your guides keep working. It was all built in your name from the start.',
+  },
+  {
+    q: 'Why the cap of 74 practices?',
+    a: 'Voice onboarding and brand setup take real attention per practice, and existing practices come first. 74 is the number we can onboard this quarter without letting quality slip. It is a capacity limit, not a marketing trick.',
+  },
+]
 
 export default function ChiropractorsPage() {
   return (
@@ -195,6 +241,13 @@ export default function ChiropractorsPage() {
         </P>
       </Section>
 
+      {/* ── FAQ ── */}
+      <Section>
+        <Eyebrow>Questions, answered straight</Eyebrow>
+        <H2>Everything chiropractors ask before they start.</H2>
+        <Faq items={FAQ_ITEMS} />
+      </Section>
+
       {/* ── Close ── */}
       <Section dark>
         <H2>74 practices this quarter. That is the cap, and it is real.</H2>
@@ -211,6 +264,7 @@ export default function ChiropractorsPage() {
         </Cta>
       </Section>
 
+      <FaqJsonLd items={FAQ_ITEMS} />
       <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
         <p>Omniply · Built for chiropractic practices</p>
         <p className="mt-2">

@@ -19,6 +19,9 @@ import {
   TouchpointGraph,
   ReactivationLoop,
   PricingBlock,
+  Faq,
+  FaqJsonLd,
+  type FaqEntry,
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
@@ -26,6 +29,41 @@ export const metadata: Metadata = {
   description:
     'Articles, newsletters, social posts, lead magnets and review growth. Generated in your voice, approved by you, published every week without you. $397/mo flat.',
 }
+
+const FAQ_ITEMS: FaqEntry[] = [
+  {
+    q: 'How is this different from just using ChatGPT?',
+    a: 'ChatGPT is a blank box that waits for you to be good at prompting, and it forgets you between sessions. Omniply is a pipeline: it learns your voice once, runs on a fixed weekly schedule, applies compliance and brand guardrails to every piece, and publishes to your website, email list and social accounts automatically. You approve output. You never prompt anything.',
+  },
+  {
+    q: 'Will it really sound like me?',
+    a: 'That is the whole point of the onboarding. You talk, in your own words, about your business and the people you serve. The system studies how you actually speak and writes in that voice from day one. Most owners say the spooky moment is reading their first newsletter and hearing themselves in it.',
+  },
+  {
+    q: 'How much of my time does this take?',
+    a: 'Setup is a guided conversation of roughly ten to fifteen minutes. After that, your job is a review pass measured in minutes per week: read, click approve, done. Everything else, including publishing and scheduling, happens without you.',
+  },
+  {
+    q: 'What exactly is included in the $397?',
+    a: 'Everything. Weekly articles, the weekly newsletter with 25,000 email sends a month, social posts with designed graphics, your branded lead-magnet library, and the review growth engine. There are no per-piece fees, no content credits, and no surprise line items.',
+  },
+  {
+    q: 'What if I do not like a piece of content?',
+    a: 'Nothing goes out without your approval. If a piece misses, you reject it with a note and the system regenerates it with your feedback applied. Your name never appears on anything you have not signed off.',
+  },
+  {
+    q: 'Do I need to be technical?',
+    a: 'No. If you can answer questions about your own business and click an approve button, you have every skill required. The setup conversation feels like talking to a sharp marketing consultant, not configuring software.',
+  },
+  {
+    q: 'Can I cancel? What happens to my content?',
+    a: 'You can cancel any month. Everything already published stays published, because it was always yours: your website, your email list, your social accounts, your documents.',
+  },
+  {
+    q: 'Why only 74 practices this quarter?',
+    a: 'Because onboarding is the moment we clone your voice and set up your brand properly, and we refuse to rush it. The cap is our real capacity for doing that well while serving the practices already inside. When the spots are gone, the door closes until next quarter.',
+  },
+]
 
 export default function HomePage() {
   return (
@@ -185,6 +223,13 @@ export default function HomePage() {
         </P>
       </Section>
 
+      {/* ── FAQ ── */}
+      <Section>
+        <Eyebrow>Questions, answered straight</Eyebrow>
+        <H2>Everything owners ask before they start.</H2>
+        <Faq items={FAQ_ITEMS} />
+      </Section>
+
       {/* ── Close ── */}
       <Section dark>
         <H2>We onboard 74 practices this quarter. Then we close the doors and serve them.</H2>
@@ -201,6 +246,7 @@ export default function HomePage() {
         </Cta>
       </Section>
 
+      <FaqJsonLd items={FAQ_ITEMS} />
       <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
         <p>Omniply · The content operating system for local practices</p>
         <p className="mt-2">

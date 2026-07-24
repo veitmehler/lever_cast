@@ -264,3 +264,47 @@ export function PricingBlock({ vertical }: { vertical?: boolean }) {
     </div>
   )
 }
+
+/* ── FAQ ────────────────────────────────────────────────────────────────── */
+export interface FaqEntry {
+  q: string
+  a: string
+}
+
+export function Faq({ items }: { items: FaqEntry[] }) {
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <details
+          key={item.q}
+          className="group rounded-xl border bg-white p-5"
+          style={{ borderColor: TOKENS.line }}
+        >
+          <summary className="cursor-pointer list-none text-lg font-bold" style={{ color: TOKENS.ink }}>
+            <span className="mr-2 inline-block transition-transform group-open:rotate-90" style={{ color: TOKENS.accent }}>
+              ▸
+            </span>
+            {item.q}
+          </summary>
+          <p className="mt-3 text-lg leading-relaxed" style={{ color: TOKENS.body }}>
+            {item.a}
+          </p>
+        </details>
+      ))}
+    </div>
+  )
+}
+
+/** FAQPage JSON-LD for rich results. */
+export function FaqJsonLd({ items }: { items: FaqEntry[] }) {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map((i) => ({
+      '@type': 'Question',
+      name: i.q,
+      acceptedAnswer: { '@type': 'Answer', text: i.a },
+    })),
+  }
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+}

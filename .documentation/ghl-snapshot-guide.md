@@ -48,11 +48,13 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 
 1. **Three billing workflows** (Subscription trigger × Active / Overdue / Canceled →
    Custom Webhook, per the payment checklist) — with the webhook URL referencing a
-   **Custom Value**: `https://svc.omniply.io/api/ghl/billing-events/{{custom_values.omniply_billing_token}}`
+   **Custom Value**: `{{custom_values.omniply_billing_token}}` (the custom value holds the FULL webhook URL — auto-set at provisioning)
    → snapshot deploys untouched; per-client setup = paste ONE custom value (the token from
    `POST /api/admin/accounts/:id/billing-token`) instead of editing three workflows.
-2. **Custom Values**: `omniply_billing_token` (empty placeholder) + any future webhook
-   tokens follow the same pattern.
+2. **Custom Values**: `omniply_billing_token` + `omniply_review_token` — AUTO-CREATED
+   with their full webhook URLs by zero-touch provisioning at app install; the snapshot
+   does not need placeholders. Workflow webhook URL fields reference the custom value
+   directly (it IS the URL).
 3. **Tag taxonomy** (pre-created so workflows reference them from day one):
    - `leadgen-<template-slug>` per starter lead magnet
    - `appointment-completed`, `first-visit-completed` (dormant until the PMS connector or
@@ -72,8 +74,8 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 7b. **Trigger link `omniply-review`** (placeholder destination) — the QR review card
    encodes its URL; provisioning points it at the clinic's Google review deep link via
    API (leadgen master-library plan Phase F, option C).
-7c. **Review Received workflow → Custom Webhook** to our review receiver
-   (`{{custom_values.omniply_review_token}}` pattern) — feeds review mining
+7c. **Review Received workflow → Custom Webhook** with URL
+   `{{custom_values.omniply_review_token}}` (full URL auto-set at provisioning) — feeds review mining
    (google-reviews-acquisition plan Tier 3). Requires the clinic's Google connection in
    GHL Reputation (runbook step).
 7d. **Native Reviews QR: do NOT create / disable where possible** (user decision —

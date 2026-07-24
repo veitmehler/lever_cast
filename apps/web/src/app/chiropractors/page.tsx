@@ -89,6 +89,40 @@ export default function ChiropractorsPage() {
         <Cta sub="Onboarding capped at 74 practices this quarter">Set up your account right now</Cta>
       </Section>
 
+
+      {/* ── The Big Idea ── */}
+      <Section>
+        <Eyebrow>Read this first</Eyebrow>
+        <H2>The big idea in 213 words.</H2>
+        <P lead>
+          Think for a moment about what happens when a person&apos;s back finally gives out. Bent over a
+          bathroom sink, one small twist, and suddenly nothing in their life matters more than making the
+          pain stop.
+        </P>
+        <P lead><strong>What happens next? They reach for their phone.</strong></P>
+        <P>
+          And here is where the science gets uncomfortable. Princeton psychologists found that people form
+          trust judgments in <strong>a tenth of a second</strong>, long before a single rational thought. All
+          the time that follows is spent justifying that instant verdict, not revising it.
+        </P>
+        <P>
+          Your future patient works the same way. In that moment they do not compare credentials or read
+          three websites. <strong>They call the name that already feels familiar and trusted.</strong>
+        </P>
+        <P>
+          And familiarity cannot be built in the moment of pain. It is built in the months before it, one
+          useful article, one email, one post at a time, by whoever kept showing up.
+        </P>
+        <P>
+          Which means <strong>the patient is won before they even know they are choosing.</strong> That is
+          the whole game. Not better adjustments. Not a prettier logo. Presence, accumulated in advance, so
+          when the moment comes you are not one option among ten. You are the obvious call.
+        </P>
+        <P>
+          This page is dedicated to the economics of being the obvious call, and to the machine that makes
+          it automatic.
+        </P>
+      </Section>
       {/* ── Problem reframe ── */}
       <Section>
         <Eyebrow>The real problem</Eyebrow>

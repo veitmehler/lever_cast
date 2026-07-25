@@ -56,8 +56,19 @@ describe('composePalette — Coast fixture', () => {
     expect(p.headerBackground).toBe('#2e4a5f')
   })
 
-  it('keeps the observed slate button (readable label)', () => {
-    expect(p.button).toBe('#3d5a6c')
+  it('button is the popping gold, not the site\'s conservative navy', () => {
+    // User rule: email CTAs must pop off body AND header — pure vividness wins;
+    // yellow is allowed for buttons (dark label text carries it).
+    expect(p.button).toBe('#f2cc54')
+  })
+
+  it('button label is the dark header ink (white fails on gold)', () => {
+    expect(p.buttonText).toBe('#2e4a5f')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('the navy stays available as a button alternate', () => {
+    expect(p.alternates?.button).toContain('#3d5a6c')
   })
 
   it('never ships a link color that fails 4.5:1 on the body', () => {

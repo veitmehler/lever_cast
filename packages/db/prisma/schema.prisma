@@ -1143,6 +1143,7 @@ model BrandSettings {
   nlBodyFontWeight    String?
   nlLinkColor         String?
   nlButtonColor       String? // CTA/read-more button color (falls back to nlLinkColor)
+  nlButtonTextColor   String? // button label color (white or dark header ink), contrast-computed
   // Four content-section band colors (cycled) + header logo (header band only)
   nlSectionColor1     String?
   nlSectionColor2     String?

@@ -42,6 +42,11 @@ model Account {
   // the GHL workflow posts to /api/ghl/billing-events/<token>.
   ghlBillingToken String?   @unique
   billingEvents   GhlBillingEvent[]
+  // Stripe-central billing (2026-07-24): bound on FIRST payment via email/
+  // contact match (two-phase, like owner promotion); renewals map directly.
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  ghlContactId         String? // buyer's contact in the selling location (Stripe metadata)
   // Per-account URL token for the GHL Review-Received webhook receiver
   // (google-reviews plan Tier 3) — workflow posts to /api/ghl/reviews/<token>.
   ghlReviewToken  String?   @unique
@@ -165,6 +170,26 @@ model GhlAppToken {
 
 // Audit log + idempotency window for GHL billing webhook events (multi-tenancy
 // plan Phase B). One row per received event, including suppressed duplicates.
+// Stripe webhook idempotency + unmatched-event holding table (Stripe-central
+// billing, 2026-07-24). Unmatched rows (buyer paid with a different email)
+// retry on later events and can be resolved manually at launch scale.
+model StripeEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique // Stripe's evt_… id — idempotency key
+  type           String
+  email          String?
+  contactId      String?
+  subscriptionId String?
+  accountId      String? // resolved account (null = held/unmatched)
+  matched        Boolean  @default(false)
+  raw            Json?
+  createdAt      DateTime @default(now())
+
+  @@index([matched, createdAt])
+  @@index([subscriptionId])
+  @@map("stripe_events")
+}
+
 model GhlBillingEvent {
   id        String   @id @default(cuid())
   accountId String

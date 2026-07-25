@@ -136,8 +136,12 @@ function hueDistance(a: string, b: string): number {
 // ── composition ───────────────────────────────────────────────────────────────
 
 const CONTRAST_TEXT = 4.5
-/** Small hue-preserving darkening we accept happily; beyond it a candidate only wins as last resort. */
-const GRACEFUL_DELTA_L = 0.15
+/** Links must never come from the yellow/orange family (user rule 2026-07-24). */
+const BANNED_LINK_HUE: [number, number] = [25, 95]
+/** "Bright and alive" gate: a link hue must already be vivid on the homepage. */
+const LINK_MIN_SATURATION = 0.35
+/** Header band must be dark enough to carry the light logo. */
+const HEADER_MAX_LUMINANCE = 0.5
 
 interface Candidate extends BrandColor {
   hex: string
@@ -175,10 +179,27 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   const ground = lightGrounds[0]?.hex ?? '#ffffff'
   provenance.bodyBackground = lightGrounds[0] ? 'extracted' : 'fallback'
 
-  // Header background: observed nav bar, else the ground.
-  const nav = byRole('nav_background')[0]
-  const headerBackground = nav?.hex ?? ground
-  provenance.headerBackground = nav ? 'extracted' : `derived from ${ground}`
+  // Header background: a newsletter header is a BRANDING BAND, not page
+  // chrome — take the strongest dark structural brand color (hero/nav/footer/
+  // band; main before supporting, then coverage). A cream nav must not produce
+  // a cream newsletter header; the ground is a last resort.
+  const structural = colors
+    .filter((c) =>
+      c.observedRoles?.some((r) =>
+        ['hero_background', 'nav_background', 'footer_background', 'band'].includes(r),
+      ),
+    )
+    .filter((c) => c.hex !== ground && relLuminance(c.hex) < HEADER_MAX_LUMINANCE)
+    .sort((a, b) => {
+      const promo = (x: Candidate) => (x.prominence === 'main' ? 1 : 0)
+      return promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
+    })
+  const darkestMainAny = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
+  const headerPick =
+    structural[0] ??
+    (darkestMainAny && relLuminance(darkestMainAny.hex) < HEADER_MAX_LUMINANCE ? darkestMainAny : null)
+  const headerBackground = headerPick?.hex ?? ground
+  provenance.headerBackground = headerPick ? 'extracted' : `derived from ${ground}`
 
   // Header text: best-contrast brand color on the header, else plain ink.
   const headerTextCandidate = [...mains, ...colors]
@@ -210,31 +231,57 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     provenance.button = 'fallback'
   }
 
-  // Link/accent: try candidates in preference order; hue-preserving darkening;
-  // graceful adjustments beat heavy ones (a gold that must fall to mud loses to
-  // a blue that darkens a little).
-  const distinctive = [...nonGround]
-    .filter((c) => c.hex !== ground)
-    .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex))
-  const linkCandidates: Candidate[] = []
-  for (const c of [...byRole('link_text'), ...(observedButton ? [observedButton] : []), ...distinctive]) {
-    if (!linkCandidates.some((x) => x.hex === c.hex)) linkCandidates.push(c)
+  // Link/accent: the brand's LIFE color (user rules 2026-07-24). Eligible =
+  // vivid on the homepage (saturation gate), hue outside the yellow/orange
+  // band (links are NEVER yellow/orange; buttons may be — dark label text),
+  // and darkenable to 4.5:1 within its own hue. Rank: role tier (observed
+  // link color > structural band/button/hero > icon-only), then smallest
+  // darkening ("slightly darkened" beats transformed), then saturation.
+  const isBannedLinkHue = (hex: string) => {
+    const h = hexToHsl(hex).h
+    return h >= BANNED_LINK_HUE[0] && h <= BANNED_LINK_HUE[1]
   }
-  const adjusted = linkCandidates
-    .map((c) => ({ c, adj: adjustForContrast(c.hex, ground, CONTRAST_TEXT) }))
-    .filter((x): x is { c: Candidate; adj: { hex: string; deltaL: number } } => x.adj !== null)
-  const graceful = adjusted.find((x) => x.adj.deltaL <= GRACEFUL_DELTA_L)
-  const chosen = graceful ?? adjusted.sort((a, b) => a.adj.deltaL - b.adj.deltaL)[0]
+  const roleTier = (c: Candidate): number =>
+    c.observedRoles?.includes('link_text')
+      ? 3
+      : c.observedRoles?.some((r) => ['band', 'button_fill', 'hero_background'].includes(r))
+        ? 2
+        : 1
+  type Adjusted = { c: Candidate; adj: { hex: string; deltaL: number } }
+  const withAdjustment = (cands: Candidate[]): Adjusted[] =>
+    cands
+      .filter((c, i, arr) => arr.findIndex((x) => x.hex === c.hex) === i)
+      .map((c) => ({ c, adj: adjustForContrast(c.hex, ground, CONTRAST_TEXT) }))
+      .filter((x): x is Adjusted => x.adj !== null)
+  const eligible = withAdjustment(
+    nonGround.filter(
+      (c) => c.hex !== ground && !isBannedLinkHue(c.hex) && saturationOf(c.hex) >= LINK_MIN_SATURATION,
+    ),
+  ).sort(
+    (a, b) =>
+      roleTier(b.c) - roleTier(a.c) ||
+      a.adj.deltaL - b.adj.deltaL ||
+      saturationOf(b.c.hex) - saturationOf(a.c.hex),
+  )
+  // Duller non-banned mains: the selection fallback when nothing vivid exists,
+  // and always an alternates source (a navy chip next to a vivid winner).
+  const relaxed = withAdjustment(mains.filter((c) => c.hex !== ground && !isBannedLinkHue(c.hex))).sort(
+    (a, b) => saturationOf(b.c.hex) - saturationOf(a.c.hex),
+  )
   let accent: string
+  const chosen = eligible[0] ?? relaxed[0]
   if (chosen) {
     accent = chosen.adj.hex
     provenance.accent =
       chosen.adj.deltaL === 0 ? 'extracted' : `derived from ${chosen.c.hex} (darkened for contrast)`
+  } else if (!isBannedLinkHue(button) && adjustForContrast(button, ground, CONTRAST_TEXT)) {
+    accent = adjustForContrast(button, ground, CONTRAST_TEXT)!.hex
+    provenance.accent = `derived from ${button} (button fallback)`
   } else {
     accent = relLuminance(ground) >= 0.5 ? '#2a6f97' : '#9fd3ee'
     provenance.accent = 'fallback'
   }
-  alternates.accent = adjusted
+  alternates.accent = [...eligible, ...relaxed]
     .map((x) => x.adj.hex)
     .filter((h) => h !== accent)
     .filter((h, i, arr) => arr.indexOf(h) === i)

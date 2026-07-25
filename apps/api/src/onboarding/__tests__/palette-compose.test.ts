@@ -51,9 +51,9 @@ describe('color math', () => {
 describe('composePalette — Coast fixture', () => {
   const p = composePalette(COAST)
 
-  it('grounds on the cream and keeps the cream nav as header', () => {
+  it('grounds on the cream but headers on the navy branding band (not page chrome)', () => {
     expect(p.bodyBackground).toBe('#f7f1e3')
-    expect(p.headerBackground).toBe('#f7f1e3')
+    expect(p.headerBackground).toBe('#2e4a5f')
   })
 
   it('keeps the observed slate button (readable label)', () => {
@@ -64,9 +64,18 @@ describe('composePalette — Coast fixture', () => {
     expect(contrastRatio(p.accent!, p.bodyBackground!)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('prefers an extracted passing color over heavy darkening (gold cannot win as-is)', () => {
-    // Gold at 2:1 must not survive as the link color.
-    expect(p.accent!.toLowerCase()).not.toBe('#f2cc54')
+  it('links come from the vivid light blue, darkened within its own hue', () => {
+    // User rule: bright-and-alive hue wins; navy is too dull (s < 0.35), gold
+    // is yellow-banned — the light blue, slightly darkened, is the link color.
+    const srcHue = hexToHsl('#99c9d3').h
+    const gotHue = hexToHsl(p.accent!).h
+    const dh = Math.abs(gotHue - srcHue)
+    expect(Math.min(dh, 360 - dh)).toBeLessThan(8)
+  })
+
+  it('links are never yellow/orange family', () => {
+    const h = hexToHsl(p.accent!).h
+    expect(h < 25 || h > 95).toBe(true)
   })
 
   it('offers pre-validated alternates for links', () => {
@@ -109,6 +118,20 @@ describe('composePalette — edge cases', () => {
     expect(p.button).toBe('#22364a')
     expect(p.sectionTints).toHaveLength(2)
     expect(contrastRatio(p.accent!, p.bodyBackground!)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('yellow-only brand: buttons may be gold, links never are', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.7 },
+        { hex: '#f2b705', prominence: 'main', observedRoles: ['button_fill', 'band', 'icon_accent'], coverage: 0.2 },
+      ],
+    })
+    const h = hexToHsl(p.accent!).h
+    expect(h < 25 || h > 95).toBe(true)
+    expect(contrastRatio(p.accent!, p.bodyBackground!)).toBeGreaterThanOrEqual(4.5)
+    // The button keeps the brand gold (dark label text carries it).
+    expect(p.button).toBe('#f2b705')
   })
 
   it('empty inventory: safe fallbacks throughout', () => {

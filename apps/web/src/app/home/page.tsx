@@ -64,6 +64,10 @@ const FAQ_ITEMS: FaqEntry[] = [
     q: 'Why only 74 practices this quarter?',
     a: 'Because onboarding is the moment we clone your voice and set up your brand properly, and we refuse to rush it. The cap is our real capacity for doing that well while serving the practices already inside. When the spots are gone, the door closes until next quarter.',
   },
+  {
+    q: 'Do I need a WordPress website?',
+    a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically — that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
+  },
 ]
 
 export default function HomePage() {

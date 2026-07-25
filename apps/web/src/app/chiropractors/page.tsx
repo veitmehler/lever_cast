@@ -70,6 +70,10 @@ const FAQ_ITEMS: FaqEntry[] = [
     q: 'Why the cap of 74 practices?',
     a: 'Voice onboarding and brand setup take real attention per practice, and existing practices come first. 74 is the number we can onboard this quarter without letting quality slip. It is a capacity limit, not a marketing trick.',
   },
+  {
+    q: 'Do I need a WordPress website?',
+    a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically — that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
+  },
 ]
 
 export default function ChiropractorsPage() {

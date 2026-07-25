@@ -156,12 +156,48 @@ export function ProfileCard({
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(PROFILE_FIELDS.map((f) => [f.key, String(card[f.key] ?? '')])),
   )
-  const spec = String(card.primarySpecialization ?? '')
+  // Specializations: registry CHECKBOXES (they route the content calendar — no
+  // free text). Preselected from the site detection; confirm-or-correct.
+  const registry = (card.availableSpecializations as string[] | undefined) ?? []
+  const [specs, setSpecs] = useState<Set<string>>(() => {
+    const detected = [
+      ...((card.specializations as string[] | undefined) ?? []),
+      ...(card.primarySpecialization ? [String(card.primarySpecialization)] : []),
+    ].filter((s) => registry.includes(s))
+    return new Set(detected)
+  })
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-      {spec && (
-        <div className="inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-          {spec.replace(/_/g, ' ')}
+      {registry.length > 0 && (
+        <div>
+          <label className={labelCls}>Clinic specializations (check all that apply)</label>
+          <div className="flex flex-wrap gap-2">
+            {registry.map((key) => (
+              <label
+                key={key}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                  specs.has(key) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={specs.has(key)}
+                  disabled={disabled}
+                  onChange={() =>
+                    setSpecs((s) => {
+                      const next = new Set(s)
+                      if (next.has(key)) next.delete(key)
+                      else next.add(key)
+                      return next
+                    })
+                  }
+                />
+                {specs.has(key) ? '✓ ' : ''}
+                {key.replace(/_/g, ' ')}
+              </label>
+            ))}
+          </div>
         </div>
       )}
       {PROFILE_FIELDS.map((f) => (
@@ -187,11 +223,88 @@ export function ProfileCard({
       ))}
       <button
         className={`${primaryBtn} w-full`}
-        disabled={disabled || !values.businessDescription.trim() || !values.who.trim()}
-        onClick={() => onSubmit({ ...values, confirmed: true })}
+        disabled={disabled || !values.businessDescription.trim() || !values.who.trim() || (registry.length > 0 && specs.size === 0)}
+        onClick={() => onSubmit({ ...values, specializations: [...specs], confirmed: true })}
       >
         This is my brand ✓
       </button>
+    </div>
+  )
+}
+
+// ── photo (spokesperson for quote cards) ─────────────────────────────────────
+
+export function PhotoCard({
+  disabled,
+  uploadUrl,
+  authToken,
+  onSubmit,
+}: {
+  disabled: boolean
+  uploadUrl: string
+  authToken: string
+  onSubmit: (answer: Record<string, unknown>) => void
+}) {
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function handleFile(file: File) {
+    setUploading(true)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append('photo', file, file.name)
+      const res = await fetch(uploadUrl, { method: 'POST', headers: { Authorization: authToken }, body: form })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url) {
+        setError(data.error ?? 'Upload failed — try again')
+        return
+      }
+      setPreview(data.url)
+    } catch {
+      setError('Upload failed — check your connection and try again')
+    } finally {
+      setUploading(false)
+    }
+  }
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-4">
+        <div className="flex h-24 w-24 flex-none items-center justify-center overflow-hidden rounded-full border-2 border-border bg-background">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Your photo" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-3xl text-muted-foreground">👤</span>
+          )}
+        </div>
+        <label className={`${ghostBtn} cursor-pointer`}>
+          {uploading ? 'Uploading…' : preview ? 'Change photo' : 'Choose photo'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            disabled={disabled || uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleFile(f)
+            }}
+          />
+        </label>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          className={`${primaryBtn} flex-1`}
+          disabled={disabled || uploading || !preview}
+          onClick={() => onSubmit({ url: preview })}
+        >
+          Use this photo ✓
+        </button>
+        <button className={ghostBtn} disabled={disabled || uploading} onClick={() => onSubmit({ none: true })}>
+          Skip for now
+        </button>
+      </div>
     </div>
   )
 }

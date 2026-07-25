@@ -17,6 +17,7 @@ import {
   commitBusinessConfirm,
   afterFifthQuestion,
   commitLogoConfirm,
+  commitPhoto,
   commitBrandProfile,
   commitTemplateReveal,
   commitOffers,
@@ -31,6 +32,7 @@ import {
   commitElevenLabs,
   commitToggles,
 } from './commits'
+import { specializationRegistryKeys } from './site-analysis'
 
 export type StepKind = 'info' | 'text' | 'choice' | 'confirm_card' | 'voice' | 'action'
 
@@ -160,13 +162,32 @@ const STEPS: StepDef[] = [
     },
   },
   {
+    id: 'photo',
+    kind: 'confirm_card',
+    prepare: async () => ({
+      messages: [
+        "Your quote posts show a real face next to the words — that's what makes them feel personal instead of corporate.",
+        'Upload a photo of the person who represents your content (you, or your lead practitioner). Square, good light, shoulders-up works best — it appears as a circular avatar on quote cards.',
+      ],
+      card: { type: 'photo_upload' },
+    }),
+    commit: async (ctx, answer) => {
+      const err = await commitPhoto(ctx, answer)
+      if (!err) ctx.stepData.photo = answer
+      return err
+    },
+  },
+  {
     id: 'brand_profile_confirm',
     kind: 'confirm_card',
     prepare: async (ctx) => ({
       messages: [
         "Here's your Brand Profile — built from your website plus everything you just told me. Read it over and fix anything that's off. This drives every article, newsletter and post we write.",
       ],
-      card: (ctx.stepData.brandProfileDraft as Record<string, unknown>) ?? {},
+      card: {
+        ...((ctx.stepData.brandProfileDraft as Record<string, unknown>) ?? {}),
+        availableSpecializations: await specializationRegistryKeys(),
+      },
       pending: !ctx.stepData.synthesisDone,
     }),
     commit: async (ctx, answer) => {

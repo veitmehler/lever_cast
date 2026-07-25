@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { embedFetch } from '@/lib/embedSession'
 import { VoiceRecorder } from './VoiceRecorder'
-import { BusinessCard, LogoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard } from './cards'
+import { BusinessCard, LogoCard, PhotoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard } from './cards'
+import { currentEmbedSession, embedApiUrl } from '@/lib/embedSession'
 
 // The chat message scrolls away — the input itself must say what belongs in it.
 const TEXT_PLACEHOLDERS: Record<string, string> = {
@@ -303,6 +304,15 @@ function ConfirmCard({
           card={card as { candidates?: string[] }}
           disabled={busy}
           onSubmit={(a) => onSubmit(a, a.none ? 'No logo' : 'Use this logo ✓')}
+        />
+      )
+    case 'photo':
+      return (
+        <PhotoCard
+          disabled={busy}
+          uploadUrl={embedApiUrl('/api/onboarding/photo')}
+          authToken={`Bearer emb_${currentEmbedSession()?.token ?? ''}`}
+          onSubmit={(a) => onSubmit(a, a.none ? 'Skip for now' : 'Use this photo ✓')}
         />
       )
     case 'brand_profile_confirm':

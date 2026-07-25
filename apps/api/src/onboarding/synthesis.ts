@@ -83,7 +83,7 @@ OWNER'S SPOKEN ANSWERS (verbatim transcripts — mine these for personality, sta
 Return STRICT JSON:
 {
  "businessDescription": "2-3 sentences: what the practice does and for whom — concrete, no marketing fluff",
- "who": "2-3 sentences describing the target patient (from answer 3, sharpened with website facts)",
+ "who": "3-4 sentences describing the target patient. Start from answer 3, then ENRICH with the website: mine the services/conditions/treatments pages for the specific problems, demographics, occupations and life situations the site targets (desk workers, athletes, young families, seniors…) — the richer and more specific, the better every downstream article targets them",
  "ourExperience": "2-3 sentences of practitioner experience/process (from answer 5 + credentials found on the site)",
  "articleGoal": "1-2 sentences: what each article should achieve for the reader and the practice (from answer 1)",
  "specialInstructions": "Editorial stance distilled from answers 2 and 4: what the content should consistently push against and stand for. CRITICAL: phrase as critique of PRACTICES/patterns, never named competitors, and no therapeutic-outcome claims (AHPRA-safe).",

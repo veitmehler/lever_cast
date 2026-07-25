@@ -15,6 +15,13 @@ import { embedFetch } from '@/lib/embedSession'
 import { VoiceRecorder } from './VoiceRecorder'
 import { BusinessCard, LogoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard } from './cards'
 
+// The chat message scrolls away — the input itself must say what belongs in it.
+const TEXT_PLACEHOLDERS: Record<string, string> = {
+  writing_sample: 'Paste a blog post, patient email, or any writing of yours (500+ words) — or type "skip"…',
+  booking_url: 'Paste the link patients use to book online, e.g. https://your-practice.com/book…',
+  gbp: 'Paste your Google Business Profile (Maps) link — or type "skip"…',
+}
+
 interface StepView {
   id: string
   kind: 'info' | 'text' | 'choice' | 'confirm_card' | 'voice' | 'action'
@@ -222,7 +229,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               rows={4}
-              placeholder="Paste here…"
+              placeholder={TEXT_PLACEHOLDERS[step.id] ?? 'Paste here…'}
               className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
               disabled={busy}
             />

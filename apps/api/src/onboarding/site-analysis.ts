@@ -175,6 +175,20 @@ export async function crawlSite(websiteUrl: string): Promise<CrawlResult> {
  * distinguishes a supporting color from a main one. Downscaled for the vision
  * call: color regions survive resizing; text legibility is not needed.
  */
+/** One dominant color covering nearly everything = we probably hid the site itself. */
+async function looksBlank(png: Buffer): Promise<boolean> {
+  const sharp = (await import('sharp')).default
+  const { data, info } = await sharp(png).resize({ width: 64, withoutEnlargement: true }).raw().toBuffer({ resolveWithObject: true })
+  const counts = new Map<string, number>()
+  let total = 0
+  for (let i = 0; i + 2 < data.length; i += info.channels) {
+    const key = `${data[i] >> 5}-${data[i + 1] >> 5}-${data[i + 2] >> 5}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+    total++
+  }
+  return Math.max(...counts.values()) / (total || 1) > 0.92
+}
+
 export async function screenshotHomepage(websiteUrl: string): Promise<Buffer | null> {
   try {
     const raw = await withRasterPage(async (page) => {
@@ -218,7 +232,17 @@ export async function screenshotHomepage(websiteUrl: string): Promise<Buffer | n
         })
         .catch(() => {})
       await new Promise((r) => setTimeout(r, 400))
-      return (await page.screenshot({ type: 'png', fullPage: true })) as Buffer
+      let shot = (await page.screenshot({ type: 'png', fullPage: true })) as Buffer
+      // Safety net (Sherman bench finding): some themes wrap the whole site in
+      // a large fixed element — if suppression blanked the page, reload and
+      // shoot untouched (a visible cookie banner beats an empty screenshot).
+      if (await looksBlank(shot)) {
+        logger.warn({ websiteUrl }, '[onboarding/site] overlay suppression blanked the page — reshooting untouched')
+        await page.reload({ waitUntil: 'networkidle2', timeout: 30_000 })
+        await new Promise((r) => setTimeout(r, 400))
+        shot = (await page.screenshot({ type: 'png', fullPage: true })) as Buffer
+      }
+      return shot
     })
     const sharp = (await import('sharp')).default
     const resized = await sharp(raw)

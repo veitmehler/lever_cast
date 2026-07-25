@@ -136,7 +136,8 @@ PRACTICE: ${profile.businessDescription}
 AUDIENCE: ${profile.who}
 SPECIALIZATION: ${profile.primarySpecialization ?? profile.industry}
 
-Rules: offers are practice-visit promotions (assessments, check-ups, seasonal programs, family bundles) — NEVER discounts framed as therapeutic guarantees, no outcome claims (AHPRA-safe). Titles ≤ 8 words, bodies 1-2 sentences, ctaLabel ≤ 4 words.
+Rules: offers are practice-visit promotions (assessments, check-ups, seasonal programs, family bundles) — NEVER discounts framed as therapeutic guarantees, no outcome claims (AHPRA-safe). Titles ≤ 8 words, bodies 2-3 sentences, ctaLabel ≤ 4 words.
+BENEFIT RULE (mandatory): every offer body ENDS with one concrete, tangible benefit the reader receives — a complimentary take-home resource (e.g. a printed posture guide, a personalized posture/movement report, a written home-exercise mini-plan, a workspace-setup checklist), never a price discount, percentage off, gift, or prize. The benefit must be something the practice can hand over at the visit, stated plainly ("…and take home your personalized posture report."). If a benefit has a condition, state it in the same sentence. No urgency or scarcity pressure ("only this week", "limited spots").
 Return STRICT JSON: {"offers":[{"title":"...","body":"...","ctaLabel":"...","month":1},...,{"title":"evergreen one","body":"...","ctaLabel":"..."}]} — 12 with month + 2 without.`,
     'onboarding.offers',
     0.6,

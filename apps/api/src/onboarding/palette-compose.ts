@@ -294,7 +294,10 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   const hueClash = (hex: string) =>
     accentHue !== null && Math.min(Math.abs(hexToHsl(hex).h - accentHue), 360 - Math.abs(hexToHsl(hex).h - accentHue)) < 20
   const popPick = popEligible.find((c) => !hueClash(c.hex)) ?? popEligible[0]
-  const observedButton = byRole('button_fill')[0]
+  // A site's own button may be ground-colored (white button on colored bands)
+  // — on OUR body it would be invisible, so the observed fallback must also
+  // stand off the ground (bench finding: life.edu white-on-white).
+  const observedButton = byRole('button_fill').find((c) => dist(c.hex, ground) >= POP_MIN_DISTANCE)
   const darkestMain = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
   let button: string
   if (popPick) {
@@ -352,6 +355,12 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   }
   while (tints.length < 2) {
     tints.push(tints.length === 0 ? toTint(accent) : toTint(headerBackground === ground ? button : headerBackground))
+  }
+  // Monochrome brands can produce twin tints (bench finding: thejoint.com) —
+  // keep the hue but deepen the second band so they alternate visibly.
+  if (dist(tints[0], tints[1]) < 16) {
+    const { h, s } = hexToHsl(tints[1])
+    tints[1] = hslToHex(h, Math.min(s, 0.5), 0.86)
   }
   provenance.sectionTints = 'derived (lightened brand hues)'
 

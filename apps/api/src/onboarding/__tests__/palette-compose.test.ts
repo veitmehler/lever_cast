@@ -145,6 +145,30 @@ describe('composePalette — edge cases', () => {
     expect(p.button).toBe('#f2b705')
   })
 
+  it('white site-buttons never yield an invisible button on our body (life.edu bench finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background', 'button_fill'], coverage: 0.6 },
+        { hex: '#8dc340', prominence: 'main', observedRoles: ['hero_background', 'band'], coverage: 0.2 },
+        { hex: '#036030', prominence: 'main', observedRoles: ['band'], coverage: 0.1 },
+      ],
+    })
+    expect(p.button!.toLowerCase()).not.toBe('#ffffff')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('monochrome brands still get two visibly different section tints (thejoint bench finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.6 },
+        { hex: '#00b3be', prominence: 'main', observedRoles: ['button_fill', 'band', 'link_text'], coverage: 0.2 },
+        { hex: '#00a4af', prominence: 'main', observedRoles: ['band'], coverage: 0.1 },
+      ],
+    })
+    expect(p.sectionTints).toHaveLength(2)
+    expect(p.sectionTints![0]).not.toBe(p.sectionTints![1])
+  })
+
   it('empty inventory: safe fallbacks throughout', () => {
     const p = composePalette({ colors: [] })
     expect(p.bodyBackground).toBe('#ffffff')

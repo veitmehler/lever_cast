@@ -180,6 +180,44 @@ export async function screenshotHomepage(websiteUrl: string): Promise<Buffer | n
     const raw = await withRasterPage(async (page) => {
       await page.setViewport({ width: 1440, height: 1200 })
       await page.goto(websiteUrl, { waitUntil: 'networkidle2', timeout: 30_000 })
+      // Consent banners / modals darken or cover the page and poison the pixel
+      // evidence (Wellness Way bench finding) — hide the usual suspects plus
+      // any full-viewport fixed overlay before shooting.
+      await page
+        .evaluate(() => {
+          // Browser context — globals via globalThis casts (no "dom" lib in this project).
+          interface El {
+            style: { setProperty(k: string, v: string, p?: string): void; overflow?: string }
+            getBoundingClientRect(): { width: number; height: number }
+          }
+          const g = globalThis as unknown as {
+            document: {
+              createElement(t: string): { textContent: string }
+              head: { appendChild(n: unknown): void }
+              body: { querySelectorAll(sel: string): Iterable<El>; style: { overflow: string } }
+            }
+            window: {
+              innerWidth: number
+              innerHeight: number
+              getComputedStyle(el: El): { position: string; zIndex: string }
+            }
+          }
+          const style = g.document.createElement('style')
+          style.textContent =
+            '[id*="cookie" i],[class*="cookie" i],[id*="consent" i],[class*="consent" i],[class*="gdpr" i],#onetrust-consent-sdk,.cc-window,[class*="modal-backdrop" i]{display:none !important}'
+          g.document.head.appendChild(style)
+          for (const el of Array.from(g.document.body.querySelectorAll('*'))) {
+            const cs = g.window.getComputedStyle(el)
+            if (cs.position !== 'fixed') continue
+            const r = el.getBoundingClientRect()
+            if (r.width >= g.window.innerWidth * 0.8 && r.height >= g.window.innerHeight * 0.8 && Number(cs.zIndex) > 100) {
+              el.style.setProperty('display', 'none', 'important')
+            }
+          }
+          g.document.body.style.overflow = 'visible'
+        })
+        .catch(() => {})
+      await new Promise((r) => setTimeout(r, 400))
       return (await page.screenshot({ type: 'png', fullPage: true })) as Buffer
     })
     const sharp = (await import('sharp')).default
@@ -198,14 +236,20 @@ export async function screenshotHomepage(websiteUrl: string): Promise<Buffer | n
 /**
  * Deterministic pixel clusters from the screenshot (palette v2 Phase B).
  * Coverage percentages come from counted pixels, never from LLM estimates.
+ *
+ * Two histograms: a broad one (top clusters by area) plus a SATURATION-WEIGHTED
+ * one — a button's worth of vivid orange is tiny by area but critical as
+ * evidence, and must not be starved out of the cluster list by acres of white
+ * (Parker bench finding: the guard dropped a real button color).
  */
 export async function pixelClusters(screenshot: Buffer): Promise<{ hex: string; coverage: number }[]> {
   const sharp = (await import('sharp')).default
   const { data, info } = await sharp(screenshot)
-    .resize({ width: 160, withoutEnlargement: true })
+    .resize({ width: 200, withoutEnlargement: true })
     .raw()
     .toBuffer({ resolveWithObject: true })
   const counts = new Map<string, number>()
+  const vividCounts = new Map<string, number>()
   const q = 24 // quantization bucket size per channel
   for (let i = 0; i + 2 < data.length; i += info.channels) {
     const r = Math.min(255, Math.round(data[i] / q) * q)
@@ -213,11 +257,20 @@ export async function pixelClusters(screenshot: Buffer): Promise<{ hex: string; 
     const b = Math.min(255, Math.round(data[i + 2] / q) * q)
     const key = `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
     counts.set(key, (counts.get(key) ?? 0) + 1)
+    // HSL-ish saturation of the quantized pixel — vivid pixels get their own tally.
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const l = (max + min) / 510
+    const sat = max === min ? 0 : l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min)
+    if (sat >= 0.4 && max > 40) vividCounts.set(key, (vividCounts.get(key) ?? 0) + 1)
   }
   const total = [...counts.values()].reduce((a, b) => a + b, 0) || 1
-  return [...counts.entries()]
+  const broad = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 96)
+  const vivid = [...vividCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 32)
+  const merged = new Map<string, number>()
+  for (const [hex, n] of [...broad, ...vivid]) if (!merged.has(hex)) merged.set(hex, n)
+  return [...merged.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 24)
     .map(([hex, n]) => ({ hex, coverage: n / total }))
 }
 

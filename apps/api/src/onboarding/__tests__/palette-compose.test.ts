@@ -169,6 +169,40 @@ describe('composePalette — edge cases', () => {
     expect(p.sectionTints![0]).not.toBe(p.sectionTints![1])
   })
 
+  it('warm-vivid brand color loses the header to a dark neutral (ACA bench finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background', 'hero_background'], coverage: 0.5 },
+        { hex: '#e52823', prominence: 'main', observedRoles: ['button_fill', 'band', 'link_text'], coverage: 0.1 },
+        { hex: '#333333', prominence: 'main', observedRoles: ['button_fill'], coverage: 0.08 },
+      ],
+    })
+    expect(p.headerBackground).toBe('#333333')
+    // Red keeps its life-color jobs: links and CTA.
+    expect(hexToHsl(p.accent!).h < 25 || hexToHsl(p.accent!).h > 330).toBe(true)
+  })
+
+  it('warm structural loses to a calm structural dark even when mis-tagged as ground (Sherman bench finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.5 },
+        { hex: '#9b2743', prominence: 'main', observedRoles: ['button_fill', 'band', 'link_text'], coverage: 0.12 },
+        { hex: '#000000', prominence: 'ground', observedRoles: ['footer_background'], coverage: 0.09 },
+      ],
+    })
+    expect(p.headerBackground).toBe('#000000')
+  })
+
+  it('a truly red-only brand keeps its red header (brand-true beats taste)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.6 },
+        { hex: '#c62828', prominence: 'main', observedRoles: ['band', 'button_fill'], coverage: 0.2 },
+      ],
+    })
+    expect(p.headerBackground).toBe('#c62828')
+  })
+
   it('empty inventory: safe fallbacks throughout', () => {
     const p = composePalette({ colors: [] })
     expect(p.bodyBackground).toBe('#ffffff')

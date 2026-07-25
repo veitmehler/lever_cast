@@ -206,6 +206,23 @@ describe('composePalette — edge cases', () => {
     expect(p.headerBackground).toBe('#c62828')
   })
 
+  it('brand-consistent button: the site\'s own vivid button wins over a more exotic color (Foot Levelers finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background', 'hero_background'], coverage: 0.5 },
+        { hex: '#263857', prominence: 'main', observedRoles: ['footer_background', 'link_text'], coverage: 0.1 },
+        { hex: '#32baff', prominence: 'main', observedRoles: ['button_fill', 'icon_accent'], coverage: 0.06 },
+        { hex: '#82c341', prominence: 'supporting', observedRoles: ['button_fill'], coverage: 0.03 },
+      ],
+    })
+    // The light blue is the site's primary (main) button and passes all pop
+    // gates — it must win even though its hue is near the navy links; link hue
+    // is irrelevant to buttons (user rule).
+    expect(p.button).toBe('#32baff')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+    expect(p.alternates?.button).toContain('#82c341')
+  })
+
   it('empty inventory: safe fallbacks throughout', () => {
     const p = composePalette({ colors: [] })
     expect(p.bodyBackground).toBe('#ffffff')

@@ -299,8 +299,12 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   // Button: the CTA must POP off both the body and the header (user rule
   // 2026-07-24) — attention is CHROMA, not luminance (gold on cream fails WCAG
   // luminance contrast yet visibly pops), so the pop gate is saturation +
-  // color distance, and rank is pure vividness. Yellow/orange is allowed here
-  // (dark label text carries it). Label readability stays a hard gate.
+  // color distance. Yellow/orange is allowed here (dark label text carries
+  // it). Label readability stays a hard gate. Link hue is IRRELEVANT to
+  // buttons (user rule 2026-07-24): pop is judged against body + header only.
+  // BRAND CONSISTENCY (Foot Levelers finding): when the site's own observed
+  // button color passes the gates, it wins outright; vividness ranking only
+  // substitutes when the brand's button can't do the email job.
   const labelReads = (fill: string) =>
     contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
   const popEligible = colors
@@ -313,12 +317,13 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     .filter((c) => dist(c.hex, ground) >= POP_MIN_DISTANCE && dist(c.hex, headerBackground) >= POP_MIN_DISTANCE)
     .filter((c) => labelReads(c.hex))
     .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex) || (b.coverage ?? 0) - (a.coverage ?? 0))
-  // Hierarchy guard: links and buttons are different jobs — avoid the accent's
-  // hue when another pop candidate exists.
-  const accentHue = provisionalAccent ? hexToHsl(provisionalAccent.c.hex).h : null
-  const hueClash = (hex: string) =>
-    accentHue !== null && Math.min(Math.abs(hexToHsl(hex).h - accentHue), 360 - Math.abs(hexToHsl(hex).h - accentHue)) < 20
-  const popPick = popEligible.find((c) => !hueClash(c.hex)) ?? popEligible[0]
+  const observedPop = popEligible
+    .filter((c) => c.observedRoles?.includes('button_fill'))
+    .sort((a, b) => {
+      const promo = (x: Candidate) => (x.prominence === 'main' ? 1 : 0)
+      return promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
+    })
+  const popPick = observedPop[0] ?? popEligible[0]
   // A site's own button may be ground-colored (white button on colored bands)
   // — on OUR body it would be invisible, so the observed fallback must also
   // stand off the ground (bench finding: life.edu white-on-white).
@@ -327,7 +332,7 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   let button: string
   if (popPick) {
     button = popPick.hex
-    provenance.button = 'extracted (pop)'
+    provenance.button = observedPop[0] ? 'extracted (brand button)' : 'extracted (pop)'
   } else if (observedButton && labelReads(observedButton.hex)) {
     button = observedButton.hex
     provenance.button = 'extracted'

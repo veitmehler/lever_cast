@@ -229,13 +229,21 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   const darkNeutrals = colors.filter(
     (c) => c.hex !== ground && relLuminance(c.hex) < 0.4 && saturationOf(c.hex) < 0.3,
   )
-  const isStructural = (c: Candidate) => structural.some((s) => s.hex === c.hex)
+  // Role weight (CMCC finding): a hero background is the brand's own statement
+  // of "this is our color"; a band is decoration. hero > nav > footer > band.
+  const HEADER_ROLE_WEIGHT: Record<string, number> = {
+    hero_background: 4,
+    nav_background: 3,
+    footer_background: 2,
+    band: 1,
+  }
+  const roleWeight = (c: Candidate) =>
+    Math.max(0, ...(c.observedRoles ?? []).map((r) => HEADER_ROLE_WEIGHT[r] ?? 0))
   const headerPool = [...calmStructural, ...darkNeutrals]
     .filter((c, i, arr) => arr.findIndex((x) => x.hex === c.hex) === i)
     .sort((a, b) => {
       const promo = (x: Candidate) => (x.prominence === 'main' ? 1 : 0)
-      const struct = (x: Candidate) => (isStructural(x) ? 1 : 0)
-      return promo(b) - promo(a) || struct(b) - struct(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
+      return promo(b) - promo(a) || roleWeight(b) - roleWeight(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
     })
   const headerPick =
     headerPool[0] ??
@@ -317,11 +325,15 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     .filter((c) => dist(c.hex, ground) >= POP_MIN_DISTANCE && dist(c.hex, headerBackground) >= POP_MIN_DISTANCE)
     .filter((c) => labelReads(c.hex))
     .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex) || (b.coverage ?? 0) - (a.coverage ?? 0))
+  // Dedicated-CTA preference (ICPA finding): a color that is ALSO the link
+  // color is the site's all-purpose accent; a color used ONLY for buttons is
+  // their true CTA color and wins.
   const observedPop = popEligible
     .filter((c) => c.observedRoles?.includes('button_fill'))
     .sort((a, b) => {
+      const dedicated = (x: Candidate) => (x.observedRoles?.includes('link_text') ? 0 : 1)
       const promo = (x: Candidate) => (x.prominence === 'main' ? 1 : 0)
-      return promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
+      return dedicated(b) - dedicated(a) || promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
     })
   const popPick = observedPop[0] ?? popEligible[0]
   // A site's own button may be ground-colored (white button on colored bands)

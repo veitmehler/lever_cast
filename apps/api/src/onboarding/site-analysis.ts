@@ -13,7 +13,7 @@ import { logger } from '../lib/logger'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { instrumentCall } from '../lib/net/instrument'
 import { withTimeout } from '../lib/net/with-timeout'
-import { normalizeHex, type BrandColor, type BrandInventory } from './palette-compose'
+import { normalizeHex, hexToHsl, type BrandColor, type BrandInventory } from './palette-compose'
 
 const PAGE_FETCH_TIMEOUT_MS = 15_000
 const MAX_PAGES = 6
@@ -497,11 +497,42 @@ CSS color hints from the page source (frequency-ordered, may include noise): ${c
       valid.push({ ...c, hex, coverage: best.coverage })
     }
     if (!valid.length) return null
-    return { colors: valid }
+    return { colors: augmentInventory(valid, clusters, cssHints) }
   } catch (err) {
     logger.warn({ err }, '[onboarding/site] brand inventory extraction failed')
     return null
   }
+}
+
+/**
+ * Evidence-driven inventory augmentation (AlignLife bench finding): the LLM can
+ * MISS a small brand color (a CTA button), and pixel clusters were previously
+ * only a veto. A vivid cluster that ALSO appears in the site's CSS hints is
+ * real by two independent sources — inject it as a role-unknown supporting
+ * candidate so the composer's pop rules can consider it.
+ */
+export function augmentInventory(
+  valid: BrandColor[],
+  clusters: { hex: string; coverage: number }[],
+  cssHints: string[],
+): BrandColor[] {
+  const hintHexes = cssHints.map((h) => normalizeHex(h)).filter((h): h is string => Boolean(h))
+  const injected: BrandColor[] = []
+  for (const cl of clusters) {
+    if ((cl.coverage ?? 0) < 0.002) continue
+    if (hexToHsl(cl.hex).s < 0.5) continue
+    if (valid.some((c) => rgbDistance(c.hex, cl.hex) < 60)) continue
+    const hint = hintHexes.find((h) => rgbDistance(h, cl.hex) < 40)
+    if (!hint) continue
+    if (injected.some((c) => rgbDistance(c.hex, hint) < 40)) continue
+    // Prefer the exact CSS value over the quantized cluster centroid.
+    injected.push({ hex: hint, prominence: 'supporting', observedRoles: [], coverage: cl.coverage })
+    if (injected.length >= 3) break
+  }
+  if (injected.length) {
+    logger.info({ injected: injected.map((c) => c.hex) }, '[onboarding/site] inventory augmented from pixel+CSS evidence')
+  }
+  return [...valid, ...injected]
 }
 
 function rgbDistance(a: string, b: string): number {

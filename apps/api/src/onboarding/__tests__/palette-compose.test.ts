@@ -223,6 +223,31 @@ describe('composePalette — edge cases', () => {
     expect(p.alternates?.button).toContain('#82c341')
   })
 
+  it('hero background outranks a band color for the header (CMCC finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#fafafa', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.5 },
+        { hex: '#4b771c', prominence: 'main', observedRoles: ['band', 'button_fill', 'link_text'], coverage: 0.1 },
+        { hex: '#4d1a4d', prominence: 'main', observedRoles: ['hero_background', 'band', 'link_text'], coverage: 0.1 },
+      ],
+    })
+    expect(p.headerBackground).toBe('#4d1a4d')
+  })
+
+  it('dedicated CTA color beats the all-purpose accent for the button (ICPA finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#002b5c', prominence: 'main', observedRoles: ['nav_background', 'footer_background'], coverage: 0.15 },
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['hero_background', 'band'], coverage: 0.5 },
+        { hex: '#2898ed', prominence: 'main', observedRoles: ['button_fill', 'link_text', 'icon_accent'], coverage: 0.08 },
+        { hex: '#ffb81c', prominence: 'supporting', observedRoles: ['button_fill'], coverage: 0.02 },
+      ],
+    })
+    // Orange serves buttons ONLY — the brand's true CTA color; blue keeps links.
+    expect(p.button).toBe('#ffb81c')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('empty inventory: safe fallbacks throughout', () => {
     const p = composePalette({ colors: [] })
     expect(p.bodyBackground).toBe('#ffffff')

@@ -207,6 +207,29 @@ describe('POST /stripe/events', () => {
     await app.close()
   })
 
+  it('maps pause and resume to the lifecycle machine', async () => {
+    accountFindUnique.mockImplementation(async (args: { where?: Record<string, unknown> }) => {
+      if (args?.where?.stripeSubscriptionId === 'sub_1') return { id: 'acct_1' }
+      return null
+    })
+    const app = await build()
+    const paused = {
+      id: 'evt_5',
+      type: 'customer.subscription.paused',
+      data: { object: { object: 'subscription', id: 'sub_1', customer: 'cus_1', metadata: { altId: 'SELLLOC' } } },
+    }
+    await post(app, paused)
+    expect(applyBillingEvent).toHaveBeenCalledWith('acct_1', 'payment_failed', expect.anything())
+    const resumed = {
+      id: 'evt_6',
+      type: 'customer.subscription.resumed',
+      data: { object: { object: 'subscription', id: 'sub_1', customer: 'cus_1', metadata: { altId: 'SELLLOC' } } },
+    }
+    await post(app, resumed)
+    expect(applyBillingEvent).toHaveBeenCalledWith('acct_1', 'payment_cleared', expect.anything())
+    await app.close()
+  })
+
   it('acknowledges unhandled event types without processing', async () => {
     const app = await build()
     const res = await post(app, { id: 'evt_4', type: 'charge.refunded', data: { object: {} } })

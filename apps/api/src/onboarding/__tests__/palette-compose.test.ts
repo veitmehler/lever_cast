@@ -223,6 +223,22 @@ describe('composePalette — edge cases', () => {
     expect(p.alternates?.button).toContain('#82c341')
   })
 
+  it('deep-but-vivid observed brand button beats a fringe pop color — lightness band is free-choice-only (CMCC finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background', 'hero_background'], coverage: 0.5 },
+        { hex: '#4b771c', prominence: 'main', observedRoles: ['band', 'button_fill', 'link_text'], coverage: 0.025 },
+        { hex: '#4b2c5e', prominence: 'main', observedRoles: ['hero_background', 'link_text', 'band'], coverage: 0.002 },
+        { hex: '#d9782d', prominence: 'main', observedRoles: ['link_text', 'band'], coverage: 0.0006 },
+      ],
+    })
+    // Green: lightness 0.288 (below the free-choice floor) but the SITE uses it
+    // as its button, it's vivid, reads white, and pops off body + purple header.
+    expect(p.button).toBe('#4b771c')
+    expect(p.headerBackground).toBe('#4b2c5e')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('hero background outranks a band color for the header (CMCC finding)', () => {
     const p = composePalette({
       colors: [

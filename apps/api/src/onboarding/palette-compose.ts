@@ -169,6 +169,30 @@ export function labelColorFor(fill: string, headerBackground: string): string {
   return candidates.sort((a, b) => contrastRatio(b, fill) - contrastRatio(a, fill))[0]
 }
 
+/** A button label (white or near-black) reads on this fill. */
+function fillLabelReads(fill: string): boolean {
+  return contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
+}
+
+/**
+ * Mid-lightness brand buttons (Parker's orange: white 3.4:1, ink 4.34:1) get a
+ * hue-preserving lightness nudge until a label reads — adjust the fill, not
+ * the verdict. Small cap: past it, the color isn't "their orange" anymore.
+ */
+function adjustFillForLabel(hex: string, maxDeltaL = 0.12): { hex: string; deltaL: number } | null {
+  if (fillLabelReads(hex)) return { hex, deltaL: 0 }
+  const { h, s, l } = hexToHsl(hex)
+  for (let step = 0.01; step <= maxDeltaL; step += 0.01) {
+    for (const dir of [1, -1]) {
+      const nl = l + dir * step
+      if (nl < 0.05 || nl > 0.95) continue
+      const cand = hslToHex(h, s, nl)
+      if (fillLabelReads(cand)) return { hex: cand, deltaL: step }
+    }
+  }
+  return null
+}
+
 /** Lighten a hue into band-tint territory (lum >= 0.85) while keeping its identity. */
 function toTint(hex: string): string {
   const { h, s } = hexToHsl(hex)
@@ -313,39 +337,49 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   // BRAND CONSISTENCY (Foot Levelers finding): when the site's own observed
   // button color passes the gates, it wins outright; vividness ranking only
   // substitutes when the brand's button can't do the email job.
-  const labelReads = (fill: string) =>
-    contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
-  // HARD gates apply to every candidate: vivid, pops off body AND header,
-  // readable label. The LIGHTNESS band applies only to FREE-CHOICE candidates
-  // (colors we elect on the brand's behalf) — an observed brand button skips
-  // it (CMCC finding: a deep-but-vivid green the site itself uses as its
-  // button failed the floor by 0.012 and lost to a fringe orange).
-  const popGates = (c: Candidate) =>
+  const labelReads = fillLabelReads
+  // HARD gates apply to every candidate: vivid, pops off body AND header.
+  // The LIGHTNESS band and the strict label check apply only to FREE-CHOICE
+  // candidates (colors we elect on the brand's behalf) — an observed brand
+  // button skips the band (CMCC: deep-but-vivid green) and gets a
+  // hue-preserving fill nudge when only its label fails (Parker: mid-
+  // lightness orange).
+  const popGatesNoLabel = (c: Candidate) =>
     c.hex !== ground &&
     c.hex !== headerBackground &&
     saturationOf(c.hex) >= BUTTON_MIN_SATURATION &&
     dist(c.hex, ground) >= POP_MIN_DISTANCE &&
-    dist(c.hex, headerBackground) >= POP_MIN_DISTANCE &&
-    labelReads(c.hex)
+    dist(c.hex, headerBackground) >= POP_MIN_DISTANCE
   const popEligible = colors
-    .filter(popGates)
+    .filter(popGatesNoLabel)
+    .filter((c) => labelReads(c.hex))
     .filter((c) => {
       const l = hexToHsl(c.hex).l
       return l >= BUTTON_LIGHTNESS_RANGE[0] && l <= BUTTON_LIGHTNESS_RANGE[1]
     })
     .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex) || (b.coverage ?? 0) - (a.coverage ?? 0))
-  // Dedicated-CTA preference (ICPA finding): a color that is ALSO the link
-  // color is the site's all-purpose accent; a color used ONLY for buttons is
-  // their true CTA color and wins.
-  const observedPop = colors
-    .filter(popGates)
+  // Dedicated-CTA preference (ICPA + Dynamic Chiropractic findings): a color
+  // that ALSO serves links or structural bands is the site's all-purpose
+  // accent; a buttons-only color is their true CTA color and ranks first.
+  // Ranking, never exclusion — a sole all-purpose button still wins.
+  type ObservedPick = { c: Candidate; fill: string; adjusted: boolean }
+  const observedPop: ObservedPick[] = colors
     .filter((c) => c.observedRoles?.includes('button_fill'))
-    .sort((a, b) => {
-      const dedicated = (x: Candidate) => (x.observedRoles?.includes('link_text') ? 0 : 1)
-      const promo = (x: Candidate) => (x.prominence === 'main' ? 1 : 0)
-      return dedicated(b) - dedicated(a) || promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
+    .filter(popGatesNoLabel)
+    .map((c) => {
+      const adj = adjustFillForLabel(c.hex)
+      return adj ? { c, fill: adj.hex, adjusted: adj.deltaL > 0 } : null
     })
-  const popPick = observedPop[0] ?? popEligible[0]
+    .filter((x): x is ObservedPick => x !== null)
+    .sort((a, b) => {
+      const dedicated = (x: ObservedPick) =>
+        x.c.observedRoles?.some((r) => r === 'link_text' || r === 'band') ? 0 : 1
+      const promo = (x: ObservedPick) => (x.c.prominence === 'main' ? 1 : 0)
+      return (
+        dedicated(b) - dedicated(a) || promo(b) - promo(a) || (b.c.coverage ?? 0) - (a.c.coverage ?? 0)
+      )
+    })
+  const popPick = observedPop[0] ?? (popEligible[0] ? { c: popEligible[0], fill: popEligible[0].hex, adjusted: false } : undefined)
   // A site's own button may be ground-colored (white button on colored bands)
   // — on OUR body it would be invisible, so the observed fallback must also
   // stand off the ground (bench finding: life.edu white-on-white).
@@ -353,8 +387,12 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   const darkestMain = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
   let button: string
   if (popPick) {
-    button = popPick.hex
-    provenance.button = observedPop[0] ? 'extracted (brand button)' : 'extracted (pop)'
+    button = popPick.fill
+    provenance.button = observedPop[0]
+      ? popPick.adjusted
+        ? `derived from ${popPick.c.hex} (brand button, adjusted for label contrast)`
+        : 'extracted (brand button)'
+      : 'extracted (pop)'
   } else if (observedButton && labelReads(observedButton.hex)) {
     button = observedButton.hex
     provenance.button = 'extracted'

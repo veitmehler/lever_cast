@@ -175,6 +175,9 @@ describe('composePalette — edge cases', () => {
         { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background', 'hero_background'], coverage: 0.5 },
         { hex: '#e52823', prominence: 'main', observedRoles: ['button_fill', 'band', 'link_text'], coverage: 0.1 },
         { hex: '#333333', prominence: 'main', observedRoles: ['button_fill'], coverage: 0.08 },
+        // A fringe supporting band must NOT outrank the main dark neutral
+        // (second ACA run put a green band in the inventory).
+        { hex: '#27ae60', prominence: 'supporting', observedRoles: ['band'], coverage: 0.03 },
       ],
     })
     expect(p.headerBackground).toBe('#333333')

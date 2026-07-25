@@ -315,20 +315,30 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   // substitutes when the brand's button can't do the email job.
   const labelReads = (fill: string) =>
     contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
+  // HARD gates apply to every candidate: vivid, pops off body AND header,
+  // readable label. The LIGHTNESS band applies only to FREE-CHOICE candidates
+  // (colors we elect on the brand's behalf) — an observed brand button skips
+  // it (CMCC finding: a deep-but-vivid green the site itself uses as its
+  // button failed the floor by 0.012 and lost to a fringe orange).
+  const popGates = (c: Candidate) =>
+    c.hex !== ground &&
+    c.hex !== headerBackground &&
+    saturationOf(c.hex) >= BUTTON_MIN_SATURATION &&
+    dist(c.hex, ground) >= POP_MIN_DISTANCE &&
+    dist(c.hex, headerBackground) >= POP_MIN_DISTANCE &&
+    labelReads(c.hex)
   const popEligible = colors
-    .filter((c) => c.hex !== ground && c.hex !== headerBackground)
-    .filter((c) => saturationOf(c.hex) >= BUTTON_MIN_SATURATION)
+    .filter(popGates)
     .filter((c) => {
       const l = hexToHsl(c.hex).l
       return l >= BUTTON_LIGHTNESS_RANGE[0] && l <= BUTTON_LIGHTNESS_RANGE[1]
     })
-    .filter((c) => dist(c.hex, ground) >= POP_MIN_DISTANCE && dist(c.hex, headerBackground) >= POP_MIN_DISTANCE)
-    .filter((c) => labelReads(c.hex))
     .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex) || (b.coverage ?? 0) - (a.coverage ?? 0))
   // Dedicated-CTA preference (ICPA finding): a color that is ALSO the link
   // color is the site's all-purpose accent; a color used ONLY for buttons is
   // their true CTA color and wins.
-  const observedPop = popEligible
+  const observedPop = colors
+    .filter(popGates)
     .filter((c) => c.observedRoles?.includes('button_fill'))
     .sort((a, b) => {
       const dedicated = (x: Candidate) => (x.observedRoles?.includes('link_text') ? 0 : 1)

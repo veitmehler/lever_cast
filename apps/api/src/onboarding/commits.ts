@@ -125,6 +125,17 @@ export async function commitLogoConfirm(ctx: StepContext, answer: unknown): Prom
   return null
 }
 
+/** photo: spokesperson photo → brandSettings.socialLogoUrl (quote-card avatar). */
+export async function commitPhoto(ctx: StepContext, answer: unknown): Promise<string | null> {
+  const a = (answer ?? {}) as { url?: string; none?: boolean }
+  if (a.none) return null // quote cards fall back to the logo
+  const url = a.url?.trim()
+  if (!url) return 'Upload a photo or skip this step'
+  if (!/^https?:\/\//.test(url)) return "That doesn't look like an image URL"
+  await brandUpsert(ctx.userId, { socialLogoUrl: url })
+  return null
+}
+
 /** brand_profile_confirm: persist the (possibly edited) profile; ready the reveal. */
 export async function commitBrandProfile(ctx: StepContext, answer: unknown): Promise<string | null> {
   const edited = (answer ?? {}) as Partial<BrandProfileDraft> & { confirmed?: boolean }
@@ -132,6 +143,11 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
   if (!draft.businessDescription?.trim() || !draft.who?.trim()) {
     return 'The profile needs at least a business description and target audience — fix those fields'
   }
+  // Specializations come from registry CHECKBOXES (calendar-routing keys, no
+  // free text). Primary = the detected one if still checked, else the first.
+  const checked = Array.isArray(edited.specializations) ? edited.specializations.filter(Boolean) : draft.specializations ?? []
+  if (checked.length === 0) return 'Check at least one specialization — it routes your content calendar'
+  const primary = checked.includes(draft.primarySpecialization ?? '') ? draft.primarySpecialization! : checked[0]
   await brandUpsert(ctx.userId, {
     businessDescription: draft.businessDescription,
     who: draft.who,
@@ -139,9 +155,9 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
     articleGoal: draft.articleGoal ?? null,
     specialInstructions: draft.specialInstructions ?? null,
     industry: draft.industry ?? null,
-    primarySpecialization: draft.primarySpecialization ?? null,
-    specializations: draft.specializations ?? [],
-    specialization: draft.primarySpecialization ?? null,
+    primarySpecialization: primary,
+    specializations: checked,
+    specialization: primary,
   })
   ctx.stepData.brandProfileDraft = draft as unknown as Record<string, unknown>
 

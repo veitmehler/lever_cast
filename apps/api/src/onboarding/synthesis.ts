@@ -12,6 +12,7 @@ import { logger } from '../lib/logger'
 import { instrumentCall } from '../lib/net/instrument'
 import { withTimeout } from '../lib/net/with-timeout'
 import type { SemanticPalette, SpecializationDraft } from './site-analysis'
+import { labelColorFor } from './palette-compose'
 
 const MODEL = 'gemini-3-flash-preview'
 
@@ -181,6 +182,8 @@ export function buildTemplatePreviewHtml(opts: {
   const accent = p.accent ?? '#2a6f97'
   const body = p.bodyBackground ?? '#ffffff'
   const tints = p.sectionTints?.length ? p.sectionTints : ['#f2f6fa', '#fdf6ee']
+  const btn = p.button ?? accent
+  const btnText = (p as { buttonText?: string }).buttonText ?? labelColorFor(btn, header)
   const esc = (s: string) => s.replace(/</g, '&lt;')
   return `<!doctype html><html><body style="margin:0;font-family:Arial,Helvetica,sans-serif;background:${body}">
 <div style="max-width:600px;margin:0 auto">
@@ -197,7 +200,7 @@ export function buildTemplatePreviewHtml(opts: {
     <p style="margin:0;font-size:13px;color:#444">Alternating section bands use your site's tones.</p>
   </div>
   <div style="padding:16px 24px">
-    <a href="#" style="display:inline-block;background:${p.button ?? accent};color:#fff;padding:10px 18px;border-radius:6px;font-size:14px;text-decoration:none">Book an appointment</a>
+    <a href="#" style="display:inline-block;background:${btn};color:${btnText};padding:10px 18px;border-radius:6px;font-size:14px;text-decoration:none">Book an appointment</a>
   </div>
   <div style="background:${tints[1] ?? tints[0]};padding:16px 24px">
     <h3 style="margin:0 0 6px;font-size:15px;color:${header}">Seasonal offer</h3>

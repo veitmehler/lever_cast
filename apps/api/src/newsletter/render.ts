@@ -85,6 +85,7 @@ export interface RenderBrand {
   nlBodyFontWeight?: string | null
   nlLinkColor?: string | null
   nlButtonColor?: string | null
+  nlButtonTextColor?: string | null
 }
 
 export interface RenderOffer {
@@ -122,6 +123,7 @@ interface Theme {
   bodyWeight: string
   linkColor: string
   buttonColor: string // CTA/read-more buttons; falls back to linkColor
+  buttonTextColor: string // label on the button fill, contrast-computed
   headerLogoUrl: string | null
   headerLogoWidth: number
   footerLogoUrl: string | null
@@ -164,10 +166,27 @@ function pickLogo(brand: RenderBrand, variant: string | null | undefined, bg: st
   return wantLight(variant, bg) ? light ?? dark ?? legacy : dark ?? light ?? legacy
 }
 
+/** WCAG contrast (module stays import-free — mirrors onboarding/palette-compose). */
+function contrastRatio(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16)
+    const ch = (c: number) => {
+      const v = c / 255
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+  }
+  const la = lum(a)
+  const lb = lum(b)
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
 function resolveTheme(brand: RenderBrand): Theme {
   const primary = brand.nlFontFamily?.trim() || DEFAULT_FONT
   const headerBg = brand.nlHeaderBgColor?.trim() || '#fa00bb'
   const footerBg = brand.nlFooterBgColor?.trim() || '#011328'
+  const buttonColor = brand.nlButtonColor?.trim() || brand.nlLinkColor?.trim() || '#fa00bb'
   return {
     headerBg,
     footerBg,
@@ -183,7 +202,10 @@ function resolveTheme(brand: RenderBrand): Theme {
     headingWeight: brand.nlHeadingFontWeight?.trim() || '700',
     bodyWeight: brand.nlBodyFontWeight?.trim() || '400',
     linkColor: brand.nlLinkColor?.trim() || '#fa00bb',
-    buttonColor: brand.nlButtonColor?.trim() || brand.nlLinkColor?.trim() || '#fa00bb',
+    buttonColor,
+    buttonTextColor:
+      brand.nlButtonTextColor?.trim() ||
+      (contrastRatio('#ffffff', buttonColor) >= 4.5 ? '#ffffff' : '#1c2b33'),
     headerLogoUrl: pickLogo(brand, brand.nlHeaderLogoVariant, headerBg),
     headerLogoWidth: brand.nlLogoWidth && brand.nlLogoWidth > 0 ? brand.nlLogoWidth : 320,
     footerLogoUrl: pickLogo(brand, brand.nlFooterLogoVariant, footerBg),
@@ -258,7 +280,9 @@ function bulletList(items: string[], theme: Theme): string {
 }
 
 function readMoreButton(link: string, theme: Theme, label = 'Read full article →'): string {
-  return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.buttonColor};text-decoration:none;border:2px solid ${theme.buttonColor};border-radius:4px;padding:10px 22px;">${esc(label)}</a></div>`
+  // Filled, not outlined: an email CTA must pop off the screen (user rule
+  // 2026-07-24); the label color is contrast-computed against the fill.
+  return `<div style="margin-top:20px;"><a href="${esc(link || '#')}" target="_blank" style="display:inline-block;font-family:${theme.fontStack};font-size:16px;font-weight:${theme.headingWeight};color:${theme.buttonTextColor};background-color:${theme.buttonColor};text-decoration:none;border-radius:6px;padding:12px 24px;">${esc(label)}</a></div>`
 }
 
 /** A promotional offer card: accent band + optional 16:9 banner + headline + pitch + filled CTA. */

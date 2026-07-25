@@ -221,6 +221,12 @@ function previewHtml(orgName: string, logoUrl: string | null, p: Palette): strin
   const accent = p.accent ?? '#2a6f97'
   const body = p.bodyBackground ?? '#ffffff'
   const tints = p.sectionTints?.length ? p.sectionTints : ['#f2f6fa', '#fdf6ee']
+  const btn = p.button ?? accent
+  // Label: white or the dark header ink — whichever reads on the fill.
+  const labelCandidates = relLuminance(header) < 0.4 ? ['#ffffff', header, '#1c2b33'] : ['#ffffff', '#1c2b33']
+  const btnText =
+    labelCandidates.find((c) => contrastRatio(c, btn) >= 4.5) ??
+    labelCandidates.sort((a, b) => contrastRatio(b, btn) - contrastRatio(a, btn))[0]
   const esc = (s: string) => s.replace(/</g, '&lt;')
   return `<!doctype html><html><body style="margin:0;font-family:Arial,sans-serif;background:${body}">
 <div style="max-width:600px;margin:0 auto">
@@ -236,7 +242,7 @@ function previewHtml(orgName: string, logoUrl: string | null, p: Palette): strin
     <h3 style="margin:0 0 4px;font-size:14px;color:${header}">Quick tips</h3>
     <p style="margin:0;font-size:12px;color:#444">Alternating bands in your site's tones.</p>
   </div>
-  <div style="padding:14px 22px"><a href="#" style="display:inline-block;background:${p.button ?? accent};color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;text-decoration:none">Book an appointment</a></div>
+  <div style="padding:14px 22px"><a href="#" style="display:inline-block;background:${btn};color:${btnText};padding:9px 16px;border-radius:6px;font-size:13px;text-decoration:none">Book an appointment</a></div>
   <div style="background:${tints[1] ?? tints[0]};padding:14px 22px"><h3 style="margin:0 0 4px;font-size:14px;color:${header}">Seasonal offer</h3><p style="margin:0;font-size:12px;color:#444">Offer cards appear like this.</p></div>
   <div style="background:${header};color:${headerText};padding:14px 22px;text-align:center;font-size:11px;opacity:.9">${esc(orgName)}</div>
 </div></body></html>`

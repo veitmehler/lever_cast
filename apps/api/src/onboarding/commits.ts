@@ -18,6 +18,7 @@ import {
 } from './synthesis'
 import { effectiveHemisphere } from '../newsletter/calendar-routing'
 import type { SemanticPalette } from './site-analysis'
+import { labelColorFor } from './palette-compose'
 import type { StepContext } from './flow'
 
 async function brandUpsert(userId: string, data: Record<string, unknown>): Promise<void> {
@@ -182,6 +183,11 @@ export async function commitTemplateReveal(ctx: StepContext, answer: unknown): P
     nlFooterBgColor: palette.headerBackground ?? '#0b2545',
     nlLinkColor: palette.accent ?? '#2a6f97',
     nlButtonColor: palette.button ?? null,
+    // Computed against the FINAL button color — the user may have overridden
+    // the swatch, so never trust a stale precomputed label.
+    nlButtonTextColor: palette.button
+      ? labelColorFor(palette.button, palette.headerBackground ?? '#0b2545')
+      : null,
     nlFontColor: '#222222',
     nlSectionColor1: tints[0],
     nlSectionColor2: tints[1] ?? tints[0],

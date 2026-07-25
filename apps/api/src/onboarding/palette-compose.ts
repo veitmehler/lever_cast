@@ -26,6 +26,8 @@ export interface BrandInventory {
 }
 
 export interface ComposedPalette extends SemanticPalette {
+  /** Button label color (white or the dark header color), computed by contrast. */
+  buttonText?: string
   /** Per-role pre-validated alternates the user can tap in the reveal. */
   alternates?: Record<string, string[]>
   /** Per-role human-readable origin: "extracted" | "derived from #x" | "fallback". */
@@ -142,6 +144,10 @@ const BANNED_LINK_HUE: [number, number] = [25, 95]
 const LINK_MIN_SATURATION = 0.35
 /** Header band must be dark enough to carry the light logo. */
 const HEADER_MAX_LUMINANCE = 0.5
+/** Button "pop" gate: vividness + distance off both body and header (chroma, not luminance). */
+const BUTTON_MIN_SATURATION = 0.5
+const BUTTON_LIGHTNESS_RANGE: [number, number] = [0.3, 0.85]
+const POP_MIN_DISTANCE = 60
 
 interface Candidate extends BrandColor {
   hex: string
@@ -149,6 +155,18 @@ interface Candidate extends BrandColor {
 
 function saturationOf(hex: string): number {
   return hexToHsl(hex).s
+}
+
+/**
+ * Button label color: white or the (dark) header color — whichever reads best
+ * on the fill; plain dark ink when the header itself is light.
+ */
+export function labelColorFor(fill: string, headerBackground: string): string {
+  const candidates =
+    relLuminance(headerBackground) < 0.4 ? ['#ffffff', headerBackground, '#1c2b33'] : ['#ffffff', '#1c2b33']
+  const passing = candidates.find((c) => contrastRatio(c, fill) >= 4.5)
+  if (passing) return passing
+  return candidates.sort((a, b) => contrastRatio(b, fill) - contrastRatio(a, fill))[0]
 }
 
 /** Lighten a hue into band-tint territory (lum >= 0.85) while keeping its identity. */
@@ -214,23 +232,6 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     provenance.headerText = 'fallback'
   }
 
-  // Button: observed fill if its label reads, else darkest main.
-  const observedButton = byRole('button_fill')[0]
-  const labelReads = (fill: string) =>
-    contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
-  const darkestMain = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
-  let button: string
-  if (observedButton && labelReads(observedButton.hex)) {
-    button = observedButton.hex
-    provenance.button = 'extracted'
-  } else if (darkestMain && labelReads(darkestMain.hex)) {
-    button = darkestMain.hex
-    provenance.button = observedButton ? `derived from ${observedButton.hex}` : 'extracted'
-  } else {
-    button = '#0b2545'
-    provenance.button = 'fallback'
-  }
-
   // Link/accent: the brand's LIFE color (user rules 2026-07-24). Eligible =
   // vivid on the homepage (saturation gate), hue outside the yellow/orange
   // band (links are NEVER yellow/orange; buttons may be — dark label text),
@@ -268,12 +269,59 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   const relaxed = withAdjustment(mains.filter((c) => c.hex !== ground && !isBannedLinkHue(c.hex))).sort(
     (a, b) => saturationOf(b.c.hex) - saturationOf(a.c.hex),
   )
+  const provisionalAccent = eligible[0] ?? relaxed[0] ?? null
+
+  // Button: the CTA must POP off both the body and the header (user rule
+  // 2026-07-24) — attention is CHROMA, not luminance (gold on cream fails WCAG
+  // luminance contrast yet visibly pops), so the pop gate is saturation +
+  // color distance, and rank is pure vividness. Yellow/orange is allowed here
+  // (dark label text carries it). Label readability stays a hard gate.
+  const labelReads = (fill: string) =>
+    contrastRatio('#ffffff', fill) >= CONTRAST_TEXT || contrastRatio('#1c2b33', fill) >= CONTRAST_TEXT
+  const popEligible = colors
+    .filter((c) => c.hex !== ground && c.hex !== headerBackground)
+    .filter((c) => saturationOf(c.hex) >= BUTTON_MIN_SATURATION)
+    .filter((c) => {
+      const l = hexToHsl(c.hex).l
+      return l >= BUTTON_LIGHTNESS_RANGE[0] && l <= BUTTON_LIGHTNESS_RANGE[1]
+    })
+    .filter((c) => dist(c.hex, ground) >= POP_MIN_DISTANCE && dist(c.hex, headerBackground) >= POP_MIN_DISTANCE)
+    .filter((c) => labelReads(c.hex))
+    .sort((a, b) => saturationOf(b.hex) - saturationOf(a.hex) || (b.coverage ?? 0) - (a.coverage ?? 0))
+  // Hierarchy guard: links and buttons are different jobs — avoid the accent's
+  // hue when another pop candidate exists.
+  const accentHue = provisionalAccent ? hexToHsl(provisionalAccent.c.hex).h : null
+  const hueClash = (hex: string) =>
+    accentHue !== null && Math.min(Math.abs(hexToHsl(hex).h - accentHue), 360 - Math.abs(hexToHsl(hex).h - accentHue)) < 20
+  const popPick = popEligible.find((c) => !hueClash(c.hex)) ?? popEligible[0]
+  const observedButton = byRole('button_fill')[0]
+  const darkestMain = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
+  let button: string
+  if (popPick) {
+    button = popPick.hex
+    provenance.button = 'extracted (pop)'
+  } else if (observedButton && labelReads(observedButton.hex)) {
+    button = observedButton.hex
+    provenance.button = 'extracted'
+  } else if (darkestMain && labelReads(darkestMain.hex)) {
+    button = darkestMain.hex
+    provenance.button = observedButton ? `derived from ${observedButton.hex}` : 'extracted'
+  } else {
+    button = '#0b2545'
+    provenance.button = 'fallback'
+  }
+
+  // Button label: white or the dark header color — whichever actually reads.
+  const buttonText = labelColorFor(button, headerBackground)
+  provenance.buttonText = `computed for ${button}`
+
   let accent: string
-  const chosen = eligible[0] ?? relaxed[0]
-  if (chosen) {
-    accent = chosen.adj.hex
+  if (provisionalAccent) {
+    accent = provisionalAccent.adj.hex
     provenance.accent =
-      chosen.adj.deltaL === 0 ? 'extracted' : `derived from ${chosen.c.hex} (darkened for contrast)`
+      provisionalAccent.adj.deltaL === 0
+        ? 'extracted'
+        : `derived from ${provisionalAccent.c.hex} (darkened for contrast)`
   } else if (!isBannedLinkHue(button) && adjustForContrast(button, ground, CONTRAST_TEXT)) {
     accent = adjustForContrast(button, ground, CONTRAST_TEXT)!.hex
     provenance.accent = `derived from ${button} (button fallback)`
@@ -286,7 +334,7 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     .filter((h) => h !== accent)
     .filter((h, i, arr) => arr.indexOf(h) === i)
     .slice(0, 3)
-  alternates.button = [...mains, ...byRole('button_fill')]
+  alternates.button = [...popEligible, ...(observedButton ? [observedButton] : []), ...mains]
     .map((c) => c.hex)
     .filter((h) => h !== button && labelReads(h))
     .filter((h, i, arr) => arr.indexOf(h) === i)
@@ -312,6 +360,7 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
     headerText,
     accent,
     button,
+    buttonText,
     bodyBackground: ground,
     sectionTints: tints,
     confidence: Object.fromEntries(

@@ -264,6 +264,35 @@ describe('composePalette — edge cases', () => {
     expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
   })
 
+  it('mid-lightness brand button gets a hue-preserving fill nudge instead of losing (Parker finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#0e1781', prominence: 'main', observedRoles: ['nav_background', 'band', 'footer_background'], coverage: 0.03 },
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['hero_background', 'link_text'], coverage: 0.14 },
+        // White label 3.4:1, dark ink 4.34:1 — fails strict label as-is.
+        { hex: '#e86121', prominence: 'main', observedRoles: ['button_fill', 'icon_accent'], coverage: 0.002 },
+        { hex: '#0057b8', prominence: 'supporting', observedRoles: ['band'], coverage: 0.001 },
+      ],
+    })
+    expect(p.button).not.toBe('#0057b8')
+    const dh = Math.abs(hexToHsl(p.button!).h - hexToHsl('#e86121').h)
+    expect(Math.min(dh, 360 - dh)).toBeLessThan(6)
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('buttons-only color beats an all-purpose button that also paints bands (Dynamic Chiropractic finding)', () => {
+    const p = composePalette({
+      colors: [
+        { hex: '#001a33', prominence: 'main', observedRoles: ['hero_background', 'footer_background'], coverage: 0.004 },
+        { hex: '#ffffff', prominence: 'ground', observedRoles: ['nav_background'], coverage: 0.59 },
+        { hex: '#00558c', prominence: 'main', observedRoles: ['button_fill', 'band'], coverage: 0.034 },
+        { hex: '#b22222', prominence: 'supporting', observedRoles: ['button_fill'], coverage: 0.0005 },
+      ],
+    })
+    expect(p.button).toBe('#b22222')
+    expect(contrastRatio(p.buttonText!, p.button!)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('empty inventory: safe fallbacks throughout', () => {
     const p = composePalette({ colors: [] })
     expect(p.bodyBackground).toBe('#ffffff')

@@ -34,6 +34,12 @@ const EVENT_MAP: Record<string, BillingEventType> = {
   'invoice.payment_succeeded': 'payment_cleared',
   'invoice.payment_failed': 'payment_failed',
   'customer.subscription.deleted': 'cancelled',
+  // Pause/resume (configurator or dashboard): paused rides the failed-payment
+  // path (account paused, publishing runs out paidThrough naturally); resumed
+  // reactivates via payment_cleared — the lifecycle's duplicate window absorbs
+  // the invoice event that typically follows a resume.
+  'customer.subscription.paused': 'payment_failed',
+  'customer.subscription.resumed': 'payment_cleared',
 }
 
 function str(v: unknown): string | null {

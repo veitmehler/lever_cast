@@ -134,7 +134,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
   }
 
   return (
-    <div className="mx-auto flex h-screen max-w-2xl flex-col">
+    <div className="mx-auto flex h-screen max-w-4xl flex-col">
       {/* progress */}
       <div className="px-4 pt-4">
         <div className="h-1 w-full rounded bg-muted">
@@ -150,7 +150,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
         {bubbles.map((b, i) => (
           <div key={i} className={`flex ${b.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
+              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm md:text-base ${
                 b.role === 'user'
                   ? 'rounded-br-sm bg-primary text-primary-foreground'
                   : 'rounded-bl-sm border border-border bg-card text-foreground'
@@ -162,7 +162,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
         ))}
         {busy && (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+            <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-2.5 text-sm md:text-base text-muted-foreground">
               <span className="animate-pulse">…</span>
             </div>
           </div>
@@ -202,7 +202,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   rows={2}
-                  className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm md:text-base text-foreground"
                   disabled={busy}
                 />
                 <button
@@ -230,7 +230,7 @@ export function OnboardingChat({ onCompleted }: { onCompleted: () => void }) {
               onChange={(e) => setInput(e.target.value)}
               rows={4}
               placeholder={TEXT_PLACEHOLDERS[step.id] ?? 'Paste here…'}
-              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm md:text-base text-foreground"
               disabled={busy}
             />
             <button

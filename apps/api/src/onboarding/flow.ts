@@ -103,6 +103,7 @@ const STEPS: StepDef[] = [
     prepare: async () => ({
       messages: [
         "Now the good part — five questions about your practice. Answer them out loud if you can (tap the mic); speaking works better than typing, and I'll use your voice later too.",
+        "Be detailed and elaborate — ramble, tell stories, go on tangents. The more you say, the better I capture how YOU naturally talk, and that's what makes your content sound like you instead of a robot.",
         'Imagine a patient describing your clinic to a friend three years from now. What do you want them to say you did for them?',
       ],
     }),

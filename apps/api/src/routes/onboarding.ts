@@ -28,7 +28,11 @@ export async function onboardingRoutes(app: FastifyInstance) {
     const session = await getOrCreateSession(account.accountId)
     const ctx: StepContext = {
       accountId: account.accountId,
-      userId: account.userId,
+      // Onboarding writes brand/settings/ghl rows — pin them to the account
+      // OWNER so every account has one canonical row regardless of which
+      // member (buyer, agency admin) drives the walkthrough. The readiness
+      // validator reads the owner row directly.
+      userId: account.ownerUserId ?? account.userId,
       stepData: (session.stepData as Record<string, unknown>) ?? {},
     }
     return { account, session, ctx }

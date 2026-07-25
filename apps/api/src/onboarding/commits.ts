@@ -2,7 +2,7 @@
  * Real commit bodies for the onboarding steps (onboarding plan Phases 4–7).
  * Kept out of flow.ts so the step machine stays readable.
  */
-import { prisma, encrypt } from '@omniply/shared'
+import { prisma, encrypt, ghlSettingsForUser } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getBoss, QUEUES } from '../queues/index'
 import { getSystemApiKey } from '../lib/system-keys'
@@ -328,7 +328,10 @@ export async function commitSocials(ctx: StepContext, _answer: unknown): Promise
         ids[platform] = acc.id
       }
     }
-    await prisma.ghlSettings.update({ where: { userId: ctx.userId }, data: { accountIds: ids } })
+    // Credentials resolve account-wide, so write to the row that actually
+    // holds them — the session user (a second account member) may not own it.
+    const row = await ghlSettingsForUser(ctx.userId)
+    if (row) await prisma.ghlSettings.update({ where: { id: row.id }, data: { accountIds: ids } })
   } catch (err) {
     logger.warn({ err }, '[onboarding] social account fetch failed (retryable from settings)')
     ctx.stepData.socialAccounts = []

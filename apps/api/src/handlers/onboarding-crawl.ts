@@ -58,20 +58,26 @@ export async function onboardingCrawlHandler(jobs: PgBoss.Job<OnboardingCrawlJob
         // The single-shot extractor remains as fallback.
         const paletteTask = (async () => {
           if (!screenshot) return null
-          try {
-            const clusters = await pixelClusters(screenshot)
-            const inventory = await extractBrandInventory(geminiKey, screenshot, crawl.cssColorHints, clusters)
-            if (inventory) {
-              const composed = composePalette(inventory)
-              stepData.paletteInventory = inventory as unknown as Record<string, unknown>
-              logger.info(
-                { colors: inventory.colors.length, provenance: composed.provenance },
-                '[onboarding-crawl] palette composed from inventory',
-              )
-              return composed
+          // One retry with a fresh screenshot: a transient overlay/modal state
+          // can poison the pixel evidence and empty the inventory.
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const shot = attempt === 1 ? screenshot : ((await screenshotHomepage(websiteUrl)) ?? screenshot)
+              const clusters = await pixelClusters(shot)
+              const inventory = await extractBrandInventory(geminiKey, shot, crawl.cssColorHints, clusters)
+              if (inventory) {
+                const composed = composePalette(inventory)
+                stepData.paletteInventory = inventory as unknown as Record<string, unknown>
+                logger.info(
+                  { attempt, colors: inventory.colors.length, provenance: composed.provenance },
+                  '[onboarding-crawl] palette composed from inventory',
+                )
+                return composed
+              }
+              logger.warn({ attempt }, '[onboarding-crawl] empty inventory')
+            } catch (err) {
+              logger.warn({ attempt, err }, '[onboarding-crawl] inventory pipeline failed')
             }
-          } catch (err) {
-            logger.warn({ err }, '[onboarding-crawl] inventory pipeline failed — falling back to single-shot palette')
           }
           return extractPaletteFromScreenshot(geminiKey, screenshot, crawl.cssColorHints)
         })()

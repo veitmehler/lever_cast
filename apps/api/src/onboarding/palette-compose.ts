@@ -200,7 +200,15 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
   // Header background: a newsletter header is a BRANDING BAND, not page
   // chrome — take the strongest dark structural brand color (hero/nav/footer/
   // band; main before supporting, then coverage). A cream nav must not produce
-  // a cream newsletter header; the ground is a last resort.
+  // a cream newsletter header; the ground is a last resort. PROFESSIONAL-HEADER
+  // rule (user, 2026-07-24, ACA/Sherman bench findings): vivid WARM colors
+  // (red/orange/magenta) are aggressive as large header bands — prefer any calm
+  // structural dark, then any dark neutral in the inventory; a brand with
+  // nothing calmer keeps its warm color (brand-true beats taste).
+  const warmVivid = (hex: string) => {
+    const { h, s } = hexToHsl(hex)
+    return s > 0.5 && (h < 40 || h > 330)
+  }
   const structural = colors
     .filter((c) =>
       c.observedRoles?.some((r) =>
@@ -213,11 +221,24 @@ export function composePalette(inventory: BrandInventory): ComposedPalette {
       return promo(b) - promo(a) || (b.coverage ?? 0) - (a.coverage ?? 0)
     })
   const darkestMainAny = [...mains].sort((a, b) => relLuminance(a.hex) - relLuminance(b.hex))[0]
-  const headerPick =
-    structural[0] ??
-    (darkestMainAny && relLuminance(darkestMainAny.hex) < HEADER_MAX_LUMINANCE ? darkestMainAny : null)
+  const calmStructural = structural.filter((c) => !warmVivid(c.hex))
+  const darkNeutralAnywhere = colors
+    .filter((c) => c.hex !== ground && relLuminance(c.hex) < 0.4 && saturationOf(c.hex) < 0.3)
+    .sort((a, b) => (b.coverage ?? 0) - (a.coverage ?? 0))[0]
+  let headerPick: Candidate | null
+  let headerProvenance = 'extracted'
+  if (calmStructural.length) {
+    headerPick = calmStructural[0]
+  } else if (structural.length && darkNeutralAnywhere) {
+    headerPick = darkNeutralAnywhere
+    headerProvenance = `extracted (neutral preferred over warm ${structural[0].hex})`
+  } else {
+    headerPick =
+      structural[0] ??
+      (darkestMainAny && relLuminance(darkestMainAny.hex) < HEADER_MAX_LUMINANCE ? darkestMainAny : null)
+  }
   const headerBackground = headerPick?.hex ?? ground
-  provenance.headerBackground = headerPick ? 'extracted' : `derived from ${ground}`
+  provenance.headerBackground = headerPick ? headerProvenance : `derived from ${ground}`
 
   // Header text: best-contrast brand color on the header, else plain ink.
   const headerTextCandidate = [...mains, ...colors]

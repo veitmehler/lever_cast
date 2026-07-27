@@ -9,11 +9,26 @@ import type { FastifyInstance } from 'fastify'
 import { uploadBufferWithKey, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
+import { buildStandaloneLinktreeHtml } from '../lib/linktree'
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 export async function onboardingPhotoRoutes(app: FastifyInstance) {
+  // Downloadable self-contained links page (non-WordPress clinics): regenerated
+  // per request from current account data, logo inlined as a data URI.
+  app.get('/onboarding/linktree.html', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const account = await resolveAccountForClerkId(clerkId)
+    if (!account) return reply.status(404).send({ error: 'No account' })
+    const html = await buildStandaloneLinktreeHtml(account.ownerUserId ?? account.userId)
+    if (!html) return reply.status(404).send({ error: 'Nothing to link yet — set a booking URL first' })
+    reply.header('Content-Disposition', 'attachment; filename="linktree.html"')
+    reply.type('text/html; charset=utf-8')
+    return reply.send(html)
+  })
+
   app.post('/onboarding/photo', async (request, reply) => {
     const clerkId = await requireAuth(request, reply)
     if (!clerkId) return

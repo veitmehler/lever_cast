@@ -48,6 +48,66 @@ ${buttons}
 </div>`
 }
 
+/** Gather the link entries + visual tokens for a user's linktree. */
+async function linktreeDataForUser(userId: string) {
+  const brand = await brandSettingsForUser(userId)
+  if (!brand) return null
+  const links: LinkEntry[] = []
+  if (brand.bookingUrl) links.push({ label: 'Book an Appointment', url: brand.bookingUrl })
+  if (brand.organizationPhone) links.push({ label: 'Call Us', url: `tel:${brand.organizationPhone.replace(/[^+\d]/g, '')}` })
+  if (brand.googleBusinessProfileUrl) links.push({ label: 'Review Us on Google', url: brand.googleBusinessProfileUrl })
+  if (brand.organizationWebsite) links.push({ label: 'Visit Our Website', url: brand.organizationWebsite })
+  return { brand, links }
+}
+
+/**
+ * Self-contained downloadable linktree (non-WordPress clinics, user request
+ * 2026-07-27): a full HTML document with the logo inlined as a data URI so the
+ * single file works uploaded to any hosting. Returns null when nothing to link.
+ */
+export async function buildStandaloneLinktreeHtml(userId: string): Promise<string | null> {
+  const data = await linktreeDataForUser(userId)
+  if (!data || data.links.length === 0) return null
+  const { brand, links } = data
+
+  let logoUrl = brand.nlLogoLightUrl ?? brand.nlLogoUrl ?? null
+  if (logoUrl) {
+    try {
+      const res = await withTimeout((signal) => fetch(logoUrl!, { signal }), 15_000, 'linktree logo inline')
+      if (res.ok) {
+        const mime = res.headers.get('content-type') ?? 'image/png'
+        const buf = Buffer.from(await res.arrayBuffer())
+        if (buf.length <= 2_000_000) logoUrl = `data:${mime};base64,${buf.toString('base64')}`
+      }
+    } catch {
+      /* remote URL fallback is fine */
+    }
+  }
+
+  const inner = buildLinktreeHtml({
+    organizationName: brand.organizationName ?? 'Our Practice',
+    logoUrl,
+    headerBg: brand.nlHeaderBgColor ?? '#0b2545',
+    buttonColor: brand.nlButtonColor ?? brand.nlLinkColor ?? '#2a6f97',
+    buttonTextColor: brand.nlButtonTextColor ?? '#ffffff',
+    bodyBg: '#ffffff',
+    accent: brand.nlLinkColor ?? '#2a6f97',
+    links,
+  })
+  const name = esc(brand.organizationName ?? 'Links')
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${name} — Links</title>
+</head>
+<body style="margin:0;background:#ffffff;">
+${inner}
+</body>
+</html>`
+}
+
 /**
  * Publish (create or update) the /linktree page on the clinic's WordPress site
  * and point socialBioUrl at it. Best-effort by design: any failure logs and
@@ -55,8 +115,9 @@ ${buttons}
  */
 export async function publishLinktreePage(userId: string): Promise<string | null> {
   try {
-    const brand = await brandSettingsForUser(userId)
-    if (!brand) return null
+    const data = await linktreeDataForUser(userId)
+    if (!data) return null
+    const { brand, links } = data
     const memberIds = await accountMemberIdsForUser(userId)
     const conn = await prisma.wordPressConnection.findFirst({
       where: { userId: { in: memberIds } },
@@ -70,11 +131,6 @@ export async function publishLinktreePage(userId: string): Promise<string | null
     const auth = `Basic ${Buffer.from(`${conn.username}:${decrypt(conn.appPassword) ?? ''}`).toString('base64')}`
     const siteBase = conn.siteUrl.replace(/\/+$/, '')
 
-    const links: LinkEntry[] = []
-    if (brand.bookingUrl) links.push({ label: 'Book an Appointment', url: brand.bookingUrl })
-    if (brand.organizationPhone) links.push({ label: 'Call Us', url: `tel:${brand.organizationPhone.replace(/[^+\d]/g, '')}` })
-    if (brand.googleBusinessProfileUrl) links.push({ label: 'Review Us on Google', url: brand.googleBusinessProfileUrl })
-    if (brand.organizationWebsite) links.push({ label: 'Visit Our Website', url: brand.organizationWebsite })
     if (links.length === 0) {
       logger.info({ userId }, '[linktree] no links available — skipping')
       return null

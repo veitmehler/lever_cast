@@ -14,7 +14,7 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 | Marketing → Social Planner | The entire social publishing path + onboarding social-connect step |
 | Marketing → Email campaigns | Newsletter sends + promo emails (API-created campaigns) |
 | Contacts + Tags | Lead-gen captures, promo audiences, every automation trigger |
-| Automation (Workflows) | Billing webhooks + nurture sequences (pre-built below; owner rarely opens) |
+| Automation (Workflows) | Review webhook + nurture sequences (pre-built below; owner rarely opens) |
 | Conversations (email + social DMs) | Patient replies to newsletters/promos; future review responses |
 | Media Storage | Social Planner attachment dependency (invisible in practice) |
 | Our marketplace app (Custom Page) | Onboarding chat + Lead Magnets review + embedded surface |
@@ -46,15 +46,17 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 
 ## B. Prebuild checklist (the snapshot's content)
 
-1. **Three billing workflows** (Subscription trigger × Active / Overdue / Canceled →
-   Custom Webhook, per the payment checklist) — with the webhook URL referencing a
-   **Custom Value**: `{{custom_values.omniply_billing_token}}` (the custom value holds the FULL webhook URL — auto-set at provisioning)
-   → snapshot deploys untouched; per-client setup = paste ONE custom value (the token from
-   `POST /api/admin/accounts/:id/billing-token`) instead of editing three workflows.
-2. **Custom Values**: `omniply_billing_token` + `omniply_review_token` — AUTO-CREATED
-   with their full webhook URLs by zero-touch provisioning at app install; the snapshot
-   does not need placeholders. Workflow webhook URL fields reference the custom value
-   directly (it IS the URL).
+1. **Billing workflows: NONE** (superseded 2026-07-24). Billing is Stripe-central:
+   the platform's Stripe webhook receiver (`/api/stripe/events`) handles payment
+   succeeded/failed/paused/resumed/cancelled directly — nothing billing-related lives in
+   the snapshot or any subaccount, so nothing an end user can break. The old
+   per-subaccount workflow receiver remains deployed as a fallback only.
+2. **Custom Value**: `omniply_review_token` only (billing value dropped with
+   Stripe-central). Intended to be auto-set at provisioning; the current app grant has
+   customValues READONLY, so until a scope bump the runbook step is: paste the full
+   review-webhook URL (from `POST /api/admin/accounts/:id/review-token`) into the custom
+   value once per client. Create the custom value (empty placeholder) in the snapshot so
+   workflow 7c can reference it.
 3. **Tag taxonomy** (pre-created so workflows reference them from day one):
    - `leadgen-<template-slug>` per starter lead magnet
    - `appointment-completed`, `first-visit-completed` (dormant until the PMS connector or
@@ -80,12 +82,15 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
    GHL Reputation (runbook step).
 7d. **Native Reviews QR: do NOT create / disable where possible** (user decision —
    our branded QR card + trigger link replaces it; avoids two competing QR codes).
-8. NOT in the snapshot but part of client provisioning around it (onboarding runbook):
-   Private Integration key (scopes per the onboarding testing guide), SaaS Configurator
-   settings (auto-suspend ON, auto-cancel OFF, 30-day cycle), billing token custom value.
-   The marketplace app AUTO-INSTALLS via the SaaS plan (bundled 2026-07-25 — private
-   white-label app, distribution Agency & Sub-Account, free; auto-install fires for NEW
-   subaccounts created under the plan; existing subaccounts need the install link once).
+8. NOT in the snapshot but part of client provisioning around it:
+   SaaS Configurator settings (auto-suspend ON, auto-cancel OFF, 30-day cycle). Private
+   Integration keys are OBSOLETE for new clinics — zero-touch OAuth provisioning mints
+   location tokens automatically at app install. The marketplace app AUTO-INSTALLS via
+   the SaaS plan (bundled 2026-07-25 — private white-label app, distribution
+   Agency & Sub-Account, FREE — pricing tiers dropped 2026-07-25; auto-install fires for
+   NEW subaccounts created under the plan; existing subaccounts need the install link
+   once). Billing lifecycle: Stripe webhook endpoint configured once at the platform
+   level (LIVE since 2026-07-25) — no per-client billing setup at all.
 
 ## C. Decisions this spec encodes (from the 2026-07-15 brainstorm)
 

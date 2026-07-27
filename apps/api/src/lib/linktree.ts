@@ -1,0 +1,127 @@
+/**
+ * Link-in-bio ("linktree") page, published ONTO the clinic's own WordPress
+ * site at /linktree (user decision 2026-07-27: their branded domain; the path
+ * avoids colliding with an existing /links page). Fully derived from data we
+ * already hold — palette, logo variants, bookingUrl, GBP link, phone — and
+ * idempotently upserted via the WP pages API. On success, socialBioUrl points
+ * at it, so every social profile's "link in bio" lands on their own domain.
+ *
+ * Non-WordPress clinics keep the bookingUrl fallback (hosted version = later).
+ */
+import { prisma, decrypt, brandSettingsForUser, accountMemberIdsForUser } from '@omniply/shared'
+import { logger } from './logger'
+import { assertSafeWpUrl } from './ssrf'
+import { withTimeout } from './net/with-timeout'
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+interface LinkEntry {
+  label: string
+  url: string
+}
+
+export function buildLinktreeHtml(opts: {
+  organizationName: string
+  logoUrl: string | null
+  headerBg: string
+  buttonColor: string
+  buttonTextColor: string
+  bodyBg: string
+  accent: string
+  links: LinkEntry[]
+}): string {
+  const { organizationName, logoUrl, headerBg, buttonColor, buttonTextColor, bodyBg, accent, links } = opts
+  const buttons = links
+    .map(
+      (l) =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:block;background:${buttonColor};color:${buttonTextColor};text-decoration:none;text-align:center;font-size:17px;font-weight:600;padding:15px 20px;border-radius:10px;margin:0 0 14px;">${esc(l.label)}</a>`,
+    )
+    .join('\n')
+  return `<div style="background:${bodyBg};margin:0 auto;max-width:520px;padding:0 0 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="background:${headerBg};border-radius:0 0 18px 18px;padding:36px 24px 30px;text-align:center;">
+${logoUrl ? `<img src="${esc(logoUrl)}" alt="${esc(organizationName)}" style="max-height:72px;max-width:70%;height:auto;" />` : `<div style="color:#ffffff;font-size:24px;font-weight:700;">${esc(organizationName)}</div>`}
+</div>
+<div style="padding:28px 24px 0;">
+${buttons}
+</div>
+<div style="text-align:center;color:${accent};font-size:13px;padding-top:10px;">${esc(organizationName)}</div>
+</div>`
+}
+
+/**
+ * Publish (create or update) the /linktree page on the clinic's WordPress site
+ * and point socialBioUrl at it. Best-effort by design: any failure logs and
+ * returns null without throwing — the finale must never break on this.
+ */
+export async function publishLinktreePage(userId: string): Promise<string | null> {
+  try {
+    const brand = await brandSettingsForUser(userId)
+    if (!brand) return null
+    const memberIds = await accountMemberIdsForUser(userId)
+    const conn = await prisma.wordPressConnection.findFirst({
+      where: { userId: { in: memberIds } },
+      select: { username: true, appPassword: true, siteUrl: true },
+    })
+    if (!conn) {
+      logger.info({ userId }, '[linktree] no WordPress connection — skipping (bookingUrl fallback stays)')
+      return null
+    }
+    await assertSafeWpUrl(conn.siteUrl)
+    const auth = `Basic ${Buffer.from(`${conn.username}:${decrypt(conn.appPassword) ?? ''}`).toString('base64')}`
+    const siteBase = conn.siteUrl.replace(/\/+$/, '')
+
+    const links: LinkEntry[] = []
+    if (brand.bookingUrl) links.push({ label: 'Book an Appointment', url: brand.bookingUrl })
+    if (brand.organizationPhone) links.push({ label: 'Call Us', url: `tel:${brand.organizationPhone.replace(/[^+\d]/g, '')}` })
+    if (brand.googleBusinessProfileUrl) links.push({ label: 'Review Us on Google', url: brand.googleBusinessProfileUrl })
+    if (brand.organizationWebsite) links.push({ label: 'Visit Our Website', url: brand.organizationWebsite })
+    if (links.length === 0) {
+      logger.info({ userId }, '[linktree] no links available — skipping')
+      return null
+    }
+
+    const html = buildLinktreeHtml({
+      organizationName: brand.organizationName ?? 'Our Practice',
+      logoUrl: brand.nlLogoLightUrl ?? brand.nlLogoUrl ?? null,
+      headerBg: brand.nlHeaderBgColor ?? '#0b2545',
+      buttonColor: brand.nlButtonColor ?? brand.nlLinkColor ?? '#2a6f97',
+      buttonTextColor: brand.nlButtonTextColor ?? '#ffffff',
+      bodyBg: '#ffffff',
+      accent: brand.nlLinkColor ?? '#2a6f97',
+      links,
+    })
+
+    const wp = (path: string, init?: RequestInit) =>
+      withTimeout(
+        (signal) =>
+          fetch(`${siteBase}/wp-json/wp/v2${path}`, {
+            ...init,
+            headers: { Authorization: auth, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+            signal,
+          }),
+        30_000,
+        `linktree wp ${path}`,
+      )
+
+    // Idempotent upsert by slug.
+    const existingRes = await wp('/pages?slug=linktree&status=publish,draft,private,pending')
+    const existing = existingRes.ok ? ((await existingRes.json()) as { id: number }[]) : []
+    const body = JSON.stringify({ title: 'Links', slug: 'linktree', status: 'publish', content: html })
+    const res = existing[0]
+      ? await wp(`/pages/${existing[0].id}`, { method: 'POST', body })
+      : await wp('/pages', { method: 'POST', body })
+    if (!res.ok) {
+      logger.warn({ userId, status: res.status }, '[linktree] WP page upsert failed')
+      return null
+    }
+    const page = (await res.json()) as { link?: string }
+    const url = page.link ?? `${siteBase}/linktree/`
+
+    await prisma.brandSettings.update({ where: { userId: brand.userId }, data: { socialBioUrl: url } })
+    logger.info({ userId, url }, '[linktree] published to WordPress + socialBioUrl updated')
+    return url
+  } catch (err) {
+    logger.warn({ userId, err }, '[linktree] publish failed (non-fatal)')
+    return null
+  }
+}

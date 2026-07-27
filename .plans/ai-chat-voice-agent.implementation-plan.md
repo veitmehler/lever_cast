@@ -141,6 +141,39 @@ server-tool webhooks; VAPI handles telephony/STT/TTS/turn-taking.
 - `check_availability`/`book_appointment` tools against the Cliniko connector when
   it lands; voice+chat both inherit booking for connected clinics automatically.
 
+## Phase 3 — Agent interop & discoverability (the "Google agents" hedge)
+
+Context (user concern 2026-07-27): search platforms are moving toward agentic
+surfaces, and Google historically favors Google. Assessment: the favoritism operates
+in RANKING surfaces, not build tooling — Google's own agent-future bet (A2A) is a
+vendor-neutral protocol donated to the Linux Foundation, and agentic search will
+consume the open web through protocols + structured data. Strategy: do NOT move onto
+Dialogflow/Vertex Conversational Agents (cost, weaker guardrail grip, model lock);
+instead make OUR agent legible to every ecosystem's agents. If evidence of
+platform-hosted preference ever materializes, the transport-agnostic core migrates
+in weeks — that option stays open for free.
+
+**3.1 schema.org structured data — PULLABLE FORWARD (valuable pre-agent, cheap):**
+- On every clinic WordPress site (via the existing publishing path):
+  `MedicalClinic`/`LocalBusiness` (name, address, phone, hours, GBP sameAs),
+  `FAQPage` generated from the crawl corpus (guarded: factual/logistics Q&A only,
+  nothing clinical), `ReserveAction`/`potentialAction` pointing at `bookingUrl`.
+- This is what AI Overviews / agentic search consume TODAY. Complements the
+  article JSON-LD we already emit. Candidate for the launch-era backlog rather
+  than waiting for the agent build.
+
+**3.2 A2A endpoint** — expose the agent core via the Agent2Agent protocol
+(agent card + task endpoints); per-clinic identity; same guardrails and tools
+(a search agent asking "book me at 3pm" gets the booking link / Tier-2 booking
+exactly like a human chat visitor).
+
+**3.3 MCP server** — same core exposed as per-clinic MCP tools (availability,
+booking link, FAQs) for the Anthropic/OpenAI-side assistant ecosystem.
+
+**3.4 Engine flexibility** — the core stays model-agnostic (Haiku-class default);
+Gemini as a config-level engine option, so any future platform-side preference is
+a setting, not a migration.
+
 ## Sequencing & estimates
 
 | Stage | Contents | Est. |
@@ -150,6 +183,8 @@ server-tool webhooks; VAPI handles telephony/STT/TTS/turn-taking.
 | pilot | Test account + 2–3 friendly clinics, transcript review loop | 1–2 weeks calendar |
 | 2 | Voice v1 on VAPI + numbers + Stripe metering | 5–7 days |
 | 2.5 | EL voice-clone option | 1–2 days |
+| 3.1 | schema.org markup on clinic WP sites (pullable forward to launch era) | 1–2 days |
+| 3.2–3.4 | A2A + MCP adapters + engine option (when ecosystems mature) | 3–4 days |
 
 Prerequisites: launch complete; first cohort onboarded (their real corpora + PMS
 dropdown data). Tier-2 booking waits for the PMS connector plan.

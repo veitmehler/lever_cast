@@ -19,6 +19,7 @@ import { bootstrapOnboarding } from '../onboarding/bootstrap'
 import { generationReadiness } from '../lib/generation-readiness'
 import { resolveArticleCalendar, resolveNewsletterCalendar } from '../newsletter/calendar-routing'
 import { burstCurrentWindow } from '../lib/account-lifecycle'
+import { publishLinktreePage } from '../lib/linktree'
 import { getBoss, QUEUES } from '../queues/index'
 
 export async function onboardingRoutes(app: FastifyInstance) {
@@ -131,6 +132,10 @@ export async function onboardingRoutes(app: FastifyInstance) {
     })
     await prisma.onboardingSession.update({ where: { id: r.session.id }, data: { status: 'completed' } })
     logger.info({ accountId: r.account.accountId }, '[onboarding] completed — starting first burst')
+
+    // Link-in-bio page on the clinic's own WordPress at /linktree (their
+    // branded domain); best-effort — never blocks the finale.
+    void publishLinktreePage(r.account.ownerUserId).catch(() => {})
 
     // Starter lead-magnet library (leadgen plan Phase 7): compile every active
     // template for this account — lands review-gated, never blocks generation.

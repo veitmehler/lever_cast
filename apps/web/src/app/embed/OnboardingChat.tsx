@@ -332,6 +332,8 @@ function ConfirmCard({
         <WordpressCard
           card={card as { website?: string }}
           disabled={busy}
+          downloadUrl={embedApiUrl('/api/onboarding/linktree.html')}
+          authToken={`Bearer emb_${currentEmbedSession()?.token ?? ''}`}
           onSubmit={(a) => onSubmit(a, a.mode === 'skip' ? 'No WordPress — HTML export' : 'Connect & verify ✓')}
         />
       )

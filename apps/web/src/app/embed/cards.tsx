@@ -630,15 +630,36 @@ export function OffersCard({
 export function WordpressCard({
   card,
   disabled,
+  downloadUrl,
+  authToken,
   onSubmit,
 }: {
   card: { website?: string }
   disabled: boolean
+  downloadUrl?: string
+  authToken?: string
   onSubmit: (answer: Record<string, unknown>) => void
 }) {
   const [siteUrl, setSiteUrl] = useState(card.website ?? '')
   const [username, setUsername] = useState('')
   const [appPassword, setAppPassword] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  async function downloadLinktree() {
+    if (!downloadUrl) return
+    setDownloading(true)
+    try {
+      const res = await fetch(downloadUrl, { headers: authToken ? { Authorization: authToken } : {} })
+      if (!res.ok) return
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'linktree.html'
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } finally {
+      setDownloading(false)
+    }
+  }
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-4">
       <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
@@ -672,6 +693,21 @@ export function WordpressCard({
           No WordPress
         </button>
       </div>
+      {downloadUrl && (
+        <p className="text-xs text-muted-foreground">
+          Not on WordPress? With WordPress we also publish a ready-made link-in-bio page to your site automatically —
+          without it, you can{' '}
+          <button
+            type="button"
+            className="underline"
+            disabled={disabled || downloading}
+            onClick={() => void downloadLinktree()}
+          >
+            {downloading ? 'preparing…' : 'download it as an HTML file'}
+          </button>{' '}
+          and upload it to your own hosting (best after finishing this setup, so it includes all your links).
+        </p>
+      )}
     </div>
   )
 }

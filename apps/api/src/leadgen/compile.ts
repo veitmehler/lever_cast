@@ -325,6 +325,24 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
       },
     })
     logger.info({ documentId, driveFileId, pdfKey }, '[leadgen-compile] compiled → pending_review')
+
+    // Guide-link custom value (snapshot drip design, 2026-07-28): each clinic's
+    // location carries guide_link_<slug> so the nurture drip can link every
+    // guide via {{custom_values.…}}. Best-effort — requires the
+    // customValues.write scope; a 4xx here logs and never fails the compile.
+    if (driveLink) {
+      try {
+        const { getGhlCredentials } = await import('../lib/ghl/settings')
+        const { upsertGhlCustomValue } = await import('../lib/ghl/client')
+        const creds = await getGhlCredentials(doc.userId)
+        if (creds) {
+          await upsertGhlCustomValue(creds.apiKey, creds.locationId, `guide_link_${doc.slug}`, driveLink)
+          logger.info({ documentId, name: `guide_link_${doc.slug}` }, '[leadgen-compile] guide-link custom value upserted')
+        }
+      } catch (err) {
+        logger.warn({ documentId, err }, '[leadgen-compile] guide-link custom value failed (scope pending?) — non-fatal')
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logger.error({ documentId, err }, '[leadgen-compile] FAILED')

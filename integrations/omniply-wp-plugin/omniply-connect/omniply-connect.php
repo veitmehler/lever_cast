@@ -1,7 +1,6 @@
 <?php
 /**
  * Plugin Name: Omniply Connect
- * Plugin URI:  https://omniply.io
  * Description: Prints the structured-data (JSON-LD) block managed by your Omniply marketing platform in the site head. Print-only: this plugin executes no remote code and stores a single validated JSON option.
  * Version:     1.0.0
  * Requires at least: 5.5

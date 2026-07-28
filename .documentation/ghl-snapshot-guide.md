@@ -64,17 +64,21 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
    - `newsletter-subscriber` (marketing consent — NEVER auto-applied by any sync)
    - Service-communication vs marketing tags kept strictly separate (privacy posture in
      every jurisdiction)
-4. **Nurture workflow skeletons** — one per starter lead magnet: trigger on its
-   `leadgen-*` tag → short email sequence (2 placeholder emails) → create Opportunity in
-   the New Patient pipeline. This is what makes a captured lead GO somewhere.
-   Email CTAs use the `omniply-booking` trigger link (7b) + built-in location merge
-   fields ({{location.name}} etc.) — NO per-clinic edits inside the emails.
+4. **ONE nurture workflow** (simplified 2026-07-28): trigger = Contact Tag Added with
+   ALL five `leadgen-*` tags as OR-filters → 2 generic follow-up emails → create
+   Opportunity in the New Patient pipeline. The emails NEVER link the document —
+   delivery happens BEFORE the tag exists (Drive access-proposal flow auto-grants,
+   then pushes contact+tag), so copy assumes the lead already has their guide.
+   CTAs use the `omniply-booking` trigger link (7b) + built-in location merge fields
+   ({{location.name}} etc.) — NO per-clinic edits, NO per-document custom values.
+   Per-magnet copy personalization = optional later refinement.
 5. **Review-request workflow** — trigger: `appointment-completed` tag → delay → review ask
    (email; SMS variant added when SMS activates). Pre-built and DORMANT until a tag source
    exists; the QR counter card covers review velocity meanwhile.
 6. **New Patient pipeline** (the one in section A).
-7. **Booking calendar template** (one service type, placeholder hours) + email reminder
-   workflow — hidden with the calendar feature; ready for PMS-less clinics.
+7. **Booking calendar template: NOT in v1.0** (deferred 2026-07-28). Plan feature stays
+   enabled (free option value); the rare PMS-less clinic gets a calendar created
+   per-client in minutes (runbook), not a snapshot asset nobody may ever use.
 7b. **Trigger links `omniply-review` + `omniply-booking`** (placeholder destinations;
    decided 2026-07-28) — provisioning repoints BOTH per clinic via API: review → the
    Google review deep link (QR card encodes it; review-request email uses it),

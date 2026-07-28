@@ -503,6 +503,31 @@ export async function getGuideLinkFieldId(apiKey: string, locationId: string): P
   }
 }
 
+/**
+ * Upsert a LOCATION custom value by name (list → update-or-create) — unlike a
+ * blind POST this never duplicates on re-runs. Write requires the
+ * customValues.write scope (user bumping the app scope, 2026-07-28); until the
+ * grant carries it, the write 4xxs and the caller's warn-log is the signal.
+ */
+export async function upsertGhlCustomValue(
+  apiKey: string,
+  locationId: string,
+  name: string,
+  value: string,
+): Promise<boolean> {
+  const list = await ghlRequest<{ customValues?: { id: string; name?: string }[] }>(
+    apiKey,
+    `/locations/${locationId}/customValues`,
+    { method: 'GET' },
+  )
+  const existing = (list.customValues ?? []).find((v) => (v.name ?? '').toLowerCase() === name.toLowerCase())
+  const path = existing
+    ? `/locations/${locationId}/customValues/${existing.id}`
+    : `/locations/${locationId}/customValues`
+  await ghlRequest(apiKey, path, { method: existing ? 'PUT' : 'POST', body: { name, value } })
+  return true
+}
+
 // ── Trigger links (QR review card, leadgen plan Phase F option C) ────────────
 
 export interface GhlTriggerLink {

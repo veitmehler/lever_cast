@@ -158,6 +158,10 @@ export async function commitBrandProfile(ctx: StepContext, answer: unknown): Pro
     primarySpecialization: primary,
     specializations: checked,
     specialization: primary,
+    // Logistics-only FAQ pairs from synthesis → FAQPage schema (agent plan 3.1).
+    ...(Array.isArray(ctx.stepData.clinicFaqsDraft) && (ctx.stepData.clinicFaqsDraft as unknown[]).length > 0
+      ? { clinicFaqs: ctx.stepData.clinicFaqsDraft }
+      : {}),
   })
   ctx.stepData.brandProfileDraft = draft as unknown as Record<string, unknown>
 

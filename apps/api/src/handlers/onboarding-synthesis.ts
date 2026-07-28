@@ -11,7 +11,7 @@ import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { getSystemApiKey } from '../lib/system-keys'
 import { getBoss, QUEUES } from '../queues/index'
-import { synthesizeBrandProfile, generateCtaOptions, type VoiceAnswers } from '../onboarding/synthesis'
+import { synthesizeBrandProfile, generateCtaOptions, generateClinicFaqs, type VoiceAnswers } from '../onboarding/synthesis'
 import type { SpecializationDraft } from '../onboarding/site-analysis'
 
 export interface OnboardingSynthesisJobData {
@@ -68,6 +68,11 @@ export async function onboardingSynthesisHandler(jobs: PgBoss.Job<OnboardingSynt
           ...(await generateCtaOptions(geminiKey, profile)),
           { value: 'custom', label: 'Something else…' },
         ]
+        // Logistics-only FAQ pairs for FAQPage schema (agent plan 3.1) —
+        // persisted to brandSettings at brand-profile commit.
+        stepData.clinicFaqsDraft = (await generateClinicFaqs(geminiKey, (stepData.corpus as string) ?? '').catch(
+          () => [],
+        )) as unknown as Record<string, unknown>[]
       } catch (err) {
         logger.error({ accountId, err }, '[onboarding-synthesis] synthesis failed — manual profile entry')
       }

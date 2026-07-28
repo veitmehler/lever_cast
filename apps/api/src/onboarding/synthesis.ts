@@ -145,6 +145,30 @@ Return STRICT JSON: {"offers":[{"title":"...","body":"...","ctaLabel":"...","mon
   return result.offers ?? []
 }
 
+/**
+ * Logistics-only clinic FAQs for FAQPage schema markup (agent plan 3.1).
+ * Hard rule: factual/practical questions only — never symptoms, conditions,
+ * treatments, or outcomes.
+ */
+export async function generateClinicFaqs(
+  apiKey: string,
+  corpus: string,
+): Promise<{ q: string; a: string }[]> {
+  if (!corpus.trim()) return []
+  const result = await geminiJson<{ faqs: { q: string; a: string }[] }>(
+    apiKey,
+    `From this clinic website text, produce 5-7 FAQ pairs for a FAQPage schema block.
+STRICT RULES: logistics/practical ONLY — opening hours, location/parking, what to bring, appointment length, payment/insurance/health-fund basics, booking process, first-visit process. NEVER questions about symptoms, conditions, treatments, techniques, or outcomes. Answers 1-3 sentences, factual, drawn ONLY from the text (no inventions — omit a topic if the text doesn't cover it).
+Return STRICT JSON: {"faqs":[{"q":"...","a":"..."}]}
+
+WEBSITE TEXT:
+${corpus.slice(0, 20_000)}`,
+    'onboarding.clinic_faqs',
+    0.2,
+  )
+  return (result.faqs ?? []).filter((f) => f.q?.trim() && f.a?.trim())
+}
+
 export async function generateCtaOptions(
   apiKey: string,
   profile: BrandProfileDraft,

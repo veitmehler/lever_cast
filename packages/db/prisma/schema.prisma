@@ -1129,6 +1129,7 @@ model BrandSettings {
   // Weekly opening hours (Places API lookup at onboarding, owner-editable).
   // Optional everywhere: consumers DROP the hours line when null.
   openingHours             String? @db.Text
+  clinicFaqs               Json? // logistics-only Q&A [{q,a}] for FAQPage schema (agent plan 3.1; never clinical)
   // Google Place ID (resolved once from googleBusinessProfileUrl or name+address).
   // Drives the review deep link (QR card) + the weekly Places review probe.
   googlePlaceId            String?

@@ -20,6 +20,7 @@ import { generationReadiness } from '../lib/generation-readiness'
 import { resolveArticleCalendar, resolveNewsletterCalendar } from '../newsletter/calendar-routing'
 import { burstCurrentWindow } from '../lib/account-lifecycle'
 import { publishLinktreePage } from '../lib/linktree'
+import { publishClinicSchema } from '../lib/clinic-schema'
 import { getBoss, QUEUES } from '../queues/index'
 
 export async function onboardingRoutes(app: FastifyInstance) {
@@ -136,6 +137,11 @@ export async function onboardingRoutes(app: FastifyInstance) {
     // Link-in-bio page on the clinic's own WordPress at /linktree (their
     // branded domain); best-effort — never blocks the finale.
     void publishLinktreePage(r.account.ownerUserId).catch(() => {})
+    // Clinic entity schema onto their editable WP pages (agent plan 3.1) —
+    // env-flagged rollout: verify on the test account before enabling broadly.
+    if (process.env.SCHEMA_MARKUP_AUTO === '1') {
+      void publishClinicSchema(r.account.ownerUserId).catch(() => {})
+    }
 
     // Starter lead-magnet library (leadgen plan Phase 7): compile every active
     // template for this account — lands review-gated, never blocks generation.

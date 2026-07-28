@@ -12,6 +12,7 @@ import { prisma, decrypt, brandSettingsForUser, accountMemberIdsForUser } from '
 import { logger } from './logger'
 import { assertSafeWpUrl } from './ssrf'
 import { withTimeout } from './net/with-timeout'
+import { buildClinicEntity, buildFaqSchema, buildFencedBlock, type ClinicFaq } from './clinic-schema'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -95,6 +96,9 @@ export async function buildStandaloneLinktreeHtml(userId: string): Promise<strin
     links,
   })
   const name = esc(brand.organizationName ?? 'Links')
+  const entitySchemas = [buildClinicEntity(brand)]
+  const faqSchema = buildFaqSchema(((brand.clinicFaqs as unknown as ClinicFaq[] | null) ?? []))
+  const schemaBlock = buildFencedBlock(faqSchema ? [...entitySchemas, faqSchema] : entitySchemas)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -104,6 +108,7 @@ export async function buildStandaloneLinktreeHtml(userId: string): Promise<strin
 </head>
 <body style="margin:0;background:#ffffff;">
 ${inner}
+${schemaBlock}
 </body>
 </html>`
 }
@@ -159,10 +164,16 @@ export async function publishLinktreePage(userId: string): Promise<string | null
         `linktree wp ${path}`,
       )
 
+    // Entity (+FAQ) schema rides on the linktree page — the coverage floor
+    // every WP clinic gets regardless of the page ladder (agent plan 3.1).
+    const entitySchemas = [buildClinicEntity(brand)]
+    const faqSchema = buildFaqSchema(((brand.clinicFaqs as unknown as ClinicFaq[] | null) ?? []))
+    const contentWithSchema = `${html}\n${buildFencedBlock(faqSchema ? [...entitySchemas, faqSchema] : entitySchemas)}`
+
     // Idempotent upsert by slug.
     const existingRes = await wp('/pages?slug=linktree&status=publish,draft,private,pending')
     const existing = existingRes.ok ? ((await existingRes.json()) as { id: number }[]) : []
-    const body = JSON.stringify({ title: 'Links', slug: 'linktree', status: 'publish', content: html })
+    const body = JSON.stringify({ title: 'Links', slug: 'linktree', status: 'publish', content: contentWithSchema })
     const res = existing[0]
       ? await wp(`/pages/${existing[0].id}`, { method: 'POST', body })
       : await wp('/pages', { method: 'POST', body })

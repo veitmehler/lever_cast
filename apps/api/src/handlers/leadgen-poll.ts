@@ -13,14 +13,14 @@ import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { driveConfigured, listAccessProposals, resolveAccessProposal } from '../lib/gdrive/client'
 import { getGhlCredentials } from '../lib/ghl/settings'
-import { upsertGhlContact } from '../lib/ghl/client'
+import { upsertGhlContact, getGuideLinkFieldId } from '../lib/ghl/client'
 
 export async function leadgenPollHandler(_jobs: PgBoss.Job<object>[]): Promise<void> {
   if (!driveConfigured()) return // feature dormant until the key lands
 
   const docs = await prisma.leadGenDocument.findMany({
     where: { status: 'live', driveFileId: { not: null } },
-    select: { id: true, accountId: true, userId: true, driveFileId: true, slug: true, ghlTagNames: true },
+    select: { id: true, accountId: true, userId: true, driveFileId: true, driveLink: true, slug: true, ghlTagNames: true },
   })
   if (docs.length === 0) {
     await retryFailedGhlCaptures()
@@ -60,7 +60,7 @@ export async function leadgenPollHandler(_jobs: PgBoss.Job<object>[]): Promise<v
           status: 'ghl_failed', // upgraded below on success
         },
       })
-      await pushCaptureToGhl(capture.id, doc.userId, requesterEmail, doc.ghlTagNames, doc.slug)
+      await pushCaptureToGhl(capture.id, doc.userId, requesterEmail, doc.ghlTagNames, doc.slug, doc.driveLink)
     }
   }
 
@@ -73,14 +73,23 @@ async function pushCaptureToGhl(
   email: string,
   tags: string[],
   slug: string,
+  driveLink?: string | null,
 ): Promise<void> {
   try {
     const creds = await getGhlCredentials(ownerUserId)
     if (!creds) throw new Error('No GHL credentials for account owner')
+    // "Guide Link" contact field (snapshot asset): the nurture email's
+    // "here's your guide again" merge — best-effort, older snapshots lack it.
+    let customFields: { id: string; value: string }[] | undefined
+    if (driveLink) {
+      const fieldId = await getGuideLinkFieldId(creds.apiKey, creds.locationId).catch(() => null)
+      if (fieldId) customFields = [{ id: fieldId, value: driveLink }]
+    }
     const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
       email,
       tags,
       source: `leadgen:${slug}`,
+      ...(customFields ? { customFields } : {}),
     })
     await prisma.leadCapture.update({
       where: { id: captureId },
@@ -102,9 +111,9 @@ async function retryFailedGhlCaptures(): Promise<void> {
   const failed = await prisma.leadCapture.findMany({
     where: { status: 'ghl_failed' },
     take: 20,
-    include: { document: { select: { userId: true, ghlTagNames: true, slug: true } } },
+    include: { document: { select: { userId: true, ghlTagNames: true, slug: true, driveLink: true } } },
   })
   for (const c of failed) {
-    await pushCaptureToGhl(c.id, c.document.userId, c.requesterEmail, c.document.ghlTagNames, c.document.slug)
+    await pushCaptureToGhl(c.id, c.document.userId, c.requesterEmail, c.document.ghlTagNames, c.document.slug, c.document.driveLink)
   }
 }

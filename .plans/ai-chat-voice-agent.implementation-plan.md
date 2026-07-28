@@ -153,14 +153,55 @@ instead make OUR agent legible to every ecosystem's agents. If evidence of
 platform-hosted preference ever materializes, the transport-agnostic core migrates
 in weeks — that option stays open for free.
 
-**3.1 schema.org structured data — PULLABLE FORWARD (valuable pre-agent, cheap):**
-- On every clinic WordPress site (via the existing publishing path):
-  `MedicalClinic`/`LocalBusiness` (name, address, phone, hours, GBP sameAs),
-  `FAQPage` generated from the crawl corpus (guarded: factual/logistics Q&A only,
-  nothing clinical), `ReserveAction`/`potentialAction` pointing at `bookingUrl`.
-- This is what AI Overviews / agentic search consume TODAY. Complements the
-  article JSON-LD we already emit. Candidate for the launch-era backlog rather
-  than waiting for the agent build.
+**3.1 schema.org clinic-entity markup — PULLABLE FORWARD (valuable pre-agent, cheap):**
+
+What: `MedicalClinic`/`LocalBusiness` (name, address, phone, hours, geo, GBP
+`sameAs`), `FAQPage` from the crawl corpus (logistics only — hours/parking/
+insurance/first visit; NEVER clinical), `ReserveAction` → `bookingUrl`. This is
+the ENTITY layer (who the business is / how to book) complementing the existing
+per-article Article JSON-LD (content layer). Feeds AI Overviews/agentic search
+today — candidate for the LAUNCH-ERA backlog, before the agent build.
+
+**v1 — body-embedded ladder (proven pattern, ~2 days):**
+- Same technique the article pipeline already uses in production
+  (`wordpress-target.ts` appends `<script type="application/ld+json">` to post
+  content — Google accepts JSON-LD anywhere in the DOM; body placement is
+  SEO-equivalent to head). Note: REST content editing can't reach the theme's
+  `<body>`-open — content renders inside theme wrappers; end-of-content chosen
+  over start for editor UX (owner sees their content first) + damage isolation.
+- Coverage ladder, best-available per site:
+  1. Editable pages (homepage via settings `page_on_front`, contact/about):
+     fenced block `<!-- omniply-schema -->…<!-- /omniply-schema -->` appended —
+     replace-not-accumulate on update; WP native revisions = built-in undo;
+     pre-edit content hash stored our side; every touched page logged.
+  2. Page-builder sites (Elementor/Divi signatures detected in content):
+     SKIP page edits (builders render from their own data, ignore content) →
+     linktree page + article-publisher coverage only.
+  3. Everyone: `/linktree` page carries the full entity+FAQ+ReserveAction block;
+     article schema `publisher` enriched to the full clinic entity (every
+     published article reinforces the graph).
+- Connect-time capability probe: write+read-back a test block (multisite admins
+  lack `unfiltered_html` → scripts stripped → degrade to linktree-only tier).
+- Rollout: per-account flag; test account's WP first, then pilot clinics.
+
+**3.1b — Omniply micro-plugin (v2 head injection; decided 2026-07-28):**
+- OWN ~40-line plugin, deliberately dumb: reads ONE sanitized option, echoes it
+  in `wp_head`; one capability-gated (`manage_options`) REST route so provisioning
+  writes that option remotely. NO settings UI, NO PHP execution, no tracking.
+- Install path: wordpress.org directory + WP core plugins REST endpoint
+  (install+activate with the admin app password we already hold) — fully
+  zero-touch per clinic.
+- Unlocks: head-level entity schema on EVERY page regardless of page builder
+  (collapses ladder tiers 1-2), future chat-widget self-embedding site-wide,
+  theme-proof foothold for verification tags etc.
+- REJECTED alternative (2026-07-28): installing a reputable third-party
+  head-scripts plugin (WPCode/HFCM) — REST can install but NOT configure them
+  (snippets live behind their admin UIs; no REST write path), which reinstates a
+  per-clinic manual paste step; and snippet managers execute arbitrary PHP =
+  far larger attack/blame surface than a print-only micro-plugin.
+- Sequencing: SUBMIT to the .org directory EARLY (review queue = external clock,
+  days-to-weeks; fits the pre-launch window with review landing during vacation);
+  adoption post-launch. Maintenance ≈ zero by construction.
 
 **3.2 A2A endpoint** — expose the agent core via the Agent2Agent protocol
 (agent card + task endpoints); per-clinic identity; same guardrails and tools
@@ -183,7 +224,8 @@ a setting, not a migration.
 | pilot | Test account + 2–3 friendly clinics, transcript review loop | 1–2 weeks calendar |
 | 2 | Voice v1 on VAPI + numbers + Stripe metering | 5–7 days |
 | 2.5 | EL voice-clone option | 1–2 days |
-| 3.1 | schema.org markup on clinic WP sites (pullable forward to launch era) | 1–2 days |
+| 3.1 | schema.org body-ladder on clinic WP sites (pullable forward to launch era) | ~2 days |
+| 3.1b | Omniply micro-plugin: build + .org submission (early — external review clock) | ~1 day build |
 | 3.2–3.4 | A2A + MCP adapters + engine option (when ecosystems mature) | 3–4 days |
 
 Prerequisites: launch complete; first cohort onboarded (their real corpora + PMS

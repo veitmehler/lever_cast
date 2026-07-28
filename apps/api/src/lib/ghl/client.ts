@@ -457,7 +457,7 @@ export interface UpsertContactResult {
 export async function upsertGhlContact(
   apiKey: string,
   locationId: string,
-  input: { email: string; tags: string[]; source?: string },
+  input: { email: string; tags: string[]; source?: string; customFields?: { id: string; value: string }[] },
 ): Promise<UpsertContactResult> {
   const data = await ghlRequest<{ contact?: { id?: string } }>(apiKey, '/contacts/upsert', {
     method: 'POST',
@@ -466,9 +466,41 @@ export async function upsertGhlContact(
       email: input.email,
       tags: input.tags,
       ...(input.source ? { source: input.source } : {}),
+      ...(input.customFields?.length ? { customFields: input.customFields } : {}),
     },
   })
   return { contactId: data.contact?.id ?? null }
+}
+
+/**
+ * Resolve the "Guide Link" contact custom field id for a location (snapshot
+ * asset, 2026-07-28: the single per-contact field the nurture email merges —
+ * matched case-insensitively on key/name containing "guide_link"/"guide link").
+ * Cached per location; null when the field doesn't exist (older snapshots).
+ */
+const guideLinkFieldCache = new Map<string, { id: string | null; at: number }>()
+const GUIDE_LINK_CACHE_MS = 15 * 60 * 1000
+
+export async function getGuideLinkFieldId(apiKey: string, locationId: string): Promise<string | null> {
+  const hit = guideLinkFieldCache.get(locationId)
+  if (hit && Date.now() - hit.at < GUIDE_LINK_CACHE_MS) return hit.id
+  try {
+    const data = await ghlRequest<{ customFields?: { id: string; name?: string; fieldKey?: string }[] }>(
+      apiKey,
+      `/locations/${locationId}/customFields`,
+      { method: 'GET' },
+    )
+    const match = (data.customFields ?? []).find((f) => {
+      const key = (f.fieldKey ?? '').toLowerCase()
+      const name = (f.name ?? '').toLowerCase()
+      return key.includes('guide_link') || name.replace(/\s+/g, '_') === 'guide_link' || name === 'guide link'
+    })
+    const id = match?.id ?? null
+    guideLinkFieldCache.set(locationId, { id, at: Date.now() })
+    return id
+  } catch {
+    return hit?.id ?? null
+  }
 }
 
 // ── Trigger links (QR review card, leadgen plan Phase F option C) ────────────

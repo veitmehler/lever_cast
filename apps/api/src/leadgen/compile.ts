@@ -326,21 +326,29 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
     })
     logger.info({ documentId, driveFileId, pdfKey }, '[leadgen-compile] compiled → pending_review')
 
-    // Guide-link custom value (snapshot drip design, 2026-07-28): each clinic's
-    // location carries guide_link_<slug> so the nurture drip can link every
-    // guide via {{custom_values.…}}. Best-effort — requires the
-    // customValues.write scope; a 4xx here logs and never fails the compile.
+    // Guide trigger link (snapshot drip design, swapped 2026-07-29): each
+    // clinic's location carries an `omniply-guide-<slug>` trigger link the
+    // nurture drip emails use — insertable in the email builder (custom values
+    // are not) and click-tracked per guide. Repointed here at every compile so
+    // regenerated documents keep working links. Best-effort, never fails compile.
     if (driveLink) {
       try {
         const { getGhlCredentials } = await import('../lib/ghl/settings')
-        const { upsertGhlCustomValue } = await import('../lib/ghl/client')
+        const { listTriggerLinks, updateTriggerLink } = await import('../lib/ghl/client')
         const creds = await getGhlCredentials(doc.userId)
         if (creds) {
-          await upsertGhlCustomValue(creds.apiKey, creds.locationId, `guide_link_${doc.slug}`, driveLink)
-          logger.info({ documentId, name: `guide_link_${doc.slug}` }, '[leadgen-compile] guide-link custom value upserted')
+          const linkName = `omniply-guide-${doc.slug}`
+          const links = await listTriggerLinks(creds.apiKey, creds.locationId)
+          const match = links.find((l) => l.name === linkName)
+          if (match) {
+            const ok = await updateTriggerLink(creds.apiKey, match.id, linkName, driveLink)
+            logger.info({ documentId, linkName, ok }, '[leadgen-compile] guide trigger link repointed')
+          } else {
+            logger.info({ documentId, linkName }, '[leadgen-compile] guide trigger link not found (older snapshot) — skipped')
+          }
         }
       } catch (err) {
-        logger.warn({ documentId, err }, '[leadgen-compile] guide-link custom value failed (scope pending?) — non-fatal')
+        logger.warn({ documentId, err }, '[leadgen-compile] guide trigger-link repoint failed — non-fatal')
       }
     }
   } catch (err) {

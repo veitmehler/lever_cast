@@ -11,7 +11,8 @@ import type PgBoss from 'pg-boss'
 import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
-import { driveConfigured, listAccessProposals, resolveAccessProposal } from '../lib/gdrive/client'
+import { driveConfigured, listAccessProposals, resolveAccessProposal, grantReader } from '../lib/gdrive/client'
+import { rotateDocumentDriveFile, estimateSharesSinceRotation, ROTATION_THRESHOLD } from '../leadgen/rotate'
 import { getGhlCredentials } from '../lib/ghl/settings'
 import { upsertGhlContact, getGuideLinkFieldId } from '../lib/ghl/client'
 
@@ -20,7 +21,7 @@ export async function leadgenPollHandler(_jobs: PgBoss.Job<object>[]): Promise<v
 
   const docs = await prisma.leadGenDocument.findMany({
     where: { status: 'live', driveFileId: { not: null } },
-    select: { id: true, accountId: true, userId: true, driveFileId: true, driveLink: true, slug: true, ghlTagNames: true },
+    select: { id: true, accountId: true, userId: true, driveFileId: true, driveLink: true, slug: true, ghlTagNames: true, rotatedAt: true, createdAt: true },
   })
   if (docs.length === 0) {
     await retryFailedGhlCaptures()
@@ -50,6 +51,16 @@ export async function leadgenPollHandler(_jobs: PgBoss.Job<object>[]): Promise<v
         continue // retry next tick — proposal stays pending
       }
 
+      // 1b. Grant-all (drip design, 2026-07-29): this email is now KNOWN — grant
+      // it reader access on the account's OTHER live guides silently, so every
+      // later drip link opens without another request-access wall.
+      const siblings = docs.filter((d) => d.accountId === doc.accountId && d.id !== doc.id && d.driveFileId)
+      for (const sib of siblings) {
+        await grantReader(sib.driveFileId!, requesterEmail, false).catch((err) =>
+          logger.warn({ documentId: sib.id, err }, '[leadgen-poll] sibling grant failed (non-fatal)'),
+        )
+      }
+
       // 2. Capture the lead.
       const capture = await prisma.leadCapture.create({
         data: {
@@ -65,6 +76,22 @@ export async function leadgenPollHandler(_jobs: PgBoss.Job<object>[]): Promise<v
   }
 
   await retryFailedGhlCaptures()
+
+  // ACL-rotation check (user design 2026-07-29): grant-all means every account
+  // capture consumes a share slot on EVERY file — rotate any file approaching
+  // Google's ~600 direct-share ceiling. rotatedAt resets the counter.
+  for (const doc of docs) {
+    try {
+      const since = doc.rotatedAt ?? doc.createdAt
+      const shares = await estimateSharesSinceRotation(doc.accountId, since)
+      if (shares >= ROTATION_THRESHOLD) {
+        logger.warn({ documentId: doc.id, shares }, '[leadgen-poll] share ceiling approaching — rotating Drive file')
+        await rotateDocumentDriveFile(doc.id)
+      }
+    } catch (err) {
+      logger.warn({ documentId: doc.id, err }, '[leadgen-poll] rotation check failed (next tick retries)')
+    }
+  }
 }
 
 async function pushCaptureToGhl(

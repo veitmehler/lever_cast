@@ -15,9 +15,12 @@ import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-p
 import { sanitizeDashesText } from '../lib/text/dash-sanitizer'
 import { instrumentCall } from '../lib/net/instrument'
 import { withTimeout } from '../lib/net/with-timeout'
-import { ensureAccountFolder, uploadPdf, driveConfigured, deleteFile } from '../lib/gdrive/client'
+import { ensureAccountFolder, uploadPdf, driveConfigured, deleteFile, grantReader } from '../lib/gdrive/client'
 
 const MODEL = 'gemini-3-flash-preview'
+/** Active-drip window: leads captured within it get silently regranted on a
+ * rotated (recompiled) file so their drip links keep working. */
+const COHORT_REGRANT_DAYS = 42
 const LENGTH_RATIO_MIN = 0.7
 const LENGTH_RATIO_MAX = 1.4
 
@@ -41,6 +44,51 @@ export interface BrandTokens {
   headerColor: string
   accentColor: string
   fontColor: string
+}
+
+/** ROTATION support: grant the recent capture cohort on a fresh file (silent). */
+export async function regrantActiveCohort(accountId: string, newFileId: string, documentId: string): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - COHORT_REGRANT_DAYS * 24 * 60 * 60 * 1000)
+    const recent = await prisma.leadCapture.findMany({
+      where: { document: { accountId }, createdAt: { gte: cutoff }, status: { in: ['captured', 'ghl_failed'] } },
+      select: { requesterEmail: true },
+      distinct: ['requesterEmail'],
+      take: 300,
+    })
+    for (const r of recent) {
+      await grantReader(newFileId, r.requesterEmail, false).catch(() => {})
+    }
+    if (recent.length) logger.info({ documentId, regranted: recent.length }, '[leadgen-compile] active cohort regranted on new file')
+  } catch (err) {
+    logger.warn({ documentId, err }, '[leadgen-compile] cohort regrant failed (non-fatal)')
+  }
+}
+
+/** Repoint the location's omniply-guide-<slug> trigger link at the current Drive file. */
+export async function repointGuideTriggerLink(
+  userId: string,
+  slug: string,
+  driveLink: string,
+  documentId: string,
+): Promise<void> {
+  try {
+    const { getGhlCredentials } = await import('../lib/ghl/settings')
+    const { listTriggerLinks, updateTriggerLink } = await import('../lib/ghl/client')
+    const creds = await getGhlCredentials(userId)
+    if (!creds) return
+    const linkName = `omniply-guide-${slug}`
+    const links = await listTriggerLinks(creds.apiKey, creds.locationId)
+    const match = links.find((l) => l.name === linkName)
+    if (match) {
+      const ok = await updateTriggerLink(creds.apiKey, match.id, linkName, driveLink)
+    logger.info({ documentId, linkName, ok }, '[leadgen-compile] guide trigger link repointed')
+    } else {
+      logger.info({ documentId, linkName }, '[leadgen-compile] guide trigger link not found (older snapshot) — skipped')
+    }
+  } catch (err) {
+    logger.warn({ documentId, err }, '[leadgen-compile] guide trigger-link repoint failed — non-fatal')
+  }
 }
 
 async function brandTokensFor(userId: string): Promise<BrandTokens> {
@@ -307,10 +355,14 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
         folderId = await ensureAccountFolder(doc.accountId, doc.account.name ?? 'client')
         await prisma.account.update({ where: { id: doc.accountId }, data: { driveFolderId: folderId } })
       }
-      if (doc.driveFileId) await deleteFile(doc.driveFileId) // regenerate replaces
+      // ROTATION (2026-07-29): never delete the old generation — previously
+      // granted leads keep their access; the old id is archived and the new
+      // file starts with a fresh ~600-share ACL budget.
       const uploaded = await uploadPdf(folderId, `${doc.title}.pdf`, pdf)
       driveFileId = uploaded.fileId
       driveLink = uploaded.webViewLink
+
+      await regrantActiveCohort(doc.accountId, driveFileId, documentId)
     }
 
     await prisma.leadGenDocument.update({
@@ -321,6 +373,10 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
         driveFileId,
         driveLink,
         compiledAt: new Date(),
+        rotatedAt: new Date(),
+        ...(doc.driveFileId && doc.driveFileId !== driveFileId
+          ? { archivedDriveFileIds: { push: doc.driveFileId } }
+          : {}),
         lastError: null,
       },
     })
@@ -331,26 +387,7 @@ export async function compileLeadGenDocument(documentId: string, feedbackNote?: 
     // nurture drip emails use — insertable in the email builder (custom values
     // are not) and click-tracked per guide. Repointed here at every compile so
     // regenerated documents keep working links. Best-effort, never fails compile.
-    if (driveLink) {
-      try {
-        const { getGhlCredentials } = await import('../lib/ghl/settings')
-        const { listTriggerLinks, updateTriggerLink } = await import('../lib/ghl/client')
-        const creds = await getGhlCredentials(doc.userId)
-        if (creds) {
-          const linkName = `omniply-guide-${doc.slug}`
-          const links = await listTriggerLinks(creds.apiKey, creds.locationId)
-          const match = links.find((l) => l.name === linkName)
-          if (match) {
-            const ok = await updateTriggerLink(creds.apiKey, match.id, linkName, driveLink)
-            logger.info({ documentId, linkName, ok }, '[leadgen-compile] guide trigger link repointed')
-          } else {
-            logger.info({ documentId, linkName }, '[leadgen-compile] guide trigger link not found (older snapshot) — skipped')
-          }
-        }
-      } catch (err) {
-        logger.warn({ documentId, err }, '[leadgen-compile] guide trigger-link repoint failed — non-fatal')
-      }
-    }
+    if (driveLink) await repointGuideTriggerLink(doc.userId, doc.slug, driveLink, documentId)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logger.error({ documentId, err }, '[leadgen-compile] FAILED')
@@ -428,15 +465,27 @@ export async function compileCustomDocument(documentId: string, addCover: boolea
         folderId = await ensureAccountFolder(doc.accountId, doc.account.name ?? 'client')
         await prisma.account.update({ where: { id: doc.accountId }, data: { driveFolderId: folderId } })
       }
-      if (doc.driveFileId) await deleteFile(doc.driveFileId)
+      // ROTATION: archive, never delete — see compileLeadGenDocument.
       const uploaded = await uploadPdf(folderId, `${doc.title}.pdf`, finalPdf)
       driveFileId = uploaded.fileId
       driveLink = uploaded.webViewLink
+      await regrantActiveCohort(doc.accountId, driveFileId, documentId)
     }
 
     await prisma.leadGenDocument.update({
       where: { id: documentId },
-      data: { status: 'pending_review', pdfKey, driveFileId, driveLink, compiledAt: new Date(), lastError: null },
+      data: {
+        status: 'pending_review',
+        pdfKey,
+        driveFileId,
+        driveLink,
+        compiledAt: new Date(),
+        rotatedAt: new Date(),
+        ...(doc.driveFileId && doc.driveFileId !== driveFileId
+          ? { archivedDriveFileIds: { push: doc.driveFileId } }
+          : {}),
+        lastError: null,
+      },
     })
     logger.info({ documentId, addCover }, '[leadgen-compile] custom upload processed → pending_review')
   } catch (err) {

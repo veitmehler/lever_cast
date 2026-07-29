@@ -150,8 +150,8 @@ export async function deleteFile(fileId: string): Promise<void> {
 
 // ── Permissions & access proposals ────────────────────────────────────────────
 
-export async function grantReader(fileId: string, email: string): Promise<void> {
-  await driveRequest(`/files/${fileId}/permissions?${sd({ sendNotificationEmail: 'true' })}`, {
+export async function grantReader(fileId: string, email: string, notify = true): Promise<void> {
+  await driveRequest(`/files/${fileId}/permissions?${sd({ sendNotificationEmail: notify ? 'true' : 'false' })}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }),

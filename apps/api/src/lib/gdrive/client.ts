@@ -1,13 +1,17 @@
 /**
  * Google Drive client for the central lead-gen Drive (leadgen plan Phase 1).
  *
- * Auth: service-account JWT (RS256 via node:crypto — no googleapis dependency)
- * exchanged for a cached access token. The service account OWNS every file, so
- * it is always an approver for access proposals.
- *
- * Env: GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON — the key JSON, raw or base64.
- * Optional: GOOGLE_DRIVE_ROOT_FOLDER_ID — parent for all account folders
- * (e.g. a Shared Drive folder if the spike lands there).
+ * Auth (2026-07-30, two branches — OAuth preferred):
+ * 1. OAUTH REFRESH TOKEN — Google zeroed service-account storage quotas
+ *    (uploads 403), so the platform acts as the operator's own Google account
+ *    via a one-time consent (drive.file scope: only app-created files, no
+ *    restricted-scope verification; Production consent status = token never
+ *    auto-expires). Env: GOOGLE_DRIVE_OAUTH_CLIENT_ID / _CLIENT_SECRET /
+ *    _REFRESH_TOKEN.
+ * 2. SERVICE-ACCOUNT JWT (legacy fallback; folders work, uploads 403) —
+ *    Env: GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON (raw or base64).
+ * Optional: GOOGLE_DRIVE_ROOT_FOLDER_ID — parent for all account folders.
+ * No googleapis dependency; RS256 via node:crypto.
  */
 import { createSign } from 'node:crypto'
 import { logger } from '../logger'
@@ -33,12 +37,39 @@ function serviceAccount(): ServiceAccountKey {
   return JSON.parse(json) as ServiceAccountKey
 }
 
+function oauthConfigured(): boolean {
+  return !!(
+    process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID &&
+    process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET &&
+    process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN
+  )
+}
+
 export function driveConfigured(): boolean {
-  return !!process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
+  return oauthConfigured() || !!process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
 }
 
 async function accessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token
+
+  // Preferred: operator OAuth (files owned by a real account with quota).
+  if (oauthConfigured()) {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET!,
+        refresh_token: process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN!,
+      }),
+    })
+    if (!res.ok) throw new Error(`Drive OAuth refresh failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
+    const data = (await res.json()) as { access_token: string; expires_in: number }
+    cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 }
+    return data.access_token
+  }
+
   const sa = serviceAccount()
   const now = Math.floor(Date.now() / 1000)
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')

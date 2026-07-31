@@ -1,5 +1,5 @@
 === Omniply Connect ===
-Contributors: omniply
+Contributors: veitmehler
 Tags: schema, structured data, json-ld, seo
 Requires at least: 5.5
 Tested up to: 7.0

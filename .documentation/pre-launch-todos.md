@@ -58,8 +58,13 @@ production (env backup: `/opt/socioply/.env.production.bak-20260731`).
 
 ## 4. Freeze week (the week before vacation)
 
-- [ ] Droplet OS updates (28 pending packages) + reboot, BOTH droplets — after checking
-  for in-flight jobs; verify containers come back healthy (`/health/deep`).
+- [ ] Droplet OS updates + reboot, BOTH droplets — after checking for in-flight jobs;
+  verify containers come back healthy (`/health/deep`). **Big backlog done early
+  2026-08-03** (~60 pkgs incl. docker/tailscale/kernel + reboots, both boxes verified
+  healthy, health 200) so the rehearsal tests the updated system; freeze week only
+  needs the light delta accumulated since, done together with the DB upsize (§1).
+  Ops note: run upgrades via `systemd-run` on the host, NOT from an SSH/docker-attached
+  shell — the docker-ce upgrade restarts the daemon and kills attached sessions mid-apt.
 - [ ] Final rehearsal purchase through the live funnel (Stripe → provision → onboard →
   first content run).
 - [ ] Snapshot frozen + re-exported after the last workflow/asset change.

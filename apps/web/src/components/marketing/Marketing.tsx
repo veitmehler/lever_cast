@@ -101,23 +101,27 @@ function HexDot() {
 }
 
 /* ── Diagram 1: sawtooth vs compounding consistency ─────────────────────── */
-export function ConsistencyGraph() {
+export function ConsistencyGraph({ onDark }: { onDark?: boolean }) {
+  const axis = onDark ? '#343434' : TOKENS.line
+  const dim = onDark ? 'rgba(255,255,255,0.6)' : TOKENS.muted
+  const curve = onDark ? TOKENS.lime : TOKENS.accent
+  const label = onDark ? TOKENS.lime : TOKENS.accentDeep
   return (
     <figure className="my-10">
       <svg viewBox="0 0 560 260" className="w-full">
-        <line x1="40" y1="220" x2="540" y2="220" stroke={TOKENS.line} strokeWidth="2" />
-        <line x1="40" y1="220" x2="40" y2="20" stroke={TOKENS.line} strokeWidth="2" />
-        <text x="290" y="248" textAnchor="middle" fontSize="13" fill={TOKENS.muted}>Months of marketing</text>
-        <text x="18" y="120" textAnchor="middle" fontSize="13" fill={TOKENS.muted} transform="rotate(-90 18 120)">Patient attention</text>
+        <line x1="40" y1="220" x2="540" y2="220" stroke={axis} strokeWidth="2" />
+        <line x1="40" y1="220" x2="40" y2="20" stroke={axis} strokeWidth="2" />
+        <text x="290" y="248" textAnchor="middle" fontSize="13" fill={dim}>Months of marketing</text>
+        <text x="18" y="120" textAnchor="middle" fontSize="13" fill={dim} transform="rotate(-90 18 120)">Patient attention</text>
         {/* sawtooth: bursts that decay */}
-        <path d="M40 218 L80 150 L120 210 L160 140 L200 205 L240 155 L280 212 L330 160 L380 214" fill="none" stroke={TOKENS.muted} strokeWidth="3" strokeDasharray="1 0" opacity="0.75" />
-        <text x="385" y="228" fontSize="13" fill={TOKENS.muted} fontWeight="700">Bursts (most practices)</text>
+        <path d="M40 218 L80 150 L120 210 L160 140 L200 205 L240 155 L280 212 L330 160 L380 214" fill="none" stroke={dim} strokeWidth="3" strokeDasharray="1 0" opacity="0.75" />
+        <text x="385" y="228" fontSize="13" fill={dim} fontWeight="700">Bursts (most practices)</text>
         {/* compounding */}
-        <path d="M40 218 C 200 210, 330 170, 420 100 C 470 62, 510 42, 540 30" fill="none" stroke={TOKENS.accent} strokeWidth="4" />
-        <circle cx="540" cy="30" r="6" fill={TOKENS.accent} />
-        <text x="440" y="60" fontSize="14" fill={TOKENS.accentDeep} fontWeight="700">Weekly, every week</text>
+        <path d="M40 218 C 200 210, 330 170, 420 100 C 470 62, 510 42, 540 30" fill="none" stroke={curve} strokeWidth="4" />
+        <circle cx="540" cy="30" r="6" fill={curve} />
+        <text x="440" y="60" fontSize="14" fill={label} fontWeight="700">Weekly, every week</text>
       </svg>
-      <figcaption className="mt-2 text-center text-sm" style={{ color: TOKENS.muted }}>
+      <figcaption className="mt-2 text-center text-sm" style={{ color: dim }}>
         Attention compounds only when content ships every week. Bursts reset to zero.
       </figcaption>
     </figure>

@@ -23,7 +23,7 @@ import {
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
-  title: 'Omniply — Marketing Autopilot for Local Practices',
+  title: 'Omniply... Marketing Autopilot for Local Practices',
   description:
     'One loop, four systems: content in your voice, instant AI response, compounding Google reviews, and patient recall. You approve, it ships. $397/mo flat.',
 }
@@ -89,6 +89,23 @@ export default function HomePage() {
         </div>
       </Section>
 
+
+
+
+
+
+
+      {/* ── Why speed and presence decide ── */}
+      <Section>
+        <Eyebrow>Why it matters now</Eyebrow>
+        <H2>Your clients decide faster than your front desk can answer.</H2>
+        <StatBand />
+        <P>
+          Whoever answers first and stays familiar wins the booking. That is not a slogan, it is the measured
+          behavior of people choosing a local practice today.
+        </P>
+      </Section>
+
       {/* ── The Loop ── */}
       <Section dark>
         <Eyebrow>The mechanism</Eyebrow>
@@ -112,30 +129,6 @@ export default function HomePage() {
           It is not four tools. It is one flywheel: presence keeps clients warm, warm clients return and
           leave reviews, reviews bring new inquiries, instant response converts them, recall keeps them.
           Break any link and the leak reopens somewhere else.
-        </P>
-      </Section>
-
-      {/* ── How it runs (dark: PipelineDiagram uses white linework) ── */}
-      <Section dark>
-        <Eyebrow>How it runs</Eyebrow>
-        <H2>A pipeline with one gate: you.</H2>
-        <P>
-          Omniply is not an assistant you prompt. It is a pipeline that runs on a fixed weekly rhythm, holds
-          everything at a review gate where you approve with one click, and publishes across every channel on
-          schedule. The same input produces the same quality, week after week... and the one thing the machine
-          never does is skip a week.
-        </P>
-        <PipelineDiagram />
-      </Section>
-
-      {/* ── Why speed and presence decide ── */}
-      <Section>
-        <Eyebrow>Why it matters now</Eyebrow>
-        <H2>Your clients decide faster than your front desk can answer.</H2>
-        <StatBand />
-        <P>
-          Whoever answers first and stays familiar wins the booking. That is not a slogan, it is the measured
-          behavior of people choosing a local practice today.
         </P>
       </Section>
 
@@ -165,17 +158,17 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* ── Founder ── */}
-      <Section>
-        <Eyebrow>Who built this</Eyebrow>
-        <H2>Sixteen years of doing this manually taught me exactly what to automate.</H2>
+      {/* ── How it runs (dark: PipelineDiagram uses white linework) ── */}
+      <Section dark>
+        <Eyebrow>How it runs</Eyebrow>
+        <H2>A pipeline with one gate: you.</H2>
         <P>
-          I have spent 16 years running marketing for health professionals and local practices. The system
-          inside Omniply is the playbook elite practice coaches teach their clients to execute by hand... the
-          one that works every time it is actually executed, and fails every time life gets in the way of
-          executing it. So I learned to code and built the version that cannot get tired, cannot get busy, and
-          cannot skip a week.
+          Omniply is not an assistant you prompt. It is a pipeline that runs on a fixed weekly rhythm, holds
+          everything at a review gate where you approve with one click, and publishes across every channel on
+          schedule. The same input produces the same quality, week after week... and the one thing the machine
+          never does is skip a week.
         </P>
+        <PipelineDiagram />
       </Section>
 
       {/* ── FAQ ── */}
@@ -185,8 +178,18 @@ export default function HomePage() {
         <Faq items={FAQ_ITEMS} />
       </Section>
 
-      {/* ── Close ── */}
+      {/* ── Founder + Close ── */}
       <Section dark>
+        <Eyebrow>Who built this</Eyebrow>
+        <H2>Sixteen years of doing this manually taught me exactly what to automate.</H2>
+        <P>
+          I have spent 16 years running marketing for health professionals and local practices. The system
+          inside Omniply is the playbook elite practice coaches teach their clients to execute by hand... the
+          one that works every time it is actually executed, and fails every time life gets in the way of
+          executing it. So I learned to code and built the version that cannot get tired, cannot get busy, and
+          cannot skip a week.
+        </P>
+        <div className="my-12 h-px w-full" style={{ background: '#343434' }} />
         <H2>Start where the doctors start: with the X-Ray.</H2>
         <P lead>
           Two minutes, twelve questions... four system scores and a dollar figure on what your practice is

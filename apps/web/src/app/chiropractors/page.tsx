@@ -27,7 +27,7 @@ import {
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
-  title: 'Omniply for Chiropractors — Plug the Leak in Your Practice',
+  title: 'Omniply for Chiropractors... Plug the Leak in Your Practice',
   description:
     'Patients do not leave, they fade. Omniply runs the loop that stops it: content in your voice, AI response in seconds, compounding reviews, systematic recall. X-Ray your practice in 2 minutes.',
 }
@@ -75,7 +75,7 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: 'Do I need a WordPress website?',
-    a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically — that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
+    a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically... that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
   },
 ]
 
@@ -128,7 +128,7 @@ export default function ChiropractorsPage() {
       </Section>
 
       {/* ── Belief shift ── */}
-      <Section>
+      <Section dark>
         <Eyebrow>Why effort can&apos;t fix it</Eyebrow>
         <H2>You&apos;ve already tried the obvious fix. It&apos;s called trying harder.</H2>
         <P>
@@ -149,7 +149,7 @@ export default function ChiropractorsPage() {
           You need sleep. Your family needs you. And you cannot out-hustle a force that never sleeps... you
           can only out-system it. The practices that grow are simply the ones where the system runs anyway.
         </P>
-        <ConsistencyGraph />
+        <ConsistencyGraph onDark />
       </Section>
 
       {/* ── Drift ── */}
@@ -222,7 +222,7 @@ export default function ChiropractorsPage() {
       </Section>
 
       {/* ── The Prognosis ── */}
-      <Section>
+      <Section dark>
         <Eyebrow>The prognosis</Eyebrow>
         <H2>What your practice looks like ninety days into treatment.</H2>
         <ul>
@@ -262,7 +262,7 @@ export default function ChiropractorsPage() {
       </Section>
 
       {/* ── Founder ── */}
-      <Section>
+      <Section dark>
         <Eyebrow>Who built this</Eyebrow>
         <H2>Built by someone who spent 16 years marketing practices like yours by hand.</H2>
         <P>

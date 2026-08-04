@@ -37,25 +37,35 @@ body,
   margin-top: 6px;
 }
 
-/* inputs */
+/* inputs: modern underline-only fields (no boxes)
+   NOTE: card number / expiry / CVC are Stripe-hosted iframes and cannot be
+   restyled from page CSS — they keep their boxes. */
 .container-order-form-two-step .form-input.input,
 .container-order-form-two-step input[type='text'],
 .container-order-form-two-step input[type='tel'],
 .container-order-form-two-step input[type='email'],
+.container-order-form-two-step .iti input,
 .container-order-form-two-step select {
-  border: 1px solid #e2e3e6 !important;
-  border-radius: 10px !important;
-  padding: 14px 16px;
+  border: none !important;
+  border-bottom: 2px solid #e2e3e6 !important;
+  border-radius: 0 !important;
+  padding: 14px 6px 12px 6px;
   font-size: 16px;
   color: #1a1a1c;
-  background: #ffffff;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .container-order-form-two-step .form-input.input:focus,
 .container-order-form-two-step input:focus,
+.container-order-form-two-step .iti input:focus,
 .container-order-form-two-step select:focus {
-  border-color: #84b420 !important;
-  box-shadow: 0 0 0 3px rgba(195, 244, 59, 0.35) !important;
+  border-bottom-color: #84b420 !important;
+  box-shadow: none !important;
   outline: none;
+}
+/* keep the phone flag aligned with the underline style */
+.container-order-form-two-step .iti {
+  border-bottom: none;
 }
 
 /* section labels (PAYMENT etc.) */
@@ -82,12 +92,11 @@ body,
   accent-color: #84b420;
 }
 
-/* the button: lime, dark text, site radius */
-.container-order-form-two-step button[type='submit'],
-.container-order-form-two-step .order-submit,
-.container-order-form-two-step .submit-button,
-.container-order-form-two-step .main-btn,
-.container-order-form-two-step .form-body > div > button {
+/* the button: lime, dark text, site radius.
+   Catch-all: the submit is the only <button> inside the order widget. */
+div[id^='one-step-order'] button,
+div[class*='one-step-order'] button,
+.container-order-form-two-step button {
   background: #c3f43b !important;
   color: #0b0b0c !important;
   border: none !important;
@@ -97,15 +106,16 @@ body,
   padding: 16px !important;
   transition: filter 0.15s ease;
 }
-.container-order-form-two-step button[type='submit']:hover,
-.container-order-form-two-step .order-submit:hover,
-.container-order-form-two-step .main-btn:hover {
+div[id^='one-step-order'] button:hover,
+.container-order-form-two-step button:hover {
   filter: brightness(0.95);
 }
 /* keep the disabled state visibly disabled, but on-brand */
+div[id^='one-step-order'] button[disabled],
 .container-order-form-two-step button[disabled] {
-  background: #e9f7c4 !important;
-  color: #8a8a90 !important;
+  background: #dcf19a !important;
+  color: #6e6e74 !important;
+  cursor: not-allowed;
 }
 
 /* fine print */

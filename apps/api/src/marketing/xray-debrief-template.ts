@@ -188,18 +188,19 @@ export function buildDebriefHtml(d: DebriefTemplateData): string {
 </head>
 <body>
 
-<!-- P1 · COVER — title block sits ~2/3 down to invite the scroll -->
+<!-- P1 · COVER — eyebrow pinned top, title starts at 50% -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div style="flex: 1;"></div>
-  <div class="eyebrow">Omniply &middot; Following your Practice X-Ray</div>
-  <h1 class="display">X-Ray<br />Debrief</h1>
-  <div class="scanline"></div>
-  <p class="body dim" style="font-size: 14pt; max-width: 4.9in;">The treatment plan for the leak your X-Ray found.</p>
-  <div style="font-family: var(--mono); font-size: 10.5pt; letter-spacing: 0.22em; text-transform: uppercase; color: #C9C9CF; margin-top: 0.35in;">
-    Prepared for <span style="color: var(--ink);">${d.preparedFor}</span> &middot; ${d.scanDate}
+  <div class="eyebrow" style="margin-bottom: 0;">Omniply &middot; Following your Practice X-Ray</div>
+  <div style="position: absolute; top: 5.5in; left: 0.9in; right: 0.9in;">
+    <h1 class="display">X-Ray<br />Debrief</h1>
+    <div class="scanline"></div>
+    <p class="body dim" style="font-size: 14pt; max-width: 4.9in;">The treatment plan for the leak your X-Ray found.</p>
+    <div style="font-family: var(--mono); font-size: 10.5pt; letter-spacing: 0.22em; text-transform: uppercase; color: #C9C9CF; margin-top: 0.35in;">
+      Prepared for <span style="color: var(--ink);">${d.preparedFor}</span> &middot; ${d.scanDate}
+    </div>
   </div>
-  <div class="foot" style="margin-top: 0.35in;"><span>Confidential &middot; Prepared from your X-Ray answers</span><span>omniply.io</span></div>
+  <div class="foot"><span>Confidential &middot; Prepared from your X-Ray answers</span><span>omniply.io</span></div>
 </div>
 
 <!-- P2 · YOUR X-RAY RESULTS -->

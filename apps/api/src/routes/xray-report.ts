@@ -158,7 +158,7 @@ const PDF_HEADERS = { type: 'application/pdf', disposition: 'inline; filename="X
 const S3_PREFIX = 'xray-reports/'
 // Bump on template design changes: it feeds the publish id so already-published
 // reports re-render with the new design instead of serving the old S3 object.
-const TEMPLATE_VERSION = '2'
+const TEMPLATE_VERSION = '3'
 
 function publicApiBase(): string {
   return (process.env.XRAY_PUBLIC_API_BASE ?? 'https://svc.omniply.io').replace(/\/$/, '')

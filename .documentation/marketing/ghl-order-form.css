@@ -1,0 +1,115 @@
+/* ── Omniply order form — paste into GHL funnel page: Settings → Custom CSS ──
+   Aligns the one-step order form with the omniply.io design system:
+   near-black ground (#0E0E0F), white card, lime CTA (#C3F43B on #0B0B0C),
+   deep lime-green accents (#5F8A14) on light surfaces, system font stack.
+   Written against GHL's one-step order form classes (2026-08). */
+
+/* page ground: match the sales pages */
+body,
+.bgCover {
+  background: #0E0E0F !important;
+}
+
+/* the card */
+.container-order-form-two-step {
+  background: #ffffff;
+  border: 1px solid #e2e3e6;
+  border-radius: 14px;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.5);
+  padding: 30px 26px;
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* step heading → eyebrow treatment + subheading as the real title */
+.form-step .form-heading,
+.form-step .form-heading.active {
+  color: #5f8a14 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 16px;
+  font-weight: 800;
+}
+.form-step .form-sub-heading {
+  display: block;
+  color: #1a1a1c;
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 6px;
+}
+
+/* inputs */
+.container-order-form-two-step .form-input.input,
+.container-order-form-two-step input[type='text'],
+.container-order-form-two-step input[type='tel'],
+.container-order-form-two-step input[type='email'],
+.container-order-form-two-step select {
+  border: 1px solid #e2e3e6 !important;
+  border-radius: 10px !important;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: #1a1a1c;
+  background: #ffffff;
+}
+.container-order-form-two-step .form-input.input:focus,
+.container-order-form-two-step input:focus,
+.container-order-form-two-step select:focus {
+  border-color: #84b420 !important;
+  box-shadow: 0 0 0 3px rgba(195, 244, 59, 0.35) !important;
+  outline: none;
+}
+
+/* section labels (PAYMENT etc.) */
+.container-order-form-two-step section.info + *,
+.container-order-form-two-step [class*='label'],
+.container-order-form-two-step legend {
+  color: #55555c;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+/* prices / amounts / links: brand green instead of default blue */
+.container-order-form-two-step a,
+.container-order-form-two-step [class*='price'],
+.container-order-form-two-step [class*='amount'],
+.container-order-form-two-step [class*='Price'],
+.container-order-form-two-step [class*='Amount'] {
+  color: #5f8a14 !important;
+}
+
+/* product radios */
+.container-order-form-two-step input[type='radio'],
+.container-order-form-two-step input[type='checkbox'] {
+  accent-color: #84b420;
+}
+
+/* the button: lime, dark text, site radius */
+.container-order-form-two-step button[type='submit'],
+.container-order-form-two-step .order-submit,
+.container-order-form-two-step .submit-button,
+.container-order-form-two-step .main-btn,
+.container-order-form-two-step .form-body > div > button {
+  background: #c3f43b !important;
+  color: #0b0b0c !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  padding: 16px !important;
+  transition: filter 0.15s ease;
+}
+.container-order-form-two-step button[type='submit']:hover,
+.container-order-form-two-step .order-submit:hover,
+.container-order-form-two-step .main-btn:hover {
+  filter: brightness(0.95);
+}
+/* keep the disabled state visibly disabled, but on-brand */
+.container-order-form-two-step button[disabled] {
+  background: #e9f7c4 !important;
+  color: #8a8a90 !important;
+}
+
+/* fine print */
+.container-order-form-two-step + p,
+.container-order-form-two-step [class*='secure'] {
+  color: #8a8a90;
+}

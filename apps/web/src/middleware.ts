@@ -35,6 +35,9 @@ const isPublicRoute = createRouteMatcher([
   // Public marketing pages (reviewable on any host).
   '/home(.*)',
   '/chiropractors(.*)',
+  // Practice X-Ray funnel (static pages in public/, clean URLs via rewrites).
+  '/x-ray(.*)',
+  '/walkthrough(.*)',
 ])
 
 function isOmniplyDomain(host: string) {

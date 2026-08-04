@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  async rewrites() {
+    // Marketing funnel pages are self-contained static files in public/ —
+    // rewrites give them clean URLs.
+    return [
+      { source: '/x-ray', destination: '/x-ray/index.html' },
+      { source: '/walkthrough', destination: '/walkthrough/index.html' },
+    ]
+  },
   async headers() {
     return [
       {

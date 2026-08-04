@@ -6,7 +6,9 @@ export function initSentry(serviceName: 'api' | 'worker') {
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV ?? 'production',
+    // NODE_ENV is 'production' on the staging droplet too (production builds),
+    // so the deploy env must be named explicitly or staging errors page as prod.
+    environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'production',
     release: process.env.GIT_SHA ?? undefined,
     tracesSampleRate: 0.1,
     profilesSampleRate: 0.1,

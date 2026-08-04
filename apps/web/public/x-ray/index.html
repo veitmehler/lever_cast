@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Practice X-Ray — See the revenue your practice can't</title>
+<meta name="description" content="You X-ray patients before treating them. Nobody's ever X-rayed your practice. 12 questions, 2 minutes — your Practice Autopilot Score and the monthly revenue your practice is leaking." />
+<meta property="og:title" content="The Practice X-Ray" />
+<meta property="og:description" content="See the revenue your practice can't. 12 questions, 2 minutes." />
+<meta property="og:type" content="website" />
+<style>
+  :root {
+    --bg0: #0E0E0F;
+    --bg1: #18181A;
+    --bg2: #2A2A2D;
+    --line: #343434;
+    --ink: #FFFFFF;
+    --dim: #A0A0A5;
+    --lime: #C3F43B;
+    --signal: #E4604E;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg0);
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.5;
+  }
+  /* faint film grain for depth */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .stage {
+    position: relative; z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    padding: 24px 20px 64px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  header.top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0 28px;
+  }
+  .wordmark { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+  .wordmark b { color: var(--ink); font-weight: 600; }
+  select.currency {
+    background: var(--bg1); color: var(--dim); border: 1px solid var(--line);
+    border-radius: 6px; font-family: var(--mono); font-size: 12px; padding: 6px 8px;
+    cursor: pointer;
+  }
+  select.currency:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+  section.screen { display: none; animation: fadeUp 0.4s ease both; }
+  section.screen.active { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .meta {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--dim); margin-bottom: 16px;
+  }
+  .meta .lit { color: var(--lime); }
+
+  /* ── Hook ── */
+  .hook h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.12; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 18px; }
+  .hook h1 em { font-style: normal; color: var(--lime); }
+  .hook .tagline { font-size: 17px; color: var(--dim); margin-bottom: 28px; max-width: 44ch; }
+  .hook .contract {
+    display: flex; gap: 20px; margin-bottom: 36px;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--dim);
+  }
+  .hook .contract span::before { content: "— "; color: var(--lime); }
+
+  .btn {
+    display: inline-block;
+    background: var(--lime); color: #0B0B0C;
+    border: none; border-radius: 10px; cursor: pointer;
+    font-family: var(--sans); font-size: 17px; font-weight: 650;
+    padding: 16px 30px; text-decoration: none; text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 30px rgba(195, 244, 59, 0.18); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .btn[disabled] { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
+
+  /* ── Questions ── */
+  .progress { height: 2px; background: var(--line); border-radius: 1px; margin-bottom: 14px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--lime); width: 0%; transition: width 0.35s ease; }
+  .q h2 { font-size: clamp(21px, 4.2vw, 27px); line-height: 1.25; font-weight: 650; letter-spacing: -0.01em; margin: 6px 0 26px; }
+  .answers { display: flex; flex-direction: column; gap: 10px; }
+  .answers button {
+    text-align: left; background: var(--bg1); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+    font-family: var(--sans); font-size: 16px; padding: 16px 18px; min-height: 56px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .answers button:hover { border-color: var(--dim); }
+  .answers button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  .answers button.selected { border-color: var(--lime); background: #1C2214; }
+
+  .sliderwrap { background: var(--bg1); border: 1px solid var(--line); border-radius: 12px; padding: 22px 20px 18px; margin-bottom: 12px; }
+  .sliderwrap label { display: block; font-size: 15px; color: var(--dim); margin-bottom: 14px; }
+  .sliderwrap output {
+    display: block; font-size: 34px; font-weight: 700; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; margin-bottom: 12px;
+  }
+  .sliderwrap output small { font-size: 15px; font-weight: 400; color: var(--dim); margin-left: 6px; }
+  input[type="range"] { width: 100%; accent-color: var(--lime); height: 32px; cursor: pointer; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; border-radius: 4px; }
+
+  .navrow { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; }
+  .back {
+    background: none; border: none; color: var(--dim); font-family: var(--mono);
+    font-size: 12px; letter-spacing: 0.12em; cursor: pointer; padding: 8px 0; text-transform: uppercase;
+  }
+  .back:hover { color: var(--ink); }
+  .back:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  .back[hidden] { visibility: hidden; }
+
+  /* ── Scan interstitial ── */
+  .scanbox { position: relative; margin-top: 10vh; text-align: center; padding: 60px 0; overflow: hidden; }
+  .scanbox .meta { margin-bottom: 8px; }
+  .scanline {
+    position: absolute; left: 0; right: 0; top: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--lime), transparent);
+    box-shadow: 0 0 24px 4px rgba(195, 244, 59, 0.35);
+    animation: sweep 2.1s ease-in-out both;
+  }
+  @keyframes sweep { from { top: 0; opacity: 1; } 90% { opacity: 1; } to { top: 100%; opacity: 0; } }
+
+  /* ── Gate ── */
+  .gate h2 { font-size: clamp(22px, 4.5vw, 30px); font-weight: 700; letter-spacing: -0.015em; margin: 4px 0 8px; }
+  .gate p.sub { color: var(--dim); margin-bottom: 26px; }
+  .gate form { display: flex; flex-direction: column; gap: 12px; }
+  .gate input {
+    background: var(--bg1); border: 1px solid var(--line); border-radius: 10px;
+    color: var(--ink); font-family: var(--sans); font-size: 16px; padding: 15px 16px;
+  }
+  .gate input::placeholder { color: #6E6E74; }
+  .gate input:focus-visible { outline: 2px solid var(--lime); outline-offset: 1px; border-color: var(--lime); }
+  .gate .consent { font-size: 12.5px; color: var(--dim); margin-top: 4px; }
+  .gate .btn { margin-top: 10px; }
+  .fielderr { color: var(--signal); font-size: 13px; display: none; }
+
+  /* ── Results ── */
+  .film {
+    position: relative;
+    background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;
+    padding: 30px 26px 26px; margin-bottom: 16px;
+  }
+  /* registration marks */
+  .film::before, .film::after {
+    content: ""; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  }
+  .film::before { top: 10px; left: 10px; border-top: 1px solid var(--dim); border-left: 1px solid var(--dim); }
+  .film::after { bottom: 10px; right: 10px; border-bottom: 1px solid var(--dim); border-right: 1px solid var(--dim); }
+
+  .dialwrap { display: flex; align-items: center; gap: 26px; margin: 18px 0 26px; flex-wrap: wrap; }
+  .dial { width: 148px; height: 148px; flex: none; }
+  .dial .track { stroke: var(--line); }
+  .dial .arc { stroke: var(--lime); stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .dial text { fill: var(--ink); font-family: var(--sans); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dialcap { min-width: 200px; flex: 1; }
+  .dialcap .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+  .dialcap .read { font-size: 16px; color: var(--ink); max-width: 34ch; }
+
+  .bars { display: flex; flex-direction: column; gap: 14px; margin-bottom: 4px; }
+  .bar .row1 { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+  .bar .name { color: var(--ink); }
+  .bar .val { font-family: var(--mono); font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .bar .track { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; }
+  .bar .fill { height: 100%; width: 0%; background: var(--lime); border-radius: 3px; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); }
+  .bar.weak .name { color: var(--signal); }
+  .bar.weak .fill { background: var(--signal); }
+  .bar.weak .val { color: var(--signal); }
+
+  .verdict {
+    border-left: 2px solid var(--signal);
+    padding: 4px 0 4px 16px; margin: 24px 0 4px;
+    font-size: 16px; color: var(--ink);
+  }
+  .verdict b { color: var(--signal); }
+
+  .leakcard { text-align: center; padding: 34px 26px 30px; }
+  .leakcard .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--dim); }
+  .leaknum {
+    font-size: clamp(46px, 11vw, 72px); font-weight: 750; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums; line-height: 1.05; margin: 10px 0 2px;
+  }
+  .leaknum small { font-size: 0.38em; font-weight: 500; color: var(--dim); letter-spacing: 0; }
+  .leakunder { width: 84px; height: 3px; background: var(--signal); margin: 12px auto 18px; border-radius: 2px; }
+  .leaksplit { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-bottom: 8px; }
+  .leaksplit div { font-size: 14px; color: var(--dim); }
+  .leaksplit b { display: block; color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .punch { margin: 18px auto 0; max-width: 46ch; font-size: 16px; color: var(--ink); }
+  .punch b { color: var(--lime); }
+
+  details.math { margin: 14px 0 0; text-align: left; }
+  details.math summary {
+    cursor: pointer; font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--dim); list-style: none; padding: 10px 0;
+  }
+  details.math summary::before { content: "+ "; color: var(--lime); }
+  details.math[open] summary::before { content: "− "; }
+  details.math summary:hover { color: var(--ink); }
+  .assump { display: flex; flex-direction: column; gap: 16px; padding: 8px 0 6px; }
+  .assump .arow label { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--dim); margin-bottom: 6px; gap: 12px; }
+  .assump .arow label output { color: var(--ink); font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .formula { font-family: var(--mono); font-size: 11.5px; color: var(--dim); line-height: 1.7; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+  .ctabox { text-align: center; margin-top: 30px; }
+  .ctabox .btn { width: 100%; max-width: 420px; }
+  .ctabox .under { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; color: var(--dim); margin-top: 12px; text-transform: uppercase; }
+
+  footer.fine {
+    position: relative; z-index: 1;
+    font-size: 12px; color: #6E6E74; text-align: center; padding: 18px 20px 30px; max-width: 640px;
+  }
+  footer.fine a { color: var(--dim); }
+
+  @media (prefers-reduced-motion: reduce) {
+    section.screen { animation: none; }
+    .scanline { animation-duration: 0.01s; }
+    .dial .arc, .bar .fill, .progress i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <header class="top">
+    <div class="wordmark"><b>Omniply</b> · Practice X-Ray</div>
+    <select class="currency" id="currency" aria-label="Currency">
+      <option value="USD" selected>$ USD</option>
+      <option value="AUD">$ AUD</option>
+      <option value="CAD">$ CAD</option>
+      <option value="NZD">$ NZD</option>
+      <option value="GBP">£ GBP</option>
+      <option value="EUR">€ EUR</option>
+    </select>
+  </header>
+
+  <!-- ── HOOK ── -->
+  <section class="screen hook active" id="s-hook">
+    <div class="meta">Radiographic assessment · Chiropractic practices</div>
+    <h1>You X-ray patients before treating them. Nobody's ever X-rayed <em>your practice</em>.</h1>
+    <p class="tagline">See the revenue your practice can't. Answer 12 quick questions and get your Practice Autopilot Score — plus the monthly figure your practice is silently leaking.</p>
+    <div class="contract">
+      <span>12 questions</span>
+      <span>2 minutes</span>
+      <span>Your leak, in dollars</span>
+    </div>
+    <button class="btn" id="start">Start my X-Ray</button>
+  </section>
+
+  <!-- ── QUESTIONS ── -->
+  <section class="screen" id="s-q">
+    <div class="progress"><i id="pbar"></i></div>
+    <div class="meta" id="qmeta">Scan 01/12</div>
+    <div class="q" id="qbody"></div>
+    <div class="navrow">
+      <button class="back" id="qback">&larr; Back</button>
+      <button class="btn" id="qnext" hidden>Continue</button>
+    </div>
+  </section>
+
+  <!-- ── SCAN ── -->
+  <section class="screen" id="s-scan">
+    <div class="scanbox">
+      <div class="scanline"></div>
+      <div class="meta">Developing image&hellip;</div>
+      <h2 style="font-weight:650; font-size:22px;">Reading your practice.</h2>
+    </div>
+  </section>
+
+  <!-- ── GATE ── -->
+  <section class="screen gate" id="s-gate">
+    <div class="meta"><span class="lit">●</span> X-Ray complete</div>
+    <h2>Your X-Ray is ready.</h2>
+    <p class="sub">Where should we send your Practice Growth Report?</p>
+    <form id="gateform" novalidate>
+      <input type="text" id="f-name" name="name" placeholder="Your name" autocomplete="name" required />
+      <input type="email" id="f-email" name="email" placeholder="Email — where the report goes" autocomplete="email" required />
+      <span class="fielderr" id="err-email">Please enter a valid email so we can send your report.</span>
+      <input type="tel" id="f-phone" name="phone" placeholder="Mobile (optional)" autocomplete="tel" />
+      <input type="text" id="f-practice" name="practiceName" placeholder="Practice name (optional)" autocomplete="organization" />
+      <button class="btn" type="submit">Reveal my X-Ray results</button>
+      <p class="consent">We'll send your report and practical follow-ups on plugging the leaks. Unsubscribe anytime.</p>
+    </form>
+  </section>
+
+  <!-- ── RESULTS ── -->
+  <section class="screen" id="s-results">
+    <div class="meta" id="rmeta">Practice X-Ray · Results</div>
+
+    <div class="film">
+      <div class="dialwrap">
+        <svg class="dial" viewBox="0 0 120 120" role="img" aria-label="Practice Autopilot Score">
+          <circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="7" />
+          <circle class="arc" id="arc" cx="60" cy="60" r="52" fill="none" stroke-width="7"
+                  transform="rotate(-90 60 60)" />
+          <text id="dialnum" x="60" y="66" text-anchor="middle" font-size="34">0</text>
+          <text x="60" y="84" text-anchor="middle" font-size="9" fill="#A0A0A5" font-family="ui-monospace,monospace">/ 100</text>
+        </svg>
+        <div class="dialcap">
+          <div class="lbl">Practice Autopilot Score</div>
+          <div class="read" id="dialread"></div>
+        </div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+
+    <div class="film leakcard">
+      <div class="lbl">Estimated monthly leak</div>
+      <div class="leaknum" id="leaknum"></div>
+      <div class="leakunder"></div>
+      <div class="leaksplit">
+        <div>Patient drift<b id="leakdrift"></b></div>
+        <div>Missed inquiries<b id="leakresp"></b></div>
+      </div>
+      <p class="punch" id="punch"></p>
+      <details class="math">
+        <summary>Check our math — adjust any assumption</summary>
+        <div class="assump" id="assump"></div>
+        <div class="formula" id="formula"></div>
+      </details>
+    </div>
+
+    <div class="ctabox">
+      <a class="btn" id="cta" href="/walkthrough">Watch the 12-minute Practice Autopilot Walkthrough &rarr;</a>
+      <div class="under">No call. No pressure. The exact system, on screen.</div>
+    </div>
+  </section>
+</div>
+
+<footer class="fine">Estimates are computed from your answers and the stated, adjustable assumptions — they are illustrations, not guarantees. © Omniply · <a href="https://www.omniply.io">omniply.io</a></footer>
+
+<script>
+/*__XRAY_MATH_START__*/
+var XRAY = (function () {
+  'use strict'
+
+  // ── Every tunable in one place ────────────────────────────────────────────
+  // API host follows the page host so staging tests stay on staging
+  // (typeof guard: this block is also eval'd by Node test runners).
+  var API_BASE =
+    typeof location !== 'undefined' && /^staging\./.test(location.hostname)
+      ? 'https://staging-svc.omniply.io'
+      : 'https://svc.omniply.io'
+  var CONFIG = {
+    WEBHOOK_URL: 'https://services.leadconnectorhq.com/hooks/HsevyaesOdFid7b8KC9q/webhook-trigger/e0d9d2bf-3b59-4a39-b321-513e866dcf46', // GHL "X-Ray Lead Capture" inbound webhook
+    REPORT_BASE: API_BASE + '/api/xray/report', // personalized PDF endpoint
+    PUBLISH_URL: API_BASE + '/api/xray/publish', // S3-published short link (falls back to REPORT_BASE)
+    VIDEO_URL: '/walkthrough',
+    PRICE_MONTHLY: 397,
+    // Drift-leak assumptions (all surfaced + adjustable in "Check our math")
+    TARGET_MAINT_RATE: 0.35,         // share of active patients a systematic-recall practice keeps on schedule
+    REALIZATION: 0.5,                // we only credit half the gap — conservatism multiplier
+    MAINT_VISITS_PER_YEAR: 8,
+    // Response-leak assumptions
+    NO_CALLBACK_LOSS: 0.6,           // callers who never try again after a miss
+    WOULD_CONVERT: 0.6,              // share of those who would have become patients
+    FIRST_YEAR_VISITS: 12,           // first-year visits of a new patient (× visit fee = first-year value)
+    WEEKS_PER_MONTH: 4.33,
+    ROUND_TO: 50,                    // display rounding for dollar figures
+  }
+
+  var AXES = {
+    content:   { label: 'Content & Visibility' },
+    speed:     { label: 'Speed-to-Lead & After-Hours' },
+    reviews:   { label: 'Google Review Engine' },
+    retention: { label: 'Patient Retention & Recall' },
+  }
+  // Verdict tie-break: product-strength order
+  var TIEBREAK = ['retention', 'speed', 'reviews', 'content']
+
+  // pts 10/7/3/0 map to how badly inquiries get missed (best → worst)
+  var MISSED_SHARE_BY_PTS = { 10: 0.05, 7: 0.15, 3: 0.25, 0: 0.35 }
+
+  // answers: { a1,a2,a3, b1,b2, c1,c2, d1,d2 } = choice points (10/7/5/3/0 scale)
+  //          { inquiriesWeekly, maintRate (0–0.8), activePatients, visitFee }
+  function axisScores (a) {
+    var content = (a.a1 + a.a2 + a.a3) / 30 * 100
+    var speed = (a.b1 + a.b2) / 20 * 100
+    var reviews = (a.c1 + a.c2) / 20 * 100
+    var d3pts = Math.max(0, Math.min(10, (a.maintRate / CONFIG.TARGET_MAINT_RATE) * 10))
+    var retention = (a.d1 + a.d2 + d3pts) / 30 * 100
+    return {
+      content: Math.round(content),
+      speed: Math.round(speed),
+      reviews: Math.round(reviews),
+      retention: Math.round(retention),
+    }
+  }
+
+  function totalScore (scores) {
+    return Math.round((scores.content + scores.speed + scores.reviews + scores.retention) / 4)
+  }
+
+  function weakestAxis (scores) {
+    var weakest = TIEBREAK[0]
+    for (var i = 0; i < TIEBREAK.length; i++) {
+      if (scores[TIEBREAK[i]] < scores[weakest]) weakest = TIEBREAK[i]
+    }
+    return weakest
+  }
+
+  function missedShare (b1pts, b2pts) {
+    var m1 = MISSED_SHARE_BY_PTS[b1pts] !== undefined ? MISSED_SHARE_BY_PTS[b1pts] : 0.35
+    var m2 = MISSED_SHARE_BY_PTS[b2pts] !== undefined ? MISSED_SHARE_BY_PTS[b2pts] : 0.35
+    return (m1 + m2) / 2
+  }
+
+  function driftLeak (a, o) {
+    o = o || CONFIG
+    var gap = Math.max(0, o.TARGET_MAINT_RATE - a.maintRate)
+    return a.activePatients * gap * o.REALIZATION * a.visitFee * o.MAINT_VISITS_PER_YEAR / 12
+  }
+
+  function responseLeak (a, o) {
+    o = o || CONFIG
+    var firstYearValue = a.visitFee * o.FIRST_YEAR_VISITS
+    return a.inquiriesWeekly * o.WEEKS_PER_MONTH * missedShare(a.b1, a.b2) *
+      o.NO_CALLBACK_LOSS * o.WOULD_CONVERT * firstYearValue
+  }
+
+  function roundDollars (x) {
+    return Math.round(x / CONFIG.ROUND_TO) * CONFIG.ROUND_TO
+  }
+
+  function compute (a, overrides) {
+    var o = overrides ? Object.assign({}, CONFIG, overrides) : CONFIG
+    var scores = axisScores(a)
+    var drift = driftLeak(a, o)
+    var resp = responseLeak(a, o)
+    var total = drift + resp
+    return {
+      scores: scores,
+      total: totalScore(scores),
+      weakest: weakestAxis(scores),
+      driftLeak: roundDollars(drift),
+      responseLeak: roundDollars(resp),
+      totalLeak: roundDollars(total),
+      priceMultiple: Math.max(1, Math.round(total / o.PRICE_MONTHLY)),
+      missedShare: missedShare(a.b1, a.b2),
+    }
+  }
+
+  return { CONFIG: CONFIG, AXES: AXES, compute: compute, axisScores: axisScores, weakestAxis: weakestAxis, missedShare: missedShare, driftLeak: driftLeak, responseLeak: responseLeak, roundDollars: roundDollars }
+})()
+if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
+/*__XRAY_MATH_END__*/
+</script>
+
+<script>
+(function () {
+  'use strict'
+  var $ = function (id) { return document.getElementById(id) }
+
+  // ── Currency ──────────────────────────────────────────────────────────────
+  var SYMBOLS = { USD: '$', AUD: '$', CAD: '$', NZD: '$', GBP: '£', EUR: '€' }
+  var REGION_TO_CCY = { AU: 'AUD', CA: 'CAD', NZ: 'NZD', GB: 'GBP', IE: 'EUR', DE: 'EUR', FR: 'EUR', NL: 'EUR', ES: 'EUR', IT: 'EUR', AT: 'EUR', BE: 'EUR' }
+  var currency = 'USD'
+  try {
+    var region = (Intl.DateTimeFormat().resolvedOptions().locale || navigator.language || '').split('-')[1]
+    if (region && REGION_TO_CCY[region]) currency = REGION_TO_CCY[region]
+  } catch (e) { /* USD default */ }
+  $('currency').value = currency
+  $('currency').addEventListener('change', function () { currency = this.value; renderQuestion() })
+  function sym () { return SYMBOLS[currency] || '$' }
+  function money (n) { return sym() + Math.round(n).toLocaleString('en-US') }
+
+  // ── Question set (12 steps) ───────────────────────────────────────────────
+  var QUESTIONS = [
+    { id: 'a1', axis: 'Content & Visibility', text: 'How often does your practice post on social media?',
+      opts: [['Every day, or close to it', 10], ['A few times a week', 7], ['A few times a month', 3], ['Rarely or never', 0]] },
+    { id: 'a2', axis: 'Content & Visibility', text: 'Who creates your marketing content?',
+      opts: [['A system or agency — it happens without me', 10], ['A staff member, when there’s time', 7], ['I do it myself, usually late at night', 3], ['Nobody, really', 0]] },
+    { id: 'a3', axis: 'Content & Visibility', text: 'Do you send a regular email newsletter to your patient list?',
+      opts: [['Weekly', 10], ['Monthly', 7], ['Occasionally, when we get to it', 3], ['Never', 0]] },
+    { id: 'b1', axis: 'Speed-to-Lead & After-Hours', text: 'A new patient calls while you’re adjusting — or after close. What happens?',
+      opts: [['An AI or answering service books them on the spot', 10], ['Voicemail — we return calls the same day', 7], ['Voicemail — we call back when we can', 3], ['They just miss us', 0]] },
+    { id: 'b2', axis: 'Speed-to-Lead & After-Hours', text: 'How fast do website forms and social messages get answered?',
+      opts: [['Within minutes — it’s automated', 10], ['Same day', 7], ['Within a few days', 3], ['Honestly, some never get answered', 0]] },
+    { id: 'inquiriesWeekly', axis: 'Speed-to-Lead & After-Hours', type: 'slider',
+      text: 'Roughly how many new-patient inquiries per week?', sub: 'Calls, messages and web forms combined',
+      min: 0, max: 50, step: 1, def: 10, unit: '/ week' },
+    { id: 'c1', axis: 'Google Review Engine', text: 'How many Google reviews does your practice have?',
+      opts: [['300 or more', 10], ['100–299', 7], ['30–99', 3], ['Under 30', 0]] },
+    { id: 'c2', axis: 'Google Review Engine', text: 'How do new Google reviews happen?',
+      opts: [['Automatically — every patient gets a request', 10], ['We ask when we remember', 7], ['Patients leave them on their own', 3], ['We avoid asking', 0]] },
+    { id: 'd1', axis: 'Patient Retention & Recall', text: 'A patient finishes their care plan. What happens next?',
+      opts: [['Automated recall — and we stay in touch with real content', 10], ['Front desk tries to rebook them', 7], ['We tell them to come back if the pain returns', 3], ['Nothing structured', 0]] },
+    { id: 'd2', axis: 'Patient Retention & Recall', text: 'How does your practice stay in touch between visits?',
+      opts: [['Regular valuable content — email, social, education', 10], ['Occasional promotions', 5], ['Holiday messages', 3], ['We don’t', 0]] },
+    { id: 'maintRate', axis: 'Patient Retention & Recall', type: 'slider',
+      text: 'What share of your patients come in on a regular maintenance schedule?',
+      min: 0, max: 80, step: 5, def: 20, unit: '%', pct: true },
+    { id: 'numbers', axis: 'Patient Retention & Recall', type: 'sliders2',
+      text: 'Two quick numbers about your practice.',
+      s1: { id: 'activePatients', label: 'Active patients in your database (seen in the last 2 years)', min: 100, max: 5000, step: 50, def: 800 },
+      s2: { id: 'visitFee', label: 'Average visit fee', min: 40, max: 150, step: 5, def: 65, money: true } },
+  ]
+
+  var answers = {}
+  var idx = 0
+  var STORE_KEY = 'omniply-xray-v1'
+
+  // ── Screens ───────────────────────────────────────────────────────────────
+  var screens = ['s-hook', 's-q', 's-scan', 's-gate', 's-results']
+  function show (id) {
+    screens.forEach(function (s) { $(s).classList.toggle('active', s === id) })
+    window.scrollTo({ top: 0 })
+  }
+
+  $('start').addEventListener('click', function () { idx = 0; show('s-q'); renderQuestion() })
+
+  // ── Question rendering ────────────────────────────────────────────────────
+  function renderQuestion () {
+    var q = QUESTIONS[idx]
+    var n = ('0' + (idx + 1)).slice(-2)
+    $('qmeta').innerHTML = 'Scan ' + n + '/12 &middot; ' + q.axis
+    $('pbar').style.width = (idx / QUESTIONS.length * 100) + '%'
+    $('qback').hidden = idx === 0
+    var body = $('qbody')
+    body.innerHTML = ''
+    var h = document.createElement('h2')
+    h.textContent = q.text
+    body.appendChild(h)
+
+    if (!q.type) {
+      $('qnext').hidden = true
+      var wrap = document.createElement('div')
+      wrap.className = 'answers'
+      q.opts.forEach(function (opt) {
+        var b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = opt[0]
+        if (answers[q.id] === opt[1]) b.classList.add('selected')
+        b.addEventListener('click', function () {
+          answers[q.id] = opt[1]
+          b.classList.add('selected')
+          setTimeout(next, 180)
+        })
+        wrap.appendChild(b)
+      })
+      body.appendChild(wrap)
+    } else if (q.type === 'slider') {
+      $('qnext').hidden = false
+      body.appendChild(sliderEl(q.id, q.sub || '', q.min, q.max, q.step, answers[q.id] !== undefined ? (q.pct ? answers[q.id] * 100 : answers[q.id]) : q.def, q.unit, false, q.pct))
+    } else if (q.type === 'sliders2') {
+      $('qnext').hidden = false
+      body.appendChild(sliderEl(q.s1.id, q.s1.label, q.s1.min, q.s1.max, q.s1.step, answers[q.s1.id] || q.s1.def, '', q.s1.money))
+      body.appendChild(sliderEl(q.s2.id, q.s2.label, q.s2.min, q.s2.max, q.s2.step, answers[q.s2.id] || q.s2.def, '', q.s2.money))
+    }
+  }
+
+  function sliderEl (id, label, min, max, step, val, unit, isMoney, isPct) {
+    var wrap = document.createElement('div')
+    wrap.className = 'sliderwrap'
+    var lab = document.createElement('label')
+    lab.textContent = label
+    lab.setAttribute('for', 'sl-' + id)
+    var out = document.createElement('output')
+    var range = document.createElement('input')
+    range.type = 'range'; range.id = 'sl-' + id
+    range.min = min; range.max = max; range.step = step; range.value = val
+    function paint () {
+      var v = Number(range.value)
+      out.innerHTML = (isMoney ? money(v) : v.toLocaleString('en-US')) + (unit ? '<small>' + unit + '</small>' : '')
+      answers[id] = isPct ? v / 100 : v
+    }
+    range.addEventListener('input', paint)
+    paint()
+    if (label) wrap.appendChild(lab)
+    wrap.appendChild(out)
+    wrap.appendChild(range)
+    return wrap
+  }
+
+  function next () {
+    if (idx < QUESTIONS.length - 1) { idx++; renderQuestion() }
+    else finishQuestions()
+  }
+  $('qnext').addEventListener('click', next)
+  $('qback').addEventListener('click', function () { if (idx > 0) { idx--; renderQuestion() } })
+
+  function finishQuestions () {
+    $('pbar').style.width = '100%'
+    show('s-scan')
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    setTimeout(function () { show('s-gate'); $('f-name').focus() }, reduced ? 150 : 2300)
+  }
+
+  // ── Gate & capture ────────────────────────────────────────────────────────
+  $('gateform').addEventListener('submit', function (ev) {
+    ev.preventDefault()
+    var email = $('f-email').value.trim()
+    var ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
+    $('err-email').style.display = ok ? 'none' : 'block'
+    if (!$('f-name').value.trim()) { $('f-name').focus(); return }
+    if (!ok) { $('f-email').focus(); return }
+
+    var result = XRAY.compute(answers)
+    var lead = {
+      name: $('f-name').value.trim(),
+      email: email,
+      phone: $('f-phone').value.trim() || null,
+      practiceName: $('f-practice').value.trim() || null,
+      currency: currency,
+    }
+    persist(lead, result)
+    publishAndSend(lead, result)
+    renderResults(result)
+    show('s-results')
+  })
+
+  function utmParams () {
+    var out = {}
+    try {
+      var p = new URLSearchParams(location.search)
+      p.forEach(function (v, k) { if (k.indexOf('utm_') === 0) out[k] = v })
+    } catch (e) { /* noop */ }
+    return out
+  }
+
+  // Report payload — stateless: all data rides in this base64url string.
+  function reportData (lead) {
+    try {
+      var json = JSON.stringify({ v: 1, n: lead.name, p: lead.practiceName, c: currency, a: answers })
+      return btoa(unescape(encodeURIComponent(json)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    } catch (e) { return null }
+  }
+
+  // Publish to S3 for a short shareable link; fall back to the stateless
+  // ?d= URL if the publish call fails or times out. Webhook fires either way.
+  function publishAndSend (lead, result) {
+    var d = reportData(lead)
+    var fallback = d ? XRAY.CONFIG.REPORT_BASE + '?d=' + d : null
+    var done = false
+    function send (url) {
+      if (done) return
+      done = true
+      sendWebhook(lead, result, url || fallback)
+    }
+    if (!d || !XRAY.CONFIG.PUBLISH_URL) { send(null); return }
+    var timer = setTimeout(function () { send(null) }, 8000)
+    try {
+      fetch(XRAY.CONFIG.PUBLISH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ d: d }),
+      }).then(function (res) { return res.ok ? res.json() : null })
+        .then(function (j) { clearTimeout(timer); send(j && j.url ? j.url : null) })
+        .catch(function () { clearTimeout(timer); send(null) })
+    } catch (e) { clearTimeout(timer); send(null) }
+  }
+
+  function sendWebhook (lead, result, reportUrl, attempt) {
+    if (!XRAY.CONFIG.WEBHOOK_URL) return
+    var payload = Object.assign({}, lead, {
+      reportUrl: reportUrl || null,
+      axisScores: result.scores,
+      totalScore: result.total,
+      weakestAxis: result.weakest,
+      driftLeak: result.driftLeak,
+      responseLeak: result.responseLeak,
+      totalLeak: result.totalLeak,
+      answers: answers,
+      utm: utmParams(),
+      referrer: document.referrer || null,
+      ts: new Date().toISOString(),
+      source: 'practice-xray',
+    })
+    fetch(XRAY.CONFIG.WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(function () {
+      if (!attempt) setTimeout(function () { sendWebhook(lead, result, reportUrl, 1) }, 2000)
+    })
+  }
+
+  function persist (lead, result) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ answers: answers, lead: lead, currency: currency, ts: Date.now() })) } catch (e) { /* noop */ }
+  }
+
+  // ── Results ───────────────────────────────────────────────────────────────
+  var AXIS_LABEL = {
+    content: 'Content & Visibility',
+    speed: 'Speed-to-Lead & After-Hours',
+    reviews: 'Google Review Engine',
+    retention: 'Patient Retention & Recall',
+  }
+
+  function reviewBandText () {
+    var pts = answers.c1
+    return pts === 10 ? '300+' : pts === 7 ? '100–299' : pts === 3 ? '30–99' : 'under 30'
+  }
+
+  function verdictText (r) {
+    var maintPct = Math.round((answers.maintRate || 0) * 100)
+    var active = (answers.activePatients || 0).toLocaleString('en-US')
+    switch (r.weakest) {
+      case 'retention':
+        return '<b>The scan shows patient drift.</b> Only ' + maintPct + '% of your ~' + active +
+          ' active patients are on a regular schedule. The rest finished a care plan, felt fine, and drifted — until the next flare-up, at whichever clinic answers first. That drift alone is costing you an estimated <b>' + money(r.driftLeak) + '/month</b>.'
+      case 'speed':
+        return '<b>The scan shows missed connections.</b> Based on how calls and messages are handled, roughly ' +
+          Math.round(r.missedShare * 100) + '% of your ' + (answers.inquiriesWeekly || 0) +
+          ' weekly inquiries slip through — and most people who miss you once never try twice. They book with whoever answers. That’s an estimated <b>' + money(r.responseLeak) + '/month</b> walking to competitors.'
+      case 'reviews':
+        return '<b>The scan shows an invisible practice.</b> With ' + reviewBandText() +
+          ' Google reviews, you’re outranked by clinics that are no better than you — just louder. Reviews are the first thing a new patient judges you on, and yours aren’t compounding.'
+      default:
+        return '<b>The scan shows silence.</b> Your practice goes quiet between visits — and silence reads as absence. Patients can’t stay loyal to a practice they never hear from, and prospects can’t find one that never shows up.'
+    }
+  }
+
+  function scoreRead (total) {
+    if (total >= 80) return 'Strong systems. The leak below shows what tightening the last gaps is worth.'
+    if (total >= 55) return 'A solid practice running on manual effort. The leak below is what manual costs.'
+    if (total >= 30) return 'Your care is likely excellent — your follow-up systems aren’t. That gap has a monthly price.'
+    return 'Almost everything here depends on someone remembering to do it. Nobody can remember this much.'
+  }
+
+  function renderResults (r) {
+    var d = new Date()
+    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+    var stamp = ('0' + d.getDate()).slice(-2) + ' ' + months[d.getMonth()] + ' ' + d.getFullYear()
+    var pname = $('f-practice').value.trim()
+    $('rmeta').textContent = 'Practice X-Ray · ' + (pname ? pname + ' · ' : '') + stamp
+
+    // dial
+    var C = 2 * Math.PI * 52
+    var arc = $('arc')
+    arc.setAttribute('stroke-dasharray', C)
+    arc.setAttribute('stroke-dashoffset', C)
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { arc.setAttribute('stroke-dashoffset', C * (1 - r.total / 100)) })
+    })
+    animateNumber($('dialnum'), r.total, 1200)
+    $('dialread').textContent = scoreRead(r.total)
+
+    // bars
+    var bars = $('bars')
+    bars.innerHTML = ''
+    Object.keys(AXIS_LABEL).forEach(function (axis) {
+      var el = document.createElement('div')
+      el.className = 'bar' + (axis === r.weakest ? ' weak' : '')
+      el.innerHTML = '<div class="row1"><span class="name">' + AXIS_LABEL[axis] +
+        (axis === r.weakest ? ' — weakest' : '') + '</span><span class="val">' + r.scores[axis] +
+        '</span></div><div class="track"><div class="fill"></div></div>'
+      bars.appendChild(el)
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { el.querySelector('.fill').style.width = r.scores[axis] + '%' })
+      })
+    })
+
+    $('verdict').innerHTML = verdictText(r)
+    $('leaknum').innerHTML = money(r.totalLeak) + '<small> / month</small>'
+    $('leakdrift').textContent = money(r.driftLeak)
+    $('leakresp').textContent = money(r.responseLeak)
+    $('punch').innerHTML = 'That’s &asymp; <b>' + r.priceMultiple + '&times;</b> the monthly cost of fixing it. Recovering <b>one patient a month</b> pays for the whole system.'
+    $('cta').href = XRAY.CONFIG.VIDEO_URL + '?axis=' + r.weakest
+
+    renderAssumptions(r)
+  }
+
+  function animateNumber (el, target, ms) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = target; return }
+    var start = performance.now()
+    function tick (t) {
+      var p = Math.min(1, (t - start) / ms)
+      var eased = 1 - Math.pow(1 - p, 3)
+      el.textContent = Math.round(target * eased)
+      if (p < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
+
+  // ── "Check our math" ──────────────────────────────────────────────────────
+  var ASSUMPTIONS = [
+    { key: 'TARGET_MAINT_RATE', label: 'Maintenance share a systematic practice keeps', min: 0.2, max: 0.5, step: 0.05, fmt: function (v) { return Math.round(v * 100) + '%' } },
+    { key: 'REALIZATION', label: 'Share of that gap we credit (conservatism)', min: 0.25, max: 1, step: 0.05, fmt: function (v) { return Math.round(v * 100) + '%' } },
+    { key: 'MAINT_VISITS_PER_YEAR', label: 'Maintenance visits per year', min: 4, max: 14, step: 1, fmt: function (v) { return v + '/yr' } },
+    { key: 'NO_CALLBACK_LOSS', label: 'Missed callers who never try again', min: 0.3, max: 0.85, step: 0.05, fmt: function (v) { return Math.round(v * 100) + '%' } },
+    { key: 'WOULD_CONVERT', label: 'Of those, who would have booked', min: 0.3, max: 0.85, step: 0.05, fmt: function (v) { return Math.round(v * 100) + '%' } },
+    { key: 'FIRST_YEAR_VISITS', label: 'First-year visits of a new patient', min: 6, max: 20, step: 1, fmt: function (v) { return v + ' visits' } },
+  ]
+  var overrides = {}
+
+  function renderAssumptions () {
+    var box = $('assump')
+    box.innerHTML = ''
+    ASSUMPTIONS.forEach(function (a) {
+      var cur = overrides[a.key] !== undefined ? overrides[a.key] : XRAY.CONFIG[a.key]
+      var row = document.createElement('div')
+      row.className = 'arow'
+      var lab = document.createElement('label')
+      var span = document.createElement('span'); span.textContent = a.label
+      var out = document.createElement('output'); out.textContent = a.fmt(cur)
+      lab.appendChild(span); lab.appendChild(out)
+      var range = document.createElement('input')
+      range.type = 'range'; range.min = a.min; range.max = a.max; range.step = a.step; range.value = cur
+      range.setAttribute('aria-label', a.label)
+      range.addEventListener('input', function () {
+        overrides[a.key] = Number(range.value)
+        out.textContent = a.fmt(Number(range.value))
+        recompute()
+      })
+      row.appendChild(lab); row.appendChild(range)
+      box.appendChild(row)
+    })
+    paintFormula()
+  }
+
+  function paintFormula () {
+    var o = Object.assign({}, XRAY.CONFIG, overrides)
+    $('formula').innerHTML =
+      'DRIFT = patients &times; max(0, ' + Math.round(o.TARGET_MAINT_RATE * 100) + '% − your ' + Math.round((answers.maintRate || 0) * 100) + '%) &times; ' + Math.round(o.REALIZATION * 100) + '% &times; fee &times; ' + o.MAINT_VISITS_PER_YEAR + '/12<br>' +
+      'MISSED = inquiries/wk &times; 4.33 &times; missed-share(your answers) &times; ' + Math.round(o.NO_CALLBACK_LOSS * 100) + '% &times; ' + Math.round(o.WOULD_CONVERT * 100) + '% &times; (fee &times; ' + o.FIRST_YEAR_VISITS + ')'
+  }
+
+  function recompute () {
+    var r = XRAY.compute(answers, overrides)
+    $('leaknum').innerHTML = money(r.totalLeak) + '<small> / month</small>'
+    $('leakdrift').textContent = money(r.driftLeak)
+    $('leakresp').textContent = money(r.responseLeak)
+    $('punch').innerHTML = 'That’s &asymp; <b>' + r.priceMultiple + '&times;</b> the monthly cost of fixing it. Recovering <b>one patient a month</b> pays for the whole system.'
+    paintFormula()
+  }
+
+  // ── Returning visitor: restore results ────────────────────────────────────
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null')
+    if (saved && saved.answers && saved.lead && Date.now() - saved.ts < 1000 * 60 * 60 * 24 * 30) {
+      answers = saved.answers
+      currency = saved.currency || currency
+      $('currency').value = currency
+      $('f-name').value = saved.lead.name || ''
+      $('f-email').value = saved.lead.email || ''
+      $('f-practice').value = saved.lead.practiceName || ''
+      renderResults(XRAY.compute(answers))
+      show('s-results')
+    }
+  } catch (e) { /* fresh start */ }
+})()
+</script>
+</body>
+</html>

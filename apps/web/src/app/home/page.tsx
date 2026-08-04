@@ -198,7 +198,7 @@ export default function HomePage() {
           quietly leaking every month. No call, no pitch. A report and a number.
         </P>
         <Cta href={XRAY_URL} sub="2 minutes · free · your report is yours to keep">
-          X-Ray my practice
+          X-Ray My Practice
         </Cta>
         <p className="mt-6 text-center text-sm text-white/50">
           Prefer to see the system first? <a href="/walkthrough" className="underline">Watch the 12-minute walkthrough</a>

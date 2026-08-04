@@ -9,9 +9,9 @@ function loadXray() {
   const html = readFileSync(join(__dirname, '../../../public/x-ray/index.html'), 'utf8')
   const match = html.match(/\/\*__XRAY_MATH_START__\*\/([\s\S]*?)\/\*__XRAY_MATH_END__\*\//)
   if (!match) throw new Error('XRAY math block markers not found in x-ray/index.html')
-  const module = { exports: {} as Record<string, unknown> }
-  new Function('module', match[1])(module)
-  return module.exports as {
+  const mod = { exports: {} as Record<string, unknown> }
+  new Function('module', match[1])(mod)
+  return mod.exports as {
     CONFIG: Record<string, number | string>
     compute: (a: Record<string, number>, o?: Record<string, number>) => {
       scores: Record<string, number>

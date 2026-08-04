@@ -156,6 +156,9 @@ async function renderDebriefPdf(dParam: string, parsed: NonNullable<ReturnType<t
 
 const PDF_HEADERS = { type: 'application/pdf', disposition: 'inline; filename="X-Ray-Debrief.pdf"' }
 const S3_PREFIX = 'xray-reports/'
+// Bump on template design changes: it feeds the publish id so already-published
+// reports re-render with the new design instead of serving the old S3 object.
+const TEMPLATE_VERSION = '2'
 
 function publicApiBase(): string {
   return (process.env.XRAY_PUBLIC_API_BASE ?? 'https://svc.omniply.io').replace(/\/$/, '')
@@ -190,7 +193,7 @@ export async function xrayReportRoutes(app: FastifyInstance) {
     const parsed = parseReportPayload(dParam)
     if (!parsed) return reply.code(400).send({ error: 'invalid report data' })
 
-    const id = createHash('sha256').update(dParam).digest('hex').slice(0, 16)
+    const id = createHash('sha256').update(TEMPLATE_VERSION + ':' + dParam).digest('hex').slice(0, 16)
     const key = `${S3_PREFIX}${id}.pdf`
     const url = `${publicApiBase()}/api/xray/r/${id}.pdf`
 

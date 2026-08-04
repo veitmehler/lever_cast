@@ -354,6 +354,7 @@ var XRAY = (function () {
   // ── Every tunable in one place ────────────────────────────────────────────
   var CONFIG = {
     WEBHOOK_URL: '',                 // GHL inbound-webhook URL (empty = capture disabled, results still shown)
+    REPORT_BASE: 'https://svc.omniply.io/api/xray/report', // personalized PDF endpoint (prod API)
     VIDEO_URL: '/walkthrough',
     PRICE_MONTHLY: 397,
     // Drift-leak assumptions (all surfaced + adjustable in "Check our math")
@@ -627,9 +628,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
     return out
   }
 
+  // Personalized PDF URL — stateless: all data rides in the query param.
+  function reportUrl (lead) {
+    try {
+      var json = JSON.stringify({ v: 1, n: lead.name, p: lead.practiceName, c: currency, a: answers })
+      var b64 = btoa(unescape(encodeURIComponent(json)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+      return XRAY.CONFIG.REPORT_BASE + '?d=' + b64
+    } catch (e) { return null }
+  }
+
   function sendWebhook (lead, result, attempt) {
     if (!XRAY.CONFIG.WEBHOOK_URL) return
     var payload = Object.assign({}, lead, {
+      reportUrl: reportUrl(lead),
       axisScores: result.scores,
       totalScore: result.total,
       weakestAxis: result.weakest,

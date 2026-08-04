@@ -1,40 +1,37 @@
 /**
- * Generic Omniply platform sales page (marketing-site plan).
- * Served at `/` on the marketing hosts (middleware rewrite) and directly at
- * /home for review. Klaff skeleton, Kern connective tissue, Bencivenga
- * bullets, dash-free house style.
+ * Omniply platform overview (site refresh 2026-08-05).
+ * Served at `/` on the marketing hosts (middleware rewrite) and at /home.
+ * Graphical brand page, not a sales letter: the Loop is the centerpiece, the
+ * chiropractic pathway sits above the fold, and the vertical sales letter
+ * lives at /chiropractors. Voice = master pitch; dash-free house style.
  */
 import type { Metadata } from 'next'
 import {
   TOKENS,
+  XRAY_URL,
   Cta,
   Eyebrow,
   Section,
   H2,
   P,
-  Bullet,
-  ConsistencyGraph,
-  VarianceDiagram,
+  LoopDiagram,
+  StatBand,
   PipelineDiagram,
-  TouchpointGraph,
-  ReactivationLoop,
-  PricingBlock,
-  MapPackDiagram,
   Faq,
   FaqJsonLd,
   type FaqEntry,
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
-  title: 'Omniply — The Content Operating System for Local Practices',
+  title: 'Omniply — Marketing Autopilot for Local Practices',
   description:
-    'Articles, newsletters, social posts, lead magnets and review growth. Generated in your voice, approved by you, published every week without you. $397/mo flat.',
+    'One loop, four systems: content in your voice, instant AI response, compounding Google reviews, and patient recall. You approve, it ships. $397/mo flat.',
 }
 
 const FAQ_ITEMS: FaqEntry[] = [
   {
-    q: 'How is this different from just using ChatGPT?',
-    a: 'ChatGPT is a blank box that waits for you to be good at prompting, and it forgets you between sessions. Omniply is a pipeline: it learns your voice once, runs on a fixed weekly schedule, applies compliance and brand guardrails to every piece, and publishes to your website, email list and social accounts automatically. You approve output. You never prompt anything.',
+    q: 'What exactly is Omniply?',
+    a: 'A marketing autopilot for local practices. It writes and publishes your content in your voice, answers inquiries instantly with AI chat and voice, grows your Google reviews automatically, and brings past clients back with systematic recall. Four systems, one loop, one flat price.',
   },
   {
     q: 'Will it really sound like me?',
@@ -42,272 +39,170 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: 'How much of my time does this take?',
-    a: 'Setup is a guided conversation of roughly ten to fifteen minutes. After that, your job is a review pass measured in minutes per week: read, click approve, done. Everything else, including publishing and scheduling, happens without you.',
+    a: 'Setup is a guided conversation of roughly ten to fifteen minutes, and the system starts producing in hours. After that, your job is a review pass measured in minutes per week: read, click approve, done. Nothing carrying your name ships without your sign-off.',
   },
   {
-    q: 'What exactly is included in the $397?',
-    a: 'Everything. Weekly articles, the weekly newsletter with 25,000 email sends a month, social posts with designed graphics, your branded lead-magnet library, and the review growth engine. There are no per-piece fees, no content credits, and no surprise line items.',
-  },
-  {
-    q: 'What if I do not like a piece of content?',
-    a: 'Nothing goes out without your approval. If a piece misses, you reject it with a note and the system regenerates it with your feedback applied. Your name never appears on anything you have not signed off.',
-  },
-  {
-    q: 'Do I need to be technical?',
-    a: 'No. If you can answer questions about your own business and click an approve button, you have every skill required. The setup conversation feels like talking to a sharp marketing consultant, not configuring software.',
+    q: 'What is included in the $397?',
+    a: 'Everything in the loop. Weekly articles, the weekly newsletter with 25,000 email sends a month, social posts with designed graphics, branded lead-magnet guides, the AI response and recall systems, and the review growth engine. No per-piece fees, no content credits, no surprise line items.',
   },
   {
     q: 'Can I cancel? What happens to my content?',
     a: 'You can cancel any month. Everything already published stays published, because it was always yours: your website, your email list, your social accounts, your documents.',
-  },
-  {
-    q: 'Why only 74 practices this quarter?',
-    a: 'Because onboarding is the moment we clone your voice and set up your brand properly, and we refuse to rush it. The cap is our real capacity for doing that well while serving the practices already inside. When the spots are gone, the door closes until next quarter.',
-  },
-  {
-    q: 'Do I need a WordPress website?',
-    a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically — that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
   },
 ]
 
 export default function HomePage() {
   return (
     <main>
-      {/* ── Hook ── */}
+      {/* ── Hero: platform definition + vertical pathway above the fold ── */}
       <Section dark>
         <Eyebrow>Omniply</Eyebrow>
         <h1 className="mb-6 text-4xl font-extrabold leading-tight md:text-5xl" style={{ textWrap: 'balance' } as React.CSSProperties}>
-          Your next customer chose your competitor last month. Not because they are better. Because they kept showing up.
+          Marketing on autopilot for local practices.
         </h1>
         <P lead>
-          Omniply is the content operating system for local practices. It writes, designs and publishes your
-          marketing every single week, in your voice, across every channel, with you approving the output
-          instead of producing it.
+          It writes in your voice, answers in seconds, asks for the review, and remembers every client who
+          drifted... every week, while you run the practice. You approve. It ships.
         </P>
-        <Cta sub="Onboarding capped at 74 practices this quarter">Set up your account right now</Cta>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <a
+            href="/chiropractors"
+            className="rounded-xl border p-6 transition-transform hover:scale-[1.01]"
+            style={{ borderColor: TOKENS.lime, background: 'rgba(195,244,59,0.06)' }}
+          >
+            <div className="text-xs font-bold uppercase tracking-widest" style={{ color: TOKENS.lime }}>
+              Live now
+            </div>
+            <div className="mt-2 text-xl font-bold text-white">For chiropractic practices &rarr;</div>
+            <div className="mt-1 text-sm text-white/60">The full story, built for your world.</div>
+          </a>
+          <a
+            href={XRAY_URL}
+            className="rounded-xl border border-white/15 p-6 transition-transform hover:scale-[1.01]"
+          >
+            <div className="text-xs font-bold uppercase tracking-widest text-white/50">2 minutes</div>
+            <div className="mt-2 text-xl font-bold text-white">X-Ray your practice &rarr;</div>
+            <div className="mt-1 text-sm text-white/60">
+              Four system scores and a dollar figure on what is quietly leaking.
+            </div>
+          </a>
+        </div>
       </Section>
 
-
-      {/* ── The Big Idea ── */}
-      <Section>
-        <P lead>
-          The problem your customer ignored for months finally turns urgent. For the next hour nothing
-          matters except solving it.
-        </P>
-        <P lead><strong>They grab their phone. And the choice is already made.</strong></P>
-        <P>
-          Princeton researchers proved that people form trust judgments in <strong>a tenth of a
-          second</strong>. Before a single rational thought. Every second after that gets spent justifying
-          the verdict, not questioning it.
-        </P>
-        <P>
-          So your future customer does not run a careful comparison.{' '}
-          <strong>They call the name they already know.</strong>
-        </P>
-        <P>
-          And you cannot build familiarity in the moment of need. It gets built in the months before. One
-          article. One email. One post. By whoever kept showing up.
-        </P>
-        <P>
-          <strong>The customer is won before they know they are choosing.</strong> That is the whole game.
-          Not a better pitch. Not a prettier logo. Presence, banked in advance, until you are not one of ten
-          options. You are the obvious call.
-        </P>
-        <P>
-          The rest of this page is about the economics of being the obvious call, and the machine that makes
-          it automatic.
-        </P>
-      </Section>
-      {/* ── Problem reframe ── */}
-      <Section>
-        <Eyebrow>The real problem</Eyebrow>
-        <H2>You do not have a marketing problem. You have a consistency problem.</H2>
-        <P>
-          You already know what works: useful articles, a weekly newsletter, social posts that sound like you,
-          something valuable to give prospects, a steady stream of reviews. None of this is a secret. High-end
-          practice coaches charge thousands to teach exactly this system, and their clients grow with it.
-        </P>
-        <P>
-          <strong>The catch is that the system only works if it runs every week.</strong> Not the weeks you feel
-          inspired. Not the weeks between patient emergencies. Every week, for years. Attention compounds like
-          interest, and every gap resets the curve.
-        </P>
-        <ConsistencyGraph />
-        <P>
-          Here is the honest part: <strong>you were never going to sustain it manually, and neither is anyone
-          you hire at a sane price.</strong> You run a practice. Content is the first thing dropped in a busy
-          week, and every week is a busy week.
-        </P>
-      </Section>
-
-      {/* ── Why the obvious fixes fail ── */}
-      <Section>
-        <Eyebrow>Why the obvious fixes fail</Eyebrow>
-        <H2>ChatGPT does not solve this. Neither do AI agents. Here is why.</H2>
-        <P>
-          You have probably tried the AI route. Everyone has. And the tools are genuinely impressive right up
-          until you rely on them. Ask ChatGPT for a post and you get something generic that sounds like every
-          other practice in town. Wire up an AI agent like Claude Code or OpenClaw and you have a brilliant
-          intern with no memory of your brand, no publishing pipeline, and a different personality every
-          morning.
-        </P>
-        <P>
-          <strong>The technical word for the problem is non-determinism.</strong> Agents improvise. Run the same
-          request twice and you get two different results, two different tones, two different levels of
-          compliance risk. Which means a human still has to check every output, every day. That is not
-          automation. That is a supervision job you just gave yourself, on top of the one you already have.
-        </P>
-        <VarianceDiagram />
-        <P>
-          An assistant that is 90 percent right every day is a part-time employee.{' '}
-          <strong>A system is only a system if the output is dependable enough that checking it takes minutes,
-          not hours.</strong>
-        </P>
-        <P>
-          And here is the part nobody says out loud: <strong>most people get mediocre results from AI because
-          prompting is a craft, and they are beginners at it.</strong> We have spent years inside these models,
-          engineering the prompts, the research chains and the guardrails that force AI to do deep, careful
-          work instead of confident guessing. That expertise is baked into every generator in Omniply. You get
-          expert-level output every single time, without spending your evenings becoming a prompt engineer.
-        </P>
-      </Section>
-
-      {/* ── The Omniply frame ── */}
+      {/* ── The Loop ── */}
       <Section dark>
-        <Eyebrow>The Omniply frame</Eyebrow>
-        <H2>Deterministic content. Your voice. A review gate. Then it ships without you.</H2>
-        <P lead>
-          Omniply is not an assistant you prompt. It is a pipeline that runs. It learns your voice once, deeply,
-          during a guided onboarding. Then it produces your articles, newsletters, social posts and lead
-          magnets on a fixed weekly rhythm, holds them at a review gate where you approve with one click, and
-          publishes them across every channel on schedule.
+        <Eyebrow>The mechanism</Eyebrow>
+        <H2>One loop. Four systems. Each one feeds the next.</H2>
+        <LoopDiagram />
+        <div className="grid gap-5 sm:grid-cols-2">
+          {[
+            ['Presence', 'Real content, produced in your voice every week... so clients think of you before the pain does.'],
+            ['Response', 'AI chat and voice that answer in seconds, day and night, and book on the spot.'],
+            ['Proof', 'Every happy client becomes public evidence. Reviews compound like interest.'],
+            ['Recall', 'Nobody drifts unnoticed. The ones who faded get a reason to come back.'],
+          ].map(([head, body]) => (
+            <div key={head}>
+              <div className="text-lg font-bold" style={{ color: TOKENS.lime }}>{head}</div>
+              <p className="mt-1 text-white/75">{body}</p>
+            </div>
+          ))}
+        </div>
+        <P>
+          <br />
+          It is not four tools. It is one flywheel: presence keeps clients warm, warm clients return and
+          leave reviews, reviews bring new inquiries, instant response converts them, recall keeps them.
+          Break any link and the leak reopens somewhere else.
+        </P>
+      </Section>
+
+      {/* ── How it runs (dark: PipelineDiagram uses white linework) ── */}
+      <Section dark>
+        <Eyebrow>How it runs</Eyebrow>
+        <H2>A pipeline with one gate: you.</H2>
+        <P>
+          Omniply is not an assistant you prompt. It is a pipeline that runs on a fixed weekly rhythm, holds
+          everything at a review gate where you approve with one click, and publishes across every channel on
+          schedule. The same input produces the same quality, week after week... and the one thing the machine
+          never does is skip a week.
         </P>
         <PipelineDiagram />
-        <P>
-          The same input produces the same quality, week after week. Guardrails keep claims compliant and
-          on-brand. And the one thing the machine never does is skip a week.
-        </P>
       </Section>
 
-      {/* ── Money math ── */}
+      {/* ── Why speed and presence decide ── */}
       <Section>
-        <Eyebrow>The money math</Eyebrow>
-        <H2>Consistency is not a virtue. It is a conversion multiplier.</H2>
+        <Eyebrow>Why it matters now</Eyebrow>
+        <H2>Your clients decide faster than your front desk can answer.</H2>
+        <StatBand />
         <P>
-          Prospects rarely buy on first contact. They buy after they have seen you be useful seven, nine,
-          twelve times. Every touchpoint you fail to send quietly hands the sale to whoever kept showing up.
+          Whoever answers first and stays familiar wins the booking. That is not a slogan, it is the measured
+          behavior of people choosing a local practice today.
         </P>
-        <TouchpointGraph />
-        <P>
-          And the fastest revenue is not even new prospects. It is past customers who simply drifted, and who
-          come back the week your newsletter reminds them you exist.
-        </P>
-        <ReactivationLoop />
       </Section>
 
-      {/* ── Local SEO / reviews ── */}
+      {/* ── Verticals ── */}
       <Section>
-        <Eyebrow>The third lever</Eyebrow>
-        <H2>Reviews decide who gets found. Consistency decides the reviews.</H2>
+        <Eyebrow>Built per profession</Eyebrow>
+        <H2>Tailored deep, not templated wide.</H2>
         <P>
-          There is a lever most owners never connect to content at all:{' '}
-          <strong>being found in the first place.</strong> When someone searches for what you do plus their
-          suburb, Google shows a map with three businesses on it, and reputation is a huge part of how those
-          three get picked. Reputation means reviews: how many, how recent, and whether they keep coming.
+          Omniply is built one profession at a time, so the content calendar, the compliance guardrails and
+          the voice all fit your actual world.
         </P>
-        <MapPackDiagram query="best practice near me" />
-        <P>
-          A business collecting reviews <strong>systematically, week after week,</strong> climbs above
-          competitors who collected a burst two years ago and stopped. Same principle as the content curve:
-          consistency beats bursts, here with rankings instead of attention.
-        </P>
-        <P>
-          <strong>Omniply makes the asking automatic.</strong> Happy customers get an effortless path to your
-          Google review form, at the moment they are happiest, every single week. Your review count and your
-          map ranking compound alongside your content, on the same autopilot.
-        </P>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <a href="/chiropractors" className="rounded-xl border-2 p-6 transition-transform hover:scale-[1.01]" style={{ borderColor: TOKENS.accent }}>
+            <div className="text-xs font-bold uppercase tracking-widest" style={{ color: TOKENS.accentDeep }}>Live</div>
+            <div className="mt-2 text-xl font-bold">Chiropractic &rarr;</div>
+            <div className="mt-1 text-sm" style={{ color: TOKENS.muted }}>
+              Seasonal spine calendar, healthcare-safe claims, recall built for care plans.
+            </div>
+          </a>
+          <div className="rounded-xl border p-6" style={{ borderColor: TOKENS.line }}>
+            <div className="text-xs font-bold uppercase tracking-widest" style={{ color: TOKENS.muted }}>In the pipeline</div>
+            <div className="mt-2 text-xl font-bold" style={{ color: TOKENS.muted }}>More practice types</div>
+            <div className="mt-1 text-sm" style={{ color: TOKENS.muted }}>
+              The loop is universal. The tailoring takes time, and we do one profession properly at a time.
+            </div>
+          </div>
+        </div>
       </Section>
 
-      {/* ── Bencivenga bullets ── */}
-      <Section>
-        <Eyebrow>What you actually get</Eyebrow>
-        <H2>Every feature, translated into what it does for you.</H2>
-        <ul>
-          <Bullet head="A 10-minute onboarding that clones how you write and speak,">
-            so every article and email sounds like you on your best day, not like a bot doing an impression of a
-            professional.
-          </Bullet>
-          <Bullet head="Weekly articles, newsletters and social posts on autopilot,">
-            planned against a seasonal calendar built for your field, so January content converts January
-            buyers.
-          </Bullet>
-          <Bullet head="25,000 emails a month included,">
-            which means your entire list hears from you weekly and the marginal cost of staying unforgettable
-            is zero.
-          </Bullet>
-          <Bullet head="A branded lead-magnet library generated in your identity,">
-            professionally designed guides prospects trade their email for, feeding your pipeline while you
-            work.
-          </Bullet>
-          <Bullet head="A review growth engine,">
-            because your Google rating is the first page of your website whether you like it or not.
-          </Bullet>
-          <Bullet head="One review gate for everything,">
-            so you stay in control of every word that carries your name while spending minutes on it, not
-            evenings.
-          </Bullet>
-        </ul>
-      </Section>
-
-      {/* ── Pricing ── */}
-      <Section>
-        <Eyebrow>The number</Eyebrow>
-        <H2>One flat price. No content fees. No surprises.</H2>
-        <PricingBlock />
-      </Section>
-
-      {/* ── Founder + proof ── */}
+      {/* ── Founder ── */}
       <Section>
         <Eyebrow>Who built this</Eyebrow>
         <H2>Sixteen years of doing this manually taught me exactly what to automate.</H2>
         <P>
-          I have spent 16 years running marketing for health professionals and local practices, and scaling
-          online businesses from obscurity to six figures a month. The system inside Omniply is not a theory.
-          It is the same playbook elite practice coaches teach their clients to execute by hand, the one that
-          works every time it is actually executed, and fails every time life gets in the way of executing it.
-        </P>
-        <P>
-          So I learned to code and spent years turning that playbook into a machine. <strong>Omniply is the
-          version of that system that cannot get tired, cannot get busy, and cannot skip a week.</strong>
+          I have spent 16 years running marketing for health professionals and local practices. The system
+          inside Omniply is the playbook elite practice coaches teach their clients to execute by hand... the
+          one that works every time it is actually executed, and fails every time life gets in the way of
+          executing it. So I learned to code and built the version that cannot get tired, cannot get busy, and
+          cannot skip a week.
         </P>
       </Section>
 
       {/* ── FAQ ── */}
       <Section>
         <Eyebrow>Questions, answered straight</Eyebrow>
-        <H2>Everything owners ask before they start.</H2>
+        <H2>The short version of everything owners ask.</H2>
         <Faq items={FAQ_ITEMS} />
       </Section>
 
       {/* ── Close ── */}
       <Section dark>
-        <H2>We onboard 74 practices this quarter. Then we close the doors and serve them.</H2>
+        <H2>Start where the doctors start: with the X-Ray.</H2>
         <P lead>
-          That is a real capacity number, not a countdown timer. Voice onboarding, brand setup and quality
-          review take real attention per practice, and we protect the practices already inside.
+          Two minutes, twelve questions... four system scores and a dollar figure on what your practice is
+          quietly leaking every month. No call, no pitch. A report and a number.
         </P>
-        <P>
-          If your marketing is already consistent, every week, in your voice, keep going. You do not need us.
-          If it is not, you know exactly what that has been costing you.
-        </P>
-        <Cta sub="$397/mo flat · cancel any month · capped at 74 practices this quarter">
-          Set up your account right now
+        <Cta href={XRAY_URL} sub="2 minutes · free · your report is yours to keep">
+          X-Ray my practice
         </Cta>
+        <p className="mt-6 text-center text-sm text-white/50">
+          Prefer to see the system first? <a href="/walkthrough" className="underline">Watch the 12-minute walkthrough</a>
+        </p>
       </Section>
 
       <FaqJsonLd items={FAQ_ITEMS} />
       <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
-        <p>Omniply · The content operating system for local practices</p>
+        <p>Omniply &middot; Marketing autopilot for local practices</p>
         <p className="mt-2">
           <a href="/chiropractors" className="underline">Chiropractor? See the version built for your practice</a>
         </p>

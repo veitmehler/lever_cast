@@ -1,20 +1,23 @@
 /**
- * Chiropractor-specific Omniply sales page (marketing-site plan).
- * Same Klaff skeleton as /home, chiro ammunition throughout.
+ * Chiropractor sales letter (site refresh 2026-08-05).
+ * The master pitch (.documentation/marketing/practice-treatment-plan-master-pitch.md)
+ * in page form: drift hero, three forces, belief shift, the Omniply Loop,
+ * Prognosis, one-patient math. Primary CTA throughout = the Practice X-Ray.
+ * Dash-free house style; ellipses voice.
  */
 import type { Metadata } from 'next'
 import {
   TOKENS,
+  XRAY_URL,
   Cta,
   Eyebrow,
   Section,
   H2,
   P,
   Bullet,
+  LoopDiagram,
+  StatBand,
   ConsistencyGraph,
-  VarianceDiagram,
-  PipelineDiagram,
-  TouchpointGraph,
   ReactivationLoop,
   PricingBlock,
   MapPackDiagram,
@@ -24,9 +27,9 @@ import {
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
-  title: 'Omniply for Chiropractors — Your Practice, Marketed Every Week Without You',
+  title: 'Omniply for Chiropractors — Plug the Leak in Your Practice',
   description:
-    'The content system elite chiropractic coaches teach, fully automated: articles, newsletters, social, lead magnets and Google reviews in your voice. $397/mo flat.',
+    'Patients do not leave, they fade. Omniply runs the loop that stops it: content in your voice, AI response in seconds, compounding reviews, systematic recall. X-Ray your practice in 2 minutes.',
 }
 
 const FAQ_ITEMS: FaqEntry[] = [
@@ -39,12 +42,16 @@ const FAQ_ITEMS: FaqEntry[] = [
     a: 'Yes, and this is the part practices doubt until they see it. During onboarding you simply talk about your practice, your patients and what you believe about care. The system learns how you actually speak. The first newsletter reads like you dictated it on a good day, because in a real sense you did.',
   },
   {
-    q: 'How much of my week does this take?',
-    a: 'A few minutes over coffee. Content arrives in one approval inbox, you read it, you click approve, and the week is handled. The setup itself is a ten to fifteen minute guided conversation you do once.',
+    q: 'Does it work with my booking system?',
+    a: 'Yes. Omniply does not replace your practice software. Every call to action, including the AI chat and voice, points patients at your existing online booking page, whatever system you use. No migrations, no double bookings, no IT project.',
   },
   {
-    q: 'Does it work with my booking system?',
-    a: 'Yes. Omniply does not replace your practice software. Every call to action points patients at your existing online booking page, whatever system you use. No migrations, no double bookings, no IT project.',
+    q: 'Is my patient data involved?',
+    a: 'No. The marketing system runs on your public presence and your booking link. It does not touch clinical records.',
+  },
+  {
+    q: 'How much of my week does this take?',
+    a: 'A few minutes over coffee. Content arrives in one approval inbox, you read it, you click approve, and the week is handled. The setup itself is a ten to fifteen minute guided conversation you do once, and the system starts producing in hours.',
   },
   {
     q: 'Do I have to come up with the topics?',
@@ -56,7 +63,7 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: 'What exactly does $397 include? Any hidden costs?',
-    a: 'Everything: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, and the review engine. No per-piece fees, no content credits, no surprises.',
+    a: 'Everything in the loop: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, the AI response and recall systems, and the review engine. No per-piece fees, no content credits, no surprises.',
   },
   {
     q: 'How fast will I see results?',
@@ -67,10 +74,6 @@ const FAQ_ITEMS: FaqEntry[] = [
     a: 'Cancel any month. Your articles stay on your website, your list stays your list, your guides keep working. It was all built in your name from the start.',
   },
   {
-    q: 'Why the cap of 74 practices?',
-    a: 'Voice onboarding and brand setup take real attention per practice, and existing practices come first. 74 is the number we can onboard this quarter without letting quality slip. It is a capacity limit, not a marketing trick.',
-  },
-  {
     q: 'Do I need a WordPress website?',
     a: 'It works best with one. If your site runs on WordPress, Omniply publishes every article straight to your blog automatically — that is what powers the local-SEO flywheel with zero effort on your side. If you are on another platform, everything else still runs (newsletters, social posts, review collection), and articles are delivered ready to paste into your site. For fully automated article publishing, WordPress is required.',
   },
@@ -79,221 +82,194 @@ const FAQ_ITEMS: FaqEntry[] = [
 export default function ChiropractorsPage() {
   return (
     <main>
-      {/* ── Hook ── */}
+      {/* ── Hook: drift ── */}
       <Section dark>
         <Eyebrow>Omniply for Chiropractors</Eyebrow>
         <h1 className="mb-6 text-4xl font-extrabold leading-tight md:text-5xl" style={{ textWrap: 'balance' } as React.CSSProperties}>
-          Somewhere in your town tonight, a person with back pain is choosing a chiropractor. The one they
-          choose is the one they keep seeing everywhere.
+          Patients don&apos;t leave. They fade.
         </h1>
         <P lead>
-          Omniply markets your practice every single week, in your voice, on every channel your patients
-          actually look at. You adjust spines. It handles the showing up.
+          And fading is invisible in the appointment book until the quarter is already soft. Your practice
+          has a leak... most do. The question is the size. There is a 2-minute way to find out, in dollars.
         </P>
-        <Cta sub="Onboarding capped at 74 practices this quarter">Set up your account right now</Cta>
+        <Cta href={XRAY_URL} sub="12 questions · 2 minutes · your monthly leak, in dollars">
+          X-Ray my practice
+        </Cta>
       </Section>
 
-
-      {/* ── The Big Idea ── */}
+      {/* ── The Big Change: three forces ── */}
       <Section>
+        <Eyebrow>Why this is happening to good practices</Eyebrow>
+        <H2>Three forces created the leak. None of them asked your permission.</H2>
+        <P>
+          <strong>The technology force.</strong> Every patient in your town now carries every competitor&apos;s
+          front desk in their pocket. When someone&apos;s back seizes at 9pm, they don&apos;t wait for your
+          opening hours... they search, they message, and they book with whoever answers. Google decides who
+          exists. The map pack decides who gets the call.
+        </P>
+        <P>
+          <strong>The social force.</strong> Patients stopped calling back. Not because they&apos;re rude...
+          because Amazon, Uber and a decade of instant everything trained them. Princeton researchers showed
+          people form trust judgments in a tenth of a second, before a single rational thought. Your future
+          patient doesn&apos;t compare credentials. They call the name they already know, and they book with
+          whoever answers first.
+        </P>
+        <StatBand />
+        <P>
+          <strong>The economic force.</strong> The compounding asset in healthcare used to be location and
+          reputation. Now it&apos;s attention and reviews. The practices growing right now are not better
+          clinicians than you. They run better systems... and every month, the gap gets more expensive to
+          close.
+        </P>
         <P lead>
-          A person&apos;s back gives out over a bathroom sink. One small twist. For the next hour nothing in
-          their life matters except making the pain stop.
-        </P>
-        <P lead><strong>They grab their phone. And the choice is already made.</strong></P>
-        <P>
-          Princeton researchers proved that people form trust judgments in <strong>a tenth of a
-          second</strong>. Before a single rational thought. Every second after that gets spent justifying
-          the verdict, not questioning it.
-        </P>
-        <P>
-          So your future patient does not compare credentials. They do not read three websites.{' '}
-          <strong>They call the name they already know.</strong>
-        </P>
-        <P>
-          And you cannot build familiarity in the moment of pain. It gets built in the months before. One
-          article. One email. One post. By whoever kept showing up.
-        </P>
-        <P>
-          <strong>The patient is won before they know they are choosing.</strong> That is the whole game. Not
-          better adjustments. Not a prettier logo. Presence, banked in advance, until you are not one of ten
-          options. You are the obvious call.
-        </P>
-        <P>
-          The rest of this page is about the economics of being the obvious call, and the machine that makes
-          it automatic.
+          <strong>Ten years ago, &quot;great care plus word of mouth&quot; was a growth strategy. Today
+          that&apos;s a lottery ticket.</strong>
         </P>
       </Section>
-      {/* ── Problem reframe ── */}
+
+      {/* ── Belief shift ── */}
       <Section>
-        <Eyebrow>The real problem</Eyebrow>
-        <H2>You already know the playbook. The problem is that it never survives a busy week.</H2>
+        <Eyebrow>Why effort can&apos;t fix it</Eyebrow>
+        <H2>You&apos;ve already tried the obvious fix. It&apos;s called trying harder.</H2>
         <P>
-          The high-end chiropractic coaches all teach the same growth system, and they charge thousands for
-          it: educate your community weekly, email your list every week, stay visible on social, give
-          prospects something valuable, and keep your Google reviews climbing. It works. Their best clients
-          prove it works.
+          Posting at 11pm doesn&apos;t move the needle because everybody is asleep. Telling your front desk to
+          follow up when it&apos;s quiet loses to patients who expect instant answers. Asking for a Google
+          review when you remember, from the patients you&apos;re sure will say yes, means other clinics win
+          the map pack.
         </P>
         <P>
-          <strong>But the system has a brutal requirement: it only compounds if it runs every week.</strong>{' '}
-          After your last patient. After the notes. After the family gets their share of you. That is when the
-          newsletter is supposed to get written, and that is exactly when it does not.
+          So the real problem is that you need to get consistent systematically. That&apos;s exactly what the
+          expensive chiropractic coaches sell. But then you hit the actual problem...{' '}
+          <strong>it&apos;s not a discipline problem. It&apos;s a physics problem.</strong>
+        </P>
+        <P lead>
+          <strong>Attention now runs 24 hours a day. Humans don&apos;t.</strong>
+        </P>
+        <P>
+          You need sleep. Your family needs you. And you cannot out-hustle a force that never sleeps... you
+          can only out-system it. The practices that grow are simply the ones where the system runs anyway.
         </P>
         <ConsistencyGraph />
-        <P>
-          This is not a discipline failure. <strong>You are a clinician running a business, and content is the
-          first casualty of every full schedule.</strong> The practices that grow are simply the ones where
-          the content goes out anyway.
-        </P>
       </Section>
 
-      {/* ── Why the obvious fixes fail ── */}
+      {/* ── Drift ── */}
       <Section>
-        <Eyebrow>Why the obvious fixes fail</Eyebrow>
-        <H2>You tried ChatGPT. It sounded like everyone else. Here is the deeper reason.</H2>
+        <Eyebrow>The quietest leak</Eyebrow>
+        <H2>A patient finishes their care plan. They feel good. Then nothing happens.</H2>
         <P>
-          AI assistants are impressive until you rely on them. Ask for a post and you get something generic
-          about wellness that any clinic in any suburb could have published. The newer AI agents are worse in
-          a sneakier way: brilliant one day, off-brand the next, because <strong>they improvise every time
-          instead of running a fixed system.</strong> Engineers call it non-determinism. You would call it an
-          intern you cannot trust with your name.
+          No contact, no content, no reason to think of you. Eight months later their back flares up... in a
+          city full of clinics that answer faster than you.
         </P>
         <P>
-          And in healthcare that is not a cosmetic problem. One overclaiming sentence about what an adjustment
-          treats is a compliance headache waiting to happen. So you end up reading every word anyway, which
-          means you bought a tool and inherited a supervision job.
-        </P>
-        <VarianceDiagram />
-        <P>
-          <strong>A real system produces dependable output with guardrails built in,</strong> so your review
-          takes two minutes over coffee, not an evening with a red pen.
-        </P>
-        <P>
-          There is also a quieter reason your ChatGPT experiments disappointed you: <strong>prompting is a
-          craft, and you never had time to master it.</strong> We have spent years inside these models,
-          engineering the prompts and research chains that force AI to do deep, careful clinical-grade work
-          instead of confident guessing. All of that is baked into Omniply. You get the output of an AI
-          expert who knows chiropractic marketing cold, without ever writing a prompt yourself.
-        </P>
-      </Section>
-
-      {/* ── The Omniply frame ── */}
-      <Section dark>
-        <Eyebrow>The Omniply frame</Eyebrow>
-        <H2>The coaches&apos; system, running as software. In your voice. Every week. Without you.</H2>
-        <P lead>
-          Omniply learns your voice in a guided onboarding where you literally talk to it about your practice.
-          Then it runs the whole playbook: patient-education articles on your website, a weekly newsletter
-          your patients actually read, social posts with designed visuals, branded lead-magnet guides, and a
-          steady engine for Google reviews. Everything stops at one review gate where you approve with a
-          click.
-        </P>
-        <PipelineDiagram />
-        <P>
-          Health-content guardrails are built into every generator: no overclaiming, no miracle language,
-          nothing you would wince at. It writes like a careful clinician who happens to be great at
-          marketing. Because that is exactly what it learned from: you.
-        </P>
-      </Section>
-
-      {/* ── Money math ── */}
-      <Section>
-        <Eyebrow>The money math</Eyebrow>
-        <H2>More touchpoints turn more prospects into patients. And more past patients into rebookings.</H2>
-        <P>
-          A person searching for back-pain help does not book on first contact. They lurk. They read one of
-          your articles, see a post, get your guide on desk posture, read two more emails, and then book. Every
-          missing touchpoint is a patient who booked somewhere else.
-        </P>
-        <TouchpointGraph />
-        <P>
-          Then there is the revenue already sitting in your files: <strong>every patient who stopped coming has
-          a spine that did not stop needing care.</strong> They did not leave you. Life just got loud. A weekly
-          newsletter is the quiet tap on the shoulder that fills next week&apos;s schedule with people who
-          already know and trust you.
+          Quick question: how many electricians do you have stored in <em>your</em> phone for emergencies?
+          Exactly. And if you don&apos;t have one, you&apos;ll call the first one on Google Maps that
+          responds... correct? That is precisely how your faded patients choose their next chiropractor.
         </P>
         <ReactivationLoop />
+        <P>
+          <strong>Every patient who stopped coming has a spine that did not stop needing care.</strong> They
+          did not leave you. Life got loud, and nobody tapped them on the shoulder.
+        </P>
       </Section>
 
-      {/* ── Local SEO / reviews ── */}
+      {/* ── The Omniply Loop ── */}
+      <Section dark>
+        <Eyebrow>The mechanism</Eyebrow>
+        <H2>The Omniply Loop: four systems, each feeding the next.</H2>
+        <P lead>
+          What fixes this is not a tool. It&apos;s a loop... it multiplies your omni-channel exposure where
+          your patients pay attention all day.
+        </P>
+        <LoopDiagram />
+        <div className="grid gap-6 sm:grid-cols-2">
+          {[
+            ['Presence', 'Real content... posts, articles, a newsletter your patients actually read... produced in your voice every week, without you writing a word. So when the emergency strikes, they remember who to call: you.'],
+            ['Response', 'AI chat and voice that answer in seconds, at 2pm while you&rsquo;re adjusting or at 2am while you&rsquo;re asleep, and book the appointment on the spot. The inquiry you answer instantly is the patient your competitor never meets.'],
+            ['Proof', 'A review engine that turns every happy patient into public evidence, automatically. Reviews compound like interest: invisible week to week, undeniable year to year.'],
+            ['Recall', 'Reactivation that never forgets a patient. Care plan ends, contact continues... and the ones who faded get a reason to come back before the flare-up, not after.'],
+          ].map(([head, body]) => (
+            <div key={head}>
+              <div className="text-lg font-bold" style={{ color: TOKENS.lime }}>{head}</div>
+              <p className="mt-1 leading-relaxed text-white/75" dangerouslySetInnerHTML={{ __html: body }} />
+            </div>
+          ))}
+        </div>
+        <P>
+          <br />
+          Presence keeps patients warm &rarr; warm patients return, and leave reviews &rarr; reviews bring new
+          inquiries &rarr; instant response converts them &rarr; recall keeps them.{' '}
+          <strong>It&apos;s not four tools. It&apos;s one flywheel.</strong> Break any link and the leak
+          reopens somewhere else... which is exactly why buying point-solutions has never fixed it, and why
+          coaching alone just hands the discipline problem back to you. The loop removes it.
+        </P>
+      </Section>
+
+      {/* ── Proof / map pack ── */}
       <Section>
-        <Eyebrow>The third lever: getting found</Eyebrow>
+        <Eyebrow>Getting found</Eyebrow>
         <H2>Three practices get shown on the map. The rest get scrolled past.</H2>
         <P>
-          When someone in pain types <strong>chiropractor near me</strong>, Google shows exactly three
-          practices above the fold. Everyone else might as well not exist. And Google fills those three spots
-          largely on reviews: how many, how recent, and whether they keep coming.
+          When someone in pain types <strong>chiropractor near me</strong>, Google shows three practices above
+          the fold, and fresh reviews are one of the strongest signals that decide who gets those spots.
         </P>
         <MapPackDiagram />
         <P>
-          A practice that collects reviews <strong>systematically, every single week,</strong> outranks the
-          practice with a burst of reviews from two years ago. Every time. It is the same law that governs
-          your content: consistency beats bursts, except here the prize is the most valuable screen real
-          estate in your town.
-        </P>
-        <P>
-          <strong>Omniply makes the asking automatic.</strong> The printed QR card sits at your front desk,
-          so the patient who just said they feel amazing becomes a five-star review before they reach the car
-          park. Well-timed follow-ups catch the rest. The reviews are real, they are yours, and they arrive
-          every week, which is exactly what the map rewards.
+          A practice collecting reviews <strong>systematically, every single week,</strong> outranks the
+          practice with a burst from two years ago. Same law as your content: consistency beats bursts,
+          except here the prize is the most valuable screen real estate in your town... and Omniply makes the
+          asking automatic, from the front-desk QR card to the well-timed follow-up.
         </P>
       </Section>
 
-      {/* ── Bencivenga bullets ── */}
+      {/* ── The Prognosis ── */}
       <Section>
-        <Eyebrow>What you actually get</Eyebrow>
-        <H2>Everything the coaches tell you to do, done for you.</H2>
+        <Eyebrow>The prognosis</Eyebrow>
+        <H2>What your practice looks like ninety days into treatment.</H2>
         <ul>
-          <Bullet head="A voice-cloning onboarding you talk through in minutes,">
-            so your newsletters sound like you talking to a patient at the table, not like a content farm
-            wearing your logo.
+          <Bullet head="The 2am back-spasm call answered, and booked, while you're asleep...">
+            so Monday&apos;s schedule fills itself before your competitor&apos;s front desk even gets in.
           </Bullet>
-          <Bullet head="Weekly patient-education articles published to your website,">
-            mapped to a chiropractic seasonal calendar, so sciatica content lands in gardening season and
-            posture content when the school year starts.
+          <Bullet head="A newsletter your patients actually open...">
+            written, designed and sent every week, without you typing a word of it.
           </Bullet>
-          <Bullet head="A weekly newsletter with 25,000 sends a month included,">
-            the single highest-leverage habit in practice marketing, running without you and costing nothing
-            extra per send.
+          <Bullet head="Fresh Google reviews arriving quietly every week...">
+            the compounding kind your competitors can&apos;t fake and can&apos;t catch up to.
           </Bullet>
-          <Bullet head="A library of branded lead-magnet guides in your colors with your logo,">
-            desk-worker survival guides, sleep guides, first-visit explainers, ready for your front desk and
-            your ads on day one.
+          <Bullet head="Patients who felt fine and faded getting a reason to come back...">
+            before the flare-up, not after they&apos;ve already googled someone else.
           </Bullet>
-          <Bullet head="A printed QR card for your front desk plus review follow-ups,">
-            so the patient who just said &quot;I feel so much better&quot; becomes a five-star Google review
-            while the feeling is still fresh.
+          <Bullet head="Your name showing up between visits,">
+            so when the pain hits, there&apos;s no search... just &quot;call my chiro.&quot;
           </Bullet>
-          <Bullet head="Social posts with designed graphics, scheduled and published for you,">
-            so your practice looks alive and current to every prospect who checks, which is all of them.
-          </Bullet>
-          <Bullet head="One approval inbox for all of it,">
-            two minutes with your morning coffee, and your entire week of marketing ships.
+          <Bullet head="And the one nobody puts on a features list:">
+            your evenings back. No more 11pm posting, no more &quot;we should really ask for reviews&quot;...
+            no more marketing guilt.
           </Bullet>
         </ul>
       </Section>
 
-      {/* ── Pricing ── */}
+      {/* ── Economics ── */}
       <Section>
-        <Eyebrow>The number</Eyebrow>
-        <H2>Less than one new patient a month. For all of it.</H2>
-        <PricingBlock vertical />
+        <Eyebrow>The one-patient math</Eyebrow>
+        <H2>Recovering one patient a month pays for the entire system.</H2>
         <P>
-          One flat price. If one article brings you one new patient this year, the system has likely paid for
-          itself. It will publish fifty-two of them.
+          Take your average visit fee. A typical patient&apos;s first year is worth roughly twelve visits of
+          it. The whole system costs $397 a month. <strong>One recovered patient covers it. The second one is
+          profit.</strong> That&apos;s the entire business case... your own numbers, doing arithmetic you can
+          check. The X-Ray does it for you, with every assumption shown.
         </P>
+        <PricingBlock vertical />
       </Section>
 
-      {/* ── Founder + proof ── */}
+      {/* ── Founder ── */}
       <Section>
         <Eyebrow>Who built this</Eyebrow>
         <H2>Built by someone who spent 16 years marketing practices like yours by hand.</H2>
         <P>
-          I have run marketing for chiropractors and health professionals for 16 years, and scaled online
-          businesses from obscurity to six figures a month. The playbook inside Omniply is the exact system
-          the top practice coaches teach their private clients to run manually. I have watched it transform
-          practices, and I have watched it quietly die in busy months, over and over, for one reason only:
-          humans cannot ship every week forever.
+          I have run marketing for chiropractors and health professionals for 16 years. The playbook inside
+          Omniply is the exact system the top practice coaches teach their private clients to run manually. I
+          have watched it transform practices, and I have watched it quietly die in busy months, over and
+          over, for one reason only: humans cannot ship every week forever.
         </P>
         <P>
           So I learned to code and spent years building the version that can. <strong>Omniply does not get
@@ -310,23 +286,27 @@ export default function ChiropractorsPage() {
 
       {/* ── Close ── */}
       <Section dark>
-        <H2>74 practices this quarter. That is the cap, and it is real.</H2>
+        <H2>Decide like a doctor decides: on the evidence.</H2>
         <P lead>
-          Voice onboarding and brand setup take real attention per practice, and the practices already inside
-          come first. When the 74 spots are taken, the door closes until next quarter.
+          The X-Ray takes 2 minutes: four system scores and a dollar figure on what your practice is quietly
+          leaking every month. Then a 12-minute walkthrough shows the actual system on screen... what it
+          posts, how it answers, what the recall messages look like. No call. No salesperson.
         </P>
         <P>
-          A year from now your practice will either have 52 weeks of compounding content working for it, or
-          another year of good intentions. The only difference is what you do in the next five minutes.
+          $397 a month. Everything in the loop. Cancel anytime. We&apos;re not asking you to become a
+          marketer... we&apos;re asking you to stop having to be one.
         </P>
-        <Cta sub="$397/mo flat · everything included · cancel any month">
-          Set up your account right now
+        <Cta href={XRAY_URL} sub="free · 2 minutes · your report is yours to keep">
+          X-Ray my practice
         </Cta>
+        <p className="mt-6 text-center text-sm text-white/50">
+          Or see the system first: <a href="/walkthrough" className="underline">the 12-minute walkthrough</a>
+        </p>
       </Section>
 
       <FaqJsonLd items={FAQ_ITEMS} />
       <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
-        <p>Omniply · Built for chiropractic practices</p>
+        <p>Omniply &middot; Built for chiropractic practices</p>
         <p className="mt-2">
           <a href="/home" className="underline">Not a chiropractor? See the Omniply platform</a>
         </p>

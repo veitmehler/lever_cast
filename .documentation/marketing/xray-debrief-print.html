@@ -2,8 +2,9 @@
 <!--
   X-Ray Debrief — print source for the Treatment Plan PDF.
   Copy is VERBATIM from practice-treatment-plan-master-pitch.md (the locked master).
-  Render: node .documentation/marketing/render-debrief.js
-  (replaces __QR_B64__ with the walkthrough QR, outputs apps/web/public/x-ray/X-Ray-Debrief.pdf)
+  Render: node .documentation/marketing/render-debrief.js <qr-b64-file>
+  The QR placeholder token (in the CTA img) is replaced at render time.
+  Output: apps/web/public/x-ray/X-Ray-Debrief.pdf
 -->
 <html lang="en">
 <head>
@@ -31,7 +32,6 @@
     padding: 0.85in 0.9in 0.75in;
     display: flex; flex-direction: column;
   }
-  /* registration marks */
   .rm { position: absolute; width: 0.16in; height: 0.16in; }
   .rm.tl { top: 0.3in; left: 0.3in; border-top: 1px solid var(--faint); border-left: 1px solid var(--faint); }
   .rm.tr { top: 0.3in; right: 0.3in; border-top: 1px solid var(--faint); border-right: 1px solid var(--faint); }
@@ -41,7 +41,7 @@
   .head {
     display: flex; justify-content: space-between; align-items: baseline;
     font-family: var(--mono); font-size: 8.5pt; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--dim); margin-bottom: 0.55in;
+    text-transform: uppercase; color: var(--dim); margin-bottom: 0.5in;
   }
   .head b { color: var(--ink); font-weight: 600; }
   .foot {
@@ -56,9 +56,9 @@
     text-transform: uppercase; color: var(--lime); margin-bottom: 0.28in;
   }
   h1.display { font-size: 46pt; line-height: 1.04; font-weight: 750; letter-spacing: -0.02em; }
-  h2.sect { font-size: 27pt; line-height: 1.12; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 0.3in; }
-  .big { font-size: 33pt; line-height: 1.12; font-weight: 720; letter-spacing: -0.018em; }
-  p.body { font-size: 12.5pt; line-height: 1.62; color: var(--ink); max-width: 5.7in; margin-bottom: 0.18in; }
+  h2.sect { font-size: 25pt; line-height: 1.14; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 0.26in; }
+  .big { font-size: 31pt; line-height: 1.13; font-weight: 720; letter-spacing: -0.018em; }
+  p.body { font-size: 12pt; line-height: 1.58; color: var(--ink); max-width: 5.8in; margin-bottom: 0.16in; }
   p.body.dim { color: var(--dim); }
   p.body b { font-weight: 680; }
   em { font-style: italic; }
@@ -72,33 +72,33 @@
   }
 
   .forcenum {
-    font-family: var(--mono); font-size: 64pt; font-weight: 700; color: var(--bg2);
-    line-height: 1; margin-bottom: 0.2in;
+    font-family: var(--mono); font-size: 40pt; font-weight: 700; color: var(--bg2);
+    line-height: 1; margin: 0.22in 0 0.12in;
   }
+  .forcenum.xl { font-size: 64pt; margin: 0 0 0.2in; }
   .forcename {
     font-family: var(--mono); font-size: 11pt; letter-spacing: 0.3em; text-transform: uppercase;
-    color: var(--lime); margin-bottom: 0.3in;
+    color: var(--lime); margin-bottom: 0.2in;
   }
 
   .statband {
-    display: flex; gap: 0.35in; margin: 0.4in 0 0.3in;
+    display: flex; gap: 0.35in; margin: 0.28in 0 0.2in;
     border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-    padding: 0.32in 0;
+    padding: 0.28in 0;
   }
   .stat { flex: 1; }
-  .stat .n { font-size: 30pt; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat .n { font-size: 28pt; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .stat .l { font-family: var(--mono); font-size: 8.5pt; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-top: 8px; line-height: 1.6; }
   .fnmark { color: var(--lime); font-size: 60%; vertical-align: super; }
 
   .quoteblock {
     border-left: 2.5px solid var(--signal);
-    padding: 0.1in 0 0.1in 0.32in; margin: 0.35in 0;
+    padding: 0.1in 0 0.1in 0.32in; margin: 0.32in 0;
   }
-  .quoteblock .big { color: var(--ink); }
 
   .inset {
     background: var(--bg1); border: 1px solid var(--line); border-radius: 10px;
-    padding: 0.26in 0.3in; margin: 0.25in 0; max-width: 5.7in;
+    padding: 0.26in 0.3in; margin: 0.25in 0; max-width: 5.8in;
   }
   .inset p { font-size: 11.5pt; line-height: 1.6; color: var(--ink); }
   .inset .lbl { font-family: var(--mono); font-size: 8pt; letter-spacing: 0.22em; text-transform: uppercase; color: var(--lime); margin-bottom: 8px; }
@@ -140,34 +140,28 @@
   <div class="foot"><span>Confidential &middot; Prepared for practice owners</span><span>omniply.io</span></div>
 </div>
 
-<!-- P2 · §1 THE FRAME -->
+<!-- P2 · §1 THE FRAME + §2 OPENER -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>01 &middot; The Frame</span></div>
-  <div class="big" style="margin-bottom: 0.4in;">An X-ray doesn't lie.</div>
+  <div class="big" style="margin-bottom: 0.35in;">An X-ray doesn't lie.</div>
   <p class="body">It doesn't exaggerate, it doesn't flatter, and it doesn't care how long you've been in practice. It shows the thing you couldn't see. And once you've seen it, you can't unsee it.</p>
   <p class="body">You've seen yours. Your practice has a leak. Now you know roughly what it costs you every month, and you know which part of the machine is lagging behind.</p>
   <p class="body">This is the treatment plan. Read it the way you'd want a patient to read yours: not as entertainment. As the difference between managing a problem and living with one.</p>
-  <div class="foot"><span>P.02 — 15</span><span>omniply.io</span></div>
+  <div class="scanline" style="margin: 0.35in 0;"></div>
+  <h2 class="sect">Why this is happening<br />to good practices.</h2>
+  <p class="body">First, understand that the leak is not your fault. Three forces created it, none of them asked your permission, and all three are permanent.</p>
+  <div class="foot"><span>P.02 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P3 · §2 FORCE 01 -->
+<!-- P3 · FORCES 01 + 02 -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>02 &middot; The Big Change</span></div>
-  <h2 class="sect">Why this is happening<br />to good practices.</h2>
-  <p class="body">First, understand that the leak is not your fault. Three forces created it, none of them asked your permission, and all three are permanent.</p>
-  <div class="forcenum">01</div>
+  <div class="forcenum" style="margin-top: 0;">01</div>
   <div class="forcename">The technology force</div>
   <p class="body">Every patient in your town now carries every competitor's front desk in their pocket. When someone's back seizes at 9pm, they don't wait for your opening hours...</p>
   <p class="body">They search, they message, and they book with whoever answers. Google decides who exists. The map pack decides who gets the call.</p>
-  <div class="foot"><span>P.03 — 15</span><span>omniply.io</span></div>
-</div>
-
-<!-- P4 · §2 FORCE 02 -->
-<div class="page">
-  <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div class="head"><span><b>X-Ray Debrief</b></span><span>02 &middot; The Big Change</span></div>
   <div class="forcenum">02</div>
   <div class="forcename">The social force</div>
   <p class="body">Patients stopped calling back. Not because they're rude... because Amazon, Uber and a decade of instant everything trained them.</p>
@@ -177,23 +171,23 @@
     <div class="stat"><div class="n signal">2 days</div><div class="l">the average business's response time</div></div>
   </div>
   <p class="body">And loyalty quietly became a subscription that simply gets canceled by silence.</p>
-  <div class="foot"><span>P.04 — 15 &nbsp;&middot;&nbsp; * sources on the back page</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.03 — 13 &nbsp;&middot;&nbsp; * sources on the back page</span><span>omniply.io</span></div>
 </div>
 
-<!-- P5 · §2 FORCE 03 -->
+<!-- P4 · FORCE 03 -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>02 &middot; The Big Change</span></div>
-  <div class="forcenum">03</div>
+  <div class="forcenum xl">03</div>
   <div class="forcename">The economic force</div>
   <p class="body">The compounding asset in healthcare used to be location and reputation. Now it's attention and reviews. The practices growing right now are not better clinicians than you. They run better systems... and every month, the gap between good-clinician practices and good-system practices gets more expensive to close.</p>
   <div class="quoteblock" style="border-color: var(--lime); margin-top: 0.55in;">
     <div class="big">Ten years ago, "great care plus word of mouth" was a growth strategy.<br /><br />Today that's a lottery ticket.</div>
   </div>
-  <div class="foot"><span>P.05 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.04 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P6 · §3 TRYING HARDER -->
+<!-- P5 · §3 BELIEF SHIFT (merged) -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>03 &middot; The Belief Shift</span></div>
@@ -202,20 +196,13 @@
   <p class="body">Telling your front desk to follow up when it's quiet is a losing strategy because your clients expect instant answers today. And asking for a Google review when you remember, and only from the patients you're sure will say yes, means that other clinics win the Google Map pack.</p>
   <p class="body">So the real problem is that you need to get consistent systematically. That's exactly what all the expensive chiropractic coaches sell.</p>
   <p class="body">But then you hit the actual problem... it's not a discipline problem, it's a <b>physics problem.</b></p>
-  <div class="foot"><span>P.06 — 15</span><span>omniply.io</span></div>
-</div>
-
-<!-- P7 · §3 PHYSICS -->
-<div class="page">
-  <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div class="head"><span><b>X-Ray Debrief</b></span><span>03 &middot; The Belief Shift</span></div>
-  <div class="big" style="margin: 0.5in 0 0.45in; font-size: 38pt;">Attention now runs<br />24 hours a day.<br /><span class="lime">Humans don't.</span></div>
+  <div class="big" style="margin: 0.32in 0; font-size: 27pt;">Attention now runs 24 hours a day. <span class="lime">Humans don't.</span></div>
   <p class="body">You need sleep. Your family needs you. Your kids need guidance. And sometimes you also need to rest...</p>
   <p class="body">So, you cannot out-hustle a force that never sleeps... you can only <b>out-system it.</b></p>
-  <div class="foot"><span>P.07 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.05 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P8 · §3 DRIFT -->
+<!-- P6 · §3 DRIFT -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>03 &middot; The Belief Shift</span></div>
@@ -228,10 +215,10 @@
   <div class="quoteblock">
     <div class="big"><span class="signal">Patients don't leave. They fade.</span> And fading is invisible in the appointment book until the quarter is already soft.</div>
   </div>
-  <div class="foot"><span>P.08 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.06 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P9 · §4 THE LOOP -->
+<!-- P7 · §4 THE LOOP -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>04 &middot; The Mechanism</span></div>
@@ -273,10 +260,10 @@
       </g>
     </svg>
   </div>
-  <div class="foot"><span>P.09 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.07 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P10 · PRESENCE + RESPONSE -->
+<!-- P8 · PRESENCE + RESPONSE -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>04 &middot; The Mechanism</span></div>
@@ -294,10 +281,10 @@
     </div>
     <p class="body">If not, they'll call the next chiro in the map pack without hesitation because they will go to whoever they can schedule the appointment with <em>first</em>!</p>
   </div>
-  <div class="foot"><span>P.10 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.08 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P11 · PROOF + RECALL -->
+<!-- P9 · PROOF + RECALL -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>04 &middot; The Mechanism</span></div>
@@ -311,10 +298,10 @@
     <div class="partname"><span class="dot">&#9679;</span> Recall</div>
     <p class="body">Reactivation that never forgets a patient. Care plan ends, contact continues; nobody drifts unnoticed, and the ones who faded get a reason to come back... before the flare-up, not after.</p>
   </div>
-  <div class="foot"><span>P.11 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.09 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P12 · FLYWHEEL -->
+<!-- P10 · FLYWHEEL -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>04 &middot; The Mechanism</span></div>
@@ -322,10 +309,10 @@
   <p class="body">Watch what the loop does: presence keeps patients warm &rarr; warm patients return, and leave reviews &rarr; reviews bring new inquiries &rarr; instant response converts them &rarr; recall keeps them.</p>
   <p class="body">Break any link and the leak reopens somewhere else, which is exactly why buying point-solutions has never fixed it.</p>
   <p class="body">Which is exactly why all the chiro practice coaching just hands the discipline problem back to you. <b>The loop removes it.</b></p>
-  <div class="foot"><span>P.12 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.10 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P13 · §5 ECONOMICS -->
+<!-- P11 · §5 ECONOMICS -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>05 &middot; The Economics</span></div>
@@ -333,7 +320,7 @@
   <p class="body">Now the part your X-Ray already did for you.</p>
   <p class="body">Take your average visit fee. A typical patient's first year is worth roughly twelve visits of it. The whole system costs $397 a month.</p>
   <div class="mathrow">
-    <div class="mathcard"><div class="v dim" style="color: var(--dim);">fee &times; 12</div><div class="k">one patient's first year</div></div>
+    <div class="mathcard"><div class="v" style="color: var(--dim);">fee &times; 12</div><div class="k">one patient's first year</div></div>
     <div class="vs">VS</div>
     <div class="mathcard"><div class="v lime">$397</div><div class="k">the whole system / month</div></div>
   </div>
@@ -342,10 +329,10 @@
   </div>
   <p class="body">And your X-Ray told you the leak is bigger than two.</p>
   <p class="body">That's the entire business case. No projections, no hockey sticks... just your own numbers, doing arithmetic you can check.</p>
-  <div class="foot"><span>P.13 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.11 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P14 · §6 PRIZE + CTA -->
+<!-- P12 · §6 PRIZE + CTA -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>06 &middot; The Prize</span></div>
@@ -361,10 +348,10 @@
     </div>
     <img src="data:image/png;base64,__QR_B64__" alt="QR code to the walkthrough" />
   </div>
-  <div class="foot"><span>P.14 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.12 — 13</span><span>omniply.io</span></div>
 </div>
 
-<!-- P15 · §7 CLOSE + SOURCES -->
+<!-- P13 · §7 CLOSE + SOURCES -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
   <div class="head"><span><b>X-Ray Debrief</b></span><span>07 &middot; The Close</span></div>
@@ -376,7 +363,7 @@
     Leak estimates referenced in this document are computed from your own X-Ray answers and stated, adjustable assumptions. They are illustrations, not guarantees or income claims.<br /><br />
     &copy; Omniply &middot; omniply.io &middot; Built for chiropractic practices only.
   </div>
-  <div class="foot"><span>P.15 — 15</span><span>omniply.io</span></div>
+  <div class="foot"><span>P.13 — 13</span><span>omniply.io</span></div>
 </div>
 
 </body>

@@ -1,44 +1,48 @@
 /**
  * Shared marketing-site building blocks (marketing-site plan).
  *
- * Placeholder brand tokens derived from the Omniply favicon: deep navy
- * gradient grounds, white linework, one electric-azure accent. Swap the
- * TOKENS object when the real brand assets arrive — nothing else changes.
+ * Brand tokens = the real Omniply system (site refresh 2026-08-05): layered
+ * near-black grounds and the electric lime #C3F43B, matching the X-Ray funnel
+ * and the Debrief PDF. On light sections the accent uses darker lime-green
+ * derivatives for contrast; pure lime lives on dark grounds and buttons.
  * Copy style is dash-free (house rule). All diagrams are inline SVG.
  */
 import React from 'react'
 
 export const TOKENS = {
-  ink: '#0A1826',
-  inkDeep: '#05090F',
-  paper: '#F7FAFC',
-  body: '#1E2B38',
-  muted: '#5A6B7A',
-  accent: '#38A8F8',
-  accentDeep: '#1B7FD4',
-  line: '#D9E2EA',
+  ink: '#18181A',
+  inkDeep: '#0E0E0F',
+  paper: '#F5F6F4',
+  body: '#1A1A1C',
+  muted: '#55555C',
+  accent: '#84B420', // lime-green readable on light grounds (diagrams, links)
+  accentDeep: '#5F8A14', // eyebrows / emphasis text on light grounds
+  lime: '#C3F43B', // pure brand lime: dark grounds + button fills only
+  line: '#E2E3E6',
 }
 
 export const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL ?? '#pricing'
+export const XRAY_URL = '/x-ray'
 
-export function Cta({ children, sub }: { children: React.ReactNode; sub?: string }) {
+export function Cta({ children, sub, href }: { children: React.ReactNode; sub?: string; href?: string }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <a
-        href={CHECKOUT_URL}
-        className="inline-block rounded-xl px-10 py-5 text-lg font-bold text-white shadow-lg transition-transform hover:scale-[1.02]"
-        style={{ background: `linear-gradient(135deg, ${TOKENS.accent}, ${TOKENS.accentDeep})` }}
+        href={href ?? CHECKOUT_URL}
+        className="inline-block rounded-xl px-10 py-5 text-lg font-bold shadow-lg transition-transform hover:scale-[1.02]"
+        style={{ background: TOKENS.lime, color: '#0B0B0C' }}
       >
         {children}
       </a>
-      {sub && <p className="text-sm" style={{ color: TOKENS.muted }}>{sub}</p>}
+      {sub && <p className="text-sm opacity-80">{sub}</p>}
     </div>
   )
 }
 
 export function Eyebrow({ children }: { children: React.ReactNode }) {
+  // color comes from the enclosing Section via --eyebrow (lime on dark, deep green on light)
   return (
-    <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: TOKENS.accentDeep }}>
+    <div className="mb-3 text-[16px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--eyebrow)' }}>
       {children}
     </div>
   )
@@ -58,9 +62,9 @@ export function Section({
       id={id}
       className="px-6 py-20 md:py-28"
       style={
-        dark
-          ? { background: `linear-gradient(180deg, ${TOKENS.ink}, ${TOKENS.inkDeep})`, color: '#fff' }
-          : { background: TOKENS.paper, color: TOKENS.body }
+        (dark
+          ? { background: `linear-gradient(180deg, ${TOKENS.ink}, ${TOKENS.inkDeep})`, color: '#fff', ['--eyebrow' as string]: TOKENS.lime }
+          : { background: TOKENS.paper, color: TOKENS.body, ['--eyebrow' as string]: TOKENS.accentDeep }) as React.CSSProperties
       }
     >
       <div className="mx-auto max-w-3xl">{children}</div>
@@ -73,14 +77,14 @@ export function H2({ children }: { children: React.ReactNode }) {
 }
 
 export function P({ children, lead }: { children: React.ReactNode; lead?: boolean }) {
-  return <p className={`mb-5 ${lead ? 'text-xl leading-relaxed' : 'text-lg leading-relaxed'}`}>{children}</p>
+  return <p className={`mb-5 leading-relaxed ${lead ? 'text-[22px]' : 'text-[20px]'}`}>{children}</p>
 }
 
 export function Bullet({ head, children }: { head: string; children: React.ReactNode }) {
   return (
     <li className="mb-5 flex gap-4">
       <HexDot />
-      <span className="text-lg leading-relaxed">
+      <span className="text-[20px] leading-relaxed">
         <strong>{head}</strong> {children}
       </span>
     </li>
@@ -97,23 +101,27 @@ function HexDot() {
 }
 
 /* ── Diagram 1: sawtooth vs compounding consistency ─────────────────────── */
-export function ConsistencyGraph() {
+export function ConsistencyGraph({ onDark }: { onDark?: boolean }) {
+  const axis = onDark ? '#343434' : TOKENS.line
+  const dim = onDark ? 'rgba(255,255,255,0.6)' : TOKENS.muted
+  const curve = onDark ? TOKENS.lime : TOKENS.accent
+  const label = onDark ? TOKENS.lime : TOKENS.accentDeep
   return (
     <figure className="my-10">
       <svg viewBox="0 0 560 260" className="w-full">
-        <line x1="40" y1="220" x2="540" y2="220" stroke={TOKENS.line} strokeWidth="2" />
-        <line x1="40" y1="220" x2="40" y2="20" stroke={TOKENS.line} strokeWidth="2" />
-        <text x="290" y="248" textAnchor="middle" fontSize="13" fill={TOKENS.muted}>Months of marketing</text>
-        <text x="18" y="120" textAnchor="middle" fontSize="13" fill={TOKENS.muted} transform="rotate(-90 18 120)">Patient attention</text>
+        <line x1="40" y1="220" x2="540" y2="220" stroke={axis} strokeWidth="2" />
+        <line x1="40" y1="220" x2="40" y2="20" stroke={axis} strokeWidth="2" />
+        <text x="290" y="248" textAnchor="middle" fontSize="13" fill={dim}>Months of marketing</text>
+        <text x="18" y="120" textAnchor="middle" fontSize="13" fill={dim} transform="rotate(-90 18 120)">Patient attention</text>
         {/* sawtooth: bursts that decay */}
-        <path d="M40 218 L80 150 L120 210 L160 140 L200 205 L240 155 L280 212 L330 160 L380 214" fill="none" stroke={TOKENS.muted} strokeWidth="3" strokeDasharray="1 0" opacity="0.75" />
-        <text x="385" y="228" fontSize="13" fill={TOKENS.muted} fontWeight="700">Bursts (most practices)</text>
+        <path d="M40 218 L80 150 L120 210 L160 140 L200 205 L240 155 L280 212 L330 160 L380 214" fill="none" stroke={dim} strokeWidth="3" strokeDasharray="1 0" opacity="0.75" />
+        <text x="385" y="228" fontSize="13" fill={dim} fontWeight="700">Bursts (most practices)</text>
         {/* compounding */}
-        <path d="M40 218 C 200 210, 330 170, 420 100 C 470 62, 510 42, 540 30" fill="none" stroke={TOKENS.accent} strokeWidth="4" />
-        <circle cx="540" cy="30" r="6" fill={TOKENS.accent} />
-        <text x="440" y="60" fontSize="14" fill={TOKENS.accentDeep} fontWeight="700">Weekly, every week</text>
+        <path d="M40 218 C 200 210, 330 170, 420 100 C 470 62, 510 42, 540 30" fill="none" stroke={curve} strokeWidth="4" />
+        <circle cx="540" cy="30" r="6" fill={curve} />
+        <text x="440" y="60" fontSize="14" fill={label} fontWeight="700">Weekly, every week</text>
       </svg>
-      <figcaption className="mt-2 text-center text-sm" style={{ color: TOKENS.muted }}>
+      <figcaption className="mt-2 text-center text-sm" style={{ color: dim }}>
         Attention compounds only when content ships every week. Bursts reset to zero.
       </figcaption>
     </figure>
@@ -350,5 +358,100 @@ export function MapPackDiagram({ query }: { query?: string }) {
         Google fills these three spots largely on reviews: how many, how recent, how steady.
       </figcaption>
     </figure>
+  )
+}
+
+/* ── The Omniply Loop flywheel (site adaptation of the Debrief diagram) ──── */
+export function LoopDiagram() {
+  const node = (x: number, y: number, w: number, label: string) => (
+    <g key={label}>
+      <rect x={x} y={y} width={w} height={40} rx={9} fill="#18181A" stroke="#343434" />
+      <text x={x + w / 2} y={y + 25} textAnchor="middle" fill="#FFFFFF" fontSize="12.5" fontFamily="ui-monospace, Menlo, monospace" letterSpacing="2">
+        {label}
+      </text>
+    </g>
+  )
+  return (
+    <div className="my-10 flex justify-center overflow-x-auto">
+      <svg width="380" height="380" viewBox="0 0 430 430" role="img" aria-label="The Omniply Loop: Presence, Proof, Recall, Response">
+        <defs>
+          <marker id="loop-ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#C3F43B" />
+          </marker>
+        </defs>
+        <g fill="none" stroke="#C3F43B" strokeWidth="2">
+          <path d="M 262 78 A 150 150 0 0 1 352 168" markerEnd="url(#loop-ah)" />
+          <path d="M 352 262 A 150 150 0 0 1 262 352" markerEnd="url(#loop-ah)" />
+          <path d="M 168 352 A 150 150 0 0 1 78 262" markerEnd="url(#loop-ah)" />
+          <path d="M 78 168 A 150 150 0 0 1 168 78" markerEnd="url(#loop-ah)" />
+        </g>
+        {node(140, 32, 150, 'PRESENCE')}
+        {node(306, 195, 118, 'PROOF')}
+        {node(140, 358, 150, 'RECALL')}
+        {node(6, 195, 140, 'RESPONSE')}
+        <text x="215" y="207" textAnchor="middle" fill="#A0A0A5" fontSize="11" fontFamily="ui-monospace, Menlo, monospace">THE</text>
+        <text x="215" y="227" textAnchor="middle" fill="#C3F43B" fontSize="13" fontFamily="ui-monospace, Menlo, monospace" letterSpacing="2">OMNIPLY LOOP</text>
+      </svg>
+    </div>
+  )
+}
+
+/* ── Verified stat band (same numbers + sources as the X-Ray funnel) ─────── */
+export function StatBand({ onDark }: { onDark?: boolean }) {
+  const stats = [
+    { n: '78%', l: 'of customers buy from whoever answers first' },
+    { n: '100×', l: 'more likely to connect in 5 min vs. 30 min' },
+    { n: '2 days', l: 'the average business response time' },
+  ]
+  const ink = onDark ? '#FFFFFF' : TOKENS.body
+  const dim = onDark ? 'rgba(255,255,255,0.6)' : TOKENS.muted
+  return (
+    <div className="my-10">
+      <div className="grid grid-cols-1 gap-6 border-y py-8 sm:grid-cols-3" style={{ borderColor: onDark ? '#343434' : TOKENS.line }}>
+        {stats.map((s) => (
+          <div key={s.n}>
+            <div className="text-4xl font-extrabold tracking-tight" style={{ color: s.n === '100×' ? (onDark ? TOKENS.lime : TOKENS.accentDeep) : ink }}>
+              {s.n}
+            </div>
+            <div className="mt-2 text-xs font-semibold uppercase tracking-wider" style={{ color: dim }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs" style={{ color: dim }}>
+        Sources: Oldroyd, Lead Response Management Study (InsideSales, 2007) &middot; Harvard Business Review (2011) &middot; Lead Connect survey
+      </p>
+    </div>
+  )
+}
+
+/* ── Slim branding header (site pages) ───────────────────────────────────── */
+export function SiteHeader({ vertical }: { vertical?: string }) {
+  return (
+    <header
+      className="sticky top-0 z-50 px-6 py-4"
+      style={{ background: 'rgba(14,14,15,0.88)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #232325' }}
+    >
+      <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
+        <a href="/home" className="flex items-center gap-3 font-mono text-sm font-bold tracking-[0.25em] text-white no-underline">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="Omniply" className="h-7 w-7 rounded-md" />
+          <span>
+            OMNIPLY{vertical ? <span className="font-normal text-white/50"> &middot; {vertical.toUpperCase()}</span> : null}
+          </span>
+        </a>
+        <nav className="flex items-center gap-5 text-sm">
+          <a href="/walkthrough" className="hidden text-white/60 hover:text-white sm:inline">
+            Walkthrough
+          </a>
+          <a
+            href={XRAY_URL}
+            className="rounded-lg px-4 py-2 font-bold"
+            style={{ background: TOKENS.lime, color: '#0B0B0C' }}
+          >
+            X-Ray my practice
+          </a>
+        </nav>
+      </div>
+    </header>
   )
 }

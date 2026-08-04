@@ -1,0 +1,147 @@
+/* ── Omniply order form — paste into GHL funnel page: Settings → Custom CSS ──
+   Aligns the one-step order form with the omniply.io design system:
+   near-black ground (#0E0E0F), white card, lime CTA (#C3F43B on #0B0B0C),
+   deep lime-green accents (#5F8A14) on light surfaces, system font stack.
+   Written against GHL's one-step order form classes (2026-08). */
+
+/* page ground: match the sales pages */
+body,
+.bgCover {
+  background: #0E0E0F !important;
+}
+
+/* the card — uniform 35px padding on desktop; on mobile 35px top/bottom
+   only, left/right left to GHL's defaults */
+.container-order-form-two-step {
+  background: #ffffff;
+  border: 1px solid #e2e3e6;
+  border-radius: 14px;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.5);
+  padding-top: 35px !important;
+  padding-bottom: 35px !important;
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+@media (min-width: 769px) {
+  .container-order-form-two-step {
+    padding: 35px !important;
+  }
+}
+
+/* step heading → eyebrow treatment + subheading as the real title */
+.form-step .form-heading,
+.form-step .form-heading.active {
+  color: #5f8a14 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 16px;
+  font-weight: 800;
+}
+.form-step .form-sub-heading {
+  display: block;
+  color: #1a1a1c;
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 6px;
+}
+
+/* inputs: modern underline-only fields (no boxes)
+   NOTE: card number / expiry / CVC are Stripe-hosted iframes and cannot be
+   restyled from page CSS — they keep their boxes. */
+.container-order-form-two-step .form-input.input,
+.container-order-form-two-step input[type='text'],
+.container-order-form-two-step input[type='tel'],
+.container-order-form-two-step input[type='email'],
+.container-order-form-two-step .iti input,
+.container-order-form-two-step select {
+  border: none !important;
+  border-bottom: 2px solid #e2e3e6 !important;
+  border-radius: 0 !important;
+  padding: 14px 6px 12px 6px;
+  font-size: 16px;
+  color: #1a1a1c;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.container-order-form-two-step .form-input.input:focus,
+.container-order-form-two-step input:focus,
+.container-order-form-two-step .iti input:focus,
+.container-order-form-two-step select:focus {
+  border-bottom-color: #84b420 !important;
+  box-shadow: none !important;
+  outline: none;
+}
+/* keep the phone flag aligned with the underline style */
+.container-order-form-two-step .iti {
+  border-bottom: none;
+}
+
+/* section labels (PAYMENT etc.) */
+.container-order-form-two-step section.info + *,
+.container-order-form-two-step [class*='label'],
+.container-order-form-two-step legend {
+  color: #55555c;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+/* prices / amounts / links: brand green instead of default blue */
+.container-order-form-two-step a,
+.container-order-form-two-step [class*='price'],
+.container-order-form-two-step [class*='amount'],
+.container-order-form-two-step [class*='Price'],
+.container-order-form-two-step [class*='Amount'] {
+  color: #5f8a14 !important;
+}
+
+/* product radios */
+.container-order-form-two-step input[type='radio'],
+.container-order-form-two-step input[type='checkbox'] {
+  accent-color: #84b420;
+}
+
+/* the button: lime, dark text, site radius.
+   Catch-all: the submit is the only <button> inside the order widget. */
+div[id^='one-step-order'] button,
+div[class*='one-step-order'] button,
+.container-order-form-two-step button {
+  background: #c3f43b !important;
+  color: #0b0b0c !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  padding: 16px !important;
+  transition: filter 0.15s ease;
+}
+div[id^='one-step-order'] button:hover,
+.container-order-form-two-step button:hover {
+  filter: brightness(0.95);
+}
+/* keep the disabled state visibly disabled, but on-brand */
+div[id^='one-step-order'] button[disabled],
+.container-order-form-two-step button[disabled] {
+  background: #dcf19a !important;
+  color: #6e6e74 !important;
+  cursor: not-allowed;
+}
+
+/* fine print */
+.container-order-form-two-step + p,
+.container-order-form-two-step [class*='secure'] {
+  color: #8a8a90;
+}
+
+/* ── branding strip inside the card ── */
+.container-order-form-two-step::before {
+  content: 'OMNIPLY  ·  SECURE CHECKOUT';
+  display: block;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: #0b0b0c;
+  padding-bottom: 16px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid #ecedef;
+}

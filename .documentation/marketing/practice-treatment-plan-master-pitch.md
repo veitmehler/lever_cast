@@ -24,8 +24,8 @@ It doesn't exaggerate, it doesn't flatter, and it doesn't care how long you've
 been in practice. It shows the thing you couldn't see. And once you've seen it,
 you can't unsee it.
 
-You've seen yours. Your practice has a leak — you now know roughly what it
-costs you every month, and you know which part of the machine it's coming from.
+You've seen yours. Your practice has a leak. Now you know roughly what it
+costs you every month, and you know which part of the machine is lagging behind.
 
 This is the treatment plan. Read it the way you'd want a patient to read
 yours: not as entertainment. As the difference between managing a problem
@@ -40,23 +40,29 @@ none of them asked your permission, and all three are permanent.
 
 **The technology force.** Every patient in your town now carries every
 competitor's front desk in their pocket. When someone's back seizes at 9pm,
-they don't wait for your opening hours — they search, they message, and they
-book with whoever answers. Google decides who exists. The map pack decides
-who gets the call.
+they don't wait for your opening hours... 
 
-**The social force.** Patients stopped calling back. Not because they're rude —
-because Amazon, Uber and a decade of instant everything trained them. An
-unanswered call isn't a delay anymore; it's an answer. And loyalty quietly
-became a subscription: renewed by contact, canceled by silence.
+They search, they message, and they book with whoever answers. Google decides 
+who exists. The map pack decides who gets the call.
+
+**The social force.** Patients stopped calling back. Not because they're rude...
+because Amazon, Uber and a decade of instant everything trained them. 
+
+78% of customers buy from whoever answers first. Reach an inquiry within five minutes 
+and you're 100× more likely to even connect than half an hour later. The average business 
+takes two days... 
+
+And loyalty quietly became a subscription that simply gets canceled by silence.
 
 **The economic force.** The compounding asset in healthcare used to be
 location and reputation. Now it's attention and reviews. The practices growing
-right now are not better clinicians than you. They are better systems — and
+right now are not better clinicians than you. They run better systems... and
 every month, the gap between good-clinician practices and good-system
 practices gets more expensive to close.
 
 Ten years ago, "great care plus word of mouth" was a growth strategy.
-Today it's a lottery ticket.
+
+Today that's a lottery ticket.
 
 ---
 
@@ -64,20 +70,41 @@ Today it's a lottery ticket.
 
 You've already tried the obvious fix. It's called *trying harder.*
 
-Posting on social media at 11pm. Telling the front desk to follow up when
-things quiet down. Asking for a Google review when you remember, from the
-patients you're sure will say yes. Promising yourself you'll "get consistent"
-this quarter.
+The problem is that you and your staff are busy. Posting at 11 pm doesn't move
+the needle because everybody is asleep. 
 
-Here's the belief that has to break: **this is not a discipline problem.
-It's a physics problem.** Attention now runs 24 hours a day. Humans don't.
-You cannot out-hustle a force that never sleeps — you can only out-system it.
+Telling your front desk to follow up when it's quiet is a losing strategy because
+your clients expect instant answers today. And asking for a Google review
+when you remember, and only from the patients you're sure will say yes, means
+that other clinics win the Google Map pack.
+
+So the real problem is that you need to get consistent systematically. That's
+exactly what all the expensive chiropractic coaches sell.
+
+But then you hit the actual problem... it's not a discipline problem, it's a
+physics problem.
+
+Attention now runs 24 hours a day. Humans don't.
+
+You need sleep. Your family needs you. Your kids need guidance. And sometimes
+you also need to rest...
+
+So, you cannot out-hustle a force that never sleeps... you can only out-system it.
 
 And the leak this physics creates is the quietest one in your business:
-**patient drift.** A patient finishes their care plan. They feel good — which
-means your care *worked*. Then nothing happens. No contact, no content, no
-reason to think of you. Eight months later their back flares up in a city
-full of clinics that answer instantly.
+**patient drift.** 
+
+A patient finishes their care plan. They feel good, which means your care *worked*. 
+
+But then nothing happens. No contact, no content, no reason to think of you. 
+
+Then eight months later their back flares up. But you are in a city full of clinics 
+that answer faster than you, and they have likely multiple chiros saved in their
+phones... how many electricians do you have stored in *your* phone for emergencies?
+
+Exactly!
+
+And if you don't, you'll call the first one listed in Google Maps that responds... correct?
 
 Patients don't leave. They fade. And fading is invisible in the appointment
 book until the quarter is already soft.
@@ -86,33 +113,54 @@ book until the quarter is already soft.
 
 ## 4 · THE MECHANISM (the Autopilot Loop)
 
+So the solution is what we call the **Omniply Loop** because it multiplies your omni-channel 
+exposure where your clients pay attention all day.
+
 For a chiropractic practice that's tired of marketing being a second job,
-what fixes this is not a tool. It's a loop — four parts, each feeding the next.
-We call it the **Autopilot Loop**:
+what fixes this is not a tool. It's a loop. Four parts, each feeding the next:
 
 **Presence.** Real content — posts, articles, a newsletter your patients
 actually read — produced for your practice, in your voice, every week,
 without you writing a word. Presence is what makes patients think of you
 *before* the pain does.
 
+So when the emergency strikes, they remember who to call... you!
+
 **Response.** AI chat and voice that answer in seconds, at 2pm while you're
-adjusting and at 2am while you're asleep — and book the appointment on the
-spot. The inquiry you answer instantly is the patient your competitor
+adjusting or at 2am while you're asleep. So your clients can book the appointment 
+on the spot. The inquiry you answer instantly is the patient your competitor
 never meets.
+
+Remember, if they can book the appointment within 5 minutes, you are 100 times
+more likely to get the business than just half an hour later.
+
+If not, they'll call the next chiro in the map pack without hesitation because
+they will go to whoever they can schedule the appointment with *first*!
 
 **Proof.** A review engine that turns every happy patient into public
 evidence, automatically. Reviews compound like interest: invisible
 week to week, undeniable year to year.
 
+Plus, fresh reviews are one of the strongest signals that decide who ranks first 
+who gets the top spot in Google's Map pack... 
+
+A constant stream of new reviews increases your chances to be the first 
+listing like nothing else. So anyone new in town that needs your help,
+can find you on the first page.
+
 **Recall.** Reactivation that never forgets a patient. Care plan ends,
 contact continues; nobody drifts unnoticed, and the ones who faded get a
-reason to come back — before the flare-up, not after.
+reason to come back... before the flare-up, not after.
 
 Watch what the loop does: presence keeps patients warm → warm patients
 return, and leave reviews → reviews bring new inquiries → instant response
 converts them → recall keeps them. It's not four tools. It's one flywheel.
-Break any link and the leak reopens somewhere else — which is exactly why
+
+Break any link and the leak reopens somewhere else, which is exactly why
 buying point-solutions has never fixed it.
+
+Which is exactly why all the chiro practice coaching just hands the 
+discipline problem back to you. The loop removes it.
 
 ---
 
@@ -126,7 +174,7 @@ twelve visits of it. The whole system costs $397 a month.
 **Recovering one patient a month pays for the entire system.** The second
 one is profit. And your X-Ray told you the leak is bigger than two.
 
-That's the entire business case. No projections, no hockey sticks — just
+That's the entire business case. No projections, no hockey sticks... just
 your own numbers, doing arithmetic you can check.
 
 ---
@@ -134,9 +182,11 @@ your own numbers, doing arithmetic you can check.
 ## 6 · THE PRIZE (and the one ask)
 
 Omniply is not marketing software with a chiropractic template. It's built
-for chiropractic only — the content knows the difference between a
-subluxation and a slogan, the onboarding reads your website, your brand,
-your specialties, and the system starts producing in days, not months.
+for chiropractic only. The content engine knows the difference between a
+subluxation and a slogan. 
+
+The onboarding reads your website, your brand, your specialties, and the system 
+starts producing in hours, not weeks.
 
 We're not asking you to become a marketer. We're asking you to stop
 having to be one.
@@ -146,7 +196,7 @@ lock-in, no salesperson.
 
 Which is why the next step isn't a call. It's twelve minutes of the actual
 system, on screen: what it posts, how it answers, what the recall messages
-look like. Watch it the way you'd read a scan — then decide like a doctor
+look like. Watch it the way you'd read a scan. Then decide like a doctor
 decides: **on the evidence.**
 
 **→ Watch the 12-Minute Practice Autopilot Walkthrough**
@@ -155,7 +205,7 @@ decides: **on the evidence.**
 
 ## 7 · THE CLOSE (hook point)
 
-You've seen the X-ray. You know what untreated looks like — you've watched
+You've seen the X-ray. You know what untreated looks like... you've watched
 it happen to patients who "felt fine."
 
 Treatment starts the day you decide it does.

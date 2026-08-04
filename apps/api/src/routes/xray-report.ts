@@ -143,6 +143,13 @@ export async function xrayReportRoutes(app: FastifyInstance) {
       const pdf = await withRasterPage(async (page) => {
         // 'load' suffices: the document is fully inline (data-URI images only).
         await page.setContent(html, { waitUntil: 'load' })
+        // Cold-start guard: the very first render after container boot produced
+        // a truncated PDF once (fonts/layout still settling). Wait for fonts +
+        // a settle tick before printing.
+        await page.evaluate(() =>
+          (globalThis as unknown as { document: { fonts: { ready: Promise<unknown> } } }).document.fonts.ready,
+        )
+        await new Promise((res) => setTimeout(res, 150))
         return await page.pdf({ printBackground: true, preferCSSPageSize: true })
       })
       const buf = Buffer.from(pdf)

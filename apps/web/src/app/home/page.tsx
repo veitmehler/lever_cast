@@ -10,6 +10,7 @@ import {
   TOKENS,
   XRAY_URL,
   Cta,
+  SiteHeader,
   Eyebrow,
   Section,
   H2,
@@ -54,6 +55,7 @@ const FAQ_ITEMS: FaqEntry[] = [
 export default function HomePage() {
   return (
     <main>
+      <SiteHeader />
       {/* ── Hero: platform definition + vertical pathway above the fold ── */}
       <Section dark>
         <Eyebrow>Omniply</Eyebrow>

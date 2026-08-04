@@ -130,3 +130,18 @@ div[id^='one-step-order'] button[disabled],
 .container-order-form-two-step [class*='secure'] {
   color: #8a8a90;
 }
+
+/* ── branding strip inside the card ── */
+.container-order-form-two-step::before {
+  content: 'OMNIPLY  ·  SECURE CHECKOUT';
+  display: block;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: #0b0b0c;
+  padding-bottom: 16px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid #ecedef;
+}

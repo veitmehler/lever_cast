@@ -10,6 +10,7 @@ import {
   TOKENS,
   XRAY_URL,
   Cta,
+  SiteHeader,
   Eyebrow,
   Section,
   H2,
@@ -82,6 +83,7 @@ const FAQ_ITEMS: FaqEntry[] = [
 export default function ChiropractorsPage() {
   return (
     <main>
+      <SiteHeader vertical="For Chiropractors" />
       {/* ── Hook: drift ── */}
       <Section dark>
         <Eyebrow>Omniply for Chiropractors</Eyebrow>

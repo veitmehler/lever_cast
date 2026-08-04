@@ -14,6 +14,8 @@
  * semaphore caps concurrency; results are LRU-cached by the raw `d` param.
  */
 import type { FastifyInstance } from 'fastify'
+import { createHash } from 'node:crypto'
+import { readS3Object, uploadBufferWithKey } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
 import { compute, scoreRead, verdictHtml, type XrayAnswers } from '../marketing/xray-math'
@@ -99,70 +101,131 @@ const pdfCache = new Map<string, Buffer>()
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
+async function renderDebriefPdf(dParam: string, parsed: NonNullable<ReturnType<typeof parseReportPayload>>): Promise<Buffer> {
+  const cached = pdfCache.get(dParam)
+  if (cached) {
+    pdfCache.delete(dParam)
+    pdfCache.set(dParam, cached)
+    return cached
+  }
+
+  const { answers, preparedFor, currency } = parsed
+  const sym = SYMBOLS[currency]
+  const money = (n: number) => sym + Math.round(n).toLocaleString('en-US')
+  const r = compute(answers)
+
+  const now = new Date()
+  const scanDate = `${String(now.getUTCDate()).padStart(2, '0')} ${MONTHS[now.getUTCMonth()]} ${now.getUTCFullYear()}`
+
+  const html = buildDebriefHtml({
+    preparedFor,
+    scanDate,
+    totalScore: r.total,
+    scoreRead: scoreRead(r.total),
+    barsHtml: buildBarsHtml(r.scores, r.weakest),
+    verdictHtml: verdictHtml(answers, r, money),
+    totalLeak: money(r.totalLeak),
+    driftLeak: money(r.driftLeak),
+    respLeak: money(r.responseLeak),
+    mult: r.priceMultiple,
+    fee: money(answers.visitFee),
+    feeYear: money(answers.visitFee * 12),
+  })
+
+  const pdf = await withRasterPage(async (page) => {
+    // 'load' suffices: the document is fully inline (data-URI images only).
+    await page.setContent(html, { waitUntil: 'load' })
+    // Cold-start guard: the very first render after container boot produced
+    // a truncated PDF once (fonts/layout still settling). Wait for fonts +
+    // a settle tick before printing.
+    await page.evaluate(() =>
+      (globalThis as unknown as { document: { fonts: { ready: Promise<unknown> } } }).document.fonts.ready,
+    )
+    await new Promise((res) => setTimeout(res, 150))
+    return await page.pdf({ printBackground: true, preferCSSPageSize: true })
+  })
+  const buf = Buffer.from(pdf)
+  pdfCache.set(dParam, buf)
+  if (pdfCache.size > CACHE_MAX) {
+    const oldest = pdfCache.keys().next().value
+    if (oldest) pdfCache.delete(oldest)
+  }
+  logger.info({ preparedFor, totalLeak: r.totalLeak, weakest: r.weakest }, '[xray] personalized debrief rendered')
+  return buf
+}
+
+const PDF_HEADERS = { type: 'application/pdf', disposition: 'inline; filename="X-Ray-Debrief.pdf"' }
+const S3_PREFIX = 'xray-reports/'
+
+function publicApiBase(): string {
+  return (process.env.XRAY_PUBLIC_API_BASE ?? 'https://svc.omniply.io').replace(/\/$/, '')
+}
+
 export async function xrayReportRoutes(app: FastifyInstance) {
+  // Stateless render: the URL carries the data. Permanent fallback link.
   app.get<{ Querystring: { d?: string } }>('/xray/report', async (request, reply) => {
     const dParam = request.query.d
     if (!dParam || dParam.length > 4096) {
       return reply.code(400).send({ error: 'missing or oversized report data' })
     }
-
     const parsed = parseReportPayload(dParam)
     if (!parsed) return reply.code(400).send({ error: 'invalid report data' })
 
-    const cached = pdfCache.get(dParam)
-    if (cached) {
-      pdfCache.delete(dParam)
-      pdfCache.set(dParam, cached)
-      return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', 'inline; filename="X-Ray-Debrief.pdf"').send(cached)
-    }
-
-    const { answers, preparedFor, currency } = parsed
-    const sym = SYMBOLS[currency]
-    const money = (n: number) => sym + Math.round(n).toLocaleString('en-US')
-    const r = compute(answers)
-
-    const now = new Date()
-    const scanDate = `${String(now.getUTCDate()).padStart(2, '0')} ${MONTHS[now.getUTCMonth()]} ${now.getUTCFullYear()}`
-
-    const html = buildDebriefHtml({
-      preparedFor,
-      scanDate,
-      totalScore: r.total,
-      scoreRead: scoreRead(r.total),
-      barsHtml: buildBarsHtml(r.scores, r.weakest),
-      verdictHtml: verdictHtml(answers, r, money),
-      totalLeak: money(r.totalLeak),
-      driftLeak: money(r.driftLeak),
-      respLeak: money(r.responseLeak),
-      mult: r.priceMultiple,
-      fee: money(answers.visitFee),
-      feeYear: money(answers.visitFee * 12),
-    })
-
     try {
-      const pdf = await withRasterPage(async (page) => {
-        // 'load' suffices: the document is fully inline (data-URI images only).
-        await page.setContent(html, { waitUntil: 'load' })
-        // Cold-start guard: the very first render after container boot produced
-        // a truncated PDF once (fonts/layout still settling). Wait for fonts +
-        // a settle tick before printing.
-        await page.evaluate(() =>
-          (globalThis as unknown as { document: { fonts: { ready: Promise<unknown> } } }).document.fonts.ready,
-        )
-        await new Promise((res) => setTimeout(res, 150))
-        return await page.pdf({ printBackground: true, preferCSSPageSize: true })
-      })
-      const buf = Buffer.from(pdf)
-      pdfCache.set(dParam, buf)
-      if (pdfCache.size > CACHE_MAX) {
-        const oldest = pdfCache.keys().next().value
-        if (oldest) pdfCache.delete(oldest)
-      }
-      logger.info({ preparedFor, totalLeak: r.totalLeak, weakest: r.weakest }, '[xray] personalized debrief rendered')
-      return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', 'inline; filename="X-Ray-Debrief.pdf"').send(buf)
+      const buf = await renderDebriefPdf(dParam, parsed)
+      return reply.header('Content-Type', PDF_HEADERS.type).header('Content-Disposition', PDF_HEADERS.disposition).send(buf)
     } catch (err) {
       logger.error({ err }, '[xray] debrief render failed')
       return reply.code(500).send({ error: 'report rendering failed, please retry' })
+    }
+  })
+
+  // Publish: render once, store in S3, return a short shareable link.
+  // Called by the quiz at capture time; idempotent (id = content hash).
+  app.post<{ Body: { d?: string } }>('/xray/publish', async (request, reply) => {
+    const dParam = typeof request.body?.d === 'string' ? request.body.d : undefined
+    if (!dParam || dParam.length > 4096) {
+      return reply.code(400).send({ error: 'missing or oversized report data' })
+    }
+    const parsed = parseReportPayload(dParam)
+    if (!parsed) return reply.code(400).send({ error: 'invalid report data' })
+
+    const id = createHash('sha256').update(dParam).digest('hex').slice(0, 16)
+    const key = `${S3_PREFIX}${id}.pdf`
+    const url = `${publicApiBase()}/api/xray/r/${id}.pdf`
+
+    try {
+      // Already published? (readS3Object throws on missing key.)
+      await readS3Object(key)
+      return reply.send({ url, id })
+    } catch {
+      /* not yet published — render + upload below */
+    }
+
+    try {
+      const buf = await renderDebriefPdf(dParam, parsed)
+      await uploadBufferWithKey(key, buf, 'application/pdf')
+      logger.info({ id, preparedFor: parsed.preparedFor }, '[xray] debrief published to S3')
+      return reply.send({ url, id })
+    } catch (err) {
+      logger.error({ err }, '[xray] debrief publish failed')
+      return reply.code(500).send({ error: 'publish failed' })
+    }
+  })
+
+  // Short link: stream the published PDF from S3.
+  app.get<{ Params: { file: string } }>('/xray/r/:file', async (request, reply) => {
+    const file = request.params.file
+    if (!/^[a-f0-9]{16}\.pdf$/.test(file)) return reply.code(404).send({ error: 'not found' })
+    try {
+      const { body } = await readS3Object(`${S3_PREFIX}${file}`)
+      return reply
+        .header('Content-Type', PDF_HEADERS.type)
+        .header('Content-Disposition', PDF_HEADERS.disposition)
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .send(body)
+    } catch {
+      return reply.code(404).send({ error: 'not found' })
     }
   })
 }

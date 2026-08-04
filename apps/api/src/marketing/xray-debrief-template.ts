@@ -54,7 +54,7 @@ export function buildBarsHtml(
 export function buildDebriefHtml(d: DebriefTemplateData): string {
   const C = 2 * Math.PI * 52
   const arcOffset = (C * (1 - d.totalScore / 100)).toFixed(1)
-  const P = (n: number) => 'P.' + String(n).padStart(2, '0') + ' — 14'
+  const P = (n: number) => 'P.' + String(n).padStart(2, '0') + ' — 15'
 
   return `<!doctype html>
 <html lang="en">
@@ -148,6 +148,9 @@ export function buildDebriefHtml(d: DebriefTemplateData): string {
   .srcs { font-family: var(--mono); font-size: 8pt; line-height: 1.9; color: var(--faint); letter-spacing: 0.02em; max-width: 6in; }
   .srcs b { color: var(--dim); font-weight: 600; }
   .loopwrap { display: flex; justify-content: center; margin: 0.3in 0 0.1in; }
+  ul.prog { list-style: none; margin-top: 0.1in; }
+  ul.prog li { position: relative; padding-left: 0.34in; margin-bottom: 0.24in; font-size: 12.5pt; line-height: 1.6; max-width: 5.9in; }
+  ul.prog li::before { content: "+"; position: absolute; left: 0; top: 1px; color: var(--lime); font-family: var(--mono); font-size: 14pt; font-weight: 700; }
 
   /* ── Results page (film card, mirrors the app) ── */
   .film {
@@ -406,10 +409,27 @@ ${d.barsHtml}
   <div class="foot"><span>${P(11)}</span><span>omniply.io</span></div>
 </div>
 
-<!-- P12 · §5 ECONOMICS (personalized) -->
+<!-- P12 · §5 THE PROGNOSIS -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div class="head"><span><b>X-Ray Debrief</b></span><span>05 &middot; The Economics</span></div>
+  <div class="head"><span><b>X-Ray Debrief</b></span><span>05 &middot; The Prognosis</span></div>
+  <h2 class="sect">The Prognosis.</h2>
+  <p class="body dim">What your practice looks like ninety days into treatment:</p>
+  <ul class="prog">
+    <li>The 2am back-spasm call answered, and booked, while you're asleep... so Monday's schedule fills itself before your competitor's front desk even gets in.</li>
+    <li>A newsletter your patients actually open... written, designed and sent every week, without you typing a word of it.</li>
+    <li>Fresh Google reviews arriving quietly every week... the compounding kind your competitors can't fake and can't catch up to.</li>
+    <li>Patients who "felt fine and faded" getting a reason to come back before the flare-up... not after they've already googled someone else.</li>
+    <li>Your name showing up between visits, so when the pain hits, there's no search... just "call my chiro."</li>
+    <li>And the one nobody puts on a features list: your evenings back. No more 11pm posting, no more "we should really ask for reviews"... no more marketing guilt.</li>
+  </ul>
+  <div class="foot"><span>${P(12)}</span><span>omniply.io</span></div>
+</div>
+
+<!-- P13 · §6 ECONOMICS (personalized) -->
+<div class="page">
+  <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
+  <div class="head"><span><b>X-Ray Debrief</b></span><span>06 &middot; The Economics</span></div>
   <h2 class="sect">The one-patient math.</h2>
   <p class="body">Now the part your X-Ray already did for you.</p>
   <p class="body">Take your average visit fee. A typical patient's first year is worth roughly twelve visits of it. The whole system costs $397 a month.</p>
@@ -423,13 +443,13 @@ ${d.barsHtml}
   </div>
   <p class="body">And your X-Ray told you the leak is bigger than two: <b>${d.totalLeak}/month &asymp; ${d.mult}&times;</b> the cost of fixing it.</p>
   <p class="body">That's the entire business case. No projections, no hockey sticks... just your own numbers, doing arithmetic you can check.</p>
-  <div class="foot"><span>${P(12)}</span><span>omniply.io</span></div>
+  <div class="foot"><span>${P(13)}</span><span>omniply.io</span></div>
 </div>
 
-<!-- P13 · §6 PRIZE + CTA -->
+<!-- P14 · §7 PRIZE + CTA -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div class="head"><span><b>X-Ray Debrief</b></span><span>06 &middot; The Prize</span></div>
+  <div class="head"><span><b>X-Ray Debrief</b></span><span>07 &middot; The Prize</span></div>
   <p class="body">Omniply is not marketing software with a chiropractic template. It's built for chiropractic only. The content engine knows the difference between a subluxation and a slogan.</p>
   <p class="body">The onboarding reads your website, your brand, your specialties, and the system starts producing in hours, not weeks.</p>
   <p class="body"><b>We're not asking you to become a marketer. We're asking you to stop having to be one.</b></p>
@@ -442,13 +462,13 @@ ${d.barsHtml}
     </div>
     <img src="data:image/png;base64,${QR_B64}" alt="QR code to the walkthrough" />
   </div>
-  <div class="foot"><span>${P(13)}</span><span>omniply.io</span></div>
+  <div class="foot"><span>${P(14)}</span><span>omniply.io</span></div>
 </div>
 
-<!-- P14 · §7 CLOSE + SOURCES -->
+<!-- P15 · §8 CLOSE + SOURCES -->
 <div class="page">
   <span class="rm tl"></span><span class="rm tr"></span><span class="rm bl"></span><span class="rm br"></span>
-  <div class="head"><span><b>X-Ray Debrief</b></span><span>07 &middot; The Close</span></div>
+  <div class="head"><span><b>X-Ray Debrief</b></span><span>08 &middot; The Close</span></div>
   <div class="big" style="margin: 0.5in 0 0.4in;">You've seen the X-ray.<br />You know what untreated looks like...</div>
   <p class="body">You've watched it happen to patients who "felt fine."</p>
   <div class="big lime" style="margin: 0.4in 0 0.8in;">Treatment starts the day you decide it does.</div>
@@ -457,7 +477,7 @@ ${d.barsHtml}
     Leak estimates in this document are computed from your own X-Ray answers and stated, adjustable assumptions. They are illustrations, not guarantees or income claims.<br /><br />
     &copy; Omniply &middot; omniply.io &middot; Built for chiropractic practices only.
   </div>
-  <div class="foot"><span>${P(14)}</span><span>omniply.io</span></div>
+  <div class="foot"><span>${P(15)}</span><span>omniply.io</span></div>
 </div>
 
 </body>

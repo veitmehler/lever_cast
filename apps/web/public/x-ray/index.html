@@ -355,6 +355,7 @@ var XRAY = (function () {
   var CONFIG = {
     WEBHOOK_URL: 'https://services.leadconnectorhq.com/hooks/HsevyaesOdFid7b8KC9q/webhook-trigger/e0d9d2bf-3b59-4a39-b321-513e866dcf46', // GHL "X-Ray Lead Capture" inbound webhook
     REPORT_BASE: 'https://svc.omniply.io/api/xray/report', // personalized PDF endpoint (prod API)
+    PUBLISH_URL: 'https://svc.omniply.io/api/xray/publish', // S3-published short link (falls back to REPORT_BASE)
     VIDEO_URL: '/walkthrough',
     PRICE_MONTHLY: 397,
     // Drift-leak assumptions (all surfaced + adjustable in "Check our math")
@@ -614,7 +615,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
       currency: currency,
     }
     persist(lead, result)
-    sendWebhook(lead, result)
+    publishAndSend(lead, result)
     renderResults(result)
     show('s-results')
   })
@@ -628,20 +629,43 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
     return out
   }
 
-  // Personalized PDF URL — stateless: all data rides in the query param.
-  function reportUrl (lead) {
+  // Report payload — stateless: all data rides in this base64url string.
+  function reportData (lead) {
     try {
       var json = JSON.stringify({ v: 1, n: lead.name, p: lead.practiceName, c: currency, a: answers })
-      var b64 = btoa(unescape(encodeURIComponent(json)))
+      return btoa(unescape(encodeURIComponent(json)))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-      return XRAY.CONFIG.REPORT_BASE + '?d=' + b64
     } catch (e) { return null }
   }
 
-  function sendWebhook (lead, result, attempt) {
+  // Publish to S3 for a short shareable link; fall back to the stateless
+  // ?d= URL if the publish call fails or times out. Webhook fires either way.
+  function publishAndSend (lead, result) {
+    var d = reportData(lead)
+    var fallback = d ? XRAY.CONFIG.REPORT_BASE + '?d=' + d : null
+    var done = false
+    function send (url) {
+      if (done) return
+      done = true
+      sendWebhook(lead, result, url || fallback)
+    }
+    if (!d || !XRAY.CONFIG.PUBLISH_URL) { send(null); return }
+    var timer = setTimeout(function () { send(null) }, 8000)
+    try {
+      fetch(XRAY.CONFIG.PUBLISH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ d: d }),
+      }).then(function (res) { return res.ok ? res.json() : null })
+        .then(function (j) { clearTimeout(timer); send(j && j.url ? j.url : null) })
+        .catch(function () { clearTimeout(timer); send(null) })
+    } catch (e) { clearTimeout(timer); send(null) }
+  }
+
+  function sendWebhook (lead, result, reportUrl, attempt) {
     if (!XRAY.CONFIG.WEBHOOK_URL) return
     var payload = Object.assign({}, lead, {
-      reportUrl: reportUrl(lead),
+      reportUrl: reportUrl || null,
       axisScores: result.scores,
       totalScore: result.total,
       weakestAxis: result.weakest,
@@ -660,7 +684,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch(function () {
-      if (!attempt) setTimeout(function () { sendWebhook(lead, result, 1) }, 2000)
+      if (!attempt) setTimeout(function () { sendWebhook(lead, result, reportUrl, 1) }, 2000)
     })
   }
 

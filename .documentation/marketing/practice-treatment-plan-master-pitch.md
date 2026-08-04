@@ -111,7 +111,7 @@ book until the quarter is already soft.
 
 ---
 
-## 4 · THE MECHANISM (the Autopilot Loop)
+## 4 · THE MECHANISM (the Omniply Loop)
 
 So the solution is what we call the **Omniply Loop** because it multiplies your omni-channel 
 exposure where your clients pay attention all day.
@@ -131,8 +131,8 @@ adjusting or at 2am while you're asleep. So your clients can book the appointmen
 on the spot. The inquiry you answer instantly is the patient your competitor
 never meets.
 
-Remember, if they can book the appointment within 5 minutes, you are 100 times
-more likely to get the business than just half an hour later.
+Remember: reach them inside five minutes and you're 100× more likely to even get them on the 
+line... and 78% book with whoever they can schedule with first.
 
 If not, they'll call the next chiro in the map pack without hesitation because
 they will go to whoever they can schedule the appointment with *first*!
@@ -142,7 +142,7 @@ evidence, automatically. Reviews compound like interest: invisible
 week to week, undeniable year to year.
 
 Plus, fresh reviews are one of the strongest signals that decide who ranks first 
-who gets the top spot in Google's Map pack... 
+and gets the top spot in Google's Map pack... 
 
 A constant stream of new reviews increases your chances to be the first 
 listing like nothing else. So anyone new in town that needs your help,
@@ -164,7 +164,28 @@ discipline problem back to you. The loop removes it.
 
 ---
 
-## 5 · THE ECONOMICS (the one-patient math)
+## 5 · THE PROGNOSIS (what treatment changes)
+
+What your practice looks like ninety days into treatment:
+
+- The 2am back-spasm call answered, and booked, while you're asleep... so
+  Monday's schedule fills itself before your competitor's front desk even
+  gets in.
+- A newsletter your patients actually open... written, designed and sent every
+  week, without you typing a word of it.
+- Fresh Google reviews arriving quietly every week... the compounding kind your
+  competitors can't fake and can't catch up to.
+- Patients who "felt fine and faded" getting a reason to come back before the
+  flare-up... not after they've already googled someone else.
+- Your name showing up between visits, so when the pain hits, there's no
+  search... just "call my chiro."
+- And the one nobody puts on a features list: your evenings back. No more 11pm
+  posting, no more "we should really ask for reviews"... no more marketing
+  guilt.
+
+---
+
+## 6 · THE ECONOMICS (the one-patient math)
 
 Now the part your X-Ray already did for you.
 
@@ -179,7 +200,7 @@ your own numbers, doing arithmetic you can check.
 
 ---
 
-## 6 · THE PRIZE (and the one ask)
+## 7 · THE PRIZE (and the one ask)
 
 Omniply is not marketing software with a chiropractic template. It's built
 for chiropractic only. The content engine knows the difference between a
@@ -203,7 +224,7 @@ decides: **on the evidence.**
 
 ---
 
-## 7 · THE CLOSE (hook point)
+## 8 · THE CLOSE (hook point)
 
 You've seen the X-ray. You know what untreated looks like... you've watched
 it happen to patients who "felt fine."
@@ -215,16 +236,15 @@ Treatment starts the day you decide it does.
 
 # Derivation notes (not part of the copy)
 
-## PDF layout map (~14 spreads, radiograph film design system from /x-ray)
-1. Cover: "The Practice Treatment Plan" + registration marks + "Following your Practice X-Ray"
-2. §1 frame — full-bleed, big type, sparse
-3–5. §2 three forces — one force per page, mono metadata labels
-6–7. §3 belief shift + drift mechanics ("patients don't leave, they fade" gets its own page)
-8–10. §4 the loop — one spread for the loop diagram (four nodes, lime arrows), one for part details
-11. §5 economics — the one-patient math in huge type (generic form: "your fee × 12")
-12. §6 prize + offer
-13. §7 close + CTA (trigger-linked video URL + QR)
-14. Back cover: compliance footer (estimates/illustrations, no income guarantees), omniply.io
+## PDF layout map (personalized "X-Ray Debrief" 15 pages / static fallback 14; radiograph design)
+Cover ("Prepared for {practice|name}") · [personalized only] Your X-Ray Results
+(dial + bars + verdict + leak card) · §1 frame + §2 opener · forces 01+02 (stat
+band) · force 03 (lottery quote) · §3 belief shift (merged) · §3 drift ("they
+fade") · §4 loop diagram · presence+response · proof+recall · flywheel ·
+§5 prognosis (lime-plus bullets) · §6 economics (personalized: their fee × 12,
+their leak ≈ N×) · §7 prize + CTA (QR) · §8 close + sources/compliance.
+Personalized template: apps/api/src/marketing/xray-debrief-template.ts;
+static: .documentation/marketing/xray-debrief-print.html — update together.
 
 ## Video script map (must match /walkthrough chapter cards)
 - 0:00–0:30 §1+§3 compressed: cold open on the leak
@@ -232,13 +252,13 @@ Treatment starts the day you decide it does.
 - 3:45 Ch.2 Speed-to-Lead — §2 social force + Response demo
 - 7:00 Ch.3 Review Engine — Proof demo
 - 9:30 Ch.4 Content & Visibility — Presence demo
-- ~11:00 §5 economics + §6 offer + close
+- ~10:45 §5 prognosis (rapid-fire) → §6 economics + §7 offer + close
 (NOTE: chapter timestamps on /walkthrough page are placeholders — sync real ones after recording.)
 
 ## Nurture email spine (each email = one section reopened, personalized)
 1. Day 0: "Your Practice Growth Report" — their scores/leak + Treatment Plan PDF (trigger link)
 2. Day 2: §3 drift ("patients don't leave, they fade") + their drift number → video Ch.1
 3. Day 4: §2 social force + their missed-inquiry number → video Ch.2
-4. Day 7: §5 one-patient math with THEIR fee → video + checkout
-5. Day 11: §6 prize frame, soft close → video + checkout
+4. Day 7: §6 one-patient math with THEIR fee → video + checkout
+5. Day 11: §7 prize frame, soft close → video + checkout
 (Copy to be written as its own task; personal numbers come from GHL custom fields.)

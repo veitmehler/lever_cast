@@ -352,10 +352,16 @@ var XRAY = (function () {
   'use strict'
 
   // ── Every tunable in one place ────────────────────────────────────────────
+  // API host follows the page host so staging tests stay on staging
+  // (typeof guard: this block is also eval'd by Node test runners).
+  var API_BASE =
+    typeof location !== 'undefined' && /^staging\./.test(location.hostname)
+      ? 'https://staging-svc.omniply.io'
+      : 'https://svc.omniply.io'
   var CONFIG = {
     WEBHOOK_URL: 'https://services.leadconnectorhq.com/hooks/HsevyaesOdFid7b8KC9q/webhook-trigger/e0d9d2bf-3b59-4a39-b321-513e866dcf46', // GHL "X-Ray Lead Capture" inbound webhook
-    REPORT_BASE: 'https://svc.omniply.io/api/xray/report', // personalized PDF endpoint (prod API)
-    PUBLISH_URL: 'https://svc.omniply.io/api/xray/publish', // S3-published short link (falls back to REPORT_BASE)
+    REPORT_BASE: API_BASE + '/api/xray/report', // personalized PDF endpoint
+    PUBLISH_URL: API_BASE + '/api/xray/publish', // S3-published short link (falls back to REPORT_BASE)
     VIDEO_URL: '/walkthrough',
     PRICE_MONTHLY: 397,
     // Drift-leak assumptions (all surfaced + adjustable in "Check our math")

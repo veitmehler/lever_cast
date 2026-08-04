@@ -95,7 +95,7 @@ export default function ChiropractorsPage() {
           has a leak... most do. The question is the size. There is a 2-minute way to find out, in dollars.
         </P>
         <Cta href={XRAY_URL} sub="12 questions · 2 minutes · your monthly leak, in dollars">
-          X-Ray my practice
+          X-Ray My Practice
         </Cta>
       </Section>
 
@@ -299,7 +299,7 @@ export default function ChiropractorsPage() {
           marketer... we&apos;re asking you to stop having to be one.
         </P>
         <Cta href={XRAY_URL} sub="free · 2 minutes · your report is yours to keep">
-          X-Ray my practice
+          X-Ray My Practice
         </Cta>
         <p className="mt-6 text-center text-sm text-white/50">
           Or see the system first: <a href="/walkthrough" className="underline">the 12-minute walkthrough</a>

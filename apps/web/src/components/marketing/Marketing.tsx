@@ -26,7 +26,7 @@ export const XRAY_URL = '/x-ray'
 
 export function Cta({ children, sub, href }: { children: React.ReactNode; sub?: string; href?: string }) {
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="mt-6 flex flex-col items-center gap-3">
       <a
         href={href ?? CHECKOUT_URL}
         className="inline-block rounded-xl px-10 py-5 text-lg font-bold shadow-lg transition-transform hover:scale-[1.02]"
@@ -448,7 +448,7 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
             className="rounded-lg px-4 py-2 font-bold"
             style={{ background: TOKENS.lime, color: '#0B0B0C' }}
           >
-            X-Ray my practice
+            X-Ray My Practice
           </a>
         </nav>
       </div>

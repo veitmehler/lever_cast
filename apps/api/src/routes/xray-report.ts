@@ -141,7 +141,8 @@ export async function xrayReportRoutes(app: FastifyInstance) {
 
     try {
       const pdf = await withRasterPage(async (page) => {
-        await page.setContent(html, { waitUntil: 'networkidle0' })
+        // 'load' suffices: the document is fully inline (data-URI images only).
+        await page.setContent(html, { waitUntil: 'load' })
         return await page.pdf({ printBackground: true, preferCSSPageSize: true })
       })
       const buf = Buffer.from(pdf)

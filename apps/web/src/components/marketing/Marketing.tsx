@@ -428,24 +428,30 @@ export function StatBand({ onDark }: { onDark?: boolean }) {
 export function SiteHeader({ vertical }: { vertical?: string }) {
   return (
     <header
-      className="sticky top-0 z-50 flex items-center justify-between px-6 py-4"
+      className="sticky top-0 z-50 px-6 py-4"
       style={{ background: 'rgba(14,14,15,0.88)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #232325' }}
     >
-      <a href="/home" className="font-mono text-sm font-bold tracking-[0.25em] text-white no-underline">
-        OMNIPLY{vertical ? <span className="font-normal text-white/50"> &middot; {vertical.toUpperCase()}</span> : null}
-      </a>
-      <nav className="flex items-center gap-5 text-sm">
-        <a href="/walkthrough" className="hidden text-white/60 hover:text-white sm:inline">
-          Walkthrough
+      <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
+        <a href="/home" className="flex items-center gap-3 font-mono text-sm font-bold tracking-[0.25em] text-white no-underline">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="Omniply" className="h-7 w-7 rounded-md" />
+          <span>
+            OMNIPLY{vertical ? <span className="font-normal text-white/50"> &middot; {vertical.toUpperCase()}</span> : null}
+          </span>
         </a>
-        <a
-          href={XRAY_URL}
-          className="rounded-lg px-4 py-2 font-bold"
-          style={{ background: TOKENS.lime, color: '#0B0B0C' }}
-        >
-          X-Ray my practice
-        </a>
-      </nav>
+        <nav className="flex items-center gap-5 text-sm">
+          <a href="/walkthrough" className="hidden text-white/60 hover:text-white sm:inline">
+            Walkthrough
+          </a>
+          <a
+            href={XRAY_URL}
+            className="rounded-lg px-4 py-2 font-bold"
+            style={{ background: TOKENS.lime, color: '#0B0B0C' }}
+          >
+            X-Ray my practice
+          </a>
+        </nav>
+      </div>
     </header>
   )
 }

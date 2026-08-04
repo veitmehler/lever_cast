@@ -42,7 +42,7 @@ export function Cta({ children, sub, href }: { children: React.ReactNode; sub?: 
 export function Eyebrow({ children }: { children: React.ReactNode }) {
   // color comes from the enclosing Section via --eyebrow (lime on dark, deep green on light)
   return (
-    <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--eyebrow)' }}>
+    <div className="mb-3 text-[16px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--eyebrow)' }}>
       {children}
     </div>
   )
@@ -77,14 +77,14 @@ export function H2({ children }: { children: React.ReactNode }) {
 }
 
 export function P({ children, lead }: { children: React.ReactNode; lead?: boolean }) {
-  return <p className={`mb-5 ${lead ? 'text-xl leading-relaxed' : 'text-lg leading-relaxed'}`}>{children}</p>
+  return <p className={`mb-5 leading-relaxed ${lead ? 'text-[22px]' : 'text-[20px]'}`}>{children}</p>
 }
 
 export function Bullet({ head, children }: { head: string; children: React.ReactNode }) {
   return (
     <li className="mb-5 flex gap-4">
       <HexDot />
-      <span className="text-lg leading-relaxed">
+      <span className="text-[20px] leading-relaxed">
         <strong>{head}</strong> {children}
       </span>
     </li>

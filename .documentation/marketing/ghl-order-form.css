@@ -10,14 +10,21 @@ body,
   background: #0E0E0F !important;
 }
 
-/* the card */
+/* the card — uniform 35px padding on desktop; on mobile 35px top/bottom
+   only, left/right left to GHL's defaults */
 .container-order-form-two-step {
   background: #ffffff;
   border: 1px solid #e2e3e6;
   border-radius: 14px;
   box-shadow: 0 14px 48px rgba(0, 0, 0, 0.5);
-  padding: 30px 26px;
+  padding-top: 35px !important;
+  padding-bottom: 35px !important;
   font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+@media (min-width: 769px) {
+  .container-order-form-two-step {
+    padding: 35px !important;
+  }
 }
 
 /* step heading → eyebrow treatment + subheading as the real title */

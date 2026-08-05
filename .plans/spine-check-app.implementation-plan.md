@@ -97,8 +97,8 @@ results ("never seen a chiropractor? this one's for you").
 4. **Linktree**: Spine Check entry at the TOP (above booking) in
    `buildLinktreeHtml` + standalone variant — "Take the 2-Minute Spine
    Check". Links to their WP `/spine-check` (or hosted fallback).
-5. **Snapshot**: document the `spine-check-lead` tag + (if b) the email-1
-   variants in the snapshot guide; Reputation/booking untouched.
+5. **Snapshot**: document the `spine-check-lead` tag in the snapshot guide
+   (drip branches already exist); Reputation/booking untouched.
 
 ## Build steps
 

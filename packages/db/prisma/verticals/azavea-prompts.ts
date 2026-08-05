@@ -71,6 +71,9 @@ Primary keyword: {{primaryKeyword}}
 Search intent: {{searchIntent}}
 Reader: {{who}}
 
+WRITING VOICE (follow precisely):
+{{writing_style}}
+
 Requirements:
 - Open with something concrete from the reader's world: a moment in their practice, a number from their P&L, a pattern they'll recognise
 - Address the reader as a business owner making decisions — "your practice", "your front desk", "your numbers"
@@ -127,6 +130,9 @@ FAQs: {{faqs}}
 READER: {{who}}
 PUBLISHER: {{business_description}}
 EDITORIAL GOAL: {{article_goal}}
+
+WRITING VOICE (follow precisely — this is the publisher's house voice):
+{{writing_style}}
 
 Excluded keywords (do not use): {{excludedKeywords}}
 

@@ -80,14 +80,20 @@ results ("never seen a chiropractor? this one's for you").
 3. **Capture**: `POST /api/spine-check/capture` (public, rate-limited):
    `{accountId, name, email, phone?, scores{4}, total, weakestDomain}` →
    validate + clamp → `upsertGhlContact` into the clinic's location with
-   tags `spine-check-lead` + `leadgen-<matched-guide-slug>` → the EXISTING
-   snapshot nurture drip delivers the guides; the matched guide is named in
-   the results screen and arrives in drip email 1.
-   DECISION NEEDED: drip email 1 currently opens the 5-guide sequence in
-   fixed order — either (a) accept fixed order and only *name* the matched
-   guide in results copy, or (b) add 4 tag-variants of email 1 in the
-   snapshot so the matched guide leads. Recommend (b) — small snapshot work,
-   big relevance win.
+   tags `spine-check-lead` + `leadgen-<matched-guide-slug>`.
+   RESOLVED (user): the snapshot drip workflow already has 5 branches keyed
+   on which guide tag lands FIRST — so applying the matched guide's tag at
+   capture makes that guide lead the sequence. No snapshot changes needed.
+   **Drive access at capture (required)**: quiz leads never go through the
+   Drive request-access flow, so the capture endpoint must grant access
+   directly — reuse the poller's grant-all: `grantReader(fileId, email,
+   notify=false)` across ALL of the account's live guide files at submission,
+   so every trigger-link click in the drip opens instantly. Record the
+   capture the same way the poller does so the rotation estimator
+   (~500-shares threshold) keeps counting accurately. Failure mode: if a
+   Drive grant fails, still create the contact + tags — the drip link then
+   falls back to Drive's request-access flow, which the existing poller
+   already handles.
 4. **Linktree**: Spine Check entry at the TOP (above booking) in
    `buildLinktreeHtml` + standalone variant — "Take the 2-Minute Spine
    Check". Links to their WP `/spine-check` (or hosted fallback).
@@ -106,7 +112,8 @@ results ("never seen a chiropractor? this one's for you").
 5. Linktree top-slot addition (both variants).
 6. Staging E2E on the dev clinic: publish → quiz → capture → contact + tags
    + drip entry verified.
-7. Snapshot guide update + (decision b) email-1 variants.
+7. Snapshot guide note only: document the `spine-check-lead` tag (drip
+   branches already exist).
 
 Estimate: ~4–6 focused days incl. tests and E2E. No schema changes expected
 (reuses BrandSettings + existing tags); one new route + one lib module.

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LinktreeDownloadButton } from './LinktreeDownloadButton'
+import { SpineCheckDownloadButton } from './SpineCheckDownloadButton'
 
 export function WordPressSection() {
   return (
@@ -21,6 +22,7 @@ export function WordPressSection() {
           </Link>
         </Button>
         <LinktreeDownloadButton />
+        <SpineCheckDownloadButton />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         Not on WordPress? Download the page as a single HTML file and upload it to your own hosting.

@@ -116,7 +116,7 @@ export function buildSpineCheckEmbed(clinic: SpineCheckClinic): string {
   const hostedUrl = `${publicApiBase()}/api/spine-check/p/${clinic.accountId}`
   const name = clinic.practiceName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   return `<p>How well do your daily habits treat your back? Take the free 2-Minute Spine Check from ${name}... twelve quick questions about your desk, your sleep and your mornings, your Spine Habits Score at the end, and a free guide picked for you.</p>
-<iframe id="sc-frame" src="${hostedUrl}" title="The 2-Minute Spine Check — ${name}" style="width:100%;border:0;min-height:980px;display:block;" loading="lazy"></iframe>
+<iframe id="sc-frame" src="${hostedUrl}?embed=1" title="The 2-Minute Spine Check — ${name}" style="width:100%;border:0;min-height:980px;display:block;" loading="lazy"></iframe>
 <noscript><p><a href="${hostedUrl}">Take the 2-Minute Spine Check</a></p></noscript>
 <script>(function(){window.addEventListener('message',function(e){if(!e.data||e.data.type!=='sc-height')return;var f=document.getElementById('sc-frame');if(f&&e.source===f.contentWindow&&e.data.height>200){f.style.height=e.data.height+'px';f.style.minHeight='0';}});})();</script>`
 }

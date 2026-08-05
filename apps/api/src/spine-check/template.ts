@@ -75,6 +75,9 @@ export function buildSpineCheckFragment(c: SpineCheckClinic): string {
   #sc-app .sc-guidebox { border: 1px solid var(--line); border-left: 4px solid var(--btn); border-radius: 12px; padding: 16px 18px; margin: 16px 0 0; font-size: 15.5px; }
   #sc-app .sc-disclaimer { font-size: 12.5px; color: var(--dim); margin-top: 18px; }
   #sc-app .sc-credit { text-align: center; color: var(--accent); font-size: 13px; padding-top: 18px; }
+  /* Embedded context (iframe on the clinic's own site): their page header
+     already carries the brand — drop the redundant strip + credit. */
+  #sc-app.sc-embedded .sc-brand, #sc-app.sc-embedded .sc-credit { display: none; }
 </style>
 <div id="sc-app">
   <div class="sc-brand">
@@ -123,6 +126,14 @@ export function buildSpineCheckFragment(c: SpineCheckClinic): string {
   <div class="sc-credit">${name}</div>
 </div>
 
+<script>
+(function () {
+  try {
+    var embedded = /[?&]embed=1/.test(window.location.search) || window.parent !== window
+    if (embedded) document.getElementById('sc-app').className = 'sc-embedded'
+  } catch (e) { /* standalone look is the safe default */ }
+})()
+</script>
 <script>
 /*__SPINE_MATH_START__*/
 var SPINE = (function () {

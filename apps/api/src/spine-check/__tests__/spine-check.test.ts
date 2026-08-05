@@ -121,6 +121,16 @@ describe('iframe embed (WP publish content)', () => {
     expect(hostile).not.toContain('<img onerror=x>')
   })
 
+  it('iframe src carries the deterministic embed signal', () => {
+    expect(embed).toContain('?embed=1')
+  })
+
+  it('quiz hides brand strip + credit when embedded, shows them standalone', () => {
+    const frag = buildSpineCheckFragment(CLINIC)
+    expect(frag).toContain('#sc-app.sc-embedded .sc-brand, #sc-app.sc-embedded .sc-credit { display: none; }')
+    expect(frag).toContain("/[?&]embed=1/.test(window.location.search) || window.parent !== window")
+  })
+
   it('quiz reports its height for the parent resizer', () => {
     const frag = buildSpineCheckFragment(CLINIC)
     expect(frag).toContain("postMessage({ type: 'sc-height'")

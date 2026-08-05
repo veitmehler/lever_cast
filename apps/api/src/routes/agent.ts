@@ -22,6 +22,7 @@ import { fillPrompt } from '../newsletter/llm'
 import { agentContextForAccount } from '../agent/context'
 import { emergencyNumberFor, MAX_MESSAGE_CHARS } from '../agent/guardrails'
 import { AgentTurnError, runAgentTurn } from '../agent/engine'
+import { AGENT_LOADER_JS, buildAgentPanelHtml } from '../agent/widget'
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/
 const VISITOR_KEY_RE = /^[A-Za-z0-9_-]{8,64}$/
@@ -35,6 +36,25 @@ async function accountForToken(token: unknown): Promise<{ id: string } | null> {
 }
 
 export async function agentRoutes(app: FastifyInstance) {
+  // One-line-install loader: <script async src=".../api/agent/widget.js"
+  // data-omniply="TOKEN"></script>. Static for every clinic — cacheable.
+  app.get('/agent/widget.js', async (_request, reply) => {
+    reply.header('Content-Type', 'application/javascript; charset=utf-8')
+    reply.header('Cache-Control', 'public, max-age=3600')
+    return AGENT_LOADER_JS
+  })
+
+  // The chat panel the loader iframes (same-origin /boot + /chat calls).
+  app.get('/agent/w/:token', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const account = await accountForToken(token)
+    if (!account) return reply.status(404).send('Not found')
+    reply.header('Content-Type', 'text/html; charset=utf-8')
+    reply.header('Content-Security-Policy', 'frame-ancestors *')
+    reply.header('Cache-Control', 'public, max-age=300')
+    return buildAgentPanelHtml(token)
+  })
+
   app.get('/agent/boot', async (request, reply) => {
     const { token } = request.query as { token?: string }
     const account = await accountForToken(token)

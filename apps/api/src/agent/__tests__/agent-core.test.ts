@@ -250,3 +250,25 @@ describe('action validation', () => {
     expect(validateAction(null, CTX)).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Widget surfaces
+// ---------------------------------------------------------------------------
+
+import { AGENT_LOADER_JS, buildAgentPanelHtml } from '../widget'
+
+describe('widget surfaces', () => {
+  it('panel embeds the token and talks same-origin', () => {
+    const html = buildAgentPanelHtml('tok_ABC123456789012345')
+    expect(html).toContain("var TOKEN = 'tok_ABC123456789012345'")
+    expect(html).toContain("var API = '/api/agent'")
+    expect(html).toContain('noindex')
+    expect(html).toContain('op-agent-close')
+  })
+
+  it('loader validates the token shape and namespaces once', () => {
+    expect(AGENT_LOADER_JS).toContain('/^[A-Za-z0-9_-]{16,64}$/')
+    expect(AGENT_LOADER_JS).toContain('__opAgentLoaded')
+    expect(AGENT_LOADER_JS).toContain("'/api/agent/w/'")
+  })
+})

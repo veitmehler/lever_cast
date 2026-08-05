@@ -775,7 +775,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
     $('leakdrift').textContent = money(r.driftLeak)
     $('leakresp').textContent = money(r.responseLeak)
     $('punch').innerHTML = 'That’s &asymp; <b>' + r.priceMultiple + '&times;</b> the monthly cost of fixing it. Recovering <b>one patient a month</b> pays for the whole system.'
-    $('cta').href = XRAY.CONFIG.VIDEO_URL + '?axis=' + r.weakest
+    $('cta').href = XRAY.CONFIG.VIDEO_URL
 
     renderAssumptions(r)
   }

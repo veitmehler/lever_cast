@@ -19,7 +19,7 @@
 </head>
 <body style="margin:0; padding:0; background-color:#F4F5F7;" bgcolor="#F4F5F7">
   <!-- preheader (hidden) -->
-  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">Your score, your leak, and the treatment plan.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">Your score, your leak, and the debrief inside.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F5F7" style="background-color:#F4F5F7;">
     <tr>
@@ -43,10 +43,11 @@
 <p style="margin:0 0 18px 0;">Your Practice X-Ray came back. Two numbers matter:</p>
 <p style="margin:0 0 18px 0;"><strong>Your Practice Omniply Score: {{contact.xray_total_score}}/100.</strong><br /><strong>Your estimated monthly leak: ${{contact.xray_total_leak}}.</strong></p>
 <p style="margin:0 0 18px 0;">The full report is here... your four system scores, the two leaks behind that number, and the treatment plan for each one:</p>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 22px 0;"><tr><td bgcolor="#C3F43B" style="background-color:#C3F43B; border-radius:9px; mso-padding-alt:14px 26px;"><a href="{{contact.xray_report_url}}" style="display:inline-block; padding:14px 26px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:700; color:#0B0B0C; text-decoration:none;">Read your X-Ray Debrief →</a></td></tr></table>
-<p style="margin:0 0 18px 0;">An X-ray doesn't lie. It doesn't flatter either. Read it the way you'd want a patient to read theirs: not as entertainment... as the difference between managing a problem and living with one.</p>
+<p style="margin:0 0 18px 0;"><a href="{{contact.xray_report_url}}" style="color:#3B6E1F; font-weight:700; text-decoration:underline;">Read your X-Ray Debrief →</a></p>
+<p style="margin:0 0 18px 0;">An X-ray doesn't lie. It doesn't flatter either. Read it the way you'd want a patient to read theirs: not as entertainment... that's the difference between managing a problem and living with one.</p>
 <p style="margin:26px 0 4px 0; color:#1A1A1C;">— Veit @ Omniply</p>
-<p style="margin:22px 0 0 0; padding-top:16px; border-top:1px solid #ECEDEF; font-size:14.5px; color:#55555C;">P.S. There's nothing to buy in the first twelve pages. It's your diagnosis, in writing. The last three pages show what treatment looks like... you decide if you want it.</p>
+<p style="margin:22px 0 0 0; padding-top:16px; border-top:1px solid #ECEDEF; font-size:14.5px; color:#55555C;">P.S. This is your comprehensive diagnosis, in writing. Plus, we'll show you how you can fix it easily... so check it out now:</p>
+<p style="margin:0 0 18px 0;"><a href="{{contact.xray_report_url}}" style="color:#3B6E1F; font-weight:700; text-decoration:underline;">Click here for your X-Ray results →</a></p>
                   </td>
                 </tr>
               </table>

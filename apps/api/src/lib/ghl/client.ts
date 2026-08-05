@@ -457,7 +457,14 @@ export interface UpsertContactResult {
 export async function upsertGhlContact(
   apiKey: string,
   locationId: string,
-  input: { email: string; tags: string[]; source?: string; customFields?: { id: string; value: string }[] },
+  input: {
+    email: string
+    tags: string[]
+    source?: string
+    firstName?: string
+    phone?: string
+    customFields?: { id: string; value: string }[]
+  },
 ): Promise<UpsertContactResult> {
   const data = await ghlRequest<{ contact?: { id?: string } }>(apiKey, '/contacts/upsert', {
     method: 'POST',
@@ -466,6 +473,8 @@ export async function upsertGhlContact(
       email: input.email,
       tags: input.tags,
       ...(input.source ? { source: input.source } : {}),
+      ...(input.firstName ? { firstName: input.firstName } : {}),
+      ...(input.phone ? { phone: input.phone } : {}),
       ...(input.customFields?.length ? { customFields: input.customFields } : {}),
     },
   })

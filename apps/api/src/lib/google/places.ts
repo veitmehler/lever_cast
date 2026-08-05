@@ -30,7 +30,19 @@ export interface PlaceProbe {
   totalReviews?: number
   /** Weekly hours as newline-joined weekday_text (owner-editable afterwards). */
   openingHours?: string
+  /** Structured weekly periods (chat agent's open-now computation). */
+  periods?: PlacePeriod[]
+  /** Minutes offset from UTC at the place (legacy `utc_offset`). */
+  utcOffsetMinutes?: number
+  formattedAddress?: string
+  formattedPhone?: string
   reviews: PlaceReview[]
+}
+
+/** Legacy Place Details opening_hours period: day 0=Sunday, time "HHMM". */
+export interface PlacePeriod {
+  open: { day: number; time: string }
+  close?: { day: number; time: string }
 }
 
 export interface PlaceReview {
@@ -67,7 +79,7 @@ export async function resolvePlaceId(
 }
 
 async function details(placeId: string, sort: 'most_relevant' | 'newest'): Promise<PlaceProbe | null> {
-  const fields = 'name,rating,user_ratings_total,opening_hours,reviews'
+  const fields = 'name,rating,user_ratings_total,opening_hours,utc_offset,formatted_address,formatted_phone_number,reviews'
   const res = await fetch(
     `${BASE}/details/json?place_id=${placeId}&fields=${fields}&reviews_sort=${sort}&reviews_no_translations=true&key=${key()}`,
   )
@@ -78,7 +90,10 @@ async function details(placeId: string, sort: 'most_relevant' | 'newest'): Promi
       name?: string
       rating?: number
       user_ratings_total?: number
-      opening_hours?: { weekday_text?: string[] }
+      opening_hours?: { weekday_text?: string[]; periods?: PlacePeriod[] }
+      utc_offset?: number
+      formatted_address?: string
+      formatted_phone_number?: string
       reviews?: { author_name?: string; rating?: number; text?: string; relative_time_description?: string }[]
     }
   }
@@ -89,6 +104,10 @@ async function details(placeId: string, sort: 'most_relevant' | 'newest'): Promi
     rating: data.result.rating,
     totalReviews: data.result.user_ratings_total,
     openingHours: data.result.opening_hours?.weekday_text?.join('\n'),
+    periods: data.result.opening_hours?.periods,
+    utcOffsetMinutes: data.result.utc_offset,
+    formattedAddress: data.result.formatted_address,
+    formattedPhone: data.result.formatted_phone_number,
     reviews: (data.result.reviews ?? [])
       .filter((r) => r.text?.trim())
       .map((r) => ({

@@ -13,6 +13,7 @@ import { logger } from './logger'
 import { assertSafeWpUrl } from './ssrf'
 import { withTimeout } from './net/with-timeout'
 import { buildClinicEntity, buildFaqSchema, buildFencedBlock, type ClinicFaq } from './clinic-schema'
+import { spineCheckUrlForUser } from '../spine-check/generate'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -54,6 +55,9 @@ async function linktreeDataForUser(userId: string) {
   const brand = await brandSettingsForUser(userId)
   if (!brand) return null
   const links: LinkEntry[] = []
+  // Spine Check on top (user decision 2026-08-06: the most valuable opt-in).
+  const spineCheckUrl = await spineCheckUrlForUser(userId).catch(() => null)
+  if (spineCheckUrl) links.push({ label: 'Take the 2-Minute Spine Check', url: spineCheckUrl })
   if (brand.bookingUrl) links.push({ label: 'Book an Appointment', url: brand.bookingUrl })
   if (brand.organizationPhone) links.push({ label: 'Call Us', url: `tel:${brand.organizationPhone.replace(/[^+\d]/g, '')}` })
   if (brand.googleBusinessProfileUrl) links.push({ label: 'Review Us on Google', url: brand.googleBusinessProfileUrl })

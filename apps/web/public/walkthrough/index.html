@@ -73,10 +73,10 @@
   </div>
 
   <div class="chapters">
-    <div class="chapter" data-axis="retention"><span class="n">Ch. 1 — 0:30</span>Patient Retention &amp; Recall — the drift leak</div>
-    <div class="chapter" data-axis="speed"><span class="n">Ch. 2 — 3:45</span>Speed-to-Lead — AI chat &amp; voice, 24/7</div>
-    <div class="chapter" data-axis="reviews"><span class="n">Ch. 3 — 7:00</span>The Google Review Engine</div>
-    <div class="chapter" data-axis="content"><span class="n">Ch. 4 — 9:30</span>Content &amp; Visibility on autopilot</div>
+    <div class="chapter" data-axis="retention"><span class="n">Chapter 1</span>Patient Retention &amp; Recall — the drift leak</div>
+    <div class="chapter" data-axis="speed"><span class="n">Chapter 2</span>Speed-to-Lead — AI chat &amp; voice, 24/7</div>
+    <div class="chapter" data-axis="reviews"><span class="n">Chapter 3</span>The Google Review Engine</div>
+    <div class="chapter" data-axis="content"><span class="n">Chapter 4</span>Content &amp; Visibility on autopilot</div>
   </div>
 
   <div class="buy">
@@ -95,15 +95,6 @@
     CHECKOUT_URL: '',   // GHL SaaS-configurator purchase link — set before launch
     VIDEO_EMBED_URL: '', // video embed URL once recorded
   }
-  // Highlight the chapter matching the visitor's weakest axis (?axis=…)
-  try {
-    var axis = new URLSearchParams(location.search).get('axis')
-    if (axis) {
-      var el = document.querySelector('.chapter[data-axis="' + axis.replace(/[^a-z]/g, '') + '"]')
-      if (el) el.classList.add('reco')
-    }
-  } catch (e) { /* noop */ }
-
   var btn = document.getElementById('checkout')
   if (CONFIG.CHECKOUT_URL) btn.href = CONFIG.CHECKOUT_URL
   else {

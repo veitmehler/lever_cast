@@ -58,6 +58,11 @@ model Account {
   driveFolderId String?
   leadGenDocuments LeadGenDocument[]
   leadCaptures     LeadCapture[]
+  // Public token identifying this account's chat-agent widget
+  // (.plans/chat-agent-v1.implementation-plan.md) — same URL-token pattern as
+  // ghlBillingToken/ghlReviewToken. Minted at provisioning.
+  agentWidgetToken   String?             @unique
+  agentConversations AgentConversation[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1021,6 +1026,50 @@ model LLMUsage {
   @@index([jobId])
   @@index([source])
   @@map("llm_usage")
+}
+
+// Chat-agent transcript audit trail (.plans/chat-agent-v1.implementation-plan.md).
+// Retention: 180 days (decision D) — a cleanup cron deletes older conversations.
+model AgentConversation {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  channel     String   @default("web") // web | voice (later)
+  // Anonymous per-browser key (widget-generated, not a cookie) — groups a
+  // visitor's turns; never a tracking identifier.
+  visitorKey  String
+  // Compliance surface: red-flag interceptions and post-filtered replies flag
+  // the conversation so it sorts first in the transcript list.
+  flagged     Boolean  @default(false)
+  flagReason  String?
+  endedReason String? // resolved | turn-cap | abuse-ceiling | red-flag
+  turnCount   Int      @default(0)
+  costUsd     Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages AgentMessage[]
+
+  @@index([accountId, createdAt])
+  @@index([flagged, createdAt])
+  @@map("agent_conversations")
+}
+
+model AgentMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // visitor | assistant
+  content        String            @db.Text
+  // Validated action the assistant turn carried (send_booking_link,
+  // offer_guide, capture_contact, request_callback) — server-executed.
+  action         Json?
+  // True when the post-filter replaced the model's reply with the safe fallback.
+  filtered       Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("agent_messages")
 }
 
 model SystemApiKey {

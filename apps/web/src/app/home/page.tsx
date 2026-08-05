@@ -44,7 +44,7 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: 'What is included in the $397?',
-    a: 'Everything in the loop. Weekly articles, the weekly newsletter with 25,000 email sends a month, social posts with designed graphics, branded lead-magnet guides, the AI response and recall systems, and the review growth engine. No per-piece fees, no content credits, no surprise line items.',
+    a: 'Everything in the loop. Weekly articles, the weekly newsletter with 25,000 email sends a month, social posts with designed graphics, branded lead-magnet guides, the 2-Minute Spine Check for your website, the AI response and recall systems, and the review growth engine. No per-piece fees, no content credits, no surprise line items.',
   },
   {
     q: 'Can I cancel? What happens to my content?',

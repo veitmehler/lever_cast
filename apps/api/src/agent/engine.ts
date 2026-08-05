@@ -1,0 +1,257 @@
+/**
+ * Chat-agent turn engine (.plans/chat-agent-v1.implementation-plan.md §2/§4).
+ *
+ * One provider-agnostic jsonMode LLM call per turn, fenced deterministically:
+ *   pre-filters (red flags, turn cap, abuse ceiling — no LLM) →
+ *   engine call (admin-selected model via the agent_system prompt row) →
+ *   post-filter (forbidden-pattern scan → safe fallback + flag) →
+ *   whitelist-validated action.
+ *
+ * Budget (decision G): $1.50/day included per account; over budget the
+ * visitor experience continues and overage accrues in LLMUsage (source
+ * 'agent') for surcharge billing. Only the ~10× abuse ceiling hard-stops.
+ */
+import { prisma } from '@omniply/shared'
+import { getLLMAdapter } from '../article-pipeline/llm/factory'
+import { cleanAndParseJSON } from '../article-pipeline/output-cleaner'
+import { recordLLMUsage } from '../lib/llm-usage'
+import { fillPrompt } from '../newsletter/llm'
+import { logger } from '../lib/logger'
+import { agentContextForAccount, openStatusFor, type AgentContext } from './context'
+import {
+  MAX_MESSAGE_CHARS,
+  MAX_VISITOR_TURNS,
+  checkRedFlags,
+  checkReply,
+  redFlagReply,
+  safeFallbackReply,
+} from './guardrails'
+import { validateAction, type AgentAction } from './tools'
+
+export const INCLUDED_DAILY_BUDGET_USD = 1.5
+export const ABUSE_CEILING_USD = 15
+
+export interface TurnInput {
+  accountId: string
+  conversationId?: string | null
+  visitorKey: string
+  message: string
+}
+
+export interface TurnResult {
+  conversationId: string
+  reply: string
+  action: AgentAction | null
+  /** Echoed so the widget can render the booking card without another call. */
+  bookingUrl: string | null
+  guideTitle: string | null
+  ended: string | null
+}
+
+interface ModelTurn {
+  reply?: unknown
+  action?: unknown
+}
+
+async function agentSpendTodayUsd(ownerUserId: string): Promise<number> {
+  const dayStart = new Date()
+  dayStart.setUTCHours(0, 0, 0, 0)
+  const agg = await prisma.lLMUsage.aggregate({
+    _sum: { cost: true },
+    where: { userId: ownerUserId, source: 'agent', createdAt: { gte: dayStart } },
+  })
+  return agg._sum.cost ?? 0
+}
+
+async function persistTurn(opts: {
+  conversationId: string
+  visitorText: string
+  reply: string
+  action: AgentAction | null
+  filtered: boolean
+  flagReason?: string | null
+  endedReason?: string | null
+  costUsd?: number
+}): Promise<void> {
+  await prisma.$transaction([
+    prisma.agentMessage.create({
+      data: { conversationId: opts.conversationId, role: 'visitor', content: opts.visitorText },
+    }),
+    prisma.agentMessage.create({
+      data: {
+        conversationId: opts.conversationId,
+        role: 'assistant',
+        content: opts.reply,
+        action: opts.action ?? undefined,
+        filtered: opts.filtered,
+      },
+    }),
+    prisma.agentConversation.update({
+      where: { id: opts.conversationId },
+      data: {
+        turnCount: { increment: 1 },
+        ...(opts.costUsd ? { costUsd: { increment: opts.costUsd } } : {}),
+        ...(opts.flagReason ? { flagged: true, flagReason: opts.flagReason } : {}),
+        ...(opts.endedReason ? { endedReason: opts.endedReason } : {}),
+      },
+    }),
+  ])
+}
+
+function guideTitleFor(ctx: AgentContext, action: AgentAction | null): string | null {
+  if (!action) return null
+  const slug = action.type === 'offer_guide' ? action.slug : action.type === 'capture_contact' ? action.guideSlug : null
+  return ctx.guides.find((g) => g.slug === slug)?.title ?? null
+}
+
+/**
+ * Run one visitor turn. Throws AgentTurnError('bad-conversation') when the
+ * conversationId doesn't belong to this account+visitor.
+ */
+export class AgentTurnError extends Error {
+  constructor(public code: 'bad-conversation' | 'no-context') {
+    super(code)
+  }
+}
+
+export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
+  const ctx = await agentContextForAccount(input.accountId)
+  if (!ctx) throw new AgentTurnError('no-context')
+
+  const message = input.message.trim().slice(0, MAX_MESSAGE_CHARS)
+
+  // Load or create the conversation (ownership enforced).
+  let conversation = input.conversationId
+    ? await prisma.agentConversation.findUnique({ where: { id: input.conversationId } })
+    : null
+  if (input.conversationId && (!conversation || conversation.accountId !== input.accountId || conversation.visitorKey !== input.visitorKey)) {
+    throw new AgentTurnError('bad-conversation')
+  }
+  conversation ??= await prisma.agentConversation.create({
+    data: { accountId: input.accountId, visitorKey: input.visitorKey },
+  })
+
+  const base = { conversationId: conversation.id, bookingUrl: ctx.bookingUrl, guideTitle: null as string | null }
+
+  // ── Pre-filters (no LLM) ─────────────────────────────────────────────────
+  if (conversation.turnCount >= MAX_VISITOR_TURNS) {
+    const reply = `We've covered a lot! For anything more, the ${ctx.practiceName} front desk is the best next step${ctx.phone ? ` — ${ctx.phone}` : ''}.`
+    await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action: null, filtered: false, endedReason: 'turn-cap' })
+    return { ...base, reply, action: null, ended: 'turn-cap' }
+  }
+
+  const redFlag = checkRedFlags(message)
+  if (redFlag) {
+    const reply = redFlagReply(redFlag, ctx.countryCode)
+    await persistTurn({
+      conversationId: conversation.id,
+      visitorText: message,
+      reply,
+      action: null,
+      filtered: false,
+      flagReason: `red-flag:${redFlag}`,
+      endedReason: 'red-flag',
+    })
+    logger.warn({ accountId: input.accountId, conversationId: conversation.id, redFlag }, '[agent] red-flag interception')
+    return { ...base, reply, action: null, ended: 'red-flag' }
+  }
+
+  const spentToday = await agentSpendTodayUsd(ctx.ownerUserId)
+  if (spentToday >= ABUSE_CEILING_USD) {
+    const reply = `The assistant is taking a break — please call ${ctx.practiceName}${ctx.phone ? ` on ${ctx.phone}` : ''} or leave your details and the team will get back to you.`
+    await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action: null, filtered: false, endedReason: 'abuse-ceiling' })
+    logger.warn({ accountId: input.accountId, spentToday }, '[agent] abuse ceiling reached — hard stop')
+    return { ...base, reply, action: null, ended: 'abuse-ceiling' }
+  }
+
+  // ── Engine call ──────────────────────────────────────────────────────────
+  const [sys, frame] = await Promise.all([
+    prisma.promptTemplate.findUnique({ where: { key: 'agent_system' } }),
+    prisma.promptTemplate.findUnique({ where: { key: 'agent_user_frame' } }),
+  ])
+  if (!sys?.isActive || !frame?.isActive) throw new AgentTurnError('no-context')
+
+  const historyRows = await prisma.agentMessage.findMany({
+    where: { conversationId: conversation.id },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+    select: { role: true, content: true },
+  })
+  const history = historyRows
+    .reverse()
+    .map((m) => `${m.role === 'visitor' ? 'Visitor' : 'Assistant'}: ${m.content}`)
+    .join('\n')
+
+  const open = openStatusFor(ctx)
+  const openStatus = open.known
+    ? [`Local time at the practice: ${open.localTime}.`, open.verdict, open.todayLine ? `Today's hours: ${open.todayLine}` : null]
+        .filter(Boolean)
+        .join(' ')
+    : 'Not computed — rely on WEEKLY HOURS if present, otherwise the front desk confirms hours.'
+
+  const vars = {
+    practiceName: ctx.practiceName,
+    knowledge: ctx.knowledge,
+    openStatus,
+    guides: ctx.guides.map((g) => `${g.slug} — ${g.title}`).join('\n') || '(none)',
+    history: history || '(first message)',
+    message,
+  }
+
+  const adapter = getLLMAdapter(sys.defaultProvider)
+  let reply: string | null = null
+  let rawAction: unknown = null
+  let costUsd = 0
+
+  for (let attempt = 1; attempt <= 2 && reply === null; attempt++) {
+    try {
+      const response = await adapter.call({
+        systemPrompt: fillPrompt(sys.userPrompt, vars),
+        userPrompt: fillPrompt(frame.userPrompt, vars),
+        model: sys.defaultModel,
+        temperature: 0.4,
+        maxTokens: sys.maxTokens ?? 700,
+        jsonMode: true,
+      })
+      costUsd += response.cost
+      await recordLLMUsage(ctx.ownerUserId, 'agent', response)
+      const { data } = cleanAndParseJSON(response.content)
+      const turn = data as ModelTurn
+      if (typeof turn.reply === 'string' && turn.reply.trim()) {
+        reply = turn.reply.trim().slice(0, 1200)
+        rawAction = turn.action ?? null
+      }
+    } catch (err) {
+      logger.warn({ err, accountId: input.accountId, attempt }, '[agent] engine call failed')
+    }
+  }
+
+  let filtered = false
+  let flagReason: string | null = null
+  let action: AgentAction | null = null
+
+  if (reply === null) {
+    reply = `Sorry — I'm having a moment. ${ctx.phone ? `The front desk can help right away on ${ctx.phone}.` : 'Please try again in a minute or contact the practice directly.'}`
+  } else {
+    const verdict = checkReply(reply)
+    if (!verdict.ok) {
+      logger.warn({ accountId: input.accountId, conversationId: conversation.id, reason: verdict.reason }, '[agent] post-filter replaced reply')
+      reply = safeFallbackReply(ctx.practiceName, ctx.phone)
+      filtered = true
+      flagReason = `post-filter:${verdict.reason}`
+    } else {
+      action = validateAction(rawAction, {
+        guideSlugs: ctx.guides.map((g) => g.slug),
+        bookingAvailable: Boolean(ctx.bookingUrl),
+      })
+    }
+  }
+
+  await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action, filtered, flagReason, costUsd })
+
+  if (spentToday + costUsd >= INCLUDED_DAILY_BUDGET_USD && spentToday < INCLUDED_DAILY_BUDGET_USD) {
+    logger.warn({ accountId: input.accountId, spentToday: spentToday + costUsd }, '[agent] included daily budget crossed — overage accruing')
+  }
+
+  return { ...base, reply, action, guideTitle: guideTitleFor(ctx, action), ended: null }
+}

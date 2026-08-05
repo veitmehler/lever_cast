@@ -64,7 +64,7 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: 'What exactly does $397 include? Any hidden costs?',
-    a: 'Everything in the loop: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, the AI response and recall systems, and the review engine. No per-piece fees, no content credits, no surprises.',
+    a: 'Everything in the loop: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, the 2-Minute Spine Check on your website, the AI response and recall systems, and the review engine. No per-piece fees, no content credits, no surprises.',
   },
   {
     q: 'How fast will I see results?',

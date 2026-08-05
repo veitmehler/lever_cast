@@ -47,6 +47,9 @@ function reflow(block) {
 
 function inline(text) {
   let t = text
+  // named links FIRST (before bold would eat the ** markers)
+  t = t.replace(/\*\*\[(.+?)\]\*\*\s*\(([^)\s]+)\)/g,
+    `<a href="$2" style="color:#3B6E1F; font-weight:700; text-decoration:underline;">$1</a>`)
   // bold, then single-asterisk italics
   t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   t = t.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
@@ -58,27 +61,12 @@ function inline(text) {
   return t
 }
 
-function button(label, url) {
-  return (
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 22px 0;"><tr>` +
-    `<td bgcolor="#C3F43B" style="background-color:#C3F43B; border-radius:9px; mso-padding-alt:14px 26px;">` +
-    `<a href="${url}" style="display:inline-block; padding:14px 26px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:700; color:#0B0B0C; text-decoration:none;">${label}</a>` +
-    `</td></tr></table>`
-  )
-}
-
 function compileBody(body) {
   const blocks = body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean)
   const html = []
   for (const block of blocks) {
     const lines = block.split('\n').map((l) => l.trim())
 
-    // CTA button: **[Label]** (url)
-    const btn = block.match(/^\*\*\[(.+?)\]\*\*\s*\((.+?)\)$/s)
-    if (btn) {
-      html.push(button(btn[1].trim(), btn[2].trim()))
-      continue
-    }
     // bullet rows: block starts with **+**; continuation lines (hard wraps) join
     if (lines[0].startsWith('**+**')) {
       const bullets = []

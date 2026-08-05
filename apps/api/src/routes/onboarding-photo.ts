@@ -10,6 +10,7 @@ import { uploadBufferWithKey, resolveAccountForClerkId } from '@omniply/shared'
 import { requireAuth } from '../middleware/auth'
 import { logger } from '../lib/logger'
 import { buildStandaloneLinktreeHtml } from '../lib/linktree'
+import { buildStandaloneSpineCheckHtml } from '../spine-check/generate'
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp'])
@@ -25,6 +26,19 @@ export async function onboardingPhotoRoutes(app: FastifyInstance) {
     const html = await buildStandaloneLinktreeHtml(account.ownerUserId ?? account.userId)
     if (!html) return reply.status(404).send({ error: 'Nothing to link yet — set a booking URL first' })
     reply.header('Content-Disposition', 'attachment; filename="linktree.html"')
+    reply.type('text/html; charset=utf-8')
+    return reply.send(html)
+  })
+
+  // Downloadable Spine Check (non-WordPress clinics) — single-file quiz app.
+  app.get('/onboarding/spine-check.html', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const account = await resolveAccountForClerkId(clerkId)
+    if (!account) return reply.status(404).send({ error: 'No account' })
+    const html = await buildStandaloneSpineCheckHtml(account.ownerUserId ?? account.userId)
+    if (!html) return reply.status(404).send({ error: 'Brand not set up yet' })
+    reply.header('Content-Disposition', 'attachment; filename="spine-check.html"')
     reply.type('text/html; charset=utf-8')
     return reply.send(html)
   })

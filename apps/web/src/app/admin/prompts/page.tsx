@@ -79,6 +79,11 @@ const STEP_LABELS: Record<string, string> = {
   generate_medium_article:        '2. Medium Article',
   // Promotional email
   generate_promotional_email:     'Promotional Email',
+  // AI chat agent (decision B — admin-editable prompts + model)
+  agent_chat_system:              '1. Agent System Prompt (rails + model selection)',
+  agent_chat_user_frame:          '2. Agent Turn Frame (knowledge/history layout)',
+  agent_widget_greeting:          '3. Widget Greeting (static copy)',
+  agent_callback_summary:         '4. Callback Summary (front-desk handover)',
   // Social media posts
   social_quote_selection:         '1. Quote selection',
   social_carousel_plan:           '2. Carousel plan',
@@ -107,6 +112,8 @@ const VISUAL_STEP_NUMBER: Record<number, string> = {
   30: '1', 31: '2',
   // Social media posts
   201: '1', 202: '2', 203: '3', 204: '4', 205: '5', 206: '6', 207: '7', 208: '8', 217: '9', 218: '10',
+  // AI chat agent
+  500: '1', 501: '2', 502: '3', 503: '4',
 }
 
 const PHASE_GROUPS: { label: string; steps: number[] }[] = [
@@ -136,6 +143,12 @@ const PHASE_GROUPS: { label: string; steps: number[] }[] = [
   {
     label: 'Social Media Posts',
     steps: [201, 202, 203, 204, 205, 206, 207, 208, 217, 218],
+  },
+  {
+    // The agent's MODEL is managed here too: the Agent System Prompt row's
+    // provider/model IS the agent's model selection (chat-agent decision A).
+    label: 'AI Chat Agent',
+    steps: [500, 501, 502, 503],
   },
 ]
 

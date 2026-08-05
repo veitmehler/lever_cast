@@ -14,6 +14,7 @@ import { ghlBillingRoutes } from './routes/ghl-billing'
 import { stripeBillingRoutes } from './routes/stripe-billing'
 import { xrayReportRoutes } from './routes/xray-report'
 import { spineCheckRoutes } from './routes/spine-check'
+import { agentRoutes } from './routes/agent'
 import { ghlReviewRoutes } from './routes/ghl-reviews'
 import { ghlAppEventRoutes } from './routes/ghl-app-events'
 import { googleOauthRoutes } from './routes/google-oauth'
@@ -96,6 +97,7 @@ async function main() {
   await app.register(stripeBillingRoutes, { prefix: '/api' })
   await app.register(xrayReportRoutes, { prefix: '/api' })
   await app.register(spineCheckRoutes, { prefix: '/api' })
+  await app.register(agentRoutes, { prefix: '/api' })
   await app.register(ghlReviewRoutes, { prefix: '/api' })
   await app.register(ghlAppEventRoutes, { prefix: '/api' })
   await app.register(googleOauthRoutes, { prefix: '/api' })

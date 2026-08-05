@@ -1,0 +1,116 @@
+/**
+ * Chat-agent endpoints (.plans/chat-agent-v1.implementation-plan.md §4).
+ *
+ * Public (widget-token addressed, same-origin from the svc-hosted iframe):
+ *   GET  /api/agent/boot?token=…   — greeting + theme + chips (no LLM call)
+ *   POST /api/agent/chat           — one visitor turn through the engine
+ *
+ * Authed:
+ *   POST /api/agent/provision      — mint (or return) the account's widget
+ *                                    token; Settings/C1 uses this for the
+ *                                    embed snippet.
+ *
+ * Rate limits: chat is 15/min per IP on top of the global limiter — a chat
+ * turn is the only LLM-spending public route in the API.
+ */
+import type { FastifyInstance } from 'fastify'
+import { randomBytes } from 'node:crypto'
+import { prisma } from '@omniply/shared'
+import { logger } from '../lib/logger'
+import { requireAuth } from '../middleware/auth'
+import { fillPrompt } from '../newsletter/llm'
+import { agentContextForAccount } from '../agent/context'
+import { emergencyNumberFor, MAX_MESSAGE_CHARS } from '../agent/guardrails'
+import { AgentTurnError, runAgentTurn } from '../agent/engine'
+
+const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/
+const VISITOR_KEY_RE = /^[A-Za-z0-9_-]{8,64}$/
+const CONVERSATION_ID_RE = /^[a-z0-9]{10,40}$/i
+
+const CHIPS = ['Book an appointment', 'Hours & location', 'Your first visit', 'Ask something']
+
+async function accountForToken(token: unknown): Promise<{ id: string } | null> {
+  if (typeof token !== 'string' || !TOKEN_RE.test(token)) return null
+  return prisma.account.findUnique({ where: { agentWidgetToken: token }, select: { id: true } })
+}
+
+export async function agentRoutes(app: FastifyInstance) {
+  app.get('/agent/boot', async (request, reply) => {
+    const { token } = request.query as { token?: string }
+    const account = await accountForToken(token)
+    if (!account) return reply.status(404).send({ error: 'Unknown widget' })
+
+    const ctx = await agentContextForAccount(account.id)
+    if (!ctx) return reply.status(404).send({ error: 'Widget not ready' })
+
+    const greetingRow = await prisma.promptTemplate.findUnique({ where: { key: 'agent_greeting' } })
+    const greeting = greetingRow
+      ? fillPrompt(greetingRow.userPrompt, { practiceName: ctx.practiceName })
+      : `Hi! I'm ${ctx.practiceName}'s AI assistant. I can help with appointments, hours and general questions — I'm not able to give medical advice.`
+    const emergency = emergencyNumberFor(ctx.countryCode)
+
+    reply.header('Cache-Control', 'no-store')
+    return {
+      practiceName: ctx.practiceName,
+      greeting,
+      chips: CHIPS,
+      theme: ctx.theme,
+      disclosure: `AI assistant · Can't give medical advice · Emergencies: call ${emergency ?? 'your local emergency number'}`,
+      maxMessageChars: MAX_MESSAGE_CHARS,
+    }
+  })
+
+  app.post(
+    '/agent/chat',
+    { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const body = (typeof request.body === 'object' && request.body !== null ? request.body : {}) as Record<string, unknown>
+      const account = await accountForToken(body.token)
+      if (!account) return reply.status(404).send({ error: 'Unknown widget' })
+
+      const visitorKey = typeof body.visitorKey === 'string' && VISITOR_KEY_RE.test(body.visitorKey) ? body.visitorKey : null
+      const message = typeof body.message === 'string' ? body.message.trim() : ''
+      const conversationId =
+        typeof body.conversationId === 'string' && CONVERSATION_ID_RE.test(body.conversationId) ? body.conversationId : null
+      if (!visitorKey || !message) return reply.status(400).send({ error: 'Bad request' })
+
+      try {
+        const result = await runAgentTurn({
+          accountId: account.id,
+          conversationId,
+          visitorKey,
+          message: message.slice(0, MAX_MESSAGE_CHARS),
+        })
+        return result
+      } catch (err) {
+        if (err instanceof AgentTurnError) {
+          return reply.status(err.code === 'bad-conversation' ? 409 : 404).send({ error: err.code })
+        }
+        logger.error({ err, accountId: account.id }, '[agent] chat turn failed')
+        return reply.status(500).send({ error: 'Something went wrong' })
+      }
+    },
+  )
+
+  app.post('/agent/provision', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { accountId: true } })
+    if (!user?.accountId) return reply.status(404).send({ error: 'No account' })
+
+    const account = await prisma.account.findUnique({
+      where: { id: user.accountId },
+      select: { id: true, agentWidgetToken: true },
+    })
+    if (!account) return reply.status(404).send({ error: 'No account' })
+
+    let token = account.agentWidgetToken
+    if (!token) {
+      token = randomBytes(24).toString('base64url')
+      await prisma.account.update({ where: { id: account.id }, data: { agentWidgetToken: token } })
+      logger.info({ accountId: account.id }, '[agent] widget token minted')
+    }
+    return { token }
+  })
+}

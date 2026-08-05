@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import { NEWSLETTER_TEMPLATES } from './newsletter-prompts'
 import { CLIENT_STORY_TEMPLATES } from './client-story-prompts'
 import { PLAIN_LANGUAGE_TEMPLATES, PLAIN_LANGUAGE_CONFIGS } from './plain-language-prompts'
+import { AGENT_TEMPLATES } from './agent-prompts'
 import { DEAI_TEMPLATES, CAPTION_HOOK_SYSTEM, CAPTION_HOOK_USER } from './deai-prompts'
 
 const prisma = new PrismaClient()
@@ -1741,6 +1742,18 @@ async function main() {
     console.log(`  ✓ ${template.key}: ${template.stepName}`)
   }
   console.log(`Seeded ${DEAI_TEMPLATES.length} de-AI writing prompt templates.`)
+
+  // Chat-agent prompts (admin-editable via /admin/agents) — same string-key convention.
+  console.log('\nSeeding chat-agent prompt templates...')
+  for (const template of AGENT_TEMPLATES) {
+    await prisma.promptTemplate.upsert({
+      where: { key: template.key },
+      create: template,
+      update: {},
+    })
+    console.log(`  ✓ ${template.key}: ${template.stepName}`)
+  }
+  console.log(`Seeded ${AGENT_TEMPLATES.length} chat-agent prompt templates.`)
 
   // Seed outline frameworks
   console.log('\nSeeding outline frameworks...')

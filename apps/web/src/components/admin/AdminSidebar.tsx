@@ -32,6 +32,7 @@ const navItems = [
   { label: 'Social Runs', href: '/admin/social', icon: Share2 },
   { label: 'Newsletter', href: '/admin/newsletter', icon: Mail },
   { label: 'Music', href: '/admin/music', icon: Music },
+  { label: 'Agent Transcripts', href: '/admin/agent-transcripts', icon: MessageSquareText },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Errors', href: '/admin/errors', icon: AlertTriangle },
 ]

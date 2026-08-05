@@ -60,7 +60,7 @@ export function parseSpineCapture(body: unknown): SpineCapture | null {
 }
 
 // Hosted-page cache: generation fetches brand + guides + logo.
-const PAGE_CACHE_MS = 10 * 60 * 1000
+const PAGE_CACHE_MS = 5 * 60 * 1000
 const pageCache = new Map<string, { html: string; at: number }>()
 
 export async function spineCheckRoutes(app: FastifyInstance) {
@@ -154,6 +154,8 @@ export async function spineCheckRoutes(app: FastifyInstance) {
     const accountId = request.params.accountId
     if (!/^[a-z0-9-]{10,40}$/i.test(accountId)) return reply.code(404).send({ error: 'not found' })
 
+    // Embeddable from any clinic site (iframe publishing).
+    reply.header('Content-Security-Policy', 'frame-ancestors *')
     const hit = pageCache.get(accountId)
     if (hit && Date.now() - hit.at < PAGE_CACHE_MS) {
       return reply.header('Content-Type', 'text/html; charset=utf-8').send(hit.html)

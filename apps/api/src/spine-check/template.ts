@@ -205,11 +205,25 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SPINE
   var answers = []
   var idx = 0
 
+  // Iframe embeds auto-size via postMessage (parent resizer in the embed
+  // snippet); harmless when the quiz runs standalone.
+  function reportHeight () {
+    try {
+      var app = $('sc-app')
+      if (app && window.parent !== window) {
+        window.parent.postMessage({ type: 'sc-height', height: app.scrollHeight + 48 }, '*')
+      }
+    } catch (e) { /* noop */ }
+  }
+  window.addEventListener('resize', reportHeight)
+  setTimeout(reportHeight, 60)
+
   function show (id) {
     var scr = document.querySelectorAll('#sc-app .sc-screen')
     for (var i = 0; i < scr.length; i++) scr[i].classList.toggle('sc-active', scr[i].id === id)
     var app = $('sc-app')
     if (app && app.scrollIntoView) app.scrollIntoView({ block: 'start' })
+    setTimeout(reportHeight, 60)
   }
 
   $('sc-start').addEventListener('click', function () { idx = 0; show('sc-q'); render() })
@@ -239,7 +253,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SPINE
           answers[idx] = opt[1]
           b.className = 'sc-sel'
           setTimeout(function () {
-            if (idx < SPINE.QUESTIONS.length - 1) { idx++; render() } else { $('sc-pbar').style.width = '100%'; show('sc-gate'); $('sc-f-name').focus() }
+            if (idx < SPINE.QUESTIONS.length - 1) { idx++; render(); reportHeight() } else { $('sc-pbar').style.width = '100%'; show('sc-gate'); $('sc-f-name').focus() }
           }, 160)
         })
         wrap.appendChild(b)

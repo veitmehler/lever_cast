@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildSpineCheckFragment, buildSpineCheckHtml, type SpineCheckClinic } from '../template'
+import { buildSpineCheckEmbed } from '../generate'
 import { parseSpineCapture } from '../../routes/spine-check'
 
 const CLINIC: SpineCheckClinic = {
@@ -100,6 +101,28 @@ describe('template injection safety', () => {
     const full = buildSpineCheckHtml(CLINIC)
     expect(full).toContain('<!doctype html>')
     expect(full).toContain('id="sc-app"')
+  })
+})
+
+describe('iframe embed (WP publish content)', () => {
+  const embed = buildSpineCheckEmbed(CLINIC)
+
+  it('contains crawlable intro, iframe with hosted src, noscript link, and resizer', () => {
+    expect(embed).toContain('<p>How well do your daily habits')
+    expect(embed).toContain(`/api/spine-check/p/${CLINIC.accountId}`)
+    expect(embed).toContain('<noscript>')
+    expect(embed).toContain("e.data.type!=='sc-height'")
+    expect(embed).toContain('min-height:980px')
+  })
+
+  it('escapes hostile practice names in the embed', () => {
+    const hostile = buildSpineCheckEmbed({ ...CLINIC, practiceName: '<img onerror=x>' })
+    expect(hostile).not.toContain('<img onerror=x>')
+  })
+
+  it('quiz reports its height for the parent resizer', () => {
+    const frag = buildSpineCheckFragment(CLINIC)
+    expect(frag).toContain("postMessage({ type: 'sc-height'")
   })
 })
 

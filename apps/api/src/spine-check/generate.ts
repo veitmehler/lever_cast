@@ -10,7 +10,7 @@ import { prisma, decrypt, brandSettingsForUser, accountMemberIdsForUser } from '
 import { logger } from '../lib/logger'
 import { assertSafeWpUrl } from '../lib/ssrf'
 import { withTimeout } from '../lib/net/with-timeout'
-import { buildSpineCheckFragment, buildSpineCheckHtml, type SpineCheckClinic } from './template'
+import { buildSpineCheckHtml, type SpineCheckClinic } from './template'
 
 /** Domain → guide slug (plan: first-chiropractic-visit is NOT quiz-matched). */
 export const GUIDE_SLUG_BY_DOMAIN = {
@@ -102,6 +102,23 @@ export async function spineCheckUrlForUser(userId: string): Promise<string | nul
 }
 
 /**
+ * WP page content: crawlable intro + IFRAME embed of the hosted quiz (user
+ * decision 2026-08-07: iframe publishing — one deploy updates every clinic,
+ * immune to theme CSS/JS and content sanitizers, and the same snippet works
+ * on any site builder that accepts embeds). Parent-side resizer listens for
+ * the quiz's sc-height postMessage; a generous fixed min-height is the
+ * fallback when a platform strips the script.
+ */
+export function buildSpineCheckEmbed(clinic: SpineCheckClinic): string {
+  const hostedUrl = `${publicApiBase()}/api/spine-check/p/${clinic.accountId}`
+  const name = clinic.practiceName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return `<p>How well do your daily habits treat your back? Take the free 2-Minute Spine Check from ${name}... twelve quick questions about your desk, your sleep and your mornings, your Spine Habits Score at the end, and a free guide picked for you.</p>
+<iframe id="sc-frame" src="${hostedUrl}" title="The 2-Minute Spine Check — ${name}" style="width:100%;border:0;min-height:980px;display:block;" loading="lazy"></iframe>
+<noscript><p><a href="${hostedUrl}">Take the 2-Minute Spine Check</a></p></noscript>
+<script>(function(){window.addEventListener('message',function(e){if(!e.data||e.data.type!=='sc-height')return;var f=document.getElementById('sc-frame');if(f&&e.source===f.contentWindow&&e.data.height>200){f.style.height=e.data.height+'px';f.style.minHeight='0';}});})();</script>`
+}
+
+/**
  * Publish (create or update) the /spine-check page on the clinic's WordPress
  * site. Best-effort: failures log and return null (hosted route remains).
  */
@@ -122,8 +139,8 @@ export async function publishSpineCheckPage(userId: string): Promise<string | nu
     const auth = `Basic ${Buffer.from(`${conn.username}:${decrypt(conn.appPassword) ?? ''}`).toString('base64')}`
     const siteBase = conn.siteUrl.replace(/\/+$/, '')
 
-    // Fragment (scoped CSS + scripts) — the WP theme provides the page shell.
-    const content = buildSpineCheckFragment(clinic)
+    // Iframe embed of the hosted quiz — the WP theme provides the page shell.
+    const content = buildSpineCheckEmbed(clinic)
 
     const wp = (path: string, init?: RequestInit) =>
       withTimeout(

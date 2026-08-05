@@ -62,10 +62,15 @@ export async function evaluateArticleQuality(
   articleHtml: string,
 ): Promise<{ text: string; cost: number; tokens: number }> {
   const text = htmlToText(articleHtml).slice(0, 24000) // cap for token safety
+  // The evaluator must know today's date: without it, models with older
+  // knowledge cutoffs flag legitimately recent statistics (e.g. "2025 data"
+  // read in 2026) as unverifiable "future-dated" claims — observed on the
+  // Azavea pilot v3, which needs_review'd twice on exactly this.
+  const today = new Date().toISOString().slice(0, 10)
   const res = await getLLMAdapter('gemini').call({
     model: GEMINI_MODEL,
     systemPrompt: EVAL_SYSTEM,
-    userPrompt: `Evaluate this article:\n\n${text}`,
+    userPrompt: `Today's date: ${today}. Statistics dated in recent years up to today are NOT future-dated.\n\nEvaluate this article:\n\n${text}`,
     temperature: 0.2,
     maxTokens: 1200,
   })

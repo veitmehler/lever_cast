@@ -27,6 +27,7 @@ import {
   safeFallbackReply,
 } from './guardrails'
 import { validateAction, type AgentAction } from './tools'
+import { executeAgentAction } from './actions'
 
 export const INCLUDED_DAILY_BUDGET_USD = 1.5
 export const ABUSE_CEILING_USD = 15
@@ -243,11 +244,16 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
       action = validateAction(rawAction, {
         guideSlugs: ctx.guides.map((g) => g.slug),
         bookingAvailable: Boolean(ctx.bookingUrl),
+        hasContact: Boolean(conversation.ghlContactId),
       })
     }
   }
 
   await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action, filtered, flagReason, costUsd })
+
+  // Execute server-side effects (GHL contact/tags/note, Drive grants) AFTER
+  // the turn is persisted — never throws, failures alert + flag.
+  if (action) await executeAgentAction(ctx, conversation.id, action)
 
   if (spentToday + costUsd >= INCLUDED_DAILY_BUDGET_USD && spentToday < INCLUDED_DAILY_BUDGET_USD) {
     logger.warn({ accountId: input.accountId, spentToday: spentToday + costUsd }, '[agent] included daily budget crossed — overage accruing')

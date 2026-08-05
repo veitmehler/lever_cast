@@ -1,6 +1,6 @@
 # Omniply Chat Agent v1 — Comprehensive Build Plan (text chat; voice is a later layer)
 
-**Status: PLAN for review — 2026-08-05 · LAUNCH SCOPE (decision A)**
+**Status: APPROVED — decisions locked 2026-08-05 · LAUNCH SCOPE · build in progress**
 
 Supersedes Phases 0–1 of `.plans/ai-chat-voice-agent.implementation-plan.md`
 for the launch build; that doc remains the map for voice (Phase 2) and agent
@@ -123,10 +123,12 @@ Layered so that no single failure produces an unsafe reply:
   regional emergency numbers), `tools.ts` (send_booking_link,
   capture_contact, offer_lead_magnet, request_callback, handoff_human — all
   arguments server-validated), `engine.ts` (model call, streaming, budgets).
-- **Model**: Haiku-class default (`claude-haiku-4-5`) — cents per
-  conversation, strong instruction-following; per-account escalation flag to
-  Sonnet-class if a pilot demands it. Model-agnostic config (Gemini as
-  fallback option).
+- **Model**: admin-managed (decision A) — the agent's model is a stored
+  setting selectable across all connected providers, edited on the
+  `/admin/agents` page alongside the prompts (decision B); the engine calls
+  through the same provider abstraction as the pipelines. Seeded initial
+  value: `claude-haiku-4-5` (cents per conversation, strong
+  instruction-following).
 - **Tables**: `AgentConversation` {accountId, channel, visitorKey, flagged,
   endedReason} + `AgentMessage` {role, content, toolCalls, filtered} — the
   audit trail. (Schema addition → migration.)
@@ -136,12 +138,20 @@ Layered so that no single failure produces an unsafe reply:
 - **Widget**: one-line loader `<script src=…/widget.js data-omniply=TOKEN>`
   → launcher bubble + iframe panel (style isolation, like the Spine Check
   decision), themed from the composed palette, mobile bottom-sheet. Offline/
-  over-budget state degrades to a static “leave your details” form (which
+  abuse-ceiling state degrades to a static “leave your details” form (which
   still captures → GHL).
-- **Cost & abuse**: per-IP burst limits, per-conversation turn caps,
-  per-account daily LLM budget (~$2/day default ≈ hundreds of conversations;
-  hard stop → static form + alert), LLMUsage cost logging like every other
-  pipeline.
+- **Admin surface (decisions A+B)**: `/admin/agents` page in the
+  `/admin/prompts` style — system prompt, greeting/disclosure copy, and model
+  selector, DB-backed (agent_* prompt rows + config), seeded by the build.
+- **Callback summary (decision C)**: on `request_callback`, a cheap model
+  call produces a 2–3 sentence conversation summary appended to the GHL
+  contact note/notification the front desk receives.
+- **Cost & abuse (decision G)**: per-IP burst limits, per-conversation turn
+  caps, $1.50/day included LLM budget per account — over budget the widget
+  KEEPS working and overage cost is recorded per account for surcharge
+  billing (alert fires; Stripe metering ships with the voice phase). Hard
+  stop only at the ~10× abuse ceiling (→ static leave-your-details form).
+  LLMUsage cost logging like every other pipeline.
 - **Install paths**: (a) embed snippet shown in Settings + onboarding finale
   message; (b) auto-embedded on the /linktree page; (c) WP site-wide via the
   omniply-connect plugin v2 AFTER the .org review completes (post-launch —
@@ -154,22 +164,34 @@ Layered so that no single failure produces an unsafe reply:
 |---|---|---|
 | C0 | Agent core: context + Places hours + guardrails + tools + tables + deterministic filter tests | 3–4 d |
 | C1 | Widget (bubble/iframe/theme) + chat API (SSE) + provisioning token + Settings section | 3 d |
-| C2 | Magnet offers + callback→GHL + snapshot note (callback-requested workflow) + cost caps + transcript list | 2 d |
+| C2 | Magnet offers + callback→GHL incl. chat summary + snapshot note (callback-requested workflow) + budget/overage metering + `/admin/agents` page + transcript list | 2 d |
 | C3 | Red-team eval on staging + pilot on dev clinic’s WP + fixes | 1–2 d |
 | — | **Video Scene 8 capturable after C1** (chat demo); voice demo waits for the voice layer | — |
 
 Total: **~9–11 focused days** — the long pole of the launch window, which is
 why it starts as soon as this plan is approved.
 
-## 6 · Decisions needed (user)
+## 6 · Decisions (LOCKED 2026-08-05)
 
-- **A. Model default**: Haiku-class (recommended) — confirm.
-- **B. Greeting + disclosure wording**: draft above — edit like all copy.
-- **C. Callback “reason” handling**: pass the visitor’s one-line reason to
-  the clinic notification (recommended — clinics need context; they are the
-  health provider) vs. keep reasons only in our transcript.
-- **D. Transcript retention**: 90 days default — confirm.
-- **E. Chat pricing**: included in $397 at launch (recommended: retention
-  weapon; voice becomes the paid add-on later) — confirm.
-- **F. English-only v1** — confirm.
-- **G. Daily LLM budget default per clinic**: ~$2/day — confirm.
+- **A. Model: admin-managed.** The agent model is selectable across every
+  connected provider (anthropic/gemini/openai) from the admin area — stored
+  config like the pipeline prompts, changeable without deploys. Sensible
+  initial value: Haiku-class.
+- **B. Agent prompts: admin-editable.** New page `/admin/agents` in the
+  style of `/admin/prompts`: the agent system prompt, greeting + disclosure
+  copy, and the model selector live there (DB-backed, seeded like nl_*
+  prompts). The build seeds v1 copy; the admin edits from then on.
+- **C. Callback = request + BRIEF CHAT SUMMARY.** `request_callback`
+  generates a 2–3 sentence conversation summary (cheap model call) and
+  passes it with the contact into the clinic notification — front desk gets
+  context, not just a name and number.
+- **D. Transcript retention: 180 days.**
+- **E. Pricing: chat INCLUDED in $397.** Voice (later phase) also included
+  up to N bundled minutes, then per-minute surcharge — voice-phase Stripe
+  metering designs to that shape.
+- **F. English-only v1.**
+- **G. LLM budget: $1.50/day included, then metered surcharge.** Over-budget
+  does NOT degrade the visitor experience — usage continues, overage is
+  recorded per account for surcharge billing (Stripe metering lands with the
+  voice phase; v1 records + alerts). Abuse ceiling stays as a hard stop at
+  ~10× the included budget to cap attack-driven bills.

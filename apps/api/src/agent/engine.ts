@@ -258,6 +258,12 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
 
   if (spentToday + costUsd >= INCLUDED_DAILY_BUDGET_USD && spentToday < INCLUDED_DAILY_BUDGET_USD) {
     logger.warn({ accountId: input.accountId, spentToday: spentToday + costUsd }, '[agent] included daily budget crossed — overage accruing')
+    const { sendFailureAlert } = await import('../lib/alerts')
+    await sendFailureAlert({
+      errorType: 'agent-budget-crossed',
+      message: `Chat agent crossed the $${INCLUDED_DAILY_BUDGET_USD}/day included budget for account ${input.accountId} (spent today: $${(spentToday + costUsd).toFixed(2)}). Usage continues; overage accrues for surcharge billing (decision G). Hard stop only at $${ABUSE_CEILING_USD}.`,
+      context: { accountId: input.accountId },
+    }).catch(() => {})
   }
 
   return { ...base, reply, action, guideTitle: guideTitleFor(ctx, action), ended: null }

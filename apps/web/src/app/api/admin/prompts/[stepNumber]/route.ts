@@ -12,3 +12,8 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   const { stepNumber } = await params
   return proxyToApi(request, `/api/admin/prompts/${stepNumber}`, { method: 'PUT' })
 }
+
+export async function DELETE(request: NextRequest, { params }: Ctx) {
+  const { stepNumber } = await params
+  return proxyToApi(request, `/api/admin/prompts/${stepNumber}`, { method: 'DELETE' })
+}

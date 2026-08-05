@@ -15,7 +15,11 @@ interface PromptTemplate {
   userPrompt: string
   version: number
   isActive: boolean
+  /** Present when viewing a non-default vertical: true = no override row. */
+  inherited?: boolean
 }
+
+const DEFAULT_VERTICAL = 'default'
 
 function extractVars(text: string): string[] {
   const matches = text.match(/\{\{([^}]+)\}\}/g) ?? []
@@ -139,19 +143,43 @@ export default function AdminPromptsPage() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
+  const [verticals, setVerticals] = useState<string[]>([DEFAULT_VERTICAL])
+  const [vertical, setVertical]   = useState<string>(DEFAULT_VERTICAL)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
-        const res = await fetch('/api/admin/prompts', { cache: 'no-store' })
+        const res = await fetch('/api/admin/prompts/verticals', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          if (alive && Array.isArray(data.verticals) && data.verticals.length) setVerticals(data.verticals)
+        }
+      } catch {
+        /* selector degrades to default-only */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/prompts?vertical=${encodeURIComponent(vertical)}`, { cache: 'no-store' })
         if (!res.ok) {
           const body = await res.text()
           if (alive) setError(`HTTP ${res.status}: ${body || res.statusText}`)
           return
         }
         const data = await res.json()
-        if (alive) setTemplates(data.templates ?? [])
+        if (alive) {
+          setTemplates(data.templates ?? [])
+          setError(null)
+        }
       } catch (err) {
         if (alive) setError((err as Error).message ?? 'Failed to load prompt templates')
       } finally {
@@ -161,7 +189,7 @@ export default function AdminPromptsPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [vertical])
 
   const byStep = Object.fromEntries(templates.map((t) => [t.stepNumber, t]))
 
@@ -174,6 +202,30 @@ export default function AdminPromptsPage() {
           Admin edits are preserved on re-seed.
         </p>
       </div>
+
+      {verticals.length > 1 && (
+        <div className="mb-6 flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vertical</span>
+          <div className="flex rounded-lg border border-border bg-muted p-0.5">
+            {verticals.map((v) => (
+              <button
+                key={v}
+                onClick={() => setVertical(v)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  vertical === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v === DEFAULT_VERTICAL ? 'Default (chiro)' : v}
+              </button>
+            ))}
+          </div>
+          {vertical !== DEFAULT_VERTICAL && (
+            <span className="text-xs text-muted-foreground">
+              Greyed rows are inherited from the default set; editing one creates a {vertical} override.
+            </span>
+          )}
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -223,8 +275,10 @@ export default function AdminPromptsPage() {
                     return (
                       <Link
                         key={t.id}
-                        href={`/admin/prompts/${t.stepNumber}`}
-                        className="group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 hover:border-border/80 hover:shadow-sm transition-all"
+                        href={`/admin/prompts/${t.stepNumber}${vertical !== DEFAULT_VERTICAL ? `?vertical=${encodeURIComponent(vertical)}` : ''}`}
+                        className={`group flex items-center gap-4 rounded-xl border px-5 py-4 hover:shadow-sm transition-all ${
+                          t.inherited ? 'border-border/60 bg-muted/40 opacity-75 hover:opacity-100' : 'border-border bg-card hover:border-border/80'
+                        }`}
                       >
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                           {VISUAL_STEP_NUMBER[t.stepNumber] ?? t.stepNumber}
@@ -233,6 +287,15 @@ export default function AdminPromptsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm font-medium text-foreground">{label}</span>
+                            {vertical !== DEFAULT_VERTICAL && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  t.inherited ? 'bg-gray-100 text-gray-500' : 'bg-lime-100 text-lime-800'
+                                }`}
+                              >
+                                {t.inherited ? 'Inherited' : 'Customized'}
+                              </span>
+                            )}
                             <ProviderBadge provider={t.defaultProvider} />
                             <span className="text-xs text-gray-400">{t.defaultModel}</span>
                             {t.maxTokens !== null && t.maxTokens !== undefined && (

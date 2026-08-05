@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Loader2, AlertTriangle } from 'lucide-react'
 import { PromptEditor } from './PromptEditor'
@@ -17,11 +17,14 @@ interface PromptTemplate {
   userPrompt: string
   version: number
   isActive: boolean
+  inherited?: boolean
 }
 
 export default function PromptEditorPage() {
   const params = useParams<{ stepNumber: string }>()
   const stepNumber = parseInt(params?.stepNumber ?? '', 10)
+  const search = useSearchParams()
+  const vertical = search?.get('vertical') ?? 'default'
 
   const [template, setTemplate] = useState<PromptTemplate | null>(null)
   const [loading, setLoading]   = useState(true)
@@ -36,7 +39,7 @@ export default function PromptEditorPage() {
     let alive = true
     ;(async () => {
       try {
-        const res = await fetch(`/api/admin/prompts/${stepNumber}`, { cache: 'no-store' })
+        const res = await fetch(`/api/admin/prompts/${stepNumber}?vertical=${encodeURIComponent(vertical)}`, { cache: 'no-store' })
         if (!res.ok) {
           const body = await res.text()
           if (alive) setError(`HTTP ${res.status}: ${body || res.statusText}`)
@@ -53,7 +56,7 @@ export default function PromptEditorPage() {
     return () => {
       alive = false
     }
-  }, [stepNumber])
+  }, [stepNumber, vertical])
 
   if (loading) {
     return (
@@ -84,5 +87,5 @@ export default function PromptEditorPage() {
     )
   }
 
-  return <PromptEditor template={template} />
+  return <PromptEditor template={template} vertical={vertical} />
 }

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chat agent — test page</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1c2430; background: #fff; }
+    main { max-width: 720px; margin: 0 auto; padding: 56px 24px 120px; }
+    h1 { font-size: 28px; margin-bottom: 12px; }
+    p { margin-bottom: 14px; color: #3d4757; }
+    .note { background: #f5f7f4; border-left: 4px solid #84B420; padding: 14px 18px; border-radius: 0 10px 10px 0; font-size: 15px; }
+    code { background: #eef1f5; padding: 2px 6px; border-radius: 5px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Chat agent — internal test page</h1>
+    <p>This page simulates a clinic website with the Omniply chat assistant installed.
+       The launcher bubble sits bottom-right; it opens the assistant for the staging
+       dev clinic (Coast Chiropractic Kawana).</p>
+    <p class="note">Internal testing only — the widget on this page talks to the
+       <strong>staging</strong> environment. Callback and guide-delivery actions are
+       validated and recorded but not yet wired to GHL (C2).</p>
+    <p>Things worth trying: <code>Are you open right now?</code> ·
+       <code>Where are you located?</code> · <code>Do you treat sciatica?</code> ·
+       ask for a callback with a name and phone number · try to make it give
+       medical advice (it must refuse).</p>
+  </main>
+  <script async src="https://staging-svc.omniply.io/api/agent/widget.js" data-omniply="U_NgqpUF4SR7tIzdgBBJfkR1-H38IUy2"></script>
+</body>
+</html>

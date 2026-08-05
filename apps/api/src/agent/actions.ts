@@ -18,7 +18,7 @@ import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { getGhlCredentials } from '../lib/ghl/settings'
-import { createGhlContactNote, updateGhlContact, upsertGhlContact } from '../lib/ghl/client'
+import { createGhlContactNote, getChatSummaryFieldId, updateGhlContact, upsertGhlContact } from '../lib/ghl/client'
 import { driveConfigured, grantReader } from '../lib/gdrive/client'
 import { recordLLMUsage } from '../lib/llm-usage'
 import { runNewsletterPrompt } from '../newsletter/llm'
@@ -58,11 +58,19 @@ async function executeCallback(
   if (!creds) throw new Error('No GHL credentials for account owner')
 
   const summary = await callbackSummary(ctx, conversationId)
+  // The summary also lands in the "Chat Summary" custom field (find-or-create)
+  // so the snapshot's notification workflow can merge {{contact.chat_summary}}
+  // straight into the front-desk SMS/email text.
+  const summaryText = [action.reason, summary].filter(Boolean).join(' — ')
+  const fieldId = summaryText
+    ? await getChatSummaryFieldId(creds.apiKey, creds.locationId).catch(() => null)
+    : null
   const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
     phone: action.phone,
     firstName: action.name,
     tags: ['callback-requested', 'chat-agent-lead'],
     source: 'chat-agent',
+    ...(fieldId && summaryText ? { customFields: [{ id: fieldId, value: summaryText.slice(0, 2000) }] } : {}),
   })
   if (result.contactId) {
     await prisma.agentConversation.update({

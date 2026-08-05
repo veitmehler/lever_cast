@@ -544,6 +544,44 @@ export async function getGuideLinkFieldId(apiKey: string, locationId: string): P
 }
 
 /**
+ * Resolve (or CREATE) the "Chat Summary" contact custom field for a location —
+ * the chat-agent callback writes its summary here so snapshot workflows can
+ * merge it into the front-desk notification ({{contact.chat_summary}}).
+ * Find-or-create means no snapshot dependency; cached per location.
+ */
+const chatSummaryFieldCache = new Map<string, { id: string | null; at: number }>()
+
+export async function getChatSummaryFieldId(apiKey: string, locationId: string): Promise<string | null> {
+  const hit = chatSummaryFieldCache.get(locationId)
+  if (hit && Date.now() - hit.at < GUIDE_LINK_CACHE_MS) return hit.id
+  try {
+    const data = await ghlRequest<{ customFields?: { id: string; name?: string; fieldKey?: string }[] }>(
+      apiKey,
+      `/locations/${locationId}/customFields`,
+      { method: 'GET' },
+    )
+    let match = (data.customFields ?? []).find((f) => {
+      const key = (f.fieldKey ?? '').toLowerCase()
+      const name = (f.name ?? '').toLowerCase()
+      return key.includes('chat_summary') || name.replace(/\s+/g, '_') === 'chat_summary'
+    })
+    if (!match) {
+      const created = await ghlRequest<{ customField?: { id: string } }>(
+        apiKey,
+        `/locations/${locationId}/customFields`,
+        { method: 'POST', body: { name: 'Chat Summary', dataType: 'LARGE_TEXT' } },
+      )
+      match = created.customField ? { id: created.customField.id } : undefined
+    }
+    const id = match?.id ?? null
+    chatSummaryFieldCache.set(locationId, { id, at: Date.now() })
+    return id
+  } catch {
+    return hit?.id ?? null
+  }
+}
+
+/**
  * Upsert a LOCATION custom value by name (list → update-or-create) — unlike a
  * blind POST this never duplicates on re-runs. Write requires the
  * customValues.write scope (user bumping the app scope, 2026-07-28); until the

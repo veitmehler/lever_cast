@@ -10,7 +10,7 @@ buy button under the video. No chapters to skip to... it plays start to finish.
 ## Length philosophy
 
 Say what needs saying; hard cap **under 20 minutes** (attention ceiling).
-This draft: ~2,300 VO words ≈ **15:50 of narration**, landing **~16:30–17:30**
+This draft: ~2,450 VO words ≈ **16:50 of narration**, landing **~17:30–18:30**
 with demo breathing room. The runtime is locked by the AUDIO recording —
 screen capture is edited to fit the audio afterwards.
 
@@ -186,12 +186,14 @@ account, later that day. First article drafted. First newsletter designed.
 Social posts queued. Everything waiting in one place for a single click of
 approval... yours.
 
-## SCENE 7 · Walkthrough: Presence · ~1:45 · VO ~250 words
+## SCENE 7 · Walkthrough: Presence · ~2:30 · VO ~370 words
 
 **ON SCREEN:** REAL PRODUCT. An actual generated article (scroll it slowly)...
 the weekly newsletter (designed, branded)... social posts with graphics...
-the approval inbox; click Approve on one piece; show it published on a real
-WordPress blog + scheduled social.
+THEN the lead-magnet library: branded guide covers in the clinic's colors,
+one guide opened, the capture flow, a new contact appearing in the account.
+Finally the approval inbox; click Approve on one piece; show it published on
+a real WordPress blog + scheduled social.
 
 **VO:**
 System one. Presence.
@@ -209,6 +211,18 @@ trust you.
 
 And these are the social posts... designed graphics, real information, not
 recycled wellness quotes.
+
+Then there's this... your lead-magnet library. Professionally designed
+guides, generated in your identity... your logo, your colors, your voice. A
+desk-worker survival guide. A sleep guide. The kind of thing a prospect
+trades their email address for. They sit on your website, in your posts, on
+a card at your front desk... and every download becomes a contact in your
+list, automatically, with the follow-up already running.
+
+Watch what that means. Your content attracts strangers... your guides turn
+strangers into names on your list... and your newsletter works that list
+every single week, forever. The list is the asset. Everything you're
+watching feeds it.
 
 Now the part that keeps you in control. Nothing ships without you. Everything
 lands in one approval inbox... you read it over coffee, you click approve,
@@ -281,10 +295,12 @@ single week instead of when someone remembers.
 The clinic ranking above you right now isn't better than you. It's louder.
 This is how you get louder... automatically, and honestly.
 
-## SCENE 10 · Walkthrough: Recall · ~1:15 · VO ~180 words
+## SCENE 10 · Walkthrough: Recall · ~1:20 · VO ~195 words
 
-**ON SCREEN:** REAL PRODUCT. The reactivation flow: a lapsed-patient segment,
-the recall email/SMS that goes out, a rebooked appointment appearing.
+**ON SCREEN:** REAL PRODUCT. The clinic's patient list living in the account
+(imported at onboarding)... the weekly newsletter landing in a patient inbox...
+a newsletter offer up close... then the win-back message for a patient who
+has gone quiet.
 
 **VO:**
 System four. Recall... the one that plugs the drift leak directly.
@@ -293,19 +309,22 @@ Every patient who stopped coming has a spine that did not stop needing care.
 They didn't leave you... life got loud, and nobody tapped them on the
 shoulder.
 
-So the system never forgets a patient. Care plan ends... contact continues.
-The newsletter keeps arriving. And when someone's been gone long enough,
-they get a reason to come back... before the flare-up, not after they've
-already googled someone else.
+So here's how the system makes sure nobody fades. At onboarding, your patient
+list comes into the system... that's a ten-minute import, and it's the
+fastest win in the whole setup. From that moment, every patient hears from
+you every week... real content, in your voice, with a genuine reason to come
+back built in.
 
-This is the fastest money in the entire system, by the way. New patients
-take months of compounding... but reactivated patients rebook in weeks,
-because they already know you and already trust you. They just needed to be
-remembered.
+And patients who've gone quiet for months get a little more... a personal
+note, the kind a caring practice would send, inviting them back in... before
+the flare-up, not after they've already googled someone else.
 
-Your X-Ray called this the drift leak, and for most established practices
-it's the biggest number on the report. This is the system that closes it...
-running every week, without a single name on a front-desk call list.
+This is the fastest money in the entire system. New patients take months of
+compounding... but reactivated patients rebook in weeks, because they
+already know you and already trust you. They just needed to be remembered.
+
+Your X-Ray called this the drift leak... this is the system that closes it,
+without a single name on a front-desk call list.
 
 ## SCENE 11 · The prognosis · ~0:50 · VO ~120 words
 
@@ -380,7 +399,7 @@ Click the button below, and let's get your practice off your plate.
 
 ---
 
-## VO word count ≈ 2,305 → ~15:50 @ 145 wpm → runtime target 16:30–17:30 ✓ (<20 hard cap)
+## VO word count ≈ 2,450 → ~16:50 @ 145 wpm → runtime target 17:30–18:30 ✓ (<20 hard cap)
 
 ## Asset checklist for capture (after audio)
 
@@ -391,8 +410,9 @@ Click the button below, and let's get your practice off your plate.
 - [ ] Loop diagram animation (S5 — adapt site SVG)
 - [ ] REAL onboarding run screen-recording (S6 — use a demo practice)
 - [ ] Article/newsletter/social/approval captures + WordPress publish (S7)
+- [ ] Lead-magnet library + branded guide + capture flow (S7)
 - [ ] Chat widget + voice-call recording (S8 — **blocked on chat/voice build**)
 - [ ] QR card, review profile with fresh dates, map pack (S9)
-- [ ] Reactivation flow + rebooking (S10)
+- [ ] Patient list + newsletter-in-inbox + offer + win-back message (S10 — win-back workflow: snapshot build TODO)
 - [ ] Prognosis line animation (S11)
 - [ ] Math cards (S12) · End card + button zoom (S13)

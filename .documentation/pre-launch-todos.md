@@ -42,6 +42,12 @@ production (env backup: `/opt/socioply/.env.production.bak-20260731`).
   currently prod-IP-only; Tier-2 review pulls fail from staging).
 - [ ] Onboarding runbook note: `brandSettings.industry` is REQUIRED for the
   plain-language feature — confirm the onboarding flow always sets it.
+- [ ] **Onboarding: import the clinic's patient list into their GHL sub-account**
+  (CSV import; the newsletter needs an audience on day one — fastest win for
+  new clients). Add as an explicit onboarding-checklist step.
+- [ ] **Win-back workflow in the snapshot**: engagement-based reactivation
+  (patient-tagged + quiet ~90 days → personal-tone win-back sequence).
+  Emails to be written (copy task), then workflow added to master snapshot.
 
 ## 3. External clocks (start early — not under our control)
 

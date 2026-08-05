@@ -10,7 +10,7 @@ buy button under the video. No chapters to skip to... it plays start to finish.
 ## Length philosophy
 
 Say what needs saying; hard cap **under 20 minutes** (attention ceiling).
-This draft: ~2,450 VO words ≈ **16:50 of narration**, landing **~17:30–18:30**
+This draft: ~2,525 VO words ≈ **17:25 of narration**, landing **~18:00–19:00** (trim pass available if audio runs long)
 with demo breathing room. The runtime is locked by the AUDIO recording —
 screen capture is edited to fit the audio afterwards.
 
@@ -186,12 +186,14 @@ account, later that day. First article drafted. First newsletter designed.
 Social posts queued. Everything waiting in one place for a single click of
 approval... yours.
 
-## SCENE 7 · Walkthrough: Presence · ~2:30 · VO ~370 words
+## SCENE 7 · Walkthrough: Presence · ~3:00 · VO ~445 words
 
 **ON SCREEN:** REAL PRODUCT. An actual generated article (scroll it slowly)...
 the weekly newsletter (designed, branded)... social posts with graphics...
 THEN the lead-magnet library: branded guide covers in the clinic's colors,
 one guide opened, the capture flow, a new contact appearing in the account.
+THEN the 2-Minute Spine Check running on the clinic's own website
+[build-dependent — capture late, like S8].
 Finally the approval inbox; click Approve on one piece; show it published on
 a real WordPress blog + scheduled social.
 
@@ -219,10 +221,17 @@ trades their email address for. They sit on your website, in your posts, on
 a card at your front desk... and every download becomes a contact in your
 list, automatically, with the follow-up already running.
 
-Watch what that means. Your content attracts strangers... your guides turn
-strangers into names on your list... and your newsletter works that list
-every single week, forever. The list is the asset. Everything you're
-watching feeds it.
+And one more capture door... the most valuable one. The 2-Minute Spine
+Check. An interactive self-check that lives on your own website, in your
+brand. Patients score their daily back habits... desk, sleep, mornings...
+and the system hands them the exact guide that fits, captures their email,
+and puts your booking link in front of them. A curious visitor becomes a
+named, nurtured lead... automatically.
+
+Watch what that means. Your content attracts strangers... your guides and
+your Spine Check turn strangers into names on your list... and your
+newsletter works that list every single week, forever. The list is the
+asset. Everything you're watching feeds it.
 
 Now the part that keeps you in control. Nothing ships without you. Everything
 lands in one approval inbox... you read it over coffee, you click approve,
@@ -399,7 +408,7 @@ Click the button below, and let's get your practice off your plate.
 
 ---
 
-## VO word count ≈ 2,450 → ~16:50 @ 145 wpm → runtime target 17:30–18:30 ✓ (<20 hard cap)
+## VO word count ≈ 2,525 → ~17:25 @ 145 wpm → runtime target 18:00–19:00 ✓ (<20 hard cap, tight — trim candidates: S2 forces, S9 proof)
 
 ## Asset checklist for capture (after audio)
 
@@ -411,6 +420,7 @@ Click the button below, and let's get your practice off your plate.
 - [ ] REAL onboarding run screen-recording (S6 — use a demo practice)
 - [ ] Article/newsletter/social/approval captures + WordPress publish (S7)
 - [ ] Lead-magnet library + branded guide + capture flow (S7)
+- [ ] 2-Minute Spine Check on a clinic site (S7 — **blocked on Spine Check build**)
 - [ ] Chat widget + voice-call recording (S8 — **blocked on chat/voice build**)
 - [ ] QR card, review profile with fresh dates, map pack (S9)
 - [ ] Patient list + newsletter-in-inbox + offer + win-back message (S10 — win-back workflow: snapshot build TODO)

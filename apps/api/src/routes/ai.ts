@@ -513,13 +513,15 @@ export async function aiRoutes(app: FastifyInstance) {
       }
       const { provider: selectedProvider, apiKey, model: selectedModel } = resolved
 
-      const systemMessage = `# ROLE: 
+      const systemMessage = `# ROLE:
 
 You are an expert writing analyst and AI prompt engineer. Your mission is to meticulously analyze the writing style of the provided text and then generate a high-fidelity, reusable prompt that can replicate this style for any new content and topic.
 
 # OUTPUT INSTRUCTIONS:
 
-Return ONLY a clear, concise description (2 paragraphs) that can be used as writing style instructions for AI content generation. Do not include any analysis, explanations, or meta-commentary. Just the style description.`
+Return ONLY a clear, concise description (2 paragraphs) that can be used as writing style instructions for AI content generation. Do not include any analysis, explanations, or meta-commentary. Just the style description.
+
+CRITICAL: Do NOT quote, excerpt, or paraphrase ANY specific phrases, sentences, or named concepts from the analyzed text. No quotation marks anywhere in your output. Describe the STYLE in the abstract (sentence rhythm, tone, framing devices, structural habits) so that a model following your description produces the same voice WITHOUT ever reproducing wording from the sample.`
 
       const userPrompt = `# ARTICLE TO ANALYZE:\n\n${sampleText.trim()}`
 

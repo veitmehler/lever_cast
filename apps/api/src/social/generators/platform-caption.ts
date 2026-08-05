@@ -74,7 +74,7 @@ export async function generatePlatformCaption(opts: {
 
   try {
     const [t, brand] = await Promise.all([
-      loadPromptTemplate(203),
+      loadPromptTemplate(203, { userId: logCtx.userId }),
       loadSocialBrandTheme(logCtx.userId),
     ])
 

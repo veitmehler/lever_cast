@@ -12,6 +12,7 @@
  * 'agent') for surcharge billing. Only the ~10× abuse ceiling hard-stops.
  */
 import { prisma } from '@omniply/shared'
+import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { getLLMAdapter } from '../article-pipeline/llm/factory'
 import { cleanAndParseJSON } from '../article-pipeline/output-cleaner'
 import { recordLLMUsage } from '../lib/llm-usage'
@@ -167,8 +168,8 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
 
   // ── Engine call ──────────────────────────────────────────────────────────
   const [sys, frame] = await Promise.all([
-    prisma.promptTemplate.findUnique({ where: { key: 'agent_system' } }),
-    prisma.promptTemplate.findUnique({ where: { key: 'agent_user_frame' } }),
+    resolvePromptByKey('agent_system', { vertical: ctx.vertical }),
+    resolvePromptByKey('agent_user_frame', { vertical: ctx.vertical }),
   ])
   if (!sys?.isActive || !frame?.isActive) throw new AgentTurnError('no-context')
 

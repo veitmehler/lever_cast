@@ -16,6 +16,8 @@ vi.mock('@omniply/shared', () => ({
     sitePage: { findUnique: (...a: unknown[]) => sitePageFindUnique(...a) },
     brandSettings: { findUnique: vi.fn().mockResolvedValue(null) },
     promptTemplate: { findUnique: (...a: unknown[]) => promptFindUnique(...a) },
+    // vertical resolution (V0): unknown user → 'default' vertical
+    user: { findUnique: vi.fn().mockResolvedValue(null) },
   },
   brandSettingsForUser: vi.fn().mockResolvedValue(null),
 }))

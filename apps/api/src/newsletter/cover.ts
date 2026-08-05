@@ -6,6 +6,7 @@
  * Chrome already used for diagrams (diffusion can't render legible headlines, so
  * the text is composited, not generated). Returns the S3 URL.
  */
+import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { prisma } from '@omniply/shared'
 import { generateWithFalAI, generateWithGeminiImage, uploadBufferWithKey, deleteOldVersions } from '@omniply/shared'
 import { withRasterPage } from '../article-pipeline/enrichment/diagram-browser-pool'
@@ -166,7 +167,7 @@ export async function generateCoverImage(
   const items = params.items.slice(0, 6).filter((i) => i.headline?.trim())
   if (items.length === 0) return { summaryTitle: null, summaryImageUrl: null }
 
-  const cfg = await prisma.promptTemplate.findUnique({ where: { key: 'nl_summary_style_guide' } })
+  const cfg = await resolvePromptByKey('nl_summary_style_guide')
   const styleGuide = cfg?.userPrompt?.trim() || FALLBACK_STYLE_GUIDE
   const model = cfg?.defaultModel || FALLBACK_COVER_MODEL
   const geminiKey = await getSystemApiKey('gemini')
@@ -211,7 +212,7 @@ async function generateCoverComposite(
   }
 
   // 2. Icon style + model (admin-editable config row).
-  const styleRow = await prisma.promptTemplate.findUnique({ where: { key: 'nl_summary_icon_style' } })
+  const styleRow = await resolvePromptByKey('nl_summary_icon_style')
   const styleSuffix = styleRow?.userPrompt?.trim() || FALLBACK_ICON_STYLE
   const iconModel = styleRow?.defaultModel || FALLBACK_ICON_MODEL
   const falKey = await getSystemApiKey('fal-ai')

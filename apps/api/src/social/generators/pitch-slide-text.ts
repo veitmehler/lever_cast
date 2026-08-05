@@ -73,7 +73,7 @@ export async function generatePitchSlideText(opts: {
 }): Promise<PitchSlideCopy> {
   const fallbackCta = ctaActionForType(opts.pitchType)
 
-  const t = await loadPromptTemplate(208)
+  const t = await loadPromptTemplate(208, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
   const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 

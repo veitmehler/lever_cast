@@ -60,7 +60,7 @@ async function main() {
     const stepNumber = Number(stepStr)
 
     const existing = await prisma.promptTemplate.findUnique({
-      where: { stepNumber },
+      where: { stepNumber_vertical: { stepNumber, vertical: 'default' } },
       select: { id: true, stepName: true, maxTokens: true },
     })
 
@@ -77,7 +77,7 @@ async function main() {
     }
 
     await prisma.promptTemplate.update({
-      where: { stepNumber },
+      where: { stepNumber_vertical: { stepNumber, vertical: 'default' } },
       data: { maxTokens },
     })
 

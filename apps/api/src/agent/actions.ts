@@ -40,7 +40,7 @@ async function transcriptFor(conversationId: string): Promise<string> {
 async function callbackSummary(ctx: AgentContext, conversationId: string): Promise<string> {
   try {
     const transcript = await transcriptFor(conversationId)
-    const { content, response } = await runNewsletterPrompt('agent_summary', { transcript })
+    const { content, response } = await runNewsletterPrompt('agent_summary', { transcript }, { vertical: ctx.vertical })
     await recordLLMUsage(ctx.ownerUserId, 'agent', response)
     return content.trim().slice(0, 1000)
   } catch (err) {

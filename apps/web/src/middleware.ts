@@ -4,7 +4,17 @@ import { NextResponse } from 'next/server'
 // Canonical app host is env-driven (flips to chiro.omniply.io in the rename's
 // Phase 3); BOTH omniply and legacy socioply hosts serve during the transition.
 const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST ?? 'chiro.omniply.io'
-const APP_HOSTS = new Set([APP_HOST, 'chiro.omniply.io', 'staging.chiro.omniply.io', 'app.socioply.com'])
+// Vertical subdomains (.plans/vertical-platform.implementation-plan.md V1):
+// each vertical's app lives on its own subdomain — same deployment, the host
+// is branding. This map is the single registry future per-vertical surfaces
+// (marketing pages, sign-up context) read from.
+export const HOST_VERTICALS: Record<string, string> = {
+  'chiro.omniply.io': 'chiro',
+  'staging.chiro.omniply.io': 'chiro',
+  'app.socioply.com': 'chiro',
+  'azavea.omniply.io': 'azavea',
+}
+const APP_HOSTS = new Set([APP_HOST, ...Object.keys(HOST_VERTICALS)])
 // Marketing hosts serve the public sales pages (apex omniply.io + www; legacy www.socioply).
 const MARKETING_HOSTS = new Set(['omniply.io', 'www.omniply.io', 'www.socioply.com'])
 const WWW_HOST = 'www.socioply.com'

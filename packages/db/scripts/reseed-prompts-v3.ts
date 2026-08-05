@@ -1420,7 +1420,7 @@ async function main() {
 
   for (const p of PROMPTS) {
     const existing = await prisma.promptTemplate.findUnique({
-      where: { stepNumber: p.stepNumber },
+      where: { stepNumber_vertical: { stepNumber: p.stepNumber, vertical: 'default' } },
       select: { id: true, stepName: true },
     })
 
@@ -1433,7 +1433,7 @@ async function main() {
         continue
       }
       await prisma.promptTemplate.update({
-        where: { stepNumber: p.stepNumber },
+        where: { stepNumber_vertical: { stepNumber: p.stepNumber, vertical: 'default' } },
         data: {
           stepName: p.stepName,
           defaultProvider: p.defaultProvider,

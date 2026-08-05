@@ -49,7 +49,7 @@ export async function selectQuoteForCard(opts: {
   organizationName: string
   userId?: string
 }): Promise<QuoteSelectionResult> {
-  const t = await loadPromptTemplate(201)
+  const t = await loadPromptTemplate(201, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
   const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 
@@ -108,7 +108,7 @@ export async function selectQuotesForCards(opts: {
   count: number
   userId?: string
 }): Promise<QuoteSelectionResult[]> {
-  const t = await loadPromptTemplate(209)
+  const t = await loadPromptTemplate(209, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
   const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 

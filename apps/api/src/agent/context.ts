@@ -32,6 +32,7 @@ export interface AgentTheme {
 export interface AgentContext {
   accountId: string
   ownerUserId: string
+  vertical: string
   practiceName: string
   bookingUrl: string | null
   phone: string | null
@@ -66,7 +67,7 @@ export async function agentContextForAccount(accountId: string): Promise<AgentCo
 
   const account = await prisma.account.findUnique({
     where: { id: accountId },
-    select: { id: true, ownerUserId: true },
+    select: { id: true, ownerUserId: true, vertical: true },
   })
   if (!account) return null
   const ownerUserId =
@@ -127,6 +128,7 @@ export async function agentContextForAccount(accountId: string): Promise<AgentCo
   const ctx: AgentContext = {
     accountId,
     ownerUserId,
+    vertical: account.vertical,
     practiceName,
     bookingUrl: brand.bookingUrl ?? null,
     phone,

@@ -7,6 +7,7 @@
  * Campaign from it.
  */
 
+import { resolvePromptByStep } from '../../lib/prompt-resolver'
 import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
@@ -122,17 +123,7 @@ export async function generatePromoEmail(jobId: string, userId: string): Promise
       },
     }),
     brandSettingsForUser(userId),
-    prisma.promptTemplate.findUnique({
-      where: { stepNumber: PROMO_EMAIL_STEP_NUMBER },
-      select: {
-        systemPrompt: true,
-        userPrompt: true,
-        defaultProvider: true,
-        defaultModel: true,
-        maxTokens: true,
-        isActive: true,
-      },
-    }),
+    resolvePromptByStep(PROMO_EMAIL_STEP_NUMBER, { userId }),
   ])
 
   if (!sitePage) {

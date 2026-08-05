@@ -158,15 +158,16 @@ Layered so that no single failure produces an unsafe reply:
   do not disturb the pending “print-only” review). Voice later plugs into the
   same engine via webhook transport (VAPI), per the original plan.
 
-## 5 · Sequencing (launch scope) & estimates
+## 5 · Sequencing (launch scope) & status (2026-08-05)
 
-| Step | Contents | Est. |
+| Step | Contents | Status |
 |---|---|---|
-| C0 | Agent core: context + Places hours + guardrails + tools + tables + deterministic filter tests | 3–4 d |
-| C1 | Widget (bubble/iframe/theme) + chat API (SSE) + provisioning token + Settings section | 3 d |
-| C2 | Magnet offers + callback→GHL incl. chat summary + snapshot note (callback-requested workflow) + budget/overage metering + `/admin/agents` page + transcript list | 2 d |
-| C3 | Red-team eval on staging + pilot on dev clinic’s WP + fixes | 1–2 d |
-| — | **Video Scene 8 capturable after C1** (chat demo); voice demo waits for the voice layer | — |
+| C0 | Agent core: context + Places hours + guardrails + tools + tables + deterministic filter tests | ✅ DONE (e479432) — deployed staging, live smoke passed (red-flag/injection/treat-X/grounding) |
+| C1 | Widget (bubble/iframe/theme, JSON turn — adapters have no SSE; provisioning token) | ✅ DONE (21bb348) — verified via Playwright on omniply.io/agent-test (unlisted, loads staging) |
+| C2a | Callback EXECUTION: GHL contact (phone-first upsert) + callback-requested/chat-agent-lead tags + note + Chat Summary custom field (find-or-create) + add_contact_email follow-up + prompt v3 strict flow + widget 409 self-heal | ✅ DONE (fe6414d/2c4a97d/494d929) — full flow verified against real GHL incl. dedupe-by-phone |
+| C2b | capture_contact guide flow live-test + `/admin/agents` page + Settings embed section + budget crossing alert email + 180-day retention cron + admin transcript list | ⬜ NEXT |
+| C3 | Red-team eval on staging + pilot on dev clinic’s WP + fixes | ⬜ |
+| — | **Video Scene 8 capturable NOW** (staging widget demo); voice demo waits for the voice layer. Snapshot needs the callback-requested workflow (SMS/email template: `📞 Callback request: {{contact.first_name}} {{contact.phone}} — {{contact.chat_summary}}`) | — |
 
 Total: **~9–11 focused days** — the long pole of the launch window, which is
 why it starts as soon as this plan is approved.

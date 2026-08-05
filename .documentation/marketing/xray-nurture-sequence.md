@@ -14,12 +14,15 @@ fake scarcity, no income claims. Sender: **Veit @ Omniply**.
   workflow immediately (goal/exit condition). Nobody who bought gets email 4.
 - **SMS branch**: SMS steps only fire if contact has a phone. Quiet hours
   9:00–19:00 contact-local; GHL's default queue handles this.
+- **Links are TEXT LINKS, never buttons.** The `**[anchor →]** (url)` lines
+  render as underlined text links with that anchor text. Report links with no
+  surrounding anchor use "Click here".
 - **Merge-field notes**:
   - Money fields are RAW numbers (`5600`, no commas) — copy always prefixes `$`.
-  - `{{contact.xray_weakest_axis}}` holds `content|speed|reviews|retention` —
-    used ONLY inside video URLs (`/walkthrough?axis=…`), never as prose.
+  - `{{contact.xray_weakest_axis}}` is stored for segmentation only — never
+    used in copy or links (the walkthrough is watched start to finish).
   - Report link: `{{contact.xray_report_url}}` (S3 short link).
-- **CTA URL**: `https://omniply.io/walkthrough` (+ `?axis=` where noted).
+- **CTA URL**: `https://omniply.io/walkthrough` — always plain, no chapter jumps.
 - **Prerequisites before first send**: GHL dedicated sending domain configured;
   `veit@omniply.io` replies routed (Cloudflare email routing task); LC Phone
   number + A2P registration for SMS.
@@ -29,7 +32,7 @@ fake scarcity, no income claims. Sender: **Veit @ Omniply**.
 ## EMAIL 1 · Day 0 (minutes after capture) · type: delivery
 
 **Subject:** Your X-Ray results ({{contact.first_name}}, the number is inside)
-**Preview:** Your score, your leak, and the treatment plan.
+**Preview:** Your score, your leak, and the debrief inside.
 
 {{contact.first_name}} —
 
@@ -44,20 +47,21 @@ number, and the treatment plan for each one:
 **[Read your X-Ray Debrief →]** ({{contact.xray_report_url}})
 
 An X-ray doesn't lie. It doesn't flatter either. Read it the way you'd want a
-patient to read theirs: not as entertainment... as the difference between
+patient to read theirs: not as entertainment... that's the difference between
 managing a problem and living with one.
 
 — Veit @ Omniply
 
-P.S. There's nothing to buy in the first twelve pages. It's your diagnosis, in
-writing. The last three pages show what treatment looks like... you decide if
-you want it.
+P.S. This is your comprehensive diagnosis, in writing. Plus, we'll show you
+how you can fix it easily... so check it out now:
+
+**[Click here for your X-Ray results →]** ({{contact.xray_report_url}})
 
 ---
 
 ## SMS 1 · Day 1, morning (only if phone on file)
 
-Veit here (Omniply) — your Practice X-Ray report: {{contact.xray_report_url}}
+Veit here (Omniply). Your Practice X-Ray report: {{contact.xray_report_url}}
 Worth 3 quiet minutes. The drift number is the one to look at.
 
 ---
@@ -65,87 +69,104 @@ Worth 3 quiet minutes. The drift number is the one to look at.
 ## EMAIL 2 · Day 1 · type: splinter (drift)
 
 **Subject:** Patients don't leave. They fade.
-**Preview:** The quietest leak in your practice... in one page.
+**Preview:** The silent leak that drains your practice... in one page.
 
 A patient finishes their care plan. They feel good... which means your care
 *worked*.
 
 Then nothing happens. No contact, no content, no reason to think of you.
 
-Eight months later their back flares up — in a city full of clinics that
-answer faster than you.
+Eight months later their back flares up. In a city full of clinics that
+answer faster than you, who will they call?
+
+The top listing in the Google Maps pack that answers fastest.
 
 Your X-Ray put a number on this: **${{contact.xray_drift_leak}} a month**,
 walking out the quiet way.
+
+Because they couldn't remember your name when it mattered the most, so they
+just called someone else they could find fast.
 
 Patients don't leave. They fade. And fading is invisible in the appointment
 book until the quarter is already soft.
 
 The fix isn't discipline. It's a system that never lets go of a patient:
 
-**[Watch how Recall works — 3 minutes →]** (https://omniply.io/walkthrough?axis=retention)
+**[Watch how Recall works... 3 minutes →]** (https://omniply.io/walkthrough)
 
 — Veit
 
 P.S. "My front desk handles follow-up." They handle the ones they remember...
-at 9-to-5 speed. The leak lives in the ones nobody remembers.
+at 9-to-5 speed. Plug this leak, and your quarter picks up.
+
+**[Click here to save more appointments →]** (https://omniply.io/walkthrough)
 
 ---
 
 ## EMAIL 3 · Day 3 · type: teach (the new physics)
 
 **Subject:** 78% book with whoever answers first
-**Preview:** Three numbers that explain your score.
+**Preview:** Three numbers that explain why you lose patients.
 
 Three numbers, one story:
 
 **78%** of customers buy from whoever answers first.
+
 Reach an inquiry inside five minutes and you're **100×** more likely to even
 get them on the line than half an hour later.
+
 The average business takes **two days**.
 
 Your patients live in that world now... Amazon trained them, Uber trained
 them, and a decade of instant everything finished the job.
 
 Your X-Ray scored your practice **{{contact.xray_total_score}}/100** against
-that world — and flagged the one system doing the most damage. I recorded the
+that world... and flagged the one system doing the most damage. I recorded the
 exact fix for it:
 
-**[Watch your chapter →]** (https://omniply.io/walkthrough?axis={{contact.xray_weakest_axis}})
+**[Click here to answer every call fast →]** (https://omniply.io/walkthrough)
 
 — Veit
 
 P.S. "We already post on social media." Posting isn't the test. Answering at
 2am is.
 
+
 ---
 
 ## EMAIL 4 · Day 5 · type: story (the electrician)
 
 **Subject:** How many electricians are saved in your phone?
-**Preview:** Exactly.
+**Preview:** Likely many, so you always have one to call in an emergency...
 
 Quick question...
 
 How many electricians do you have stored in your phone for emergencies?
 
-Exactly.
+Most people have multiple options for an emergency.
 
-And when the wiring fails at 9pm, you'll call the first one on Google Maps
-that responds... correct?
+And when the lights go out at 9pm, and no one answers you, you'll call the
+first one on Google Maps that responds... correct?
+
+What do you think your clients do when their back goes out at 9pm?
+
+Exactly.
 
 That's precisely how your next patient chooses a chiropractor. Fast beats
 familiar. Every time.
 
-Which is why the practice that answers in seconds — at 2pm while the doctor
-is adjusting, at 2am while everyone's asleep — quietly wins a city.
+Which is why the practice that answers in seconds, at 2pm while the doctor
+is adjusting, or at 2am while everyone's asleep, quietly wins a city.
 
-**[See the AI answer and book a patient, live →]** (https://omniply.io/walkthrough?axis=speed)
+**[Click here to book patients any time of day →]** (https://omniply.io/walkthrough)
 
 — Veit
 
 P.S. "AI will sound robotic... my patients will notice." They'll notice a
-human who never answers more.
+human who never answers more... and the chiro with automated booking systems
+wins every single day. 
+
+**[Click here to see how it works →]** (https://omniply.io/walkthrough)
 
 ---
 
@@ -164,11 +185,11 @@ is profit.**
 
 And your X-Ray said the leak is bigger than two: **${{contact.xray_total_leak}}
 a month.** That's the entire business case... your own numbers, doing
-arithmetic you can check (every assumption is in your report:
-{{contact.xray_report_url}}).
+arithmetic you can check... every assumption is in
+**[your report →]** ({{contact.xray_report_url}}).
 
 Twelve minutes, the actual system on screen, then decide like a doctor
-decides — on the evidence:
+decides... based on the evidence:
 
 **[Watch the walkthrough →]** (https://omniply.io/walkthrough)
 
@@ -188,19 +209,28 @@ job is roughly: approve things.
 The three questions I hear most, answered straight:
 
 **"Won't AI content sound robotic? My patients will notice."**
-It's trained on YOUR practice — your website, your voice, your specialties.
+
+It's trained on YOUR practice: your website, your voice, your specialties.
+
 The content engine knows the difference between a subluxation and a slogan...
 and you approve everything before it goes out. What patients actually notice
 is a practice that goes quiet for three months.
 
 **"We already have someone doing our socials."**
-Good — that's one part of one loop. Posting doesn't answer the 2am call,
+
+Good, that's one part of one loop. Posting doesn't answer the 2am call,
 doesn't request the review, doesn't notice the patient who faded in March.
+
 The leak isn't in the posting... your X-Ray showed you where it is.
 
+Plus, wouldn't you prefer to do something better with your time than posting
+to social media... especially when the content going out on autopilot is
+well-researched, factual, and fact-checked?
+
 **"My patients are older. They're not online."**
+
 Their children are. And when Mom's back seizes, the kids do what kids do:
-google, read reviews, message three clinics... and book whichever answers.
+google, read reviews, message three clinics... and book whichever answers first.
 
 Still the same next step, still no call:
 
@@ -229,7 +259,7 @@ the flare-up... not after they've already googled someone else.
 search... just "call my chiro."
 **+** And the one nobody puts on a features list: your evenings back.
 
-**[See it running — 12 minutes →]** (https://omniply.io/walkthrough)
+**[See it running... 12 minutes →]** (https://omniply.io/walkthrough)
 
 — Veit
 
@@ -255,15 +285,15 @@ Here's the uncomfortable part: the clinic above you isn't better than you.
 It's louder. Every week you ask for reviews "when you remember," their engine
 asks every single happy patient... automatically.
 
-That gap doesn't close by itself. It compounds — in one direction or the
+That gap doesn't close by itself. It compounds, in one direction or the
 other.
 
-**[Watch the Review Engine work →]** (https://omniply.io/walkthrough?axis=reviews)
+**[Watch the Review Engine work →]** (https://omniply.io/walkthrough)
 
 — Veit
 
-P.S. "Do I have to change my booking system?" No. Everything — the AI, the
-content, the recall — promotes the booking link you already use.
+P.S. "Do I have to change my booking system?" No. Everything, the AI, the
+content, the recall, promotes the booking link you already use.
 
 ---
 
@@ -279,7 +309,7 @@ Leaks don't pause while we think about them... call it three-quarters of that
 number, gone since. Not because you did anything wrong. Because nothing
 changed.
 
-The system that changes it sets up in days, not months — and costs less than
+The system that changes it sets up in hours, not weeks... and costs less than
 recovering one patient:
 
 **[Watch the 12-minute walkthrough →]** (https://omniply.io/walkthrough)
@@ -322,8 +352,10 @@ You cancel. Monthly, no lock-in, no exit fees. Your content stays yours.
 Onboarding is a guided setup that reads your website and brand... the system
 starts producing in hours. After that, your role is approving, not creating.
 
+All in all, 2 hours for a whole month of content.
+
 **"Is my patient data involved?"**
-The marketing system runs on your public presence and your booking link — it
+The marketing system runs on your public presence and your booking link. It
 doesn't touch clinical records.
 
 That's the fine print. The big print is still your X-Ray:
@@ -340,26 +372,26 @@ ${{contact.xray_total_leak}} a month, and a $397 fix.
 **Subject:** closing your file
 **Preview:** No hard feelings... one last thing.
 
-{{contact.first_name}} — I'll stop emailing you about your X-Ray after today.
+{{contact.first_name}}, I'll stop emailing you about your X-Ray after today.
 
 Maybe the timing's wrong. Maybe the leak feels survivable. Both are okay...
 it's your practice.
 
 Two things before I close the file:
 
-Your report stays live here: {{contact.xray_report_url}} — the numbers in it
-don't expire. Unfortunately... neither does the leak.
+Your report stays live **[right here →]** ({{contact.xray_report_url}}) — the
+numbers in it don't expire. Unfortunately... neither does the leak.
 
 And if a quarter from now the appointment book feels soft and you remember
 why, the walkthrough is still twelve minutes, still no salesperson:
-https://omniply.io/walkthrough
+
+**[Click here →]** (https://omniply.io/walkthrough)
 
 Door's open.
 
 — Veit @ Omniply
 
-P.S. If you've already fixed the leak another way — genuinely, good. That was
-the point of the X-Ray.
+P.S. If you've already fixed the leak another way — genuinely, excellent. That was the point of the X-Ray.
 
 ---
 

@@ -109,7 +109,8 @@ export async function spineCheckRoutes(app: FastifyInstance) {
 
     // 3. GHL upsert — the matched guide's tags land first (drip branch
     //    selector), then the spine-check marker tag.
-    const tags = [...(matched?.ghlTagNames ?? []), 'spine-check-lead']
+    const guideTags = matched ? (matched.ghlTagNames.length ? matched.ghlTagNames : [`leadgen-${matched.slug}`]) : []
+    const tags = [...guideTags, 'spine-check-lead']
     try {
       const creds = await getGhlCredentials(ownerUserId)
       if (!creds) throw new Error('No GHL credentials for account owner')

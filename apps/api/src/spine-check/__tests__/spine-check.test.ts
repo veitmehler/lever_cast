@@ -20,6 +20,7 @@ const CLINIC: SpineCheckClinic = {
     niggle: 'Pain: Normal or Warning Sign?',
   },
   firstVisitGuideTitle: 'Your First Chiropractic Visit',
+  guidesAvailable: true,
 }
 
 /** Eval exactly the SPINE math block that ships in the generated page. */
@@ -123,6 +124,21 @@ describe('iframe embed (WP publish content)', () => {
   it('quiz reports its height for the parent resizer', () => {
     const frag = buildSpineCheckFragment(CLINIC)
     expect(frag).toContain("postMessage({ type: 'sc-height'")
+  })
+})
+
+describe('no-guides degradation', () => {
+  it('drops every delivery promise when guides are not live', () => {
+    const degraded = buildSpineCheckHtml({ ...CLINIC, guidesAvailable: false, firstVisitGuideTitle: null })
+    expect(degraded).not.toContain('and a free guide picked for you')
+    expect(degraded).not.toContain('and your free guide')
+    expect(degraded).toContain('guidesAvailable: false')
+  })
+
+  it('keeps promises when guides are live', () => {
+    const full = buildSpineCheckHtml(CLINIC)
+    expect(full).toContain('and a free guide picked for you')
+    expect(full).toContain('guidesAvailable: true')
   })
 })
 

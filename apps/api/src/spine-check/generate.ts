@@ -40,9 +40,11 @@ export async function spineCheckClinicForUser(userId: string): Promise<SpineChec
 
   const docs = await prisma.leadGenDocument.findMany({
     where: { accountId: user.accountId, status: 'live' },
-    select: { slug: true, title: true },
+    select: { slug: true, title: true, driveFileId: true },
   })
   const titleBySlug = new Map(docs.map((d) => [d.slug, d.title]))
+  const deliverableSlugs = new Set(docs.filter((d) => d.driveFileId).map((d) => d.slug))
+  const guidesAvailable = Object.values(GUIDE_SLUG_BY_DOMAIN).some((slug) => deliverableSlugs.has(slug))
   const guideTitles = {
     desk: titleBySlug.get(GUIDE_SLUG_BY_DOMAIN.desk) ?? DEFAULT_TITLES.desk,
     sleep: titleBySlug.get(GUIDE_SLUG_BY_DOMAIN.sleep) ?? DEFAULT_TITLES.sleep,
@@ -61,7 +63,8 @@ export async function spineCheckClinicForUser(userId: string): Promise<SpineChec
     bookingUrl: brand.bookingUrl ?? null,
     captureUrl: `${publicApiBase()}/api/spine-check/capture`,
     guideTitles,
-    firstVisitGuideTitle: titleBySlug.get(FIRST_VISIT_SLUG) ?? null,
+    firstVisitGuideTitle: guidesAvailable ? (titleBySlug.get(FIRST_VISIT_SLUG) ?? null) : null,
+    guidesAvailable,
   }
 }
 

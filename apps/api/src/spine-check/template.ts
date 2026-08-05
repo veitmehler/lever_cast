@@ -31,6 +31,9 @@ export interface SpineCheckClinic {
   captureUrl: string // absolute POST endpoint
   guideTitles: { desk: string; sleep: string; morning: string; niggle: string }
   firstVisitGuideTitle: string | null
+  /** false until the clinic's guides are live with Drive files — the quiz
+   * then makes no delivery promises (capture + booking CTA only). */
+  guidesAvailable: boolean
 }
 
 export function buildSpineCheckFragment(c: SpineCheckClinic): string {
@@ -80,7 +83,7 @@ export function buildSpineCheckFragment(c: SpineCheckClinic): string {
 
   <div class="sc-screen sc-active" id="sc-intro">
     <h1>The 2-Minute Spine Check</h1>
-    <p class="sc-sub">A quick, friendly look at your daily back habits... your desk, your sleep, your mornings. Twelve taps, two minutes, no jargon. At the end you'll get your Spine Habits Score and a free guide picked for you.</p>
+    <p class="sc-sub">A quick, friendly look at your daily back habits... your desk, your sleep, your mornings. Twelve taps, two minutes, no jargon. At the end you'll get your Spine Habits Score${c.guidesAvailable ? ' and a free guide picked for you' : ''}.</p>
     <button class="sc-btn" id="sc-start" type="button">Start my Spine Check</button>
     <p class="sc-fine">Free · from ${name} · nothing to install</p>
   </div>
@@ -94,7 +97,7 @@ export function buildSpineCheckFragment(c: SpineCheckClinic): string {
 
   <div class="sc-screen sc-gate" id="sc-gate">
     <h2>Your results are ready.</h2>
-    <p class="sc-sub">Where should we send your Spine Check results and your free guide?</p>
+    <p class="sc-sub">Where should we send your Spine Check results${c.guidesAvailable ? ' and your free guide' : ''}?</p>
     <input type="text" id="sc-f-name" placeholder="First name" autocomplete="given-name" />
     <input type="email" id="sc-f-email" placeholder="Email" autocomplete="email" />
     <div class="sc-err" id="sc-err">Please enter your name and a valid email.</div>
@@ -193,6 +196,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SPINE
     captureUrl: '${jsq(c.captureUrl)}',
     guideTitles: { desk: '${jsq(c.guideTitles.desk)}', sleep: '${jsq(c.guideTitles.sleep)}', morning: '${jsq(c.guideTitles.morning)}', niggle: '${jsq(c.guideTitles.niggle)}' },
     firstVisitGuide: ${c.firstVisitGuideTitle ? `'${jsq(c.firstVisitGuideTitle)}'` : 'null'},
+    guidesAvailable: ${c.guidesAvailable ? 'true' : 'false'},
   }
   // Awareness-register verdicts (guardrail #3): habits language, no alarm.
   var VERDICTS = {
@@ -303,9 +307,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SPINE
       bars.appendChild(div)
     }
     $('sc-verdict').textContent = VERDICTS[r.weakest]
-    var g = '<b>Your free guide is on its way:</b> "' + CLINIC.guideTitles[r.weakest] + '" ... check your inbox in the next few minutes.'
-    if (CLINIC.firstVisitGuide) {
-      g += '<br /><span style="color:#5c6672; font-size:14px;">Never seen a chiropractor before? Keep an eye out for "' + CLINIC.firstVisitGuide + '" too.</span>'
+    var g
+    if (CLINIC.guidesAvailable) {
+      g = '<b>Your free guide is on its way:</b> "' + CLINIC.guideTitles[r.weakest] + '" ... check your inbox in the next few minutes.'
+      if (CLINIC.firstVisitGuide) {
+        g += '<br /><span style="color:#5c6672; font-size:14px;">Never seen a chiropractor before? Keep an eye out for "' + CLINIC.firstVisitGuide + '" too.</span>'
+      }
+    } else {
+      g = "<b>Thanks... you're on the list.</b> Want to do something about it today? Booking a visit is the simplest next step."
     }
     $('sc-guidebox').innerHTML = g
   }

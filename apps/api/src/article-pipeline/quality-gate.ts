@@ -12,6 +12,7 @@
  */
 import { prisma } from '@omniply/shared'
 import { getLLMAdapter } from './llm/factory'
+import { sanitizeDashes } from '../lib/text/dash-sanitizer'
 import { logger } from '../lib/logger'
 
 // The available "Gemini 3.1 Pro" model id on the generativelanguage API is the
@@ -189,24 +190,48 @@ export async function rewriteArticleBody(jobId: string, reasons: string[]): Prom
     (await prisma.pipelineStep.findFirst({ where: { jobId, stepNumber: 11 } })) ??
     (await prisma.pipelineStep.findFirst({ where: { jobId, stepNumber: 9 } }))
   if (!bodyStep?.output) {
-    logger.warn({ jobId }, '[quality-gate] no body step to rewrite')
+    logger.warn({ jobId, }, '[quality-gate] no body step to rewrite')
     return false
   }
 
   const provider = bodyStep.provider || 'gemini'
   const model = bodyStep.model || GEMINI_MODEL
 
+  // The rewrite must not strip the account's voice or editorial rules
+  // (observed on the Azavea pilot: a generic rewrite flattened the house
+  // style and dropped the single product mention).
+  const job = await prisma.articleJob.findUnique({ where: { id: jobId }, select: { userId: true } })
+  const settings = job?.userId
+    ? await prisma.settings.findUnique({ where: { userId: job.userId }, select: { writingStyle: true } })
+    : null
+  const voiceBlock = settings?.writingStyle?.trim()
+    ? `\n\nHOUSE WRITING VOICE — the revised article must keep this voice exactly:\n${settings.writingStyle.trim()}`
+    : ''
+
   const issues = reasons.length ? reasons.map((r) => `- ${r}`).join('\n') : '- Improve overall depth, accuracy, and helpfulness.'
   try {
     const res = await getLLMAdapter(provider).call({
       model,
       systemPrompt: REWRITE_SYSTEM,
-      userPrompt: `Issues to fix:\n${issues}\n\nArticle:\n${bodyStep.output}`,
+      userPrompt: `Issues to fix:\n${issues}${voiceBlock}\n\nAdditional rules:\n- Preserve the article's voice, register, and rhetorical style — fix ONLY the listed issues.\n- If the article mentions the publisher's product or company, keep exactly the same mentions (same count, similar placement). Never add promotional content; never remove an existing single product mention.\n- Never use em-dashes; use commas, colons, or separate sentences.\n\nArticle:\n${bodyStep.output}`,
       temperature: 0.4,
       maxTokens: 8000,
     })
-    const revised = res.content?.trim()
+    let revised = res.content?.trim()
     if (!revised) return false
+
+    // Same de-AI dash pass the executor applies to prose steps — the rewrite
+    // regenerates the body AFTER that pass ran, so it must re-run here.
+    try {
+      const s = await sanitizeDashes(revised, { jobId, stepNumber: bodyStep.stepNumber })
+      if (s.changed) {
+        revised = s.text
+        logger.info({ jobId, llmCalls: s.llmCalls, kept: s.kept }, '[quality-gate] rewrite dash-sanitized')
+      }
+    } catch (err) {
+      logger.warn({ jobId, err }, '[quality-gate] rewrite dash sanitize failed — output kept as-is')
+    }
+
     await prisma.pipelineStep.update({
       where: { id: bodyStep.id },
       data: { output: revised },

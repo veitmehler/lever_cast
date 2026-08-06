@@ -47,6 +47,8 @@ export interface TurnResult {
   /** Echoed so the widget can render the booking card without another call. */
   bookingUrl: string | null
   guideTitle: string | null
+  /** Drive link for the guide card (capture_contact / send_guide_link). */
+  guideLink: string | null
   ended: string | null
 }
 
@@ -100,10 +102,19 @@ async function persistTurn(opts: {
   ])
 }
 
-function guideTitleFor(ctx: AgentContext, action: AgentAction | null): string | null {
-  if (!action) return null
-  const slug = action.type === 'offer_guide' ? action.slug : action.type === 'capture_contact' ? action.guideSlug : null
-  return ctx.guides.find((g) => g.slug === slug)?.title ?? null
+function guideFor(ctx: AgentContext, action: AgentAction | null): { title: string | null; link: string | null } {
+  if (!action) return { title: null, link: null }
+  const slug =
+    action.type === 'offer_guide' || action.type === 'send_guide_link'
+      ? action.slug
+      : action.type === 'capture_contact'
+        ? action.guideSlug
+        : null
+  const g = ctx.guides.find((x) => x.slug === slug)
+  // The link is only surfaced when it should render as a card: after a
+  // successful capture, or when the visitor declined the email ask.
+  const linkable = action.type === 'capture_contact' || action.type === 'send_guide_link'
+  return { title: g?.title ?? null, link: linkable ? (g?.driveLink ?? null) : null }
 }
 
 /**
@@ -133,7 +144,7 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
     data: { accountId: input.accountId, visitorKey: input.visitorKey },
   })
 
-  const base = { conversationId: conversation.id, bookingUrl: ctx.bookingUrl, guideTitle: null as string | null }
+  const base = { conversationId: conversation.id, bookingUrl: ctx.bookingUrl, guideTitle: null as string | null, guideLink: null as string | null }
 
   // ── Pre-filters (no LLM) ─────────────────────────────────────────────────
   if (conversation.turnCount >= MAX_VISITOR_TURNS) {
@@ -266,5 +277,6 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
     }).catch(() => {})
   }
 
-  return { ...base, reply, action, guideTitle: guideTitleFor(ctx, action), ended: null }
+  const guide = guideFor(ctx, action)
+  return { ...base, reply, action, guideTitle: guide.title, guideLink: guide.link, ended: null }
 }

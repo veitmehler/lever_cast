@@ -51,7 +51,7 @@ export function buildAgentPanelHtml(token: string): string {
 </style>
 </head>
 <body>
-<div id="hd"><div class="t" id="pn">Chat<span class="ai">AI assistant</span></div><button id="x" aria-label="Close">×</button></div>
+<div id="hd"><div class="t" id="pn">Chat<span class="ai">Online Assistance</span></div><button id="x" aria-label="Close">×</button></div>
 <div id="log" aria-live="polite"></div>
 <div id="chips"></div>
 <div id="bar"><textarea id="in" rows="1" placeholder="Type a message…" maxlength="600"></textarea><button id="send">Send</button></div>
@@ -88,6 +88,26 @@ export function buildAgentPanelHtml(token: string): string {
     a.textContent = 'Open the booking page →';
     d.appendChild(a); log.appendChild(d); log.scrollTop = log.scrollHeight;
   }
+  function guideCard(url, title) {
+    var d = document.createElement('div');
+    d.className = 'm card';
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = 'Open ' + (title || 'your guide') + ' →';
+    d.appendChild(a); log.appendChild(d); log.scrollTop = log.scrollHeight;
+  }
+  // Typewriter reveal for assistant replies (cosmetic; text arrives complete).
+  function typeOut(el, text, done) {
+    var i = 0;
+    var step = Math.max(2, Math.round(text.length / 80)); // ~1.5-2s total
+    function tick() {
+      i = Math.min(text.length, i + step);
+      el.textContent = text.slice(0, i);
+      log.scrollTop = log.scrollHeight;
+      if (i < text.length) setTimeout(tick, 24); else if (done) done();
+    }
+    tick();
+  }
 
   function setBusy(b) { busy = b; send.disabled = b || dead; input.disabled = dead; }
 
@@ -122,8 +142,11 @@ export function buildAgentPanelHtml(token: string): string {
         typing.remove();
         conv = t.conversationId;
         try { sessionStorage.setItem(convKey, conv); } catch (e) {}
-        bubble('a', t.reply);
-        if (t.action && t.action.type === 'send_booking_link' && t.bookingUrl) bookingCard(t.bookingUrl);
+        var b = bubble('a', '');
+        typeOut(b, t.reply, function () {
+          if (t.action && t.action.type === 'send_booking_link' && t.bookingUrl) bookingCard(t.bookingUrl);
+          if (t.action && (t.action.type === 'capture_contact' || t.action.type === 'send_guide_link') && t.guideLink) guideCard(t.guideLink, t.guideTitle);
+        });
         if (t.ended === 'turn-cap' || t.ended === 'abuse-ceiling') { dead = true; }
         setBusy(false);
       })
@@ -151,10 +174,10 @@ export function buildAgentPanelHtml(token: string): string {
       s.setProperty('--accent', c.theme.accent);
       document.getElementById('pn').innerHTML = '';
       var t = document.createTextNode(c.practiceName);
-      var ai = document.createElement('span'); ai.className = 'ai'; ai.textContent = 'AI assistant';
+      var ai = document.createElement('span'); ai.className = 'ai'; ai.textContent = 'Online Assistance';
       var pn = document.getElementById('pn'); pn.appendChild(t); pn.appendChild(ai);
       document.getElementById('foot').textContent = c.disclosure;
-      bubble('a', c.greeting);
+      typeOut(bubble('a', ''), c.greeting);
       c.chips.forEach(function (label) {
         var b = document.createElement('button');
         b.textContent = label;
@@ -184,6 +207,19 @@ export const AGENT_LOADER_JS = `(function () {
   bub.style.cssText = 'position:fixed;right:20px;bottom:20px;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;z-index:2147483000;background:#0b2545;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;padding:0;';
   bub.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
+  var pill = document.createElement('button');
+  pill.textContent = 'Need Help?';
+  pill.setAttribute('aria-label', 'Open chat assistant');
+  pill.style.cssText = 'position:fixed;right:88px;bottom:36px;padding:8px 14px;border-radius:999px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#0b2545;font:600 13px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.18);display:none;';
+  var pillDismissed = false;
+  try { pillDismissed = sessionStorage.getItem('op-agent-pill') === '1'; } catch (e) {}
+  function hidePill() {
+    pill.style.display = 'none';
+    try { sessionStorage.setItem('op-agent-pill', '1'); } catch (e) {}
+  }
+  setTimeout(function () { if (!pillDismissed && !open) pill.style.display = 'block'; }, 3000);
+  pill.addEventListener('click', function () { hidePill(); toggle(true); });
+
   var frame = document.createElement('iframe');
   frame.title = 'Chat assistant';
   frame.src = base + '/api/agent/w/' + token;
@@ -200,7 +236,7 @@ export const AGENT_LOADER_JS = `(function () {
     if (open) { layout(); bub.style.display = mobile() ? 'none' : 'flex'; }
     else { frame.style.display = 'none'; bub.style.display = 'flex'; }
   }
-  bub.addEventListener('click', function () { toggle(); });
+  bub.addEventListener('click', function () { hidePill(); toggle(); });
   window.addEventListener('resize', layout);
   window.addEventListener('message', function (e) {
     if (!e.data || e.source !== frame.contentWindow) return;
@@ -208,7 +244,7 @@ export const AGENT_LOADER_JS = `(function () {
     if (e.data.type === 'op-agent-theme' && e.data.headerBg) bub.style.background = String(e.data.headerBg).slice(0, 20);
   });
 
-  function mount() { document.body.appendChild(bub); document.body.appendChild(frame); }
+  function mount() { document.body.appendChild(bub); document.body.appendChild(pill); document.body.appendChild(frame); }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();
 `

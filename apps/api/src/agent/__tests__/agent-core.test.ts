@@ -243,6 +243,14 @@ describe('action validation', () => {
     expect(validateAction({ type: 'request_callback', name: 'Sam', phone: '123', reason: 'x' }, CTX)).toBeNull()
   })
 
+  it('send_guide_link only for live slugs (decline-email fallback)', () => {
+    expect(validateAction({ type: 'send_guide_link', slug: 'desk-workers-survival-guide' }, CTX)).toEqual({
+      type: 'send_guide_link',
+      slug: 'desk-workers-survival-guide',
+    })
+    expect(validateAction({ type: 'send_guide_link', slug: 'unknown' }, CTX)).toBeNull()
+  })
+
   it('add_contact_email only fires once the conversation has a contact', () => {
     expect(validateAction({ type: 'add_contact_email', email: 'sam@example.com' }, CTX)).toBeNull()
     expect(validateAction({ type: 'add_contact_email', email: 'Sam@Example.com' }, { ...CTX, hasContact: true })).toEqual({

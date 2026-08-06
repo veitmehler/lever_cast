@@ -19,6 +19,7 @@ const CORPUS_MAX_CHARS = 8_000
 export interface AgentGuide {
   slug: string
   title: string
+  driveLink: string | null
 }
 
 export interface AgentTheme {
@@ -80,7 +81,7 @@ export async function agentContextForAccount(accountId: string): Promise<AgentCo
     prisma.onboardingSession.findUnique({ where: { accountId }, select: { stepData: true } }),
     prisma.leadGenDocument.findMany({
       where: { accountId, status: 'live', driveFileId: { not: null } },
-      select: { slug: true, title: true },
+      select: { slug: true, title: true, driveLink: true },
     }),
   ])
   if (!brand) return null
@@ -134,7 +135,7 @@ export async function agentContextForAccount(accountId: string): Promise<AgentCo
     phone,
     countryCode: brand.organizationCountryCode ?? null,
     knowledge: lines.join('\n\n'),
-    guides: docs.map((d) => ({ slug: d.slug, title: d.title })),
+    guides: docs.map((d) => ({ slug: d.slug, title: d.title, driveLink: d.driveLink ?? null })),
     theme: {
       headerBg: brand.nlHeaderBgColor ?? '#0b2545',
       buttonColor: brand.nlButtonColor ?? brand.nlLinkColor ?? '#2a6f97',

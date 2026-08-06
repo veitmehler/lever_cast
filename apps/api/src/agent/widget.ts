@@ -222,7 +222,7 @@ export const AGENT_LOADER_JS = `(function () {
     try { sessionStorage.setItem('op-agent-pill', '1'); } catch (e) {}
   }
   setTimeout(function () {
-    if (!pillDismissed && !open) {
+    if (!pillDismissed && !open && teaser.style.display !== 'block') {
       pill.style.display = 'block';
       requestAnimationFrame(function () { pill.style.opacity = '1'; });
     }

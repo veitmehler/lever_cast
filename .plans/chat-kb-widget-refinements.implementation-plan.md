@@ -123,3 +123,36 @@ The 10 questions + UI shapes (all user-approved):
 
 Clinic widgets remain gated on C3. The Azavea/prod cadence is unaffected by
 any of this (article side is independent).
+
+---
+
+## H · Contact convergence + mobile batch (2026-08-06, from iPhone 15 Max testing — IMPLEMENTED, 8169c04)
+
+Four user-locked directions:
+
+1. **16px input/base text** — readability, and Safari auto-zooms any focused
+   field under 16px (that zoom was the "widget resizes" bug). Plus 100dvh,
+   visualViewport keyboard-fit, parent scroll-lock while open on mobile.
+2. **One GHL contact per conversation** (instead of end-of-chat batch
+   creation, which would delay the callback notification and has no reliable
+   trigger): first contact-needing action creates the contact with all known
+   details; later actions update by id + tag-add. Email semantics: the
+   add_contact_email address (deliberate choice for real communication)
+   becomes PRIMARY; the capture email is the lead-gen throwaway (Drive/drip
+   already served) and only holds the slot while no preferred one exists.
+   `agent/known.ts` derives known details from persisted actions; the frame
+   gets a KNOWN VISITOR DETAILS block; the system prompt confirms the email
+   on file and offers a swap instead of re-asking. Inactivity finalizer cron
+   (agent-finalize, */10 min, idle 15 min): reconciles details onto the
+   contact, writes one summary note for non-callback leads, stamps
+   finalizedAt.
+3. **Closed-state launcher bigger on phones** — 68px bubble + 15px pill
+   (desktop stays 58px/13px); the full-screen panel was fine as-is.
+4. **Dwell teaser on ALL devices** — it must draw attention on phones; only
+   auto-opening the panel remains forbidden on mobile.
+
+Deliberate prompt pushes now go through
+`packages/db/scripts/push-agent-prompts.ts <keys>` (overwrites from
+prisma/agent-prompts.ts; the seeder stays create-only). Widget snippet is at
+`widget.js?v=4`. C3 red-team must stress multi-action conversations with
+details changed mid-flow.

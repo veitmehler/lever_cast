@@ -118,6 +118,15 @@ export function parseVerdict(raw: string, geminiSummary: string): QualityVerdict
     ? obj.reasons.map((r) => String(r)).filter(Boolean).slice(0, 10)
     : []
 
+  // Enforce the judge's own rubric deterministically: "minor suggestions must
+  // NOT cause a failure". Judges occasionally return revise+minor anyway
+  // (observed: Azavea pilot v5, "formatting" — cost a full-body rewrite
+  // cycle for a non-substantive nit). Only severity 'major' may trigger the
+  // rewrite path; 'fail' verdicts are never coerced.
+  if (verdict === 'revise' && severity === 'minor') {
+    return { verdict: 'pass', severity: 'minor', reasons, geminiSummary }
+  }
+
   return { verdict, severity, reasons, geminiSummary }
 }
 

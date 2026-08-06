@@ -16,6 +16,24 @@ describe('parseVerdict', () => {
     expect(v.reasons).toHaveLength(2)
   })
 
+  it('coerces revise+minor to pass (judge rubric: minor must not fail)', () => {
+    const v = parseVerdict('{"verdict":"revise","severity":"minor","reasons":["formatting"]}', 's')
+    expect(v.verdict).toBe('pass')
+    expect(v.severity).toBe('minor')
+    expect(v.reasons).toEqual(['formatting'])
+  })
+
+  it('never coerces fail verdicts, even with minor severity', () => {
+    const v = parseVerdict('{"verdict":"fail","severity":"minor","reasons":["x"]}', 's')
+    expect(v.verdict).toBe('fail')
+  })
+
+  it('revise with missing severity stays revise (defaults to major)', () => {
+    const v = parseVerdict('{"verdict":"revise","reasons":["thin content"]}', 's')
+    expect(v.verdict).toBe('revise')
+    expect(v.severity).toBe('major')
+  })
+
   it('extracts JSON embedded in prose', () => {
     const v = parseVerdict('Here is my answer: {"verdict":"pass","severity":"minor","reasons":["typo"]} done', 's')
     expect(v.verdict).toBe('pass')

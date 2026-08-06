@@ -28,7 +28,10 @@ export function buildAgentPanelHtml(token: string): string {
   :root { --header:#0b2545; --btn:#2a6f97; --btnText:#fff; --accent:#2a6f97; }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
-  body { font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; display: flex; flex-direction: column; color: #1c2430; }
+  /* 16px base: readability + kills iOS auto-zoom on input focus (the "widget
+     resizes" bug — Safari zooms any focused field under 16px). */
+  body { font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; display: flex; flex-direction: column; color: #1c2430; }
+  @supports (height: 100dvh) { body { height: 100dvh; } }
   #hd { background: var(--header); color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
   #hd .t { font-weight: 600; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #hd .ai { font-size: 11px; opacity: .75; display: block; font-weight: 400; }
@@ -42,7 +45,7 @@ export function buildAgentPanelHtml(token: string): string {
   #chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 10px; flex: 0 0 auto; }
   #chips button { border: 1.5px solid var(--btn); color: var(--btn); background: #fff; border-radius: 999px; padding: 7px 13px; font-size: 13px; cursor: pointer; }
   #bar { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid #e6e9ee; flex: 0 0 auto; }
-  #in { flex: 1; border: 1.5px solid #d5dae2; border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; resize: none; max-height: 90px; }
+  #in { flex: 1; border: 1.5px solid #d5dae2; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; outline: none; resize: none; max-height: 90px; }
   #in:focus { border-color: var(--btn); }
   #send { background: var(--btn); color: var(--btnText); border: 0; border-radius: 10px; padding: 0 16px; font-weight: 600; cursor: pointer; }
   #send:disabled { opacity: .5; cursor: default; }
@@ -157,6 +160,24 @@ export function buildAgentPanelHtml(token: string): string {
       });
   }
 
+  // iOS keyboard stability: when the on-screen keyboard opens, the visual
+  // viewport shrinks but the layout viewport does not — the input bar can end
+  // up hidden behind the keyboard. Track visualViewport and size the body to
+  // the truly visible area so the bar stays reachable.
+  if (window.visualViewport) {
+    var vv = window.visualViewport;
+    var fit = function () {
+      if (Math.abs(vv.height - window.innerHeight) > 40) {
+        document.body.style.height = vv.height + 'px';
+        window.scrollTo(0, 0);
+      } else {
+        document.body.style.height = '';
+      }
+      log.scrollTop = log.scrollHeight;
+    };
+    vv.addEventListener('resize', fit);
+  }
+
   send.addEventListener('click', function () { submit(input.value); });
   input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input.value); } });
   document.getElementById('x').addEventListener('click', function () {
@@ -231,8 +252,8 @@ export const AGENT_LOADER_JS = `(function () {
 
   // Dwell teaser (chat-kb plan follow-up, user-approved): after ~30s of
   // presence the assistant "approaches" — the pill gives way to a small
-  // preview card. Desktop only (mobile keeps the compact pill; the panel is
-  // a full-screen takeover there and must never feel forced). Session-once.
+  // preview card. ALL devices (user-locked: it must draw attention on phones
+  // too; only auto-opening the PANEL stays forbidden on mobile). Session-once.
   var teaser = document.createElement('div');
   teaser.style.cssText = 'position:fixed;right:88px;bottom:24px;max-width:240px;padding:12px 14px;border-radius:14px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#1c2430;font:400 13px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.22);display:none;opacity:0;transition:opacity .5s,transform .5s;transform:translateY(6px);';
   teaser.innerHTML = '<span style="position:absolute;top:4px;right:8px;font-size:14px;color:#9aa3ae;" aria-label="Dismiss" role="button">\u00d7</span><strong style="display:block;margin-bottom:2px;">How can we help?</strong>Hi there! Ask us about appointments, hours, or anything else.';
@@ -244,7 +265,7 @@ export const AGENT_LOADER_JS = `(function () {
   });
   var TEASER_DELAY = location.hash === '#op-teaser-now' ? 1500 : 30000;
   setTimeout(function () {
-    if (pillDismissed || open || window.innerWidth < 480) return;
+    if (pillDismissed || open) return;
     pill.style.display = 'none';
     teaser.style.display = 'block';
     requestAnimationFrame(function () { teaser.style.opacity = '1'; teaser.style.transform = 'translateY(0)'; });
@@ -256,15 +277,51 @@ export const AGENT_LOADER_JS = `(function () {
   frame.style.cssText = 'position:fixed;right:20px;bottom:90px;width:380px;height:600px;max-height:calc(100vh - 110px);border:0;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.28);z-index:2147483000;display:none;background:#fff;';
 
   function mobile() { return window.innerWidth < 480; }
+
+  // Closed-state sizing (user-locked): the launcher must be bigger on phones —
+  // 68px bubble + 15px pill/teaser text vs 58px/13px on desktop.
+  function applyClosedSizes() {
+    var m = mobile();
+    var sz = m ? 68 : 58;
+    bub.style.width = sz + 'px'; bub.style.height = sz + 'px';
+    var right = (20 + sz + 10) + 'px';
+    pill.style.right = right;
+    pill.style.font = '600 ' + (m ? 15 : 13) + 'px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
+    pill.style.padding = m ? '11px 16px' : '8px 14px';
+    pill.style.bottom = m ? '42px' : '36px';
+    teaser.style.right = right;
+    teaser.style.maxWidth = 'min(250px,calc(100vw - ' + (20 + sz + 10 + 14) + 'px))';
+    teaser.style.font = '400 ' + (m ? 15 : 13) + 'px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
+  }
+
+  // Parent page scroll-lock while the full-screen panel is open on mobile —
+  // without it, iOS rubber-band scrolling drags the page under the chat and
+  // the panel appears to "move".
+  var prevOverflow = null;
+  function lockScroll(on) {
+    try {
+      if (on && prevOverflow === null) {
+        prevOverflow = [document.documentElement.style.overflow, document.body.style.overflow];
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+      } else if (!on && prevOverflow !== null) {
+        document.documentElement.style.overflow = prevOverflow[0];
+        document.body.style.overflow = prevOverflow[1];
+        prevOverflow = null;
+      }
+    } catch (e) {}
+  }
+
   function layout() {
+    applyClosedSizes();
     if (!open) return;
-    if (mobile()) frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:2147483001;display:block;background:#fff;';
-    else frame.style.cssText = 'position:fixed;right:20px;bottom:90px;width:380px;height:600px;max-height:calc(100vh - 110px);border:0;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.28);z-index:2147483000;display:block;background:#fff;';
+    if (mobile()) { frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:2147483001;display:block;background:#fff;'; lockScroll(true); }
+    else { frame.style.cssText = 'position:fixed;right:20px;bottom:90px;width:380px;height:600px;max-height:calc(100vh - 110px);border:0;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.28);z-index:2147483000;display:block;background:#fff;'; lockScroll(false); }
   }
   function toggle(to) {
     open = typeof to === 'boolean' ? to : !open;
     if (open) { layout(); bub.style.display = mobile() ? 'none' : 'flex'; }
-    else { frame.style.display = 'none'; bub.style.display = 'flex'; }
+    else { frame.style.display = 'none'; bub.style.display = 'flex'; lockScroll(false); }
   }
   bub.addEventListener('click', function () { hidePill(); toggle(); });
   window.addEventListener('resize', layout);
@@ -274,7 +331,7 @@ export const AGENT_LOADER_JS = `(function () {
     if (e.data.type === 'op-agent-theme' && e.data.headerBg) bub.style.background = String(e.data.headerBg).slice(0, 20);
   });
 
-  function mount() { document.body.appendChild(bub); document.body.appendChild(pill); document.body.appendChild(teaser); document.body.appendChild(frame); }
+  function mount() { document.body.appendChild(bub); document.body.appendChild(pill); document.body.appendChild(teaser); document.body.appendChild(frame); applyClosedSizes(); }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();
 `

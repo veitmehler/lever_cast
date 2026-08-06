@@ -484,11 +484,11 @@ export async function upsertGhlContact(
   return { contactId: data.contact?.id ?? null }
 }
 
-/** Patch fields onto an existing contact (chat-agent email-afterward flow). */
+/** Patch fields onto an existing contact (chat-agent convergence flow). */
 export async function updateGhlContact(
   apiKey: string,
   contactId: string,
-  fields: { email?: string; firstName?: string; phone?: string },
+  fields: { email?: string; firstName?: string; phone?: string; customFields?: { id: string; value: string }[] },
 ): Promise<void> {
   await ghlRequest<unknown>(apiKey, `/contacts/${contactId}`, {
     method: 'PUT',
@@ -496,7 +496,17 @@ export async function updateGhlContact(
       ...(fields.email ? { email: fields.email } : {}),
       ...(fields.firstName ? { firstName: fields.firstName } : {}),
       ...(fields.phone ? { phone: fields.phone } : {}),
+      ...(fields.customFields?.length ? { customFields: fields.customFields } : {}),
     },
+  })
+}
+
+/** Add tags to an existing contact (convergence path — never re-upserts). */
+export async function addGhlContactTags(apiKey: string, contactId: string, tags: string[]): Promise<void> {
+  if (!tags.length) return
+  await ghlRequest<unknown>(apiKey, `/contacts/${contactId}/tags`, {
+    method: 'POST',
+    body: { tags },
   })
 }
 

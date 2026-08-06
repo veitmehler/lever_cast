@@ -70,7 +70,12 @@ export async function resolvePlaceId(
       `${BASE}/findplacefromtext/json?input=${q}&inputtype=textquery&fields=place_id&key=${key()}`,
     )
     if (!res.ok) return null
-    const data = (await res.json()) as { candidates?: { place_id?: string }[] }
+    const data = (await res.json()) as { status?: string; error_message?: string; candidates?: { place_id?: string }[] }
+    if (data.status && data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      // e.g. REQUEST_DENIED when the caller's IP is not on the key's
+      // allowlist — surfaced loudly; this failed silently once (staging).
+      logger.warn({ status: data.status, error: data.error_message }, '[places] find-place returned non-OK status')
+    }
     return data.candidates?.[0]?.place_id ?? null
   } catch (err) {
     logger.warn({ err }, '[places] place resolution failed')
@@ -97,7 +102,12 @@ async function details(placeId: string, sort: 'most_relevant' | 'newest'): Promi
       reviews?: { author_name?: string; rating?: number; text?: string; relative_time_description?: string }[]
     }
   }
-  if (data.status !== 'OK' || !data.result) return null
+  if (data.status !== 'OK' || !data.result) {
+    if (data.status && data.status !== 'ZERO_RESULTS') {
+      logger.warn({ status: data.status, placeId }, '[places] details returned non-OK status')
+    }
+    return null
+  }
   return {
     placeId,
     name: data.result.name,

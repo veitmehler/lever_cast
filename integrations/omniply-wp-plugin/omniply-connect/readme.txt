@@ -32,7 +32,45 @@ schema.org JSON-LD — you can inspect it at any time under the
 `omniply_head_jsonld` option or via `GET /wp-json/omniply/v1/head` (as an
 administrator).
 
+== Installation ==
+
+1. Install the plugin through Plugins → Add New (or upload the ZIP via
+   Plugins → Add New → Upload Plugin) and activate it.
+2. No further setup is needed on the site itself: the plugin has no settings
+   screen and stores no data on activation.
+3. IMPORTANT — the plugin prints nothing until a structured-data block has
+   been written to it. On a fresh activation the stored option is empty, and
+   an empty option produces NO output in the page source. This is by design
+   (print-only, empty state = silent).
+
+The block is written in one of two ways:
+
+* Automatically, by the Omniply platform: when you connect your site in
+  Omniply using a WordPress Application Password for an administrator
+  account, the platform posts your clinic's JSON-LD to
+  `POST /wp-json/omniply/v1/head`. From then on the block appears in your
+  site head and is kept up to date whenever your details change.
+* Manually, by any administrator — useful for testing that the plugin works
+  without an Omniply account. For example, with WP-CLI:
+
+  `wp option update omniply_head_jsonld '[{"@context":"https://schema.org","@type":"MedicalClinic","name":"Test Clinic"}]'`
+
+  or over REST with an Application Password:
+
+  `curl -X POST 'https://YOURSITE/?rest_route=/omniply/v1/head' -u 'admin:APP_PASSWORD' -H 'Content-Type: application/json' -d '{"jsonld":[{"@context":"https://schema.org","@type":"MedicalClinic","name":"Test Clinic"}]}'`
+
+After either of these, reload any front-end page and view the source: the
+block appears in the head between `<!-- Omniply Connect -->` markers. Sending
+an empty `jsonld` value (or deleting the option) removes the output again.
+
 == Frequently Asked Questions ==
+
+= I activated the plugin but there is no JSON-LD in my page source =
+
+That is the expected state of a fresh install. The plugin only prints the
+block after one has been written to it — either by the connected Omniply
+platform or manually by an administrator (see Installation). While the
+stored option is empty, the plugin outputs nothing at all.
 
 = Does this plugin collect any data? =
 

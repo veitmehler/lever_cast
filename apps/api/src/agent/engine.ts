@@ -30,6 +30,7 @@ import {
 } from './guardrails'
 import { validateAction, type AgentAction } from './tools'
 import { executeAgentAction } from './actions'
+import { knownDetailsFor, knownDetailsPromptBlock } from './known'
 
 export const INCLUDED_DAILY_BUDGET_USD = 1.5
 export const ABUSE_CEILING_USD = 15
@@ -203,10 +204,13 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
         .join(' ')
     : 'Not computed — rely on WEEKLY HOURS if present, otherwise the front desk confirms hours.'
 
+  const known = await knownDetailsFor(conversation.id)
+
   const vars = {
     practiceName: ctx.practiceName,
     knowledge: ctx.knowledge,
     openStatus,
+    knownDetails: knownDetailsPromptBlock(known),
     guides: ctx.guides.map((g) => `${g.slug} — ${g.title}`).join('\n') || '(none)',
     history: history || '(first message)',
     message,

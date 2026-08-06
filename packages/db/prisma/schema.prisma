@@ -1054,9 +1054,11 @@ model AgentConversation {
   flagged     Boolean  @default(false)
   flagReason  String?
   endedReason String? // resolved | turn-cap | abuse-ceiling | red-flag
-  // GHL contact this conversation created (callback/capture) — lets the
-  // email-afterward flow patch the same contact.
+  // GHL contact this conversation created (callback/capture) — every later
+  // action updates THIS contact by id (convergence; no re-upserts).
   ghlContactId String?
+  // Inactivity finalizer: reconciliation + summary pass completed.
+  finalizedAt  DateTime?
   turnCount   Int      @default(0)
   costUsd     Float    @default(0)
   createdAt   DateTime @default(now())

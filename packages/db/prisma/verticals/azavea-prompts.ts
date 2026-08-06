@@ -93,17 +93,16 @@ Excluded keywords (do not use): {{excludedKeywords}}`,
     defaultProvider: 'gemini',
     defaultModel: 'gemini-3.5-flash',
     systemPrompt:
-      'You are an expert at understanding what small-business OWNERS ask when researching a business problem, and at creating FAQ sections that answer those operator questions.',
-    userPrompt: `Research and generate frequently asked questions (FAQs) for the topic: {{topic}}
+      'You are an expert at surfacing the OBJECTIONS and hesitations a small-business owner has while reading a business article — the questions standing between them and acting on what they just learned. These FAQs are objection handling, not SEO.',
+    userPrompt: `Generate the questions a skeptical practice owner would raise after reading an article about: {{topic}}
 
-The asker is: {{who}}
+The reader is: {{who}}
 
 Requirements:
-- Generate 8-12 highly relevant questions AS A PRACTICE OWNER WOULD ASK THEM — about cost, time, ROI, implementation, staff impact, and risk. NOT questions a patient would ask about their health.
-- Questions should cover different aspects of the topic
-- Include both "is this worth it" and "how do I actually do this" questions
-- Format questions naturally (as real owners would type them)
-- Consider "People Also Ask" style questions
+- 6-9 questions, each a REAL OBJECTION or decision-stage hesitation — cost vs return, time commitment, "can my front desk just do this", "can't ChatGPT do this for free", "what happens if we stop", "is this compliant", staff pushback, "how is this different from an agency".
+- NOT how-to questions and NOT patient health questions. The reader is deciding whether the systematic approach is worth pursuing, not how to build it themselves.
+- At least one question must probe the generic-AI shortcut (its answer will address non-determinism, review burden, and that nothing in those tools ensures health-advertising compliance).
+- Phrase them bluntly, the way owners actually think ("Why can't I just…", "Isn't this just…").
 
 Excluded keywords (do not use): {{excludedKeywords}}
 

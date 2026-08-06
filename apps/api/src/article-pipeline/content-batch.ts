@@ -37,7 +37,7 @@ export async function createBatchFromDates(
 ): Promise<{ batchId: string; itemCount: number } | null> {
   const acct = await prisma.account.findUnique({
     where: { id: account.accountId },
-    select: { articleCalendarId: true },
+    select: { articleCalendarId: true, vertical: true },
   })
   const owner = await prisma.user.findUnique({
     where: { id: account.ownerUserId },
@@ -73,9 +73,20 @@ export async function createBatchFromDates(
     } else if (acct?.articleCalendarId) {
       const cal = await prisma.articleCalendarTopic.findFirst({
         where: { calendarId: acct.articleCalendarId, date: { gte: start, lt: end } },
-        select: { topic: true },
+        select: { topic: true, angle: true, keywords: true, outlineFrameworkNumber: true },
       })
       if (cal) {
+        // Azavea-gated (vertical-platform plan): the azavea vertical's
+        // calendar angles carry the belief-arc brief + pinned framework, so
+        // they must reach the Topic. Clinic calendars ALSO have angles, but
+        // mapping them would change existing clinic output — deliberate
+        // no-op there until decided separately (see azavea-own-content notes).
+        const isAzavea = acct.vertical === 'azavea'
+        const brief = isAzavea
+          ? [cal.angle, cal.keywords.length ? `Target keywords: ${cal.keywords.join(', ')}` : null]
+              .filter(Boolean)
+              .join('\n\n') || null
+          : null
         const planned = await prisma.topic.create({
           data: {
             userId: account.userId,
@@ -84,6 +95,10 @@ export async function createBatchFromDates(
             status: 'pending',
             source: 'article_calendar',
             mode: 'article_first',
+            ...(isAzavea && brief ? { outlineSpecialInstructions: brief } : {}),
+            ...(isAzavea && cal.outlineFrameworkNumber != null
+              ? { outlineFrameworkNumber: cal.outlineFrameworkNumber, outlineFrameworkSource: 'calendar' }
+              : {}),
           },
         })
         items.push({ kind: 'article', date: start, topicId: planned.id })

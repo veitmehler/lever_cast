@@ -17,7 +17,9 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 const CALENDAR_NAME = 'Azavea — B2B Practice Growth'
-const START = new Date('2026-08-10T00:00:00Z') // a Monday
+// Cadence: Mon/Wed/Fri starting Wednesday 2026-08-05 (user decision; slot 1 =
+// the patient-drift arc article already published as the v6 draft).
+const START = new Date('2026-08-05T00:00:00Z') // a Wednesday
 
 interface TopicSeed {
   topic: string
@@ -191,11 +193,11 @@ async function main() {
     return
   }
 
-  // Mon + Thu each week from START.
+  // Mon/Wed/Fri from START (START itself included when it lands on M/W/F).
   const dates: Date[] = []
-  for (let week = 0; dates.length < TOPICS.length; week++) {
-    dates.push(new Date(START.getTime() + week * 7 * 86400_000))
-    if (dates.length < TOPICS.length) dates.push(new Date(START.getTime() + (week * 7 + 3) * 86400_000))
+  for (let d = new Date(START); dates.length < TOPICS.length; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dow = d.getUTCDay()
+    if (dow === 1 || dow === 3 || dow === 5) dates.push(new Date(d))
   }
 
   const calendar = await prisma.articleCalendar.create({

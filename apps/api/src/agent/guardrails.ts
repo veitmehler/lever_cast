@@ -102,12 +102,12 @@ export function redFlagReply(label: string, countryCode: string | null | undefin
   if (label === 'self-harm') {
     return (
       `I'm really glad you reached out, and I want to make sure you talk to someone who can properly help right now. ` +
-      `Please call ${emergency} or a crisis line straight away — you deserve real support, and it's available right now. ` +
+      `Please call ${emergency} or a crisis line straight away. You deserve real support, and it's available right now. ` +
       `This chat isn't the right place for this, but please don't wait to make that call.`
     )
   }
   return (
-    `What you're describing needs proper medical attention now — please call ${emergency} or get to urgent care right away. ` +
+    `What you're describing needs proper medical attention now. Please call ${emergency} or get to urgent care right away. ` +
     `This isn't something to wait on or handle over chat. Once you've been looked after, we're here to help with your ongoing care.`
   )
 }
@@ -171,7 +171,7 @@ export function safeFallbackReply(practiceName: string, phone: string | null | u
   const call = phone ? ` or give the front desk a call on ${phone}` : ''
   return (
     `That's one the team at ${practiceName} should answer for you properly. ` +
-    `The best next step is to book a visit${call} — they'll take good care of you.`
+    `The best next step is to book a visit${call}. They'll take good care of you.`
   )
 }
 
@@ -181,3 +181,21 @@ export function safeFallbackReply(practiceName: string, phone: string | null | u
 
 export const MAX_MESSAGE_CHARS = 600
 export const MAX_VISITOR_TURNS = 30
+
+// ---------------------------------------------------------------------------
+// Punctuation-dash elimination (chat output backstop)
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace punctuation dashes (em/en dashes, spaced hyphens) with plain
+ * grammar. Word-internal hyphens (X-ray, well-being) are untouched. The
+ * prompt rule catches ~95%; this guarantees the rest.
+ */
+export function stripPunctuationDashes(text: string): string {
+  return text
+    .replace(/\s*[—–]\s*/g, ', ')      // em/en dashes, any spacing
+    .replace(/\s+-\s+/g, ', ')          // spaced hyphen used as punctuation
+    .replace(/,\s*,/g, ', ')             // collapse accidental double commas
+    .replace(/([.!?:])\s*,\s*/g, '$1 ') // comma right after terminal punctuation
+    .replace(/\s{2,}/g, ' ')
+}

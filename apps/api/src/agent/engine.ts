@@ -26,6 +26,7 @@ import {
   checkReply,
   redFlagReply,
   safeFallbackReply,
+  stripPunctuationDashes,
 } from './guardrails'
 import { validateAction, type AgentAction } from './tools'
 import { executeAgentAction } from './actions'
@@ -148,7 +149,7 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
 
   // ── Pre-filters (no LLM) ─────────────────────────────────────────────────
   if (conversation.turnCount >= MAX_VISITOR_TURNS) {
-    const reply = `We've covered a lot! For anything more, the ${ctx.practiceName} front desk is the best next step${ctx.phone ? ` — ${ctx.phone}` : ''}.`
+    const reply = `We've covered a lot! For anything more, the ${ctx.practiceName} front desk is the best next step${ctx.phone ? `: ${ctx.phone}` : ''}.`
     await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action: null, filtered: false, endedReason: 'turn-cap' })
     return { ...base, reply, action: null, ended: 'turn-cap' }
   }
@@ -171,7 +172,7 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
 
   const spentToday = await agentSpendTodayUsd(ctx.ownerUserId)
   if (spentToday >= ABUSE_CEILING_USD) {
-    const reply = `The assistant is taking a break — please call ${ctx.practiceName}${ctx.phone ? ` on ${ctx.phone}` : ''} or leave your details and the team will get back to you.`
+    const reply = `The assistant is taking a break. Please call ${ctx.practiceName}${ctx.phone ? ` on ${ctx.phone}` : ''} or leave your details and the team will get back to you.`
     await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action: null, filtered: false, endedReason: 'abuse-ceiling' })
     logger.warn({ accountId: input.accountId, spentToday }, '[agent] abuse ceiling reached — hard stop')
     return { ...base, reply, action: null, ended: 'abuse-ceiling' }
@@ -243,8 +244,10 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
   let flagReason: string | null = null
   let action: AgentAction | null = null
 
+  if (reply !== null) reply = stripPunctuationDashes(reply)
+
   if (reply === null) {
-    reply = `Sorry — I'm having a moment. ${ctx.phone ? `The front desk can help right away on ${ctx.phone}.` : 'Please try again in a minute or contact the practice directly.'}`
+    reply = `Sorry, I'm having a moment. ${ctx.phone ? `The front desk can help right away on ${ctx.phone}.` : 'Please try again in a minute or contact the practice directly.'}`
   } else {
     const verdict = checkReply(reply)
     if (!verdict.ok) {

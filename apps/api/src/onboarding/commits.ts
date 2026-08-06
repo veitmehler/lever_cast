@@ -522,3 +522,135 @@ export async function commitGoogleReviews(ctx: StepContext, answer: unknown): Pr
   ctx.stepData.googleReviews = a.value
   return null
 }
+
+// ── Front Desk Questions (chat-kb plan E) ────────────────────────────────────
+
+export interface FrontDeskAnswers {
+  insurance?: { funds?: string; hicaps?: boolean; medicareCarePlans?: boolean; workersComp?: boolean; motorAccident?: boolean }
+  firstVisit?: { duration?: string; description?: string; bring?: string }
+  freeAssessment?: { offered?: boolean; terms?: string }
+  pricing?: { share?: boolean; standard?: string; discounts?: string }
+  bookingPolicy?: { how?: string; cancellation?: string }
+  practitioners?: { name?: string; gender?: string; hours?: string }[]
+  treats?: { children?: boolean; pregnancy?: boolean; seniors?: boolean; ageLimit?: string | null }
+  referrals?: string
+  payment?: { methods?: string[]; other?: string }
+  access?: string
+  languages?: string
+  afterHours?: string
+}
+
+/** Deterministic answers → logistics-only Q&A pairs. No LLM: instant, safe. */
+export function buildFrontDeskFaqs(a: FrontDeskAnswers): { q: string; a: string }[] {
+  const out: { q: string; a: string }[] = []
+  const add = (q: string, ans: string | undefined | null) => {
+    const t = ans?.trim()
+    if (t) out.push({ q, a: t })
+  }
+
+  if (a.insurance) {
+    const bits: string[] = []
+    if (a.insurance.funds?.trim()) bits.push(`We accept: ${a.insurance.funds.trim()}.`)
+    if (a.insurance.hicaps) bits.push('HICAPS instant claims are available at the practice.')
+    if (a.insurance.medicareCarePlans) bits.push('We accept Medicare care plans (EPC/CDM referrals).')
+    if (a.insurance.workersComp) bits.push("We treat workers' compensation cases.")
+    if (a.insurance.motorAccident) bits.push('We treat motor accident claims.')
+    if (bits.length) out.push({ q: 'Which insurers or health funds do you accept?', a: bits.join(' ') })
+  }
+  if (a.firstVisit) {
+    const bits: string[] = []
+    if (a.firstVisit.duration?.trim()) bits.push(`A first visit takes about ${a.firstVisit.duration.trim()}.`)
+    if (a.firstVisit.description?.trim()) bits.push(a.firstVisit.description.trim())
+    if (bits.length) out.push({ q: 'What happens at a first visit and how long does it take?', a: bits.join(' ') })
+    add('What should I bring or wear to my appointment?', a.firstVisit.bring)
+  }
+  if (a.freeAssessment?.offered && a.freeAssessment.terms?.trim()) {
+    out.push({ q: 'Do you offer a free initial assessment?', a: `Yes. ${a.freeAssessment.terms.trim()}` })
+  }
+  if (a.pricing?.share) {
+    const bits: string[] = []
+    if (a.pricing.standard?.trim()) bits.push(a.pricing.standard.trim())
+    if (a.pricing.discounts?.trim()) bits.push(a.pricing.discounts.trim())
+    bits.push('Depending on your situation, the front desk can walk you through what applies to you.')
+    out.push({ q: 'How much does a visit cost?', a: bits.join(' ') })
+  }
+  if (a.bookingPolicy) {
+    add('How do I book, reschedule or cancel an appointment?', a.bookingPolicy.how)
+    add('What is your cancellation policy?', a.bookingPolicy.cancellation)
+  }
+  const pract = (a.practitioners ?? []).filter((p) => p.name?.trim())
+  if (pract.length) {
+    const lines = pract.map((p) => `${p.name!.trim()}${p.gender ? ` (${p.gender})` : ''}${p.hours?.trim() ? ` — ${p.hours.trim()}` : ''}`)
+    out.push({ q: 'Who are the practitioners, and can I request a specific one?', a: `${lines.join('; ')}. You can request a specific practitioner when booking.` })
+    if (pract.some((p) => p.gender === 'female')) {
+      out.push({ q: 'Is there a female practitioner available?', a: `Yes: ${pract.filter((p) => p.gender === 'female').map((p) => p.name!.trim()).join(', ')}.` })
+    }
+  }
+  if (a.treats) {
+    const yes: string[] = []
+    if (a.treats.children) yes.push('children')
+    if (a.treats.pregnancy) yes.push('patients during pregnancy')
+    if (a.treats.seniors) yes.push('seniors')
+    const bits: string[] = []
+    if (yes.length) bits.push(`We see ${yes.join(', ')}.`)
+    if (a.treats.ageLimit?.trim()) bits.push(`Age note: ${a.treats.ageLimit.trim()}.`)
+    if (bits.length) out.push({ q: 'Do you treat children, pregnant patients or seniors?', a: bits.join(' ') })
+  }
+  add('Do I need a referral to book?', a.referrals)
+  if (a.payment) {
+    const methods = [...(a.payment.methods ?? [])]
+    if (a.payment.other?.trim()) methods.push(a.payment.other.trim())
+    if (methods.length) out.push({ q: 'Which payment methods do you accept?', a: `${methods.join(', ')}.` })
+  }
+  add('Where do I park and how accessible is the practice?', a.access)
+  add('Which languages does the team speak?', a.languages)
+  add('What should I do outside opening hours?', a.afterHours)
+  return out
+}
+
+/** Validate + stage the Front Desk answers (written to the KB at kb_review). */
+export async function commitFrontDesk(ctx: StepContext, answer: unknown): Promise<string | null> {
+  if (typeof answer !== 'object' || answer === null) return 'Please fill in the form.'
+  const a = answer as FrontDeskAnswers
+  if (a.freeAssessment?.offered && !a.freeAssessment.terms?.trim()) {
+    return 'Free initial assessment needs its terms stated (advertising rules require it).'
+  }
+  if (a.pricing?.share && !a.pricing.standard?.trim()) {
+    return 'To share prices in chat, add your standard rates (or turn price sharing off).'
+  }
+  const faqs = buildFrontDeskFaqs(a)
+  ctx.stepData.frontDesk = a as unknown as Record<string, unknown>
+  ctx.stepData.frontDeskFaqs = faqs
+  return null
+}
+
+/**
+ * KB review (chat-kb plan F1): the clinic approved (possibly edited) the
+ * assembled business info — commit it as the chat knowledge base.
+ */
+export async function commitKbReview(ctx: StepContext, answer: unknown): Promise<string | null> {
+  if (typeof answer !== 'object' || answer === null) return 'Please review your details.'
+  const a = answer as {
+    faqs?: { q?: string; a?: string }[]
+    openingHours?: string
+    organizationPhone?: string
+    bookingUrl?: string
+  }
+  const faqs = (a.faqs ?? [])
+    .map((f) => ({ q: (f.q ?? '').trim(), a: (f.a ?? '').trim() }))
+    .filter((f) => f.q && f.a)
+  if (faqs.length === 0) return 'The knowledge base needs at least one question and answer.'
+
+  await brandUpsert(ctx.userId, {
+    clinicFaqs: faqs,
+    ...(a.openingHours?.trim() ? { openingHours: a.openingHours.trim() } : {}),
+    ...(a.organizationPhone?.trim() ? { organizationPhone: a.organizationPhone.trim() } : {}),
+    ...(a.bookingUrl?.trim() ? { bookingUrl: a.bookingUrl.trim() } : {}),
+  })
+  ctx.stepData.kbApprovedAt = new Date().toISOString()
+
+  // The chat reflects edits within seconds, not the 15-min cache TTL.
+  const { clearAgentContextFor } = await import('../agent/context')
+  clearAgentContextFor(ctx.accountId)
+  return null
+}

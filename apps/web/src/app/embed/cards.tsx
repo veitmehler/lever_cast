@@ -734,3 +734,189 @@ export function SocialsCard({
     </div>
   )
 }
+
+// ── Front Desk Questions (chat-kb plan E) ────────────────────────────────────
+
+interface Practitioner { name: string; gender: string; hours: string }
+
+export function FrontDeskCard({ disabled, onSubmit }: { disabled: boolean; onSubmit: (a: unknown, echo: string) => void }) {
+  const [funds, setFunds] = useState('')
+  const [hicaps, setHicaps] = useState(false)
+  const [medicare, setMedicare] = useState(false)
+  const [workersComp, setWorkersComp] = useState(false)
+  const [motor, setMotor] = useState(false)
+  const [fvDuration, setFvDuration] = useState('')
+  const [fvDesc, setFvDesc] = useState('')
+  const [fvBring, setFvBring] = useState('')
+  const [freeOffered, setFreeOffered] = useState(false)
+  const [freeTerms, setFreeTerms] = useState('')
+  const [priceShare, setPriceShare] = useState(false)
+  const [priceStd, setPriceStd] = useState('')
+  const [priceDisc, setPriceDisc] = useState('')
+  const [bookHow, setBookHow] = useState('')
+  const [cancelPolicy, setCancelPolicy] = useState('')
+  const [practitioners, setPractitioners] = useState<Practitioner[]>([{ name: '', gender: 'female', hours: '' }])
+  const [treatChildren, setTreatChildren] = useState(true)
+  const [treatPregnancy, setTreatPregnancy] = useState(true)
+  const [treatSeniors, setTreatSeniors] = useState(true)
+  const [hasAgeLimit, setHasAgeLimit] = useState(false)
+  const [ageLimit, setAgeLimit] = useState('')
+  const [referrals, setReferrals] = useState('')
+  const [payMethods, setPayMethods] = useState<string[]>(['Card'])
+  const [payOther, setPayOther] = useState('')
+  const [access, setAccess] = useState('')
+  const [languages, setLanguages] = useState('')
+  const [afterHours, setAfterHours] = useState('')
+
+  const input = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm'
+  const label = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-3'
+  const check = 'flex items-center gap-2 text-sm py-0.5'
+
+  const togglePay = (m: string) =>
+    setPayMethods((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]))
+
+  const submit = () =>
+    onSubmit(
+      {
+        insurance: { funds, hicaps, medicareCarePlans: medicare, workersComp, motorAccident: motor },
+        firstVisit: { duration: fvDuration, description: fvDesc, bring: fvBring },
+        freeAssessment: { offered: freeOffered, terms: freeTerms },
+        pricing: { share: priceShare, standard: priceStd, discounts: priceDisc },
+        bookingPolicy: { how: bookHow, cancellation: cancelPolicy },
+        practitioners: practitioners.filter((p) => p.name.trim()),
+        treats: { children: treatChildren, pregnancy: treatPregnancy, seniors: treatSeniors, ageLimit: hasAgeLimit ? ageLimit : null },
+        referrals,
+        payment: { methods: payMethods, other: payOther },
+        access,
+        languages,
+        afterHours,
+      },
+      'Front desk answers saved ✓',
+    )
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-1 max-h-[70vh] overflow-y-auto">
+      <p className={label}>Insurance &amp; funds</p>
+      <input className={input} value={funds} onChange={(e) => setFunds(e.target.value)} placeholder="Funds/insurers you accept (e.g. Bupa, Medibank, HCF…)" />
+      <label className={check}><input type="checkbox" checked={hicaps} onChange={(e) => setHicaps(e.target.checked)} /> HICAPS / instant claims terminal</label>
+      <label className={check}><input type="checkbox" checked={medicare} onChange={(e) => setMedicare(e.target.checked)} /> Medicare care plans (EPC/CDM)</label>
+      <label className={check}><input type="checkbox" checked={workersComp} onChange={(e) => setWorkersComp(e.target.checked)} /> Workers&apos; compensation</label>
+      <label className={check}><input type="checkbox" checked={motor} onChange={(e) => setMotor(e.target.checked)} /> Motor accident claims</label>
+
+      <p className={label}>First visit</p>
+      <input className={input} value={fvDuration} onChange={(e) => setFvDuration(e.target.value)} placeholder="How long? (e.g. 45 minutes)" />
+      <textarea className={input} rows={2} value={fvDesc} onChange={(e) => setFvDesc(e.target.value)} placeholder="What happens during it?" />
+      <input className={input} value={fvBring} onChange={(e) => setFvBring(e.target.value)} placeholder="What should patients bring or wear?" />
+      <label className={check}><input type="checkbox" checked={freeOffered} onChange={(e) => setFreeOffered(e.target.checked)} /> We offer a free initial assessment</label>
+      {freeOffered && (
+        <input className={input} value={freeTerms} onChange={(e) => setFreeTerms(e.target.value)} placeholder="Terms (required by advertising rules, e.g. new patients only, 15 min)" />
+      )}
+
+      <p className={label}>Pricing</p>
+      <label className={check}><input type="checkbox" checked={priceShare} onChange={(e) => setPriceShare(e.target.checked)} /> The assistant may share prices in chat</label>
+      {priceShare && (
+        <>
+          <input className={input} value={priceStd} onChange={(e) => setPriceStd(e.target.value)} placeholder="Standard rates (e.g. first visit $95, standard visit $65)" />
+          <input className={input} value={priceDisc} onChange={(e) => setPriceDisc(e.target.value)} placeholder="Structured discounts with terms (optional, e.g. concession $55)" />
+        </>
+      )}
+
+      <p className={label}>Booking &amp; cancellation</p>
+      <input className={input} value={bookHow} onChange={(e) => setBookHow(e.target.value)} placeholder="How do patients book / reschedule / cancel?" />
+      <input className={input} value={cancelPolicy} onChange={(e) => setCancelPolicy(e.target.value)} placeholder="Cancellation policy (notice period, fees)" />
+
+      <p className={label}>Practitioners</p>
+      {practitioners.map((p, i) => (
+        <div key={i} className="flex gap-2">
+          <input className={input} value={p.name} onChange={(e) => setPractitioners(practitioners.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Name" />
+          <select className="rounded-lg border border-input bg-background px-2 text-sm" value={p.gender} onChange={(e) => setPractitioners(practitioners.map((x, j) => (j === i ? { ...x, gender: e.target.value } : x)))}>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+          </select>
+          <input className={input} value={p.hours} onChange={(e) => setPractitioners(practitioners.map((x, j) => (j === i ? { ...x, hours: e.target.value } : x)))} placeholder="Works (e.g. Mon–Wed, Fri am)" />
+        </div>
+      ))}
+      <button type="button" className="text-xs text-primary underline" onClick={() => setPractitioners([...practitioners, { name: '', gender: 'female', hours: '' }])}>
+        + Add practitioner
+      </button>
+
+      <p className={label}>Who you treat</p>
+      <label className={check}><input type="checkbox" checked={treatChildren} onChange={(e) => setTreatChildren(e.target.checked)} /> Children</label>
+      <label className={check}><input type="checkbox" checked={treatPregnancy} onChange={(e) => setTreatPregnancy(e.target.checked)} /> Pregnancy</label>
+      <label className={check}><input type="checkbox" checked={treatSeniors} onChange={(e) => setTreatSeniors(e.target.checked)} /> Seniors</label>
+      <label className={check}><input type="checkbox" checked={hasAgeLimit} onChange={(e) => setHasAgeLimit(e.target.checked)} /> Age limit applies</label>
+      {hasAgeLimit && <input className={input} value={ageLimit} onChange={(e) => setAgeLimit(e.target.value)} placeholder="Describe the age limit" />}
+
+      <p className={label}>Referrals</p>
+      <input className={input} value={referrals} onChange={(e) => setReferrals(e.target.value)} placeholder="Do patients need a GP referral? (generally / care plans / insurance)" />
+
+      <p className={label}>Payment methods</p>
+      {['Card', 'Cash', 'HICAPS', 'Payment plans'].map((m) => (
+        <label key={m} className={check}><input type="checkbox" checked={payMethods.includes(m)} onChange={() => togglePay(m)} /> {m}</label>
+      ))}
+      <input className={input} value={payOther} onChange={(e) => setPayOther(e.target.value)} placeholder="Additional options:" />
+
+      <p className={label}>Getting there</p>
+      <input className={input} value={access} onChange={(e) => setAccess(e.target.value)} placeholder="Parking, public transport, wheelchair access" />
+
+      <p className={label}>Languages &amp; after hours</p>
+      <input className={input} value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="Languages the team speaks" />
+      <input className={input} value={afterHours} onChange={(e) => setAfterHours(e.target.value)} placeholder="What should patients do outside opening hours?" />
+
+      <button onClick={submit} disabled={disabled} className="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        Save front desk answers
+      </button>
+    </div>
+  )
+}
+
+// ── KB review (chat-kb plan F1) ──────────────────────────────────────────────
+
+export function KbReviewCard({ card, disabled, onSubmit }: { card: Record<string, unknown>; disabled: boolean; onSubmit: (a: unknown, echo: string) => void }) {
+  const [faqs, setFaqs] = useState<{ q: string; a: string }[]>(
+    Array.isArray(card.faqs) ? (card.faqs as { q: string; a: string }[]) : [],
+  )
+  const [openingHours, setOpeningHours] = useState((card.openingHours as string) ?? '')
+  const [phone, setPhone] = useState((card.organizationPhone as string) ?? '')
+  const [bookingUrl, setBookingUrl] = useState((card.bookingUrl as string) ?? '')
+
+  const input = 'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm'
+  const label = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 mt-3'
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-1 max-h-[70vh] overflow-y-auto">
+      <p className={label}>Business basics</p>
+      <input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Practice phone" />
+      <input className={input} value={bookingUrl} onChange={(e) => setBookingUrl(e.target.value)} placeholder="Booking page URL" />
+      <textarea
+        className={input}
+        rows={3}
+        value={openingHours}
+        onChange={(e) => setOpeningHours(e.target.value)}
+        placeholder={card.hoursSource === 'google' ? 'Hours (detected from your Google listing — edit to override)' : 'Opening hours (one line per day)'}
+      />
+
+      <p className={label}>What the assistant will know ({faqs.length} answers)</p>
+      {faqs.map((f, i) => (
+        <div key={i} className="rounded-lg border border-border p-2 space-y-1">
+          <input className={input} value={f.q} onChange={(e) => setFaqs(faqs.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)))} />
+          <textarea className={input} rows={2} value={f.a} onChange={(e) => setFaqs(faqs.map((x, j) => (j === i ? { ...x, a: e.target.value } : x)))} />
+          <button type="button" className="text-xs text-destructive underline" onClick={() => setFaqs(faqs.filter((_, j) => j !== i))}>
+            Remove
+          </button>
+        </div>
+      ))}
+      <button type="button" className="text-xs text-primary underline" onClick={() => setFaqs([...faqs, { q: '', a: '' }])}>
+        + Add a question
+      </button>
+
+      <button
+        onClick={() => onSubmit({ faqs, openingHours, organizationPhone: phone, bookingUrl }, 'Knowledge base approved ✓')}
+        disabled={disabled}
+        className="mt-4 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        Approve knowledge base
+      </button>
+    </div>
+  )
+}

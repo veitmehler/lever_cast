@@ -9,7 +9,7 @@
  */
 import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../lib/logger'
-import { probePlace, placesConfigured, type PlaceProbe, type PlacePeriod } from '../lib/google/places'
+import { probePlace, placesConfigured, resolvePlaceId, type PlaceProbe, type PlacePeriod } from '../lib/google/places'
 import { computeOpenStatus, type OpenStatus } from './hours'
 
 const BUNDLE_TTL_MS = 15 * 60 * 1000
@@ -86,7 +86,24 @@ export async function agentContextForAccount(accountId: string): Promise<AgentCo
   ])
   if (!brand) return null
 
-  const probe = brand.googlePlaceId ? await placesSnapshot(brand.googlePlaceId) : null
+  // Lazy place-ID resolution (chat-kb-widget-refinements plan D): accounts
+  // that predate the onboarding resolution step self-heal here — official
+  // Find-Place-from-Text on name+address, stored once. Failures are absorbed
+  // by the 15-min bundle cache (no hammering).
+  let placeId = brand.googlePlaceId
+  if (!placeId && placesConfigured() && brand.organizationName) {
+    const address = [brand.addressLine1, brand.addressLocality, brand.addressRegion, brand.postalCode]
+      .filter(Boolean)
+      .join(', ')
+    if (address) {
+      placeId = await resolvePlaceId(brand.googleBusinessProfileUrl ?? null, `${brand.organizationName} ${address}`)
+      if (placeId) {
+        await prisma.brandSettings.update({ where: { userId: brand.userId }, data: { googlePlaceId: placeId } })
+        logger.info({ accountId, placeId }, '[places] lazily resolved place id for agent context — verify listing match during pilot')
+      }
+    }
+  }
+  const probe = placeId ? await placesSnapshot(placeId) : null
   const weekdayText = probe?.openingHours ?? brand.openingHours ?? null
 
   const practiceName = brand.organizationName ?? 'the practice'
@@ -166,4 +183,9 @@ export function openStatusFor(ctx: AgentContext, now: Date = new Date()): OpenSt
 export function clearAgentCaches(): void {
   bundleCache.clear()
   placesCache.clear()
+}
+
+/** Bust one account's bundle (KB edits reflect in seconds, not the TTL). */
+export function clearAgentContextFor(accountId: string): void {
+  bundleCache.delete(accountId)
 }

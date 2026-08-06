@@ -152,7 +152,7 @@ export function buildAgentPanelHtml(token: string): string {
       })
       .catch(function () {
         typing.remove();
-        bubble('a', "Sorry — something went wrong. Please try again, or contact the practice directly.");
+        bubble('a', "Sorry, something went wrong. Please try again, or contact the practice directly.");
         setBusy(false);
       });
   }
@@ -212,7 +212,10 @@ export const AGENT_LOADER_JS = `(function () {
   pill.setAttribute('aria-label', 'Open chat assistant');
   pill.style.cssText = 'position:fixed;right:88px;bottom:36px;padding:8px 14px;border-radius:999px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#0b2545;font:600 13px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.18);display:none;';
   var pillDismissed = false;
-  try { pillDismissed = sessionStorage.getItem('op-agent-pill') === '1'; } catch (e) {}
+  try {
+    if (location.hash === '#op-pill-reset') sessionStorage.removeItem('op-agent-pill');
+    pillDismissed = sessionStorage.getItem('op-agent-pill') === '1';
+  } catch (e) {}
   function hidePill() {
     pill.style.display = 'none';
     try { sessionStorage.setItem('op-agent-pill', '1'); } catch (e) {}

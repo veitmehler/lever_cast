@@ -99,7 +99,7 @@ Excluded keywords (do not use): {{excludedKeywords}}`,
 The searcher is: {{who}}
 
 Requirements:
-- 6-8 questions, each phrased as a REAL long-tail search query (what an owner would actually type into Google) — never as a raw sales objection. Convert objections into their searchable twins: "why can't I just use ChatGPT" becomes "Can ChatGPT write marketing content for a chiropractic practice?"; "isn't this just an agency" becomes "Should a chiropractor hire a marketing agency or use marketing software?".
+- 6-8 questions, each phrased as a REAL long-tail search query (what an owner would actually type into Google) — never as a raw sales objection. Keep each question SHORT and natural (aim under 10 words), phrased as a person would ask aloud; never append audience qualifiers ("...for chiropractors") purely for keywords — the article supplies that context. Convert objections into their searchable twins: "why can't I just use ChatGPT" becomes "Can ChatGPT write marketing content for a chiropractic practice?"; "isn't this just an agency" becomes "Should a chiropractor hire a marketing agency or use marketing software?".
 - Each question's eventual ANSWER should naturally carry the decision-stage substance (cost vs return, time commitment, staff impact, compliance, what generic AI tools can and cannot do) — pick questions whose honest answers do that work.
 - One question MUST be the generic-AI searchable twin (its answer will cover drafting ability vs non-determinism, review burden, and health-advertising compliance).
 - Include 1-2 purely informational baseline queries with real search volume (e.g. benchmark rates, definitions, compliance basics for this topic).
@@ -146,7 +146,7 @@ Requirements:
 - Include the FAQ section
 - Weave in supporting facts throughout
 - Concrete, plain, confident language; short paragraphs; no hype, no hedging filler
-- Mention the publisher's product at most ONCE, late in the article, and only where it genuinely fits the argument — the article must stand alone as useful thinking
+- Mention the publisher's product at most ONCE, late in the article, and only where it genuinely fits the argument — the article must stand alone as useful thinking. The mention must use a CATEGORY-FIRST construction: name the solution category first ("platforms that operate this whole loop end-to-end"), then the product as one instance of it, inside the same sentence — never open a paragraph by pivoting from education to the product
 - No patient-facing health advice, no clinical claims, no guaranteed-outcome language
 - Include transition sentences between sections
 - Write in HTML format with proper heading tags (h2, h3)

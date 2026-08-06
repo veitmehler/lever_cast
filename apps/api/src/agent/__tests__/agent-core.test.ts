@@ -5,6 +5,7 @@ import {
   emergencyNumberFor,
   redFlagReply,
   safeFallbackReply,
+  stripPunctuationDashes,
 } from '../guardrails'
 import { computeOpenStatus } from '../hours'
 import { validateAction } from '../tools'
@@ -287,5 +288,23 @@ describe('widget surfaces', () => {
     expect(AGENT_LOADER_JS).toContain('/^[A-Za-z0-9_-]{16,64}$/')
     expect(AGENT_LOADER_JS).toContain('__opAgentLoaded')
     expect(AGENT_LOADER_JS).toContain("'/api/agent/w/'")
+  })
+})
+
+describe('stripPunctuationDashes', () => {
+  it('replaces em/en dashes and spaced hyphens with commas', () => {
+    expect(stripPunctuationDashes('We open at 8 — closed Sundays')).toBe('We open at 8, closed Sundays')
+    expect(stripPunctuationDashes('Great question – the team can help')).toBe('Great question, the team can help')
+    expect(stripPunctuationDashes('Book a visit - it takes a minute')).toBe('Book a visit, it takes a minute')
+  })
+
+  it('leaves word-internal hyphens intact', () => {
+    expect(stripPunctuationDashes('X-ray and well-being checks')).toBe('X-ray and well-being checks')
+    expect(stripPunctuationDashes('a walk-in on a drop-off day')).toBe('a walk-in on a drop-off day')
+  })
+
+  it('cleans up doubled punctuation from replacements', () => {
+    expect(stripPunctuationDashes('Sure! — the front desk can help')).toBe('Sure! the front desk can help')
+    expect(stripPunctuationDashes('open now, — until 6pm')).toBe('open now, until 6pm')
   })
 })

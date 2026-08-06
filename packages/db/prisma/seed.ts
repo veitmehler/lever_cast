@@ -141,7 +141,7 @@ Requirements:
 - Generate 8-12 highly relevant questions
 - Questions should cover different aspects of the topic
 - Include both beginner and advanced questions
-- Format questions naturally (as real users would ask)
+- Format questions naturally, as a person would ask ALOUD — short (aim under 10 words), no audience or keyword qualifiers bolted on for SEO
 - Consider "People Also Ask" style questions
 
 Excluded keywords (do not use): {{excludedKeywords}}
@@ -630,7 +630,9 @@ Keyword: {{keyword}}
 
 Rules:
 - The question must be relevant to the topic.
-- Write in a natural, conversational style.
+- Write in a natural, conversational style — the way a person would ask it ALOUD.
+- Keep it SHORT: at most 9 words. Long keyword-stuffed questions read as robotic to human readers.
+- Never bolt on audience or keyword qualifiers ("...for chiropractic patients in 2026") — the surrounding article provides that context.
 - Do NOT add quotes or punctuation beyond the question mark.
 - Respond with ONLY the question text — nothing else.`,
   },
@@ -647,6 +649,7 @@ Original question: {{question}}
 Rules:
 - Keep the same meaning and intent.
 - Use different words, sentence structure, or phrasing.
+- Keep it SHORT and natural: at most 9 words, phrased as a person would ask aloud. If the original is long or keyword-stuffed, the rephrase should FIX that, not preserve it.
 - Do NOT add quotes or extra punctuation.
 - Respond with ONLY the rephrased question — nothing else.`,
   },

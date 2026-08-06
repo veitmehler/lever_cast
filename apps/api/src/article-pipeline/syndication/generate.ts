@@ -6,6 +6,7 @@
  * needed since the two LLM calls complete in ~10–20 s.
  */
 
+import { resolvePromptByStep } from '../../lib/prompt-resolver'
 import { prisma } from '@omniply/shared'
 import { getLLMAdapter } from '../llm/factory'
 import { logger } from '../../lib/logger'
@@ -133,17 +134,7 @@ export async function generateSyndicationArticles(
   for (const platform of PLATFORMS) {
     const stepNumber = STEP_NUMBER[platform]
 
-    const template = await prisma.promptTemplate.findUnique({
-      where: { stepNumber },
-      select: {
-        systemPrompt:    true,
-        userPrompt:      true,
-        defaultProvider: true,
-        defaultModel:    true,
-        maxTokens:       true,
-        isActive:        true,
-      },
-    })
+    const template = await resolvePromptByStep(stepNumber, { userId })
 
     if (!template || !template.isActive) {
       logger.warn(

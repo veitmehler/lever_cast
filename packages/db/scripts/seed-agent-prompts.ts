@@ -22,7 +22,7 @@ async function main() {
   let created = 0
   let skipped = 0
   for (const template of AGENT_TEMPLATES) {
-    const existing = await prisma.promptTemplate.findUnique({ where: { key: template.key } })
+    const existing = await prisma.promptTemplate.findUnique({ where: { key_vertical: { key: template.key, vertical: 'default' } } })
     if (existing) {
       skipped++
       console.log(`  = ${template.key} (exists, untouched)`)

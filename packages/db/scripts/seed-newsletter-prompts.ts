@@ -25,11 +25,11 @@ async function main() {
   let skipped = 0
   for (const template of NEWSLETTER_TEMPLATES) {
     const existing = await prisma.promptTemplate.findUnique({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       select: { id: true },
     })
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       update: {}, // never clobber an admin-edited prompt
     })

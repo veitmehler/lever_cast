@@ -42,7 +42,7 @@ export async function generateVideoReelPrompt(opts: {
   videoModel: string
   userId?: string
 }): Promise<string> {
-  const t = await loadPromptTemplate(206)
+  const t = await loadPromptTemplate(206, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'gemini').toLowerCase()
   const model = t?.defaultModel ?? 'gemini-3-flash-preview'
 

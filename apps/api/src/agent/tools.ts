@@ -13,11 +13,15 @@ export type AgentAction =
   | { type: 'offer_guide'; slug: string }
   | { type: 'capture_contact'; name: string; email: string; phone: string | null; guideSlug: string | null }
   | { type: 'request_callback'; name: string; phone: string; reason: string }
+  | { type: 'add_contact_email'; email: string }
 
 export interface ActionContext {
   /** Slugs of guides that are live AND deliverable for this account. */
   guideSlugs: string[]
   bookingAvailable: boolean
+  /** True once this conversation created a GHL contact (callback/capture) —
+   * gates the email-afterward patch so it can't fire before a contact exists. */
+  hasContact: boolean
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -65,6 +69,12 @@ export function validateAction(raw: unknown, ctx: ActionContext): AgentAction | 
       const reason = str(a.reason, 200)
       if (!name || !validPhone(phone)) return null
       return { type: 'request_callback', name, phone, reason }
+    }
+
+    case 'add_contact_email': {
+      const email = str(a.email, 254).toLowerCase()
+      if (!ctx.hasContact || !EMAIL_RE.test(email)) return null
+      return { type: 'add_contact_email', email }
     }
 
     default:

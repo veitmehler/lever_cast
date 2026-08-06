@@ -81,6 +81,8 @@ export const QUEUES = {
   ANALYTICS_SYNC: 'analytics-sync',
   IMAGE_GENERATE: 'image-generate',
   OAUTH_STATE_CLEANUP: 'oauth-state-cleanup',
+  AGENT_RETENTION_CLEANUP: 'agent-retention-cleanup',
+  AZAVEA_CADENCE: 'azavea-cadence',
   DB_BACKUP: 'db-backup',
   PG_CONN_MONITOR: 'pg-conn-monitor',
   ARTICLE_PIPELINE: 'article-pipeline',

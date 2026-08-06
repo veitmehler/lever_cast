@@ -10,7 +10,7 @@
  * context exists (per-customer generation, Phase 1c). Shared topic-level research
  * has no user, so it just logs the cost.
  */
-import { prisma } from '@omniply/shared'
+import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { getLLMAdapter } from '../article-pipeline/llm/factory'
 import type { LLMResponse } from '../article-pipeline/llm/adapter'
 import { cleanAndParseJSON } from '../article-pipeline/output-cleaner'
@@ -33,6 +33,9 @@ export interface RunOptions {
   jsonMode?: boolean
   temperature?: number
   maxTokens?: number
+  /** Vertical resolution context (V0): the generating user (or explicit vertical). */
+  userId?: string | null
+  vertical?: string | null
 }
 
 export interface RunResult {
@@ -46,7 +49,7 @@ export async function runNewsletterPrompt(
   vars: PromptVars,
   opts: RunOptions = {},
 ): Promise<RunResult> {
-  const template = await prisma.promptTemplate.findUnique({ where: { key } })
+  const template = await resolvePromptByKey(key, { userId: opts.userId, vertical: opts.vertical })
   if (!template || !template.isActive) {
     throw new Error(`Newsletter prompt "${key}" is not configured (seed nl_* prompts).`)
   }
@@ -82,8 +85,8 @@ export async function runNewsletterWriterJson<T = Record<string, unknown>>(
   opts: RunOptions = {},
 ): Promise<{ data: T; response: LLMResponse }> {
   const [sys, usr] = await Promise.all([
-    prisma.promptTemplate.findUnique({ where: { key: systemKey } }),
-    prisma.promptTemplate.findUnique({ where: { key: userKey } }),
+    resolvePromptByKey(systemKey, { userId: opts.userId, vertical: opts.vertical }),
+    resolvePromptByKey(userKey, { userId: opts.userId, vertical: opts.vertical }),
   ])
   if (!sys || !usr) {
     throw new Error(`Newsletter writer prompts not configured (${systemKey} / ${userKey}).`)

@@ -37,6 +37,8 @@ const BASE_RETRY_DELAY_MS = 1000
 const BACKOFF_MULTIPLIER = 2
 
 /** Stable fallback model used when the configured Gemini search model exhausts all retries. */
+import { resolvePromptByStep } from '../lib/prompt-resolver'
+
 const GEMINI_SEARCH_FALLBACK_MODEL = 'gemini-3.1-pro-preview'
 const FALLBACK_RETRIES = 3
 
@@ -60,11 +62,9 @@ export class StepRunner {
   ) {}
 
   async execute(): Promise<StepRunResult> {
-    const template = await prisma.promptTemplate.findFirst({
-      where: { stepNumber: this.stepNumber, isActive: true },
-    })
+    const template = await resolvePromptByStep(this.stepNumber, { userId: this.ctx.userId })
 
-    if (!template) {
+    if (!template || !template.isActive) {
       throw new Error(`No active prompt template found for step ${this.stepNumber}`)
     }
 

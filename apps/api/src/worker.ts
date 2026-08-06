@@ -13,6 +13,8 @@ import {
   PublishScheduledJobData,
 } from './handlers/publish'
 import { analyticsSyncHandler, AnalyticsSyncJobData } from './handlers/analytics'
+import { agentRetentionCleanupHandler } from './handlers/agent-retention'
+import { azaveaCadenceHandler } from './handlers/azavea-cadence'
 import { oauthStateCleanupHandler, OAuthCleanupJobData } from './handlers/oauth'
 import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
 import { pgMonitorHandler } from './handlers/pg-monitor'
@@ -106,6 +108,8 @@ async function main() {
   await boss.schedule(QUEUES.ACCOUNT_LIFECYCLE_CLOCK, '30 4 * * *', {}) // daily 04:30 UTC — 60/90d billing clocks
   await boss.schedule(QUEUES.LEADGEN_PROPOSAL_POLL, '*/2 * * * *', {}) // every 2 min — Drive access-proposal capture
   await boss.schedule(QUEUES.PLACES_REVIEW_POLL, '0 4 * * 1', {}) // Monday 04:00 UTC — weekly dual-sort review harvest
+  await boss.schedule(QUEUES.AGENT_RETENTION_CLEANUP, '15 3 * * *', {}) // daily 03:15 UTC — 180d chat-transcript retention (decision D)
+  await boss.schedule(QUEUES.AZAVEA_CADENCE, '0 8 * * *', {}) // daily 08:00 UTC — azavea vertical MWF article cadence (no-op on non-slot days)
 
   // ── Social publishing ───────────────────────────────────────────────────────
   await boss.work<PublishJobData>(
@@ -132,6 +136,18 @@ async function main() {
     QUEUES.OAUTH_STATE_CLEANUP,
     { batchSize: 1 },
     withSentry('oauth-state-cleanup', oauthStateCleanupHandler),
+  )
+
+  await boss.work(
+    QUEUES.AGENT_RETENTION_CLEANUP,
+    { batchSize: 1 },
+    withSentry('agent-retention-cleanup', agentRetentionCleanupHandler),
+  )
+
+  await boss.work(
+    QUEUES.AZAVEA_CADENCE,
+    { batchSize: 1 },
+    withSentry('azavea-cadence', azaveaCadenceHandler),
   )
 
   await boss.work<DbBackupJobData>(

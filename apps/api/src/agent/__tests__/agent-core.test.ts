@@ -208,7 +208,7 @@ describe('open-now computation', () => {
 // ---------------------------------------------------------------------------
 
 describe('action validation', () => {
-  const CTX = { guideSlugs: ['desk-workers-survival-guide', 'better-sleep-without-pills'], bookingAvailable: true }
+  const CTX = { guideSlugs: ['desk-workers-survival-guide', 'better-sleep-without-pills'], bookingAvailable: true, hasContact: false }
 
   it('booking link only when booking is available', () => {
     expect(validateAction({ type: 'send_booking_link' }, CTX)).toEqual({ type: 'send_booking_link' })
@@ -241,6 +241,15 @@ describe('action validation', () => {
       reason: 'pricing',
     })
     expect(validateAction({ type: 'request_callback', name: 'Sam', phone: '123', reason: 'x' }, CTX)).toBeNull()
+  })
+
+  it('add_contact_email only fires once the conversation has a contact', () => {
+    expect(validateAction({ type: 'add_contact_email', email: 'sam@example.com' }, CTX)).toBeNull()
+    expect(validateAction({ type: 'add_contact_email', email: 'Sam@Example.com' }, { ...CTX, hasContact: true })).toEqual({
+      type: 'add_contact_email',
+      email: 'sam@example.com',
+    })
+    expect(validateAction({ type: 'add_contact_email', email: 'junk' }, { ...CTX, hasContact: true })).toBeNull()
   })
 
   it('rejects unknown types, injection-shaped and non-object input', () => {

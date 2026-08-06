@@ -115,7 +115,7 @@ export async function generateVideoReelAsset(opts: {
 
   const [brand, videoModelTemplate] = await Promise.all([
     loadSocialBrandTheme(opts.userId),
-    loadPromptTemplate(207),
+    loadPromptTemplate(207, { userId: opts.userId }),
   ])
 
   const falModel = videoModelTemplate?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
@@ -281,7 +281,7 @@ export async function generateHookVideoAsset(opts: {
   logger.info({ userId: opts.userId, jobId, slideCount, genId }, 'generateHookVideoAsset: start')
 
   // Admin-configurable F6 models (Step 217 = intro video, Step 218 = slideshow images).
-  const [videoTpl, imageTpl] = await Promise.all([loadPromptTemplate(217), loadPromptTemplate(218)])
+  const [videoTpl, imageTpl] = await Promise.all([loadPromptTemplate(217, { userId: opts.userId }), loadPromptTemplate(218, { userId: opts.userId })])
   const hookVideoModel = videoTpl?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
   const hookImageModel = imageTpl?.defaultModel ?? 'fal-ai/flux/schnell'
 

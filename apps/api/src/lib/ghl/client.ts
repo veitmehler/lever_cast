@@ -451,14 +451,16 @@ export interface UpsertContactResult {
 }
 
 /**
- * Upsert a contact by email and apply tags (GHL creates unknown tag names on
- * the fly). POST /contacts/upsert is the documented v2 dedupe-by-email path.
+ * Upsert a contact and apply tags (GHL creates unknown tag names on the fly).
+ * POST /contacts/upsert is the documented v2 path — dedupes by email when
+ * present, otherwise by phone (chat-agent callbacks are often phone-first).
+ * At least one of email/phone must be provided.
  */
 export async function upsertGhlContact(
   apiKey: string,
   locationId: string,
   input: {
-    email: string
+    email?: string
     tags: string[]
     source?: string
     firstName?: string
@@ -466,11 +468,12 @@ export async function upsertGhlContact(
     customFields?: { id: string; value: string }[]
   },
 ): Promise<UpsertContactResult> {
+  if (!input.email && !input.phone) throw new Error('upsertGhlContact needs email or phone')
   const data = await ghlRequest<{ contact?: { id?: string } }>(apiKey, '/contacts/upsert', {
     method: 'POST',
     body: {
       locationId,
-      email: input.email,
+      ...(input.email ? { email: input.email } : {}),
       tags: input.tags,
       ...(input.source ? { source: input.source } : {}),
       ...(input.firstName ? { firstName: input.firstName } : {}),
@@ -479,6 +482,34 @@ export async function upsertGhlContact(
     },
   })
   return { contactId: data.contact?.id ?? null }
+}
+
+/** Patch fields onto an existing contact (chat-agent email-afterward flow). */
+export async function updateGhlContact(
+  apiKey: string,
+  contactId: string,
+  fields: { email?: string; firstName?: string; phone?: string },
+): Promise<void> {
+  await ghlRequest<unknown>(apiKey, `/contacts/${contactId}`, {
+    method: 'PUT',
+    body: {
+      ...(fields.email ? { email: fields.email } : {}),
+      ...(fields.firstName ? { firstName: fields.firstName } : {}),
+      ...(fields.phone ? { phone: fields.phone } : {}),
+    },
+  })
+}
+
+/**
+ * Attach a note to a contact — the chat-agent callback summary lands here so
+ * the front desk opens the contact and sees the conversation context
+ * (decision C).
+ */
+export async function createGhlContactNote(apiKey: string, contactId: string, body: string): Promise<void> {
+  await ghlRequest<unknown>(apiKey, `/contacts/${contactId}/notes`, {
+    method: 'POST',
+    body: { body: body.slice(0, 5000) },
+  })
 }
 
 /**
@@ -506,6 +537,44 @@ export async function getGuideLinkFieldId(apiKey: string, locationId: string): P
     })
     const id = match?.id ?? null
     guideLinkFieldCache.set(locationId, { id, at: Date.now() })
+    return id
+  } catch {
+    return hit?.id ?? null
+  }
+}
+
+/**
+ * Resolve (or CREATE) the "Chat Summary" contact custom field for a location —
+ * the chat-agent callback writes its summary here so snapshot workflows can
+ * merge it into the front-desk notification ({{contact.chat_summary}}).
+ * Find-or-create means no snapshot dependency; cached per location.
+ */
+const chatSummaryFieldCache = new Map<string, { id: string | null; at: number }>()
+
+export async function getChatSummaryFieldId(apiKey: string, locationId: string): Promise<string | null> {
+  const hit = chatSummaryFieldCache.get(locationId)
+  if (hit && Date.now() - hit.at < GUIDE_LINK_CACHE_MS) return hit.id
+  try {
+    const data = await ghlRequest<{ customFields?: { id: string; name?: string; fieldKey?: string }[] }>(
+      apiKey,
+      `/locations/${locationId}/customFields`,
+      { method: 'GET' },
+    )
+    let match = (data.customFields ?? []).find((f) => {
+      const key = (f.fieldKey ?? '').toLowerCase()
+      const name = (f.name ?? '').toLowerCase()
+      return key.includes('chat_summary') || name.replace(/\s+/g, '_') === 'chat_summary'
+    })
+    if (!match) {
+      const created = await ghlRequest<{ customField?: { id: string } }>(
+        apiKey,
+        `/locations/${locationId}/customFields`,
+        { method: 'POST', body: { name: 'Chat Summary', dataType: 'LARGE_TEXT' } },
+      )
+      match = created.customField ? { id: created.customField.id } : undefined
+    }
+    const id = match?.id ?? null
+    chatSummaryFieldCache.set(locationId, { id, at: Date.now() })
     return id
   } catch {
     return hit?.id ?? null

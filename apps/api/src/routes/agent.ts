@@ -16,6 +16,7 @@
 import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
 import { prisma } from '@omniply/shared'
+import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { fillPrompt } from '../newsletter/llm'
@@ -63,7 +64,7 @@ export async function agentRoutes(app: FastifyInstance) {
     const ctx = await agentContextForAccount(account.id)
     if (!ctx) return reply.status(404).send({ error: 'Widget not ready' })
 
-    const greetingRow = await prisma.promptTemplate.findUnique({ where: { key: 'agent_greeting' } })
+    const greetingRow = await resolvePromptByKey('agent_greeting', { vertical: ctx.vertical })
     const greeting = greetingRow
       ? fillPrompt(greetingRow.userPrompt, { practiceName: ctx.practiceName })
       : `Hi! I'm ${ctx.practiceName}'s AI assistant. I can help with appointments, hours and general questions — I'm not able to give medical advice.`

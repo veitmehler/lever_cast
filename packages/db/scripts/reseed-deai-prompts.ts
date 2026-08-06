@@ -38,14 +38,14 @@ async function main() {
   for (const key of OVERWRITE_KEYS) {
     const template = keyed.find((t) => t.key === key)
     if (!template) throw new Error(`Source template not found for key ${key}`)
-    const existing = await prisma.promptTemplate.findUnique({ where: { key }, select: { id: true, userPrompt: true, systemPrompt: true } })
+    const existing = await prisma.promptTemplate.findUnique({ where: { key_vertical: { key, vertical: 'default' } }, select: { id: true, userPrompt: true, systemPrompt: true } })
     if (!existing) {
       await prisma.promptTemplate.create({ data: template })
       console.log(`  + ${key}: created (did not exist)`)
       continue
     }
     await prisma.promptTemplate.update({
-      where: { key },
+      where: { key_vertical: { key, vertical: 'default' } },
       data: {
         systemPrompt: template.systemPrompt,
         userPrompt: template.userPrompt,
@@ -60,7 +60,7 @@ async function main() {
   for (const stepNumber of OVERWRITE_STEP_NUMBERS) {
     // 203's canonical text lives in deai-prompts.ts (seed.ts uses the same constants).
     const existing = await prisma.promptTemplate.findFirst({
-      where: { stepNumber },
+      where: { stepNumber_vertical: { stepNumber, vertical: 'default' } },
       select: { id: true, userPrompt: true, systemPrompt: true },
     })
     if (!existing) {
@@ -105,8 +105,8 @@ async function main() {
 
   // st_dash_fix — normal create-only.
   for (const template of DEAI_TEMPLATES) {
-    const existing = await prisma.promptTemplate.findUnique({ where: { key: template.key }, select: { id: true } })
-    await prisma.promptTemplate.upsert({ where: { key: template.key }, create: template, update: {} })
+    const existing = await prisma.promptTemplate.findUnique({ where: { key_vertical: { key: template.key, vertical: 'default' } }, select: { id: true } })
+    await prisma.promptTemplate.upsert({ where: { key_vertical: { key: template.key, vertical: 'default' } }, create: template, update: {} })
     console.log(existing ? `  • ${template.key}: already existed — left unchanged` : `  ✓ ${template.key}: created`)
   }
 

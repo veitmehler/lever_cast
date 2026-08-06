@@ -46,7 +46,7 @@ export async function extractReelBullets(opts: {
   specialInstructions?: string
   userId?: string
 }): Promise<ReelBulletsResult> {
-  const t = await loadPromptTemplate(204)
+  const t = await loadPromptTemplate(204, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
   const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 

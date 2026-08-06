@@ -58,6 +58,10 @@ model Account {
   driveFolderId String?
   leadGenDocuments LeadGenDocument[]
   leadCaptures     LeadCapture[]
+  // Platform vertical (.plans/vertical-platform.implementation-plan.md):
+  // selects the prompt seed set + subdomain family. 'chiro' has no override
+  // prompt rows, so it resolves to the 'default' set unchanged.
+  vertical String @default("chiro")
   // Public token identifying this account's chat-agent widget
   // (.plans/chat-agent-v1.implementation-plan.md) — same URL-token pattern as
   // ghlBillingToken/ghlReviewToken. Minted at provisioning.
@@ -823,7 +827,7 @@ model PipelineStep {
 
 model PromptTemplate {
   id              String         @id @default(cuid())
-  stepNumber      Int            @unique
+  stepNumber      Int
   stepName        String
   systemPrompt    String?        @db.Text
   userPrompt      String         @db.Text
@@ -835,9 +839,16 @@ model PromptTemplate {
   isActive        Boolean        @default(true)
   // Stable string key for non-pipeline prompts looked up by name (e.g. newsletter `nl_*`).
   // Nullable so existing rows stay keyed by stepNumber.
-  key             String?        @unique
+  key             String?
+  // Vertical dimension (.plans/vertical-platform.implementation-plan.md V0):
+  // 'default' = the base (chiro-tuned) set every vertical inherits; override
+  // rows exist ONLY where a vertical's copy differs. Resolution: exact
+  // (key|stepNumber, vertical) active row, else the 'default' row.
+  vertical        String         @default("default")
   pipelineSteps   PipelineStep[]
 
+  @@unique([stepNumber, vertical])
+  @@unique([key, vertical])
   @@map("prompt_templates")
 }
 
@@ -1043,6 +1054,9 @@ model AgentConversation {
   flagged     Boolean  @default(false)
   flagReason  String?
   endedReason String? // resolved | turn-cap | abuse-ceiling | red-flag
+  // GHL contact this conversation created (callback/capture) — lets the
+  // email-afterward flow patch the same contact.
+  ghlContactId String?
   turnCount   Int      @default(0)
   costUsd     Float    @default(0)
   createdAt   DateTime @default(now())

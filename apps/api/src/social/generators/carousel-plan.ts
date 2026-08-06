@@ -82,7 +82,7 @@ export async function planCarouselSlides(opts: {
   specialInstructions?: string
   userId?: string
 }): Promise<CarouselSlidePlan[]> {
-  const t = await loadPromptTemplate(202)
+  const t = await loadPromptTemplate(202, { userId: opts.userId })
   const provider = (t?.defaultProvider ?? 'anthropic').toLowerCase()
   const model = t?.defaultModel ?? 'claude-sonnet-4-5-20250929'
 

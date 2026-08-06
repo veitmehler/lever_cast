@@ -12,6 +12,7 @@
  * 'agent') for surcharge billing. Only the ~10× abuse ceiling hard-stops.
  */
 import { prisma } from '@omniply/shared'
+import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { getLLMAdapter } from '../article-pipeline/llm/factory'
 import { cleanAndParseJSON } from '../article-pipeline/output-cleaner'
 import { recordLLMUsage } from '../lib/llm-usage'
@@ -27,6 +28,7 @@ import {
   safeFallbackReply,
 } from './guardrails'
 import { validateAction, type AgentAction } from './tools'
+import { executeAgentAction } from './actions'
 
 export const INCLUDED_DAILY_BUDGET_USD = 1.5
 export const ABUSE_CEILING_USD = 15
@@ -166,8 +168,8 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
 
   // ── Engine call ──────────────────────────────────────────────────────────
   const [sys, frame] = await Promise.all([
-    prisma.promptTemplate.findUnique({ where: { key: 'agent_system' } }),
-    prisma.promptTemplate.findUnique({ where: { key: 'agent_user_frame' } }),
+    resolvePromptByKey('agent_system', { vertical: ctx.vertical }),
+    resolvePromptByKey('agent_user_frame', { vertical: ctx.vertical }),
   ])
   if (!sys?.isActive || !frame?.isActive) throw new AgentTurnError('no-context')
 
@@ -243,14 +245,25 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
       action = validateAction(rawAction, {
         guideSlugs: ctx.guides.map((g) => g.slug),
         bookingAvailable: Boolean(ctx.bookingUrl),
+        hasContact: Boolean(conversation.ghlContactId),
       })
     }
   }
 
   await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action, filtered, flagReason, costUsd })
 
+  // Execute server-side effects (GHL contact/tags/note, Drive grants) AFTER
+  // the turn is persisted — never throws, failures alert + flag.
+  if (action) await executeAgentAction(ctx, conversation.id, action)
+
   if (spentToday + costUsd >= INCLUDED_DAILY_BUDGET_USD && spentToday < INCLUDED_DAILY_BUDGET_USD) {
     logger.warn({ accountId: input.accountId, spentToday: spentToday + costUsd }, '[agent] included daily budget crossed — overage accruing')
+    const { sendFailureAlert } = await import('../lib/alerts')
+    await sendFailureAlert({
+      errorType: 'agent-budget-crossed',
+      message: `Chat agent crossed the $${INCLUDED_DAILY_BUDGET_USD}/day included budget for account ${input.accountId} (spent today: $${(spentToday + costUsd).toFixed(2)}). Usage continues; overage accrues for surcharge billing (decision G). Hard stop only at $${ABUSE_CEILING_USD}.`,
+      context: { accountId: input.accountId },
+    }).catch(() => {})
   }
 
   return { ...base, reply, action, guideTitle: guideTitleFor(ctx, action), ended: null }

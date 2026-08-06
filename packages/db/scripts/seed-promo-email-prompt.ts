@@ -57,11 +57,11 @@ Output ONLY the JSON object: {"subject": "...", "bodyHtml": "..."}`,
 
 async function main() {
   const existing = await prisma.promptTemplate.findUnique({
-    where: { stepNumber: PROMO_EMAIL_TEMPLATE.stepNumber },
+    where: { stepNumber_vertical: { stepNumber: PROMO_EMAIL_TEMPLATE.stepNumber, vertical: 'default' } },
     select: { id: true },
   })
   await prisma.promptTemplate.upsert({
-    where: { stepNumber: PROMO_EMAIL_TEMPLATE.stepNumber },
+    where: { stepNumber_vertical: { stepNumber: PROMO_EMAIL_TEMPLATE.stepNumber, vertical: 'default' } },
     create: PROMO_EMAIL_TEMPLATE,
     update: {}, // never clobber an admin-edited prompt
   })

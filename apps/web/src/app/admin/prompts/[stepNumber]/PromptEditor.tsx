@@ -17,6 +17,7 @@ interface PromptTemplate {
   userPrompt: string
   version: number
   isActive: boolean
+  inherited?: boolean
 }
 
 // Known maximum output token limits per model slug.
@@ -261,7 +262,7 @@ function usedVarsIn(text: string): Set<string> {
 }
 
 
-export function PromptEditor({ template }: { template: PromptTemplate }) {
+export function PromptEditor({ template, vertical = 'default' }: { template: PromptTemplate; vertical?: string }) {
   const [systemPrompt, setSystemPrompt] = useState(template.systemPrompt ?? '')
   const [userPrompt,   setUserPrompt]   = useState(template.userPrompt)
   const [provider,     setProvider]     = useState(template.defaultProvider)
@@ -308,11 +309,25 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
       !(v.steps ?? []).includes(template.stepNumber),
   )
 
+  const handleRevert = async () => {
+    if (!confirm(`Delete the ${vertical} override and revert this prompt to the inherited default?`)) return
+    try {
+      const res = await fetch(`/api/admin/prompts/${template.stepNumber}?vertical=${encodeURIComponent(vertical)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Revert failed')
+      toast.success('Reverted to inherited default')
+      window.location.reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Revert failed')
+    }
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setSaved(false)
     try {
-      const res = await fetch(`/api/admin/prompts/${template.stepNumber}`, {
+      const res = await fetch(`/api/admin/prompts/${template.stepNumber}?vertical=${encodeURIComponent(vertical)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -343,7 +358,7 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <Link
-            href="/admin/prompts"
+            href={vertical !== 'default' ? `/admin/prompts?vertical=${encodeURIComponent(vertical)}` : '/admin/prompts'}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-2 transition-colors"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -353,6 +368,27 @@ export function PromptEditor({ template }: { template: PromptTemplate }) {
             {STEP_LABELS[template.stepNumber] ?? `Step ${template.stepNumber}`}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5 font-mono">{template.stepName}</p>
+          {vertical !== 'default' && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span
+                className={`rounded-full px-2 py-0.5 font-medium ${
+                  template.inherited ? 'bg-gray-100 text-gray-600' : 'bg-lime-100 text-lime-800'
+                }`}
+              >
+                {vertical}: {template.inherited ? 'inherited from default' : 'customized'}
+              </span>
+              {template.inherited ? (
+                <span className="text-muted-foreground">Saving creates a {vertical} override.</span>
+              ) : (
+                <button
+                  onClick={handleRevert}
+                  className="text-red-600 hover:text-red-800 underline underline-offset-2"
+                >
+                  Revert to inherited
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <Button
           onClick={handleSave}

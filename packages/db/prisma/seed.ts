@@ -1670,7 +1670,7 @@ async function main() {
 
   for (const template of [...PROMPT_TEMPLATES, ...IMAGE_GEN_TEMPLATE, ...ENRICHMENT_TEMPLATES, ...GEO_ENRICHMENT_TEMPLATES, ...SYNDICATION_TEMPLATES, ...PROMO_EMAIL_TEMPLATE, ...SOCIAL_TEMPLATES]) {
     await prisma.promptTemplate.upsert({
-      where: { stepNumber: template.stepNumber },
+      where: { stepNumber_vertical: { stepNumber: template.stepNumber, vertical: 'default' } },
       create: template,
       // Never overwrite admin edits or production prompt content on re-seed.
       // To bulk-update prompts, run: pnpm --filter @omniply/db reseed:v3
@@ -1686,7 +1686,7 @@ async function main() {
   console.log('\nSeeding newsletter prompt templates...')
   for (const template of NEWSLETTER_TEMPLATES) {
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       // Never overwrite admin edits on re-seed.
       update: {},
@@ -1699,7 +1699,7 @@ async function main() {
   console.log('\nSeeding client-story prompt templates...')
   for (const template of CLIENT_STORY_TEMPLATES) {
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       update: {},
     })
@@ -1711,7 +1711,7 @@ async function main() {
   console.log('\nSeeding plain-language prompt templates...')
   for (const template of PLAIN_LANGUAGE_TEMPLATES) {
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       update: {},
     })
@@ -1735,7 +1735,7 @@ async function main() {
   console.log('\nSeeding de-AI writing prompt templates...')
   for (const template of DEAI_TEMPLATES) {
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       update: {},
     })
@@ -1747,7 +1747,7 @@ async function main() {
   console.log('\nSeeding chat-agent prompt templates...')
   for (const template of AGENT_TEMPLATES) {
     await prisma.promptTemplate.upsert({
-      where: { key: template.key },
+      where: { key_vertical: { key: template.key, vertical: 'default' } },
       create: template,
       update: {},
     })

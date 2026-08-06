@@ -91,19 +91,34 @@ export function buildAgentPanelHtml(token: string): string {
 
   function setBusy(b) { busy = b; send.disabled = b || dead; input.disabled = dead; }
 
-  function submit(text) {
+  function submit(text, isRetry) {
     text = (text || '').trim();
-    if (!text || busy || dead) return;
-    chips.innerHTML = '';
-    bubble('v', text);
-    input.value = '';
-    setBusy(true);
+    if (!text || (busy && !isRetry) || dead) return;
+    if (!isRetry) {
+      chips.innerHTML = '';
+      bubble('v', text);
+      input.value = '';
+      setBusy(true);
+    }
     var typing = bubble('a dots', '');
     fetch(API + '/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: TOKEN, visitorKey: vk, conversationId: conv, message: text })
-    }).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+    }).then(function (r) {
+        if (r.status === 409 && !isRetry) {
+          // Stale conversation reference (e.g. server-side reset) — drop it
+          // and retry this message once on a fresh conversation.
+          typing.remove();
+          conv = null;
+          try { sessionStorage.removeItem(convKey); } catch (e) {}
+          submit(text, true);
+          return null;
+        }
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+      })
       .then(function (t) {
+        if (!t) return;
         typing.remove();
         conv = t.conversationId;
         try { sessionStorage.setItem(convKey, conv); } catch (e) {}

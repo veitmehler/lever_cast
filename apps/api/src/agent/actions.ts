@@ -12,18 +12,34 @@
  *
  * All best-effort: the visitor's chat never breaks on a CRM hiccup — failures
  * alert us (spine-check pattern) and are visible in the transcript flags.
+ *
+ * CONVERGENCE (contact-convergence batch): one conversation = ONE GHL contact.
+ * The first contact-needing action creates it with everything known so far and
+ * stores its id; every later action updates THAT contact by id (fields +
+ * tag-add) instead of re-upserting by a different key — a guide capture
+ * followed by a callback can no longer fragment into two contacts.
  */
 import { randomUUID } from 'node:crypto'
 import { prisma } from '@omniply/shared'
 import { logger } from '../lib/logger'
 import { sendFailureAlert } from '../lib/alerts'
 import { getGhlCredentials } from '../lib/ghl/settings'
-import { createGhlContactNote, getChatSummaryFieldId, updateGhlContact, upsertGhlContact } from '../lib/ghl/client'
+import { addGhlContactTags, createGhlContactNote, getChatSummaryFieldId, updateGhlContact, upsertGhlContact } from '../lib/ghl/client'
 import { driveConfigured, grantReader } from '../lib/gdrive/client'
 import { recordLLMUsage } from '../lib/llm-usage'
 import { runNewsletterPrompt } from '../newsletter/llm'
 import type { AgentContext } from './context'
 import type { AgentAction } from './tools'
+import { knownDetailsFor, primaryEmailOf } from './known'
+
+/** The conversation's converged contact id, if one exists yet. */
+async function contactIdFor(conversationId: string): Promise<string | null> {
+  const row = await prisma.agentConversation.findUnique({
+    where: { id: conversationId },
+    select: { ghlContactId: true },
+  })
+  return row?.ghlContactId ?? null
+}
 
 /** Compact transcript for the front-desk summary prompt. */
 async function transcriptFor(conversationId: string): Promise<string> {
@@ -61,22 +77,43 @@ async function executeCallback(
   // The summary also lands in the "Chat Summary" custom field (find-or-create)
   // so the snapshot's notification workflow can merge {{contact.chat_summary}}
   // straight into the front-desk SMS/email text.
-  const summaryText = [action.reason, summary].filter(Boolean).join(' — ')
+  const summaryText = [action.reason, summary].filter(Boolean).join(', ')
   const fieldId = summaryText
     ? await getChatSummaryFieldId(creds.apiKey, creds.locationId).catch(() => null)
     : null
-  const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
-    phone: action.phone,
-    firstName: action.name,
-    tags: ['callback-requested', 'chat-agent-lead'],
-    source: 'chat-agent',
-    ...(fieldId && summaryText ? { customFields: [{ id: fieldId, value: summaryText.slice(0, 2000) }] } : {}),
-  })
-  if (result.contactId) {
-    await prisma.agentConversation.update({
-      where: { id: conversationId },
-      data: { ghlContactId: result.contactId },
+  const customFields = fieldId && summaryText ? [{ id: fieldId, value: summaryText.slice(0, 2000) }] : undefined
+  const tags = ['callback-requested', 'chat-agent-lead']
+
+  const known = await knownDetailsFor(conversationId)
+  const existingId = await contactIdFor(conversationId)
+  let contactId: string | null = existingId
+  if (existingId) {
+    // Converge: same contact the guide capture created — fields by id, tag-add.
+    await updateGhlContact(creds.apiKey, existingId, {
+      phone: action.phone,
+      ...(action.name ? { firstName: action.name } : {}),
+      ...(customFields ? { customFields } : {}),
     })
+    await addGhlContactTags(creds.apiKey, existingId, tags)
+  } else {
+    const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
+      phone: action.phone,
+      firstName: action.name ?? known.name ?? undefined,
+      // Carry the known email into creation so the contact starts complete.
+      ...(primaryEmailOf(known) ? { email: primaryEmailOf(known)! } : {}),
+      tags,
+      source: 'chat-agent',
+      ...(customFields ? { customFields } : {}),
+    })
+    contactId = result.contactId ?? null
+    if (contactId) {
+      await prisma.agentConversation.update({
+        where: { id: conversationId },
+        data: { ghlContactId: contactId },
+      })
+    }
+  }
+  if (contactId) {
     const note = [
       '📞 Chat assistant callback request',
       action.reason ? `Reason: ${action.reason}` : null,
@@ -84,11 +121,11 @@ async function executeCallback(
     ]
       .filter(Boolean)
       .join('\n')
-    await createGhlContactNote(creds.apiKey, result.contactId, note).catch((err) =>
+    await createGhlContactNote(creds.apiKey, contactId, note).catch((err) =>
       logger.warn({ err, conversationId }, '[agent] contact note failed (contact + tag landed)'),
     )
   }
-  logger.info({ accountId: ctx.accountId, conversationId }, '[agent] callback → GHL contact + tag')
+  logger.info({ accountId: ctx.accountId, conversationId, converged: Boolean(existingId) }, '[agent] callback → GHL contact + tag')
 }
 
 async function executeCapture(
@@ -129,26 +166,44 @@ async function executeCapture(
   const creds = await getGhlCredentials(ctx.ownerUserId)
   if (!creds) throw new Error('No GHL credentials for account owner')
   const guideTags = matched ? (matched.ghlTagNames.length ? matched.ghlTagNames : [`leadgen-${matched.slug}`]) : []
-  const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
-    email: action.email,
-    firstName: action.name,
-    ...(action.phone ? { phone: action.phone } : {}),
-    tags: [...guideTags, 'chat-agent-lead'],
-    source: 'chat-agent',
-  })
-  if (result.contactId) {
-    await prisma.agentConversation.update({
-      where: { id: conversationId },
-      data: { ghlContactId: result.contactId },
+  const tags = [...guideTags, 'chat-agent-lead']
+
+  const known = await knownDetailsFor(conversationId)
+  const existingId = await contactIdFor(conversationId)
+  let contactId: string | null = existingId
+  if (existingId) {
+    // Converge on the callback-created contact. The capture email only takes
+    // the primary slot when no deliberately-chosen email exists (user rule:
+    // the add_contact_email address always wins the primary slot).
+    await updateGhlContact(creds.apiKey, existingId, {
+      ...(known.preferredEmail ? {} : { email: action.email }),
+      ...(action.name ? { firstName: action.name } : {}),
+      ...(action.phone ? { phone: action.phone } : {}),
     })
+    await addGhlContactTags(creds.apiKey, existingId, tags)
+  } else {
+    const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
+      email: action.email,
+      firstName: action.name,
+      ...(action.phone ?? known.phone ? { phone: (action.phone ?? known.phone)! } : {}),
+      tags,
+      source: 'chat-agent',
+    })
+    contactId = result.contactId ?? null
+    if (contactId) {
+      await prisma.agentConversation.update({
+        where: { id: conversationId },
+        data: { ghlContactId: contactId },
+      })
+    }
   }
   if (captureId) {
     await prisma.leadCapture.update({
       where: { id: captureId },
-      data: { status: 'captured', ghlContactId: result.contactId },
+      data: { status: 'captured', ghlContactId: contactId },
     })
   }
-  logger.info({ accountId: ctx.accountId, conversationId, guide: action.guideSlug }, '[agent] capture → GHL + drip')
+  logger.info({ accountId: ctx.accountId, conversationId, guide: action.guideSlug, converged: Boolean(existingId) }, '[agent] capture → GHL + drip')
 }
 
 async function executeAddEmail(

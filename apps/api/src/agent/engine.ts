@@ -113,9 +113,10 @@ function guideFor(ctx: AgentContext, action: AgentAction | null): { title: strin
         ? action.guideSlug
         : null
   const g = ctx.guides.find((x) => x.slug === slug)
-  // The link is only surfaced when it should render as a card: after a
-  // successful capture, or when the visitor declined the email ask.
-  const linkable = action.type === 'capture_contact' || action.type === 'send_guide_link'
+  // User-locked delivery rule: a captured guide arrives BY EMAIL ONLY — the
+  // in-chat card renders solely for visitors who declined the email ask
+  // (send_guide_link), otherwise decliners would get nothing at all.
+  const linkable = action.type === 'send_guide_link'
   return { title: g?.title ?? null, link: linkable ? (g?.driveLink ?? null) : null }
 }
 

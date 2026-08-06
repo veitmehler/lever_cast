@@ -39,7 +39,7 @@ export async function contentPlanRoutes(app: FastifyInstance) {
 
     const acct = await prisma.account.findUnique({
       where: { id: account.accountId },
-      select: { articleCalendarId: true, subscriptionStartedAt: true },
+      select: { articleCalendarId: true, subscriptionStartedAt: true, vertical: true },
     })
     const owner = await prisma.user.findUnique({
       where: { id: account.ownerUserId },
@@ -191,6 +191,7 @@ export async function contentPlanRoutes(app: FastifyInstance) {
     return reply.send({
       from: dateKey(from),
       to: dateKey(to),
+      vertical: acct?.vertical ?? 'chiro',
       days,
       ideaCount,
       executableUntil: executableUntil ? dateKey(executableUntil) : null,

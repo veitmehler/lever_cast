@@ -28,7 +28,7 @@ interface Day {
   article: { primary: ArticleEntry | null; alternatives: ArticleEntry[] }
   newsletter: { topic: string; newsletterTopicId: string; newsletterId?: string; status?: string; isOverride: boolean } | null
 }
-interface PlanData { from: string; to: string; days: Day[]; ideaCount: number; executableUntil: string | null }
+interface PlanData { from: string; to: string; vertical?: string; days: Day[]; ideaCount: number; executableUntil: string | null }
 interface Idea {
   id: string; topic: string; mode?: string | null
   outlineFrameworkNumber?: number | null; outlineSpecialInstructions?: string | null; realCaseStudies?: string | null
@@ -42,8 +42,13 @@ interface Inbox {
 }
 
 // Cadence: articles Tue/Thu, newsletters Mon/Wed/Fri/Sat, Sunday nothing.
-const ARTICLE_DOW = new Set([2, 4])
-const NEWSLETTER_DOW = new Set([1, 3, 5, 6])
+// Chiro product rhythm: articles Tue/Thu, newsletters Mon/Wed/Fri/Sat.
+// Verticals can carry their own rhythm (azavea: articles Mon/Wed/Fri, no
+// newsletter yet) — the plan response's `vertical` selects the set.
+const DOW_BY_VERTICAL: Record<string, { article: Set<number>; newsletter: Set<number> }> = {
+  chiro: { article: new Set([2, 4]), newsletter: new Set([1, 3, 5, 6]) },
+  azavea: { article: new Set([1, 3, 5]), newsletter: new Set<number>() },
+}
 const dow = (date: string) => new Date(date + 'T00:00:00').getDay()
 
 export function ContentPlan() {
@@ -170,7 +175,8 @@ export function ContentPlan() {
   }
 
   // Only show content days (article = Tue/Thu, newsletter = Mon/Wed/Fri/Sat); skip Sundays.
-  const visibleDays = (data?.days ?? []).filter((d) => ARTICLE_DOW.has(dow(d.date)) || NEWSLETTER_DOW.has(dow(d.date)))
+  const rhythm = DOW_BY_VERTICAL[data?.vertical ?? 'chiro'] ?? DOW_BY_VERTICAL.chiro
+  const visibleDays = (data?.days ?? []).filter((d) => rhythm.article.has(dow(d.date)) || rhythm.newsletter.has(dow(d.date)))
   // Planning window (up to 60 days) is always fully editable; production (checkbox-selectable)
   // is capped at executableUntil — the current paid cycle. Null means ungated (legacy accounts,
   // rendered as a single undivided section, exactly like before this feature existed).
@@ -261,7 +267,7 @@ export function ContentPlan() {
   }
 
   function ArticleCell({ d }: { d: Day }) {
-    if (!ARTICLE_DOW.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
+    if (!rhythm.article.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
     const p = d.article.primary
     // Once generation has started, it's read-only here (review happens at right).
     if (p?.jobId) {
@@ -306,7 +312,7 @@ export function ContentPlan() {
   }
 
   function NewsletterCell({ d }: { d: Day }) {
-    if (!NEWSLETTER_DOW.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
+    if (!rhythm.newsletter.has(dow(d.date))) return <span className="text-xs text-muted-foreground">—</span>
     const nl = d.newsletter
     // Once generation has started, it's read-only here (review happens at right) —
     // same convention as ArticleCell going read-only once a jobId exists.

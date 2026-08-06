@@ -224,13 +224,22 @@ describe('action validation', () => {
     expect(validateAction({ type: 'offer_guide', slug: 'made-up-guide' }, CTX)).toBeNull()
   })
 
-  it('capture requires name + valid email; junk fields degrade to null', () => {
+  it('capture requires a valid email; name is optional; junk fields degrade to null', () => {
     const a = validateAction(
       { type: 'capture_contact', name: ' Sam ', email: 'Sam@Example.com', phone: '123', guideSlug: 'nope' },
       CTX,
     )
     expect(a).toEqual({ type: 'capture_contact', name: 'Sam', email: 'sam@example.com', phone: null, guideSlug: null })
-    expect(validateAction({ type: 'capture_contact', name: '', email: 'sam@example.com' }, CTX)).toBeNull()
+    // Email-only capture is valid (the guide must still be delivered — a
+    // missing name silently killed real captures before; name backfills via
+    // known-details reconciliation).
+    expect(validateAction({ type: 'capture_contact', name: '', email: 'sam@example.com' }, CTX)).toEqual({
+      type: 'capture_contact',
+      name: null,
+      email: 'sam@example.com',
+      phone: null,
+      guideSlug: null,
+    })
     expect(validateAction({ type: 'capture_contact', name: 'Sam', email: 'not-an-email' }, CTX)).toBeNull()
   })
 

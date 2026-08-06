@@ -15,12 +15,12 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { randomBytes } from 'node:crypto'
-import { prisma } from '@omniply/shared'
+import { prisma, canonicalAccountUserId, brandSettingsForUser } from '@omniply/shared'
 import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { logger } from '../lib/logger'
 import { requireAuth } from '../middleware/auth'
 import { fillPrompt } from '../newsletter/llm'
-import { agentContextForAccount } from '../agent/context'
+import { agentContextForAccount, clearAgentContextFor } from '../agent/context'
 import { emergencyNumberFor, MAX_MESSAGE_CHARS } from '../agent/guardrails'
 import { AgentTurnError, runAgentTurn } from '../agent/engine'
 import { AGENT_LOADER_JS, buildAgentPanelHtml } from '../agent/widget'
@@ -110,6 +110,52 @@ export async function agentRoutes(app: FastifyInstance) {
         logger.error({ err, accountId: account.id }, '[agent] chat turn failed')
         return reply.status(500).send({ error: 'Something went wrong' })
       }
+    },
+  )
+
+  // ── Chat knowledge base (chat-kb plan F2): read + edit + instant rebuild ──
+  app.get('/agent/kb', async (request, reply) => {
+    const clerkId = await requireAuth(request, reply)
+    if (!clerkId) return
+    const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } })
+    if (!user) return reply.status(404).send({ error: 'User not found' })
+    const brand = await brandSettingsForUser(user.id)
+    if (!brand) return reply.status(404).send({ error: 'Brand not set up yet' })
+    return {
+      faqs: Array.isArray(brand.clinicFaqs) ? brand.clinicFaqs : [],
+      openingHours: brand.openingHours ?? '',
+      organizationPhone: brand.organizationPhone ?? '',
+      bookingUrl: brand.bookingUrl ?? '',
+    }
+  })
+
+  app.put<{ Body: { faqs?: { q?: string; a?: string }[]; openingHours?: string; organizationPhone?: string; bookingUrl?: string } }>(
+    '/agent/kb',
+    async (request, reply) => {
+      const clerkId = await requireAuth(request, reply)
+      if (!clerkId) return
+      const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true, accountId: true } })
+      if (!user) return reply.status(404).send({ error: 'User not found' })
+
+      const body = request.body ?? {}
+      const faqs = (body.faqs ?? [])
+        .map((f) => ({ q: (f.q ?? '').trim().slice(0, 300), a: (f.a ?? '').trim().slice(0, 1500) }))
+        .filter((f) => f.q && f.a)
+        .slice(0, 60)
+      if (faqs.length === 0) return reply.status(400).send({ error: 'At least one question and answer is required.' })
+
+      const ownerId = await canonicalAccountUserId(user.id)
+      await prisma.brandSettings.update({
+        where: { userId: ownerId },
+        data: {
+          clinicFaqs: faqs,
+          ...(body.openingHours !== undefined ? { openingHours: body.openingHours.trim() || null } : {}),
+          ...(body.organizationPhone !== undefined ? { organizationPhone: body.organizationPhone.trim() || null } : {}),
+          ...(body.bookingUrl !== undefined ? { bookingUrl: body.bookingUrl.trim() || null } : {}),
+        },
+      })
+      if (user.accountId) clearAgentContextFor(user.accountId)
+      return { ok: true, faqCount: faqs.length }
     },
   )
 

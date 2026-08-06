@@ -24,6 +24,8 @@ import {
   commitCta,
   commitBookingUrl,
   commitPms,
+  commitFrontDesk,
+  commitKbReview,
   commitGbp,
   commitGoogleReviews,
   commitWritingSample,
@@ -360,6 +362,46 @@ const STEPS: StepDef[] = [
       if (!err) ctx.stepData.google_reviews = answer
       return err
     },
+  },
+  {
+    id: 'front_desk',
+    kind: 'confirm_card',
+    prepare: async () => ({
+      messages: [
+        "Nearly there! These are the questions patients ask your front desk every day — your answers power the website chat assistant so it answers like your best receptionist.",
+      ],
+      card: { type: 'front_desk' },
+    }),
+    commit: async (ctx, answer) => commitFrontDesk(ctx, answer),
+  },
+  {
+    id: 'kb_review',
+    kind: 'confirm_card',
+    prepare: async (ctx) => {
+      const { brandSettingsForUser } = await import('@omniply/shared')
+      const brand = await brandSettingsForUser(ctx.userId)
+      const existing = Array.isArray(brand?.clinicFaqs) ? (brand!.clinicFaqs as { q: string; a: string }[]) : []
+      const fromForm = Array.isArray(ctx.stepData.frontDeskFaqs)
+        ? (ctx.stepData.frontDeskFaqs as { q: string; a: string }[])
+        : []
+      // Form answers win on duplicate questions; crawl-derived entries fill gaps.
+      const seen = new Set(fromForm.map((f) => f.q.toLowerCase()))
+      const faqs = [...fromForm, ...existing.filter((f) => !seen.has(f.q.toLowerCase()))]
+      return {
+        messages: [
+          'Last check: this is everything the assistant will know about your practice. Edit anything that needs fixing, then approve.',
+        ],
+        card: {
+          type: 'kb_review',
+          faqs,
+          openingHours: brand?.openingHours ?? '',
+          organizationPhone: brand?.organizationPhone ?? '',
+          bookingUrl: brand?.bookingUrl ?? '',
+          hoursSource: brand?.googlePlaceId ? 'google' : 'manual',
+        },
+      }
+    },
+    commit: async (ctx, answer) => commitKbReview(ctx, answer),
   },
   {
     id: 'elevenlabs',

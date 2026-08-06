@@ -11,6 +11,7 @@ import { DiagramStyleSection } from '@/features/settings/DiagramStyleSection'
 import { ArticleTypographySection } from '@/features/settings/ArticleTypographySection'
 import { WordPressSection } from '@/features/settings/WordPressSection'
 import { ChatAssistantSection } from '@/features/settings/ChatAssistantSection'
+import { ChatKnowledgeSection } from '@/features/settings/ChatKnowledgeSection'
 import { ConnectedAccountsSection } from '@/features/settings/ConnectedAccountsSection'
 import { TeamSection } from '@/features/settings/TeamSection'
 import { useSettingsData } from '@/features/settings/useSettingsData'
@@ -51,6 +52,8 @@ export default function SettingsPage() {
         <WordPressSection />
 
         <ChatAssistantSection />
+
+        <ChatKnowledgeSection />
 
         <GhlSettingsPanel />
 

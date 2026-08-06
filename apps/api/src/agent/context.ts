@@ -184,3 +184,8 @@ export function clearAgentCaches(): void {
   bundleCache.clear()
   placesCache.clear()
 }
+
+/** Bust one account's bundle (KB edits reflect in seconds, not the TTL). */
+export function clearAgentContextFor(accountId: string): void {
+  bundleCache.delete(accountId)
+}

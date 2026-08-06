@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { embedFetch } from '@/lib/embedSession'
 import { VoiceRecorder } from './VoiceRecorder'
-import { BusinessCard, LogoCard, PhotoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard } from './cards'
+import { BusinessCard, LogoCard, PhotoCard, ProfileCard, TemplateCard, OffersCard, WordpressCard, SocialsCard, FrontDeskCard, KbReviewCard } from './cards'
 import { currentEmbedSession, embedApiUrl } from '@/lib/embedSession'
 
 // The chat message scrolls away — the input itself must say what belongs in it.
@@ -339,6 +339,10 @@ function ConfirmCard({
       )
     case 'socials':
       return <SocialsCard disabled={busy} onSubmit={(a) => onSubmit(a, "I've connected my accounts ✓")} />
+    case 'front_desk':
+      return <FrontDeskCard disabled={busy} onSubmit={onSubmit} />
+    case 'kb_review':
+      return <KbReviewCard card={card} disabled={busy} onSubmit={onSubmit} />
     default:
       return (
         <button

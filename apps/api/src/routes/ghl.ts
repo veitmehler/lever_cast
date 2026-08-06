@@ -48,6 +48,9 @@ export async function ghlRoutes(app: FastifyInstance) {
       accountIds: (row.accountIds ?? {}) as GhlAccountIds,
       maskedApiKey: decrypted ? maskApiKey(decrypted) : '',
       hasApiKey: !!row.ghlApiKey,
+      // 'oauth' = connected via the Omniply marketplace app (auto-renewing
+      // token) — the Settings UI renders read-only in that state.
+      authType: row.ghlAuthType ?? 'pi',
       lastVerifiedAt: row.lastVerifiedAt,
       lastError: row.lastError,
       promoEmail: {

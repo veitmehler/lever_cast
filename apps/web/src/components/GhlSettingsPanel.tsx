@@ -43,6 +43,7 @@ export function GhlSettingsPanel() {
   const [ghlUserId, setGhlUserId] = useState('')
   const [maskedApiKey, setMaskedApiKey] = useState('')
   const [hasApiKey, setHasApiKey] = useState(false)
+  const [authType, setAuthType] = useState<string>('pi')
   const [accountIds, setAccountIds] = useState<GhlAccountIds>({})
   const [availableAccounts, setAvailableAccounts] = useState<GhlSocialAccount[]>([])
   const [lastError, setLastError] = useState<string | null>(null)
@@ -63,6 +64,7 @@ export function GhlSettingsPanel() {
       setGhlUserId(data.ghlUserId ?? '')
       setMaskedApiKey(data.maskedApiKey ?? '')
       setHasApiKey(!!data.hasApiKey)
+      setAuthType(data.authType ?? 'pi')
       setAccountIds(data.accountIds ?? {})
       setLastError(data.lastError ?? null)
       if (data.promoEmail) setPromoEmail({ ...DEFAULT_PROMO_EMAIL, ...data.promoEmail })
@@ -206,47 +208,59 @@ export function GhlSettingsPanel() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-card-foreground mb-1">Private Integration API key</label>
-          <input
-            type="password"
-            value={ghlApiKey}
-            onChange={(e) => setGhlApiKey(e.target.value)}
-            placeholder={hasApiKey ? maskedApiKey || '••••••••' : 'Paste API key'}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-          />
-          {hasApiKey && !ghlApiKey && (
-            <p className="text-xs text-muted-foreground mt-1">Saved key: {maskedApiKey || 'configured'}. Enter a new value to replace it.</p>
-          )}
+      {authType === 'oauth' ? (
+        <div className="rounded-lg border border-lime-200 bg-lime-50 px-4 py-3">
+          <p className="text-sm font-medium text-lime-900">Connected via the Omniply app ✓</p>
+          <p className="text-xs text-lime-800 mt-1">
+            Location <span className="font-mono">{ghlLocationId}</span> — credentials are managed and renewed
+            automatically. Nothing to configure here.
+          </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-card-foreground mb-1">Location ID</label>
-          <input
-            type="text"
-            value={ghlLocationId}
-            onChange={(e) => setGhlLocationId(e.target.value)}
-            placeholder="ve9EPM428h8vShlRW1KT"
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-          />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-1">Private Integration API key</label>
+            <input
+              type="password"
+              value={ghlApiKey}
+              onChange={(e) => setGhlApiKey(e.target.value)}
+              placeholder={hasApiKey ? maskedApiKey || '••••••••' : 'Paste API key'}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+            {hasApiKey && !ghlApiKey && (
+              <p className="text-xs text-muted-foreground mt-1">Saved key: {maskedApiKey || 'configured'}. Enter a new value to replace it.</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-1">Location ID</label>
+            <input
+              type="text"
+              value={ghlLocationId}
+              onChange={(e) => setGhlLocationId(e.target.value)}
+              placeholder="ve9EPM428h8vShlRW1KT"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-1">User ID</label>
+            <input
+              type="text"
+              value={ghlUserId}
+              onChange={(e) => setGhlUserId(e.target.value)}
+              placeholder="Team member who owns scheduled posts"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-card-foreground mb-1">User ID</label>
-          <input
-            type="text"
-            value={ghlUserId}
-            onChange={(e) => setGhlUserId(e.target.value)}
-            placeholder="Team member who owns scheduled posts"
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void handleSave()} disabled={isSaving}>
-          {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          Save Omniply settings
-        </Button>
+        {authType !== 'oauth' && (
+          <Button onClick={() => void handleSave()} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Save Omniply settings
+          </Button>
+        )}
         <Button variant="outline" onClick={() => void handleLoadAccounts()} disabled={isLoadingAccounts}>
           {isLoadingAccounts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Load connected accounts

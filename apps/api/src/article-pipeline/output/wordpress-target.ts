@@ -317,6 +317,17 @@ export class WordPressTarget implements OutputTarget {
       wpReadyHtml += `\n${citationsHtml}`
     }
 
+    // Disclaimer footer — generated for every article (YMYL compliance for
+    // health content; publisher disclosure for B2B) but previously rendered
+    // only by the html target, never on WordPress. Escaped as text.
+    if (payload.disclaimer?.trim()) {
+      const esc = payload.disclaimer
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+      wpReadyHtml += `\n<hr />\n<p style="font-size:0.85em;color:#64748b;"><em>${esc}</em></p>`
+    }
+
     // Append JSON-LD schema markup so it is published with the post regardless of plugin.
     if (payload.schemaJson?.trim()) {
       wpReadyHtml += `\n<script type="application/ld+json">\n${payload.schemaJson.trim()}\n</script>`

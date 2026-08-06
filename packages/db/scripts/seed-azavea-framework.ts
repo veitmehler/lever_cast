@@ -32,7 +32,8 @@ ACT 2 — THE SOLUTION (teach the system, sell the belief — never the checklis
 - Do NOT provide step-by-step DIY instructions, scripts, templates, or "do this this week" checklists. The reader should finish understanding WHAT the right system is and WHY it works — not holding a to-do list.
 
 ACT 3 — THE NEW PROBLEM (the execution wall):
-- Now surface what running that system actually takes: the honest hours per week, the consistency it demands over months, the skills involved.
+- OPEN ACT 3 WITH THE HONEST MANUAL PROTOCOL: give the reader ONE real, small, genuinely effective do-it-yourself protocol for this topic (the angle brief names it), priced honestly in the same breath — the exact steps AND the true weekly time cost and discipline it demands. The reader must walk away with something they can do on Monday. This is not a concession; the protocol's own arithmetic is the wall.
+- Then widen from the one protocol to the full system: what running ALL of it actually takes — the honest hours per week, the consistency it demands over months, the skills involved.
 - Address the tempting shortcut: generic AI tools (ChatGPT and the like) can draft content, but their output is non-deterministic, still consumes the owner's time to prompt, review and publish — and nothing in them ensures compliance with health-advertising regulations. They will happily write claims a practice is not allowed to make, and the practice owns that liability.
 - Close on the reader's own conclusion: the system is right, and it is a job — one that runs best when it is operated for you. Do not pitch; let the arithmetic and the reader's own time-scarcity make the point. End on a short, compressed line.`,
   isActive: false,

@@ -35,7 +35,7 @@ export function ChatAssistantSection() {
         return
       }
       const data = (await res.json()) as { token: string }
-      setSnippet(`<script async src="${API_BASE}/api/agent/widget.js?v=2" data-omniply="${data.token}"></script>`)
+      setSnippet(`<script async src="${API_BASE}/api/agent/widget.js?v=3" data-omniply="${data.token}"></script>`)
     } catch {
       setError('Could not reach the server — please try again')
     } finally {

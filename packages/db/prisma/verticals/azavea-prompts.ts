@@ -93,16 +93,17 @@ Excluded keywords (do not use): {{excludedKeywords}}`,
     defaultProvider: 'gemini',
     defaultModel: 'gemini-3.5-flash',
     systemPrompt:
-      'You are an expert at surfacing the OBJECTIONS and hesitations a small-business owner has while reading a business article — the questions standing between them and acting on what they just learned. These FAQs are objection handling, not SEO.',
-    userPrompt: `Generate the questions a skeptical practice owner would raise after reading an article about: {{topic}}
+      'You write FAQ questions using the SEARCHABLE-TWIN technique: each question is a genuine long-tail search query a practice owner would type into Google, chosen so that its honest answer naturally addresses a decision-stage objection. The question earns search traffic and FAQ schema; the objection handling lives in the answer.',
+    userPrompt: `Generate FAQ questions for an article about: {{topic}}
 
-The reader is: {{who}}
+The searcher is: {{who}}
 
 Requirements:
-- 6-9 questions, each a REAL OBJECTION or decision-stage hesitation — cost vs return, time commitment, "can my front desk just do this", "can't ChatGPT do this for free", "what happens if we stop", "is this compliant", staff pushback, "how is this different from an agency".
-- NOT how-to questions and NOT patient health questions. The reader is deciding whether the systematic approach is worth pursuing, not how to build it themselves.
-- At least one question must probe the generic-AI shortcut (its answer will address non-determinism, review burden, and that nothing in those tools ensures health-advertising compliance).
-- Phrase them bluntly, the way owners actually think ("Why can't I just…", "Isn't this just…").
+- 6-8 questions, each phrased as a REAL long-tail search query (what an owner would actually type into Google) — never as a raw sales objection. Convert objections into their searchable twins: "why can't I just use ChatGPT" becomes "Can ChatGPT write marketing content for a chiropractic practice?"; "isn't this just an agency" becomes "Should a chiropractor hire a marketing agency or use marketing software?".
+- Each question's eventual ANSWER should naturally carry the decision-stage substance (cost vs return, time commitment, staff impact, compliance, what generic AI tools can and cannot do) — pick questions whose honest answers do that work.
+- One question MUST be the generic-AI searchable twin (its answer will cover drafting ability vs non-determinism, review burden, and health-advertising compliance).
+- Include 1-2 purely informational baseline queries with real search volume (e.g. benchmark rates, definitions, compliance basics for this topic).
+- NOT patient health questions.
 
 Excluded keywords (do not use): {{excludedKeywords}}
 
@@ -190,11 +191,12 @@ Article Topic: {{topic}}
 Article Content Summary: {{article_summary}}
 
 Generate a brief disclaimer for this BUSINESS article that:
-1. Is ONE short paragraph (2-3 sentences)
-2. Notes that the content is general business information, not legal, financial, or professional advice, and that figures/examples are illustrative
-3. Notes that readers should evaluate decisions for their own practice circumstances
-4. Does NOT include medical/health warnings (this is not patient-facing health content)
-5. Is professional and unobtrusive
+1. Is ONE short paragraph (3-4 sentences)
+2. Opens with the transparency disclosure, exactly this sentence: "Published by Azavea Inc., the company behind Omniply."
+3. Notes that the content is general business information, not legal, financial, or professional advice, and that figures/examples are illustrative
+4. Notes that readers should evaluate decisions for their own practice circumstances
+5. Does NOT include medical/health warnings (this is not patient-facing health content)
+6. Is professional and unobtrusive
 
 Return ONLY the disclaimer text. No explanations, no markdown, no code blocks. Just the plain text disclaimer.`,
     isActive: true,

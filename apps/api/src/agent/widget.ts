@@ -210,7 +210,7 @@ export const AGENT_LOADER_JS = `(function () {
   var pill = document.createElement('button');
   pill.textContent = 'Need Help?';
   pill.setAttribute('aria-label', 'Open chat assistant');
-  pill.style.cssText = 'position:fixed;right:88px;bottom:36px;padding:8px 14px;border-radius:999px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#0b2545;font:600 13px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.18);display:none;';
+  pill.style.cssText = 'position:fixed;right:88px;bottom:36px;padding:8px 14px;border-radius:999px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#0b2545;font:600 13px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.18);display:none;transition:opacity .4s;opacity:0;';
   var pillDismissed = false;
   try {
     if (location.hash === '#op-pill-reset') sessionStorage.removeItem('op-agent-pill');
@@ -218,10 +218,37 @@ export const AGENT_LOADER_JS = `(function () {
   } catch (e) {}
   function hidePill() {
     pill.style.display = 'none';
+    teaser.style.display = 'none';
     try { sessionStorage.setItem('op-agent-pill', '1'); } catch (e) {}
   }
-  setTimeout(function () { if (!pillDismissed && !open) pill.style.display = 'block'; }, 3000);
+  setTimeout(function () {
+    if (!pillDismissed && !open) {
+      pill.style.display = 'block';
+      requestAnimationFrame(function () { pill.style.opacity = '1'; });
+    }
+  }, 3000);
   pill.addEventListener('click', function () { hidePill(); toggle(true); });
+
+  // Dwell teaser (chat-kb plan follow-up, user-approved): after ~30s of
+  // presence the assistant "approaches" — the pill gives way to a small
+  // preview card. Desktop only (mobile keeps the compact pill; the panel is
+  // a full-screen takeover there and must never feel forced). Session-once.
+  var teaser = document.createElement('div');
+  teaser.style.cssText = 'position:fixed;right:88px;bottom:24px;max-width:240px;padding:12px 14px;border-radius:14px;border:0;cursor:pointer;z-index:2147483000;background:#fff;color:#1c2430;font:400 13px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.22);display:none;opacity:0;transition:opacity .5s,transform .5s;transform:translateY(6px);';
+  teaser.innerHTML = '<span style="position:absolute;top:4px;right:8px;font-size:14px;color:#9aa3ae;" aria-label="Dismiss" role="button">\u00d7</span><strong style="display:block;margin-bottom:2px;">How can we help?</strong>Hi there! Ask us about appointments, hours, or anything else.';
+  teaser.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.getAttribute && t.getAttribute('role') === 'button') { hidePill(); return; }
+    hidePill();
+    toggle(true);
+  });
+  var TEASER_DELAY = location.hash === '#op-teaser-now' ? 1500 : 30000;
+  setTimeout(function () {
+    if (pillDismissed || open || window.innerWidth < 480) return;
+    pill.style.display = 'none';
+    teaser.style.display = 'block';
+    requestAnimationFrame(function () { teaser.style.opacity = '1'; teaser.style.transform = 'translateY(0)'; });
+  }, TEASER_DELAY);
 
   var frame = document.createElement('iframe');
   frame.title = 'Chat assistant';
@@ -247,7 +274,7 @@ export const AGENT_LOADER_JS = `(function () {
     if (e.data.type === 'op-agent-theme' && e.data.headerBg) bub.style.background = String(e.data.headerBg).slice(0, 20);
   });
 
-  function mount() { document.body.appendChild(bub); document.body.appendChild(pill); document.body.appendChild(frame); }
+  function mount() { document.body.appendChild(bub); document.body.appendChild(pill); document.body.appendChild(teaser); document.body.appendChild(frame); }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();
 `

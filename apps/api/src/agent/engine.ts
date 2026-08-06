@@ -265,6 +265,14 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
         bookingAvailable: Boolean(ctx.bookingUrl),
         hasContact: Boolean(conversation.ghlContactId),
       })
+      // A dropped action means the reply may promise something that never
+      // executed (e.g. "the guide is on its way") — flag it so the transcript
+      // surfaces in admin review instead of failing invisibly.
+      const attempted = (rawAction as { type?: unknown } | null)?.type
+      if (rawAction && !action && typeof attempted === 'string') {
+        flagReason = `action-dropped:${attempted}`
+        logger.warn({ accountId: input.accountId, conversationId: conversation.id, attempted }, '[agent] model action failed validation and was dropped')
+      }
     }
   }
 

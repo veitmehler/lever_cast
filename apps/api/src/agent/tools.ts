@@ -11,7 +11,7 @@
 export type AgentAction =
   | { type: 'send_booking_link' }
   | { type: 'offer_guide'; slug: string }
-  | { type: 'capture_contact'; name: string; email: string; phone: string | null; guideSlug: string | null }
+  | { type: 'capture_contact'; name: string | null; email: string; phone: string | null; guideSlug: string | null }
   | { type: 'request_callback'; name: string; phone: string; reason: string }
   | { type: 'add_contact_email'; email: string }
   | { type: 'send_guide_link'; slug: string }
@@ -54,10 +54,14 @@ export function validateAction(raw: unknown, ctx: ActionContext): AgentAction | 
       const email = str(a.email, 254).toLowerCase()
       const phone = str(a.phone, 30)
       const guideSlug = str(a.guideSlug, 80)
-      if (!name || !EMAIL_RE.test(email)) return null
+      // Email is the only hard requirement: an email-only capture still
+      // delivers the guide + drip. Requiring a name silently killed captures
+      // where the model never asked for one (name backfills via known-details
+      // reconciliation if it appears later in the conversation).
+      if (!EMAIL_RE.test(email)) return null
       return {
         type: 'capture_contact',
-        name,
+        name: name || null,
         email,
         phone: phone && validPhone(phone) ? phone : null,
         guideSlug: guideSlug && ctx.guideSlugs.includes(guideSlug) ? guideSlug : null,

@@ -184,7 +184,7 @@ async function executeCapture(
   } else {
     const result = await upsertGhlContact(creds.apiKey, creds.locationId, {
       email: action.email,
-      firstName: action.name,
+      ...((action.name ?? known.name) ? { firstName: (action.name ?? known.name)! } : {}),
       ...(action.phone ?? known.phone ? { phone: (action.phone ?? known.phone)! } : {}),
       tags,
       source: 'chat-agent',

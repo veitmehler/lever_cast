@@ -45,6 +45,13 @@ const isPublicRoute = createRouteMatcher([
   // Public marketing pages (reviewable on any host).
   '/home(.*)',
   '/chiropractors(.*)',
+  '/about(.*)',
+  '/contact(.*)',
+  '/data-security(.*)',
+  '/terms(.*)',
+  '/privacy(.*)',
+  '/refund-policy(.*)',
+  '/api/marketing-contact',
   // Practice X-Ray funnel (static pages in public/, clean URLs via rewrites).
   '/x-ray(.*)',
   '/walkthrough(.*)',

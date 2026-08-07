@@ -20,6 +20,7 @@ import {
   PipelineDiagram,
   Faq,
   FaqJsonLd,
+  MarketingFooter,
   type FaqEntry,
 } from '@/components/marketing/Marketing'
 
@@ -206,12 +207,7 @@ export default function HomePage() {
       </Section>
 
       <FaqJsonLd items={FAQ_ITEMS} />
-      <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
-        <p>Omniply &middot; Marketing autopilot for local practices</p>
-        <p className="mt-2">
-          <a href="/chiropractors" className="underline">Chiropractor? See the version built for your practice</a>
-        </p>
-      </footer>
+      <MarketingFooter />
     </main>
   )
 }

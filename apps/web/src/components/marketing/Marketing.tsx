@@ -455,3 +455,51 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
     </header>
   )
 }
+
+/* ── Site footer: Azavea Inc. attribution + legal/credibility links ──────── */
+export function MarketingFooter() {
+  const links = [
+    { href: '/about', label: 'About' },
+    { href: '/contact', label: 'Contact' },
+    { href: '/data-security', label: 'Data & AI' },
+    { href: '/terms', label: 'Terms' },
+    { href: '/privacy', label: 'Privacy' },
+    { href: '/refund-policy', label: 'Refunds' },
+  ]
+  return (
+    <footer className="px-6 py-12 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
+      <p>Omniply &middot; Marketing autopilot for local practices</p>
+      <p className="mt-2">
+        <a href="/chiropractors" className="underline">Chiropractor? See the version built for your practice</a>
+      </p>
+      <nav className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2">
+        {links.map((l) => (
+          <a key={l.href} href={l.href} className="hover:text-white/85">{l.label}</a>
+        ))}
+      </nav>
+      <p className="mt-6 text-white/40">
+        &copy; {new Date().getFullYear()} Azavea Inc. All rights reserved. Omniply is a product of{' '}
+        <a href="https://azavea.ai" className="underline hover:text-white/70" rel="noopener">Azavea Inc.</a>
+      </p>
+    </footer>
+  )
+}
+
+/* ── Prose helpers for legal / info pages ────────────────────────────────── */
+export function ProsePage({ title, updated, children }: { title: string; updated?: string; children: React.ReactNode }) {
+  return (
+    <main>
+      <SiteHeader />
+      <Section>
+        <H2>{title}</H2>
+        {updated && <p className="mb-8 text-sm" style={{ color: TOKENS.muted }}>Last updated: {updated}</p>}
+        {children}
+      </Section>
+      <MarketingFooter />
+    </main>
+  )
+}
+
+export function H3({ children }: { children: React.ReactNode }) {
+  return <h3 className="mb-3 mt-10 text-xl font-bold">{children}</h3>
+}

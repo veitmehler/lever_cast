@@ -96,6 +96,7 @@ export async function provisionLocation(
 
   const billingToken = randomBytes(24).toString('base64url')
   const reviewToken = randomBytes(24).toString('base64url')
+  const dmToken = randomBytes(24).toString('base64url')
 
   const account = await prisma.account.create({
     data: {
@@ -105,6 +106,7 @@ export async function provisionLocation(
       paidThrough: new Date(Date.now() + 33 * 24 * 3600 * 1000),
       ghlBillingToken: billingToken,
       ghlReviewToken: reviewToken,
+      ghlDmToken: dmToken,
     },
   })
   const owner = await prisma.user.create({
@@ -138,6 +140,7 @@ export async function provisionLocation(
   await setCustomValues(locationId, minted.token, {
     omniply_billing_token: `${base}/api/ghl/billing-events/${billingToken}`,
     omniply_review_token: `${base}/api/ghl/reviews/${reviewToken}`,
+    omniply_dm_webhook: `${base}/api/agent/ghl-dm/${dmToken}`,
   })
 
   logger.info({ locationId, accountId: account.id, source, ownerEmail }, '[auto-provision] account provisioned')

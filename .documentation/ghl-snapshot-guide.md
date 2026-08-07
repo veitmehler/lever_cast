@@ -109,3 +109,71 @@ no PMS integration, GHL never owns booking (see the PMS strategy in
 - Review velocity at launch = newsletter/promo ask-blocks (our templates) + the branded
   QR counter card (lead-gen starter library) — automation joins when a connector lands.
 - Content AI disabled everywhere — one AI writes for the clinic, and it's ours.
+
+---
+
+## Social DM & Comment Automation (added 2026-08-07 — DM responder plan)
+
+Transport verified end-to-end on the Azavea location (FB + IG inbound to
+Conversations, outbound API replies 201 on both). Requires the marketplace
+app's four conversations scopes (bumped + re-granted 2026-08-07).
+
+### Workflow 1 — "AI DM Responder"
+- Trigger: **Customer Replied** (the builder offers NO per-channel filter —
+  fire on everything; the server filters to FB/IG and ignores the rest).
+- Condition: contact does NOT have tag `ai-off`.
+- Action: **Webhook POST** to `{{custom_values.omniply_dm_webhook}}` with
+  customData fields:
+  - `contact_id` = `{{contact.id}}`
+  - `message_body` = `{{message.body}}`
+  - `message_type` = `{{message.type}}`
+  - `direction` = `{{message.direction}}` (if available)
+- The endpoint (`/api/agent/ghl-dm/<token>`) enqueues and returns instantly;
+  the agent replies on the same channel. Payload parsing is tolerant — after
+  snapshot import, send one test DM and check api logs for `[agent-dm]
+  webhook` status `enqueued` (a `unparseable` status means the customData
+  keys need adjusting to match this list).
+
+### Workflow 2 — "Human Takeover Notify"
+- Trigger: **Tag added** = `ai-off`.
+- Actions: internal notification (SMS/email to assigned user): "🙋 Visitor
+  asked for a human — AI paused. Open the conversation." The agent applies
+  the tag itself via the `request_human` action (plus `human-requested`) and
+  leaves a summary note on the contact.
+- Manual takeover: front desk can add `ai-off` to any contact at any time;
+  remove the tag to resume the AI.
+
+### Workflows 3–9 — comment keywords (one per lead asset)
+- Trigger: **Facebook - Comment(s) on Post** / **Instagram - Comment(s) on
+  Post**, filter: comment text contains keyword (case-insensitive).
+- Actions: (1) send DM with the asset's **trigger link** (the same
+  per-location trigger links the email drip uses — attribution unified),
+  (2) public comment reply: "Just sent it to your DMs! 📩".
+- Keyword vocabulary (user-locked 2026-08-07):
+
+| Keyword | Asset |
+|---|---|
+| SPINE | 2-Minute Spine Check |
+| FIRST VISIT | First Visit Guide |
+| DESKTOP | Desktop Setup Guide |
+| SLEEP | Sleep Guide |
+| PAIN | Pain Signal Guide |
+| MORNING | Morning Routine Guide |
+| XRAY | Practice X-Ray (Azavea only) |
+
+- Caption side: the social CTA preset `dm_keyword` (custom text
+  `KEYWORD|asset description`) makes captions invite the comment. LinkedIn
+  has NO comment/DM automation (platform API restriction) — Azavea LinkedIn
+  posts use direct links instead.
+
+### Instagram connection checklist (cost a full debug session — do not skip)
+1. IG must be a Professional account linked to the location's Facebook page.
+2. In the IG app: Settings → Messages → **Allow access to messages** ON.
+3. In GHL Integrations, messaging rides the **"via Facebook page"** IG row —
+   enable messaging+automation there and REMOVE any "Direct Instagram"
+   connection (conflicts).
+4. If DMs still don't arrive: **Reconnect the Facebook integration** (re-
+   grants instagram_manage_messages + re-subscribes webhooks).
+5. Non-follower DMs sit in IG's **Requests folder**, invisible to tools until
+   accepted — acceptance unlocks FUTURE messages only. Front desk should
+   check Requests weekly.

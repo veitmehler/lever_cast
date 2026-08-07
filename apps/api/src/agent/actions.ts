@@ -41,6 +41,52 @@ async function contactIdFor(conversationId: string): Promise<string | null> {
   return row?.ghlContactId ?? null
 }
 
+async function conversationMeta(conversationId: string): Promise<{ channel: string; ghlContactId: string | null }> {
+  const row = await prisma.agentConversation.findUnique({
+    where: { id: conversationId },
+    select: { channel: true, ghlContactId: true },
+  })
+  return { channel: row?.channel ?? 'web', ghlContactId: row?.ghlContactId ?? null }
+}
+
+/** DM channel: a guide link sent in-chat still applies the drip tags. */
+async function executeDmGuideTags(
+  ctx: AgentContext,
+  conversationId: string,
+  slug: string,
+): Promise<void> {
+  const meta = await conversationMeta(conversationId)
+  if (meta.channel !== 'ghl-dm' || !meta.ghlContactId) return
+  const creds = await getGhlCredentials(ctx.ownerUserId)
+  if (!creds) return
+  const doc = await prisma.leadGenDocument.findFirst({
+    where: { accountId: ctx.accountId, slug, status: 'live' },
+    select: { ghlTagNames: true },
+  })
+  const tags = [...(doc?.ghlTagNames?.length ? doc.ghlTagNames : [`leadgen-${slug}`]), 'chat-agent-lead']
+  await addGhlContactTags(creds.apiKey, meta.ghlContactId, tags)
+  logger.info({ conversationId, slug }, '[agent] dm guide link → drip tags applied')
+}
+
+/** Visitor asked for a human: pause the AI (ai-off) + leave a handover note.
+ * The snapshot's tag-triggered workflow notifies the front desk. */
+async function executeRequestHuman(ctx: AgentContext, conversationId: string): Promise<void> {
+  const meta = await conversationMeta(conversationId)
+  if (!meta.ghlContactId) return
+  const creds = await getGhlCredentials(ctx.ownerUserId)
+  if (!creds) return
+  await addGhlContactTags(creds.apiKey, meta.ghlContactId, ['ai-off', 'human-requested'])
+  const summary = await callbackSummary(ctx, conversationId)
+  await createGhlContactNote(
+    creds.apiKey,
+    meta.ghlContactId,
+    ['🙋 Visitor asked for a HUMAN — AI is paused on this conversation.', summary ? `Chat summary: ${summary}` : null]
+      .filter(Boolean)
+      .join('\n'),
+  ).catch(() => {})
+  logger.info({ accountId: ctx.accountId, conversationId }, '[agent] human takeover requested — ai-off applied')
+}
+
 /** Compact transcript for the front-desk summary prompt. */
 async function transcriptFor(conversationId: string): Promise<string> {
   const rows = await prisma.agentMessage.findMany({
@@ -241,6 +287,12 @@ export async function executeAgentAction(
         break
       case 'add_contact_email':
         await executeAddEmail(ctx, conversationId, action)
+        break
+      case 'send_guide_link':
+        await executeDmGuideTags(ctx, conversationId, action.slug)
+        break
+      case 'request_human':
+        await executeRequestHuman(ctx, conversationId)
         break
       default:
         // send_booking_link / offer_guide render client-side; nothing to do.

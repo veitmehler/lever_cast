@@ -15,6 +15,7 @@ import {
 import { analyticsSyncHandler, AnalyticsSyncJobData } from './handlers/analytics'
 import { agentRetentionCleanupHandler } from './handlers/agent-retention'
 import { agentFinalizeHandler } from './handlers/agent-finalize'
+import { processDmTurn, type DmJobData } from './agent/dm'
 import { azaveaCadenceHandler } from './handlers/azavea-cadence'
 import { oauthStateCleanupHandler, OAuthCleanupJobData } from './handlers/oauth'
 import { dbBackupHandler, DbBackupJobData } from './handlers/backup'
@@ -150,6 +151,14 @@ async function main() {
     QUEUES.AGENT_FINALIZE,
     { batchSize: 1 },
     withSentry('agent-finalize', agentFinalizeHandler),
+  )
+
+  await boss.work<DmJobData>(
+    QUEUES.AGENT_DM_TURN,
+    { batchSize: 1 },
+    withSentry('agent-dm-turn', async (jobs) => {
+      for (const job of jobs) await processDmTurn(job.data)
+    }),
   )
 
   await boss.work(

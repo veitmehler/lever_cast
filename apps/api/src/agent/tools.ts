@@ -15,6 +15,7 @@ export type AgentAction =
   | { type: 'request_callback'; name: string; phone: string; reason: string }
   | { type: 'add_contact_email'; email: string }
   | { type: 'send_guide_link'; slug: string }
+  | { type: 'request_human' }
 
 export interface ActionContext {
   /** Slugs of guides that are live AND deliverable for this account. */
@@ -75,6 +76,9 @@ export function validateAction(raw: unknown, ctx: ActionContext): AgentAction | 
       if (!name || !validPhone(phone)) return null
       return { type: 'request_callback', name, phone, reason }
     }
+
+    case 'request_human':
+      return { type: 'request_human' }
 
     case 'send_guide_link': {
       const slug = str(a.slug, 80)

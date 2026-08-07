@@ -50,6 +50,8 @@ model Account {
   // Per-account URL token for the GHL Review-Received webhook receiver
   // (google-reviews plan Tier 3) — workflow posts to /api/ghl/reviews/<token>.
   ghlReviewToken  String?   @unique
+  // Social DM agent webhook token (custom value omniply_dm_webhook).
+  ghlDmToken     String?   @unique
   // Onboarding gate (.plans/ghl-onboarding.implementation-plan.md): first
   // generation is blocked until the chat onboarding completes (validator green).
   onboardingCompletedAt DateTime?

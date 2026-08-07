@@ -25,6 +25,7 @@ import {
   Faq,
   FaqJsonLd,
   type FaqEntry,
+  MarketingFooter,
 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
@@ -307,12 +308,7 @@ export default function ChiropractorsPage() {
       </Section>
 
       <FaqJsonLd items={FAQ_ITEMS} />
-      <footer className="px-6 py-10 text-center text-sm" style={{ background: TOKENS.inkDeep, color: 'rgba(255,255,255,0.55)' }}>
-        <p>Omniply &middot; Built for chiropractic practices</p>
-        <p className="mt-2">
-          <a href="/home" className="underline">Not a chiropractor? See the Omniply platform</a>
-        </p>
-      </footer>
+      <MarketingFooter />
     </main>
   )
 }

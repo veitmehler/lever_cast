@@ -649,3 +649,53 @@ export async function updateTriggerLink(
     return false
   }
 }
+
+/* ── Conversations (marketing contact form → GHL inbox) ───────────────────── */
+
+/** Find the contact's conversation or create one. Returns null on failure. */
+export async function findOrCreateGhlConversation(
+  apiKey: string,
+  locationId: string,
+  contactId: string,
+): Promise<string | null> {
+  try {
+    const found = await ghlRequest<{ conversations?: { id: string }[] }>(
+      apiKey,
+      `/conversations/search?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}`,
+    )
+    if (found.conversations?.length) return found.conversations[0].id
+  } catch {
+    // fall through to create
+  }
+  try {
+    const created = await ghlRequest<{ conversation?: { id: string }; id?: string }>(apiKey, '/conversations/', {
+      method: 'POST',
+      body: { locationId, contactId },
+    })
+    return created.conversation?.id ?? created.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Log an INBOUND message on a conversation so it lands in the GHL inbox like
+ * a visitor-sent message. Returns false when the API refuses (some message
+ * types need a registered conversation provider) — callers fall back to a
+ * contact note.
+ */
+export async function addGhlInboundMessage(
+  apiKey: string,
+  conversationId: string,
+  message: string,
+): Promise<boolean> {
+  try {
+    await ghlRequest(apiKey, '/conversations/messages/inbound', {
+      method: 'POST',
+      body: { type: 'SMS', conversationId, message, direction: 'inbound' },
+    })
+    return true
+  } catch {
+    return false
+  }
+}

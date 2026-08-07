@@ -28,6 +28,32 @@ prod Prisma `connection_limit=4&pool_timeout=20`; staging was already at 2/2;
 `SENTRY_ENVIRONMENT` now set on both droplets so staging errors stop paging as
 production (env backup: `/opt/socioply/.env.production.bak-20260731`).
 
+## 1b. Chat agent + Azavea (added 2026-08-06)
+
+- [ ] **C3 red-team — THE clinic-widget gate.** Suite must cover the rules locked in
+  testing: refusal under rephrasing, insurance boundaries, free-assessment terms,
+  dash-free output, KB-edit propagation, known-details memory + claim-possession
+  probes ("what's my number?"), multi-action contact convergence with mid-flow
+  detail changes, delivery-promise-without-attached-action. Precedes any clinic
+  widget install; the week of varied user testing + the new test-practice
+  onboarding (good KB) feeds it.
+- [ ] **Confirm the Azavea account's social timezone** before Fri Aug 7 (controls the
+  9/12/15 post slots). Approve article + social preview before 9am local for clean
+  spacing — late approval bunches past slots to ~10 min out.
+- [ ] **Verify the Azavea account→calendar link before every cadence milestone**
+  (`Account.articleCalendarId` → cmsgxchgk); it was found silently NULLed on
+  2026-08-06 — cadence no-ops without error when unlinked.
+- [ ] **Decide: ElevenLabs voice for Azavea?** Without it all video social slots render
+  as accent-tint carousels; with it, reels + hook videos unlock. Config-only.
+- [ ] **Metered-overage billing rail: decide WITH the voice agent build.** Leading:
+  GHL marketplace-app usage billing against the location wallet (verify
+  availability + rev share while building the app); fallback: Stripe metered items
+  on the GHL-created customer. Launch ships fair-use clause + existing
+  instrumentation only.
+- [ ] Compile the LinkedIn personal-profile backlog (long-form texts ready in DB);
+  sweep decision on the old pre-Omniply azavea.ai drafts; publish post 1402 when
+  article 1 should go live.
+
 ## 2. Platform arming (launch-day switches)
 
 - [ ] **Arm the auto-delete lifecycle** — the 60/90-day cancellation deletion path is

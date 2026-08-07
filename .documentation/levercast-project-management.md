@@ -642,7 +642,35 @@
 
 ---
 
-## Pending Tasks (Prioritized) — Current (July 2026)
+## Status Snapshot — August 2026 (current)
+
+Since the July section below: the platform became **multi-vertical**, gained a **customer-facing chat agent**, and Azavea (the company itself) became the pilot vertical dogfooding the whole pipeline for its own B2B marketing. Launch remains weeks away; C3 red-team is the sole remaining gate before clinic chat widgets.
+
+### Vertical platform + Azavea own-marketing (LIVE on prod)
+- **Single-instance multi-vertical architecture** (see `.plans/vertical-platform.implementation-plan.md`): `Account.vertical` + `PromptTemplate.vertical` with `@@unique([key, vertical])`, resolver falls back to `'default'` (chiro rows untouched → zero behavior change). Verticals = subdomain + data only; pipelines are invariant, only prompt copy adapts.
+- **Azavea vertical live on prod**: MWF article cadence from Aug 5 (`azavea-cadence` cron daily 08:00 UTC), 26 belief-arc topics through Oct 2 (framework #90 Problem→Solution→New Problem, honest-manual-protocol beat, ChatGPT-non-determinism objection handling), punchy hand-edited writing style, articles → azavea.ai WP as drafts + LinkedIn/Medium syndication + social batch (FB page / IG / LinkedIn **company** page — all three verified mapped; personal LinkedIn = manual long-form). First cold cadence run: **Fri Aug 7** (speed-to-lead). No EL voice on the account → video slots auto-convert to accent-tint carousels.
+- ⚠️ **Incident 2026-08-06**: prod Azavea account's `articleCalendarId` found NULLed (calendar + topics intact) — cadence would have silently no-opped. Relinked. **Check the calendar link before every cadence milestone.**
+- Article calibration closed at v8 (post 1402, "comprehensively satisfies" external Google-guidelines evaluation). Platform fixes found via the pilots (gate date-blindness, rewrite voice/dash/mention loss, analyzer sample-quoting, revise+minor coercion) shipped to both envs.
+
+### Chat agent v1 (C0–C2b + hardening batches COMPLETE; C3 = the gate)
+See `.plans/chat-agent-v1.implementation-plan.md` + `.plans/chat-kb-widget-refinements.implementation-plan.md`. Live on staging AND prod (hardened build):
+- Core engine (jsonMode single call, red-flag lexicon, negation-aware post-filter, dash backstop, $1.50/day budget → metered overage, $15 abuse ceiling, 180d retention), widget v4 (16px/no-iOS-zoom, dvh + visualViewport, scroll-lock, bigger mobile launcher, dwell teaser all devices), KB onboarding (Front Desk Questions step + KB review screen + Settings editor with instant cache-bust).
+- **Contact convergence** (2026-08-06): ONE GHL contact per conversation (first action creates with all known details, later actions update by id + tag-add); callback-backup email = deliberately-chosen → becomes PRIMARY email; KNOWN VISITOR DETAILS injected into the frame (exhaustive-list rule: not listed = NOT on file — never claim possession); inactivity finalizer cron (15 min idle → reconcile + one summary note for non-callback leads).
+- **Guide delivery rule (user-locked)**: captured guides deliver BY EMAIL ONLY (drip); in-chat card renders solely for email-decliners (`send_guide_link`). Capture requires only a valid email (name optional, backfills); validation-dropped actions flag the conversation (`action-dropped:<type>`) — no more silent promise-without-execution.
+- Live-verified E2E on the dev clinic: contact created, drip email delivered, single converged contact across guide→callback. Measured cost: ~$0.003/turn, ~3.4¢ for a long 11-turn conversation (~40+ such conversations/day inside the included budget). **Model decision: stays on Claude (Haiku) — data-compliance (no-training API defaults) outweighs OpenRouter/DeepSeek savings.**
+- **C3 red-team scope now also covers**: firm refusal under rephrasing, insurance boundaries, free-assessment compliance, dash-free output, KB-edit propagation, known-details memory, multi-action contact convergence with mid-flow detail changes, claim-possession hallucination ("what's my number?"), delivery-promise-without-action.
+
+### Operations
+- **Deliberate prompt pushes**: `packages/db/scripts/push-agent-prompts.ts <keys>` (overwrites from the seed file; the create-only seeder never does). Ships inside the API image — run in-container on prod.
+- **Manual deploy bypass (GH Actions outage, 2026-08-06)**: full runbook in `.documentation/manual-deploy-runbook.md` — build on the prod droplet over Tailscale, push to GHCR with droplet creds, replay the workflow scripts verbatim (in-flight gate, rollback tags, health check). Used twice same-day; both envs converged with the registry.
+- Staging Maps/Places: droplet IP 68.183.56.177 allowlisted on the Google key (was REQUEST_DENIED) — live open-now verdicts + weekly review harvest now cover staging.
+- WP plugin "Omniply Connect" review round 2 answered (readme Installation + empty-state explanation; print-only design means fresh installs correctly output nothing until the platform posts schema).
+
+### Deferred decisions (deliberate)
+- **Metered-overage billing**: defer until the voice agent (the real metered product). Leading option: GHL marketplace-app usage billing against the location wallet (verify availability/rev-share when building the app); fallback: Stripe metered items on the same GHL-created customer. Launch = fair-use clause + existing instrumentation.
+- Azavea newsletter = second wave; chiro calendar's 104 dropped angles = post-launch global decision; ElevenLabs voice for Azavea social videos = open user decision; Azavea social timezone to confirm before Fri Aug 7.
+
+## Pending Tasks (Prioritized) — July 2026 (prior snapshot; still-open items remain valid)
 
 ### Ship / Operations
 - ✅ **PRODUCTION DEPLOYED 2026-07-10**: `staging` → `main` fast-forward (124 commits, 28 migrations), `deploy-api.yml` green, droplet `GIT_SHA` verified, connection profile normal. `reseed-deai-prompts.ts` run on prod in-container (caption 203 was the one true overwrite; the nl_*/pl_* prompts were freshly created by the seed with the new text already). Verified on prod DB: 0 prompts left on retired Gemini 2.x models, all new prompt keys + chiro `PlainLanguageConfig` present
@@ -1433,8 +1461,8 @@
 
 ---
 
-**Last Updated**: July 9, 2026  
-**Project Status**: ✅ Staging-complete productized content platform — article, newsletter, and social pipelines fully automated with human review; weekly cadence per client (2 articles, 4 newsletters, 36 social posts); billing-window Content Plan in place ahead of Stripe; measured AI cost ≈ $50/client/month  
-**Where the detail lives**: per-feature design + status in `.plans/*.md`; this document is the top-level index  
-**Next Milestone**: Merge `staging` → `main` (heals prod Gemini outage) → Stripe billing integration → first paying clients on the automated cadence
+**Last Updated**: August 6, 2026  
+**Project Status**: ✅ Multi-vertical platform LIVE on prod — chiro content pipelines (articles/newsletters/social, review-gated) + GHL billing/lifecycle + GHL-embedded onboarding + customer chat agent (hardened, C3-gated for clinics) + Azavea vertical dogfooding the full pipeline for its own B2B marketing (MWF cadence live, first cold run Aug 7)  
+**Where the detail lives**: per-feature design + status in `.plans/*.md`; "Status Snapshot — August 2026" above is the current summary; this document is the top-level index  
+**Next Milestone**: Fri Aug 7 first cold Azavea cadence article → week of user chat-testing + new test-practice onboarding with a real KB → C3 red-team (clinic-widget gate) → launch prerequisites (GHL app + snapshot, rehearsal purchase, freeze week)
 

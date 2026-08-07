@@ -196,3 +196,41 @@ why it starts as soon as this plan is approved.
   recorded per account for surcharge billing (Stripe metering lands with the
   voice phase; v1 records + alerts). Abuse ceiling stays as a hard stop at
   ~10× the included budget to cap attack-driven bills.
+
+---
+
+## STATUS ADDENDUM — 2026-08-06 (current)
+
+C0–C2b COMPLETE and live on staging AND prod (post-outage manual deploys,
+main @ faf3a01). Since the original plan, three hardening batches landed —
+detail in `.plans/chat-kb-widget-refinements.implementation-plan.md`
+(sections E–H): KB onboarding + Settings editor, UX batch (guide cards →
+later superseded, greeting v2, dash elimination, teaser), and the
+contact-convergence + mobile batch.
+
+Behavior rules locked by user testing (2026-08-06), now part of the spec:
+1. ONE GHL contact per conversation — update-by-id convergence; the
+   callback-backup email is the deliberately-chosen PRIMARY email.
+2. KNOWN VISITOR DETAILS is exhaustive — the model must never claim a
+   detail is "on file" that isn't listed (hallucination found in testing).
+3. Captured guides deliver BY EMAIL ONLY; the in-chat card exists solely
+   for email-decliners (send_guide_link).
+4. capture_contact requires only a valid email (name optional — a required
+   name silently killed real captures); any validation-dropped action flags
+   the conversation (`action-dropped:<type>`).
+5. Finalizer cron (10-min sweep, 15-min idle): reconcile details onto the
+   contact + one summary note for non-callback leads. Inactivity IS the end
+   of a chat; time-sensitive effects stay inline.
+
+Measured economics (real test conversation): ~$0.003/turn, 3.4¢ for a long
+11-turn conversation → 40+ such/day inside the $1.50 budget. Model stays on
+Claude Haiku — data-compliance decision (no-training API defaults) beats
+OpenRouter/DeepSeek cost savings; admin model selector keeps the door open.
+
+**C3 red-team remains the sole clinic-widget gate.** Scope grew with each
+locked rule — the suite must cover: refusal under rephrasing, insurance
+boundaries, free-assessment terms, dash-free output, KB-edit propagation,
+known-details memory + claim-possession probes ("what's my number?"),
+multi-action convergence with mid-flow detail changes, and
+delivery-promise-without-action detection. Next: a week of varied user
+testing + a new test practice with a good KB, then C3.

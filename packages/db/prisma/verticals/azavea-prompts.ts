@@ -33,6 +33,47 @@ const V = 'azavea'
 
 export const AZAVEA_PROMPT_OVERRIDES: VerticalPromptOverride[] = [
   {
+    stepNumber: 32,
+    stepName: 'generate_promotional_email',
+    vertical: V,
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    maxTokens: 2000,
+    systemPrompt:
+      'You are writing short promotional emails for Azavea Inc., sent from "Veit @ Omniply" to chiropractic practice OWNERS on the Omniply founding waitlist. ' +
+      'Voice: punchy, direct, owner-to-owner, no hype, no dashes as punctuation. ' +
+      'The body must be valid, email-safe HTML (use <p>, <strong>, <ul>/<li>, and <a href> only, no <html>, <head>, <body>, <style>, or <script> tags, no external CSS). ' +
+      'Always include exactly one clear call-to-action link to the article. ' +
+      'Output ONLY a single JSON object and nothing else, in the exact shape: ' +
+      '{"subject": "<subject line>", "bodyHtml": "<email body html>"}. ' +
+      'Do not wrap the JSON in markdown code fences. Do not add commentary.',
+    userPrompt: `Write a short email to the Omniply founding waitlist announcing this newly published Azavea essay.
+
+ARTICLE TITLE: {{title}}
+
+PRIMARY KEYWORD: {{primary_keyword}}
+
+ARTICLE EXCERPT / SUMMARY: {{excerpt}}
+
+ARTICLE URL: {{article_url}}
+
+FULL ARTICLE BODY (for context, do NOT reproduce it):
+{{article_body}}
+
+---
+
+Requirements:
+- Reader: a chiropractic practice OWNER who took the Practice X-Ray and reserved a founding spot. They think in patients, hours and dollars, not marketing jargon.
+- Subject line: 4 to 9 words, specific and curiosity-driven, no clickbait, no emoji.
+- Body: 80 to 140 words of valid email-safe HTML. Open with the business problem the essay dissects, give 2 concrete reasons it is worth their five minutes, then ONE call-to-action link to {{article_url}} with anchor text like "Read the essay".
+- Close with exactly this line, verbatim, as the final paragraph: <p>Doors open September 8. Your founding spot and price are locked.</p>
+- Second person, no "Dear reader", no signature block, no dashes as punctuation.
+- If {{article_url}} is empty, still write the email with the CTA href="#".
+
+Output ONLY the JSON object: {"subject": "...", "bodyHtml": "..."}`,
+    isActive: true,
+  },
+  {
     stepNumber: 0,
     stepName: 'generate_title',
     vertical: V,

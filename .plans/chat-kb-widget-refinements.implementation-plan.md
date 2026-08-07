@@ -156,3 +156,31 @@ Deliberate prompt pushes now go through
 prisma/agent-prompts.ts; the seeder stays create-only). Widget snippet is at
 `widget.js?v=4`. C3 red-team must stress multi-action conversations with
 details changed mid-flow.
+
+### H-addendum — three same-day fixes from live phone testing (2026-08-06, all deployed both envs)
+
+1. **Silent capture drop** (cbe0e0b): fresh-conversation guide flow asked
+   email-only; the model attached capture_contact without a name and
+   validation dropped it while the reply claimed "guide sent" — no card, no
+   Drive grant, no contact. Fixed in three layers: name now OPTIONAL on
+   capture (email alone delivers; known-details reconciliation backfills),
+   explicit GUIDE FLOW in the system prompt (ask first name + email
+   together; never claim delivery without attaching the action), and any
+   validation-dropped action flags the conversation
+   (`action-dropped:<type>`) + logs.
+2. **Delivery rule locked** (c248096; user: guides must NEVER appear in
+   chat): captured guides deliver BY EMAIL ONLY (drip); the in-chat card
+   renders solely on send_guide_link (email-decliner fallback).
+   `guideFor()` linkable = send_guide_link only. (Original C2b design
+   showed the card after capture too — masked in testing by callback paths
+   and then by bug #1; rejected on first sight.)
+3. **Claim-possession hallucination** (5ce7f44, prompt-only): with name +
+   email known, the model told a visitor "I have your number on file" (it
+   had no phone). Anti-re-ask pressure over-generalized into assumed
+   possession. Prompts now state the exhaustive-list rule (not listed = NOT
+   on file, never claim it), callback flow gained step 0 (no phone anywhere
+   → ask, never claim), and the frame header marks the list COMPLETE.
+
+E2E confirmed by the user after the fixes: GHL contact created, drip email
+delivered, single converged contact across guide→callback in one
+conversation.

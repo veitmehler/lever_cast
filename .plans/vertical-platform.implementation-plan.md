@@ -189,3 +189,32 @@ DNS/WP plumbing, not implementation.
 - No new repos, projects, or deployments.
 - No osteo (or any second) vertical yet — but V0+V2+V4 make it a data-only
   exercise when it comes.
+
+---
+
+## STATUS ADDENDUM — 2026-08-06 (current)
+
+V0–V4 COMPLETE; Azavea vertical LIVE ON PROD with the MWF cadence
+(azavea-cadence cron daily 08:00 UTC; account cmsgxchcf, calendar cmsgxchgk,
+26 belief-arc topics Aug 5–Oct 2; framework #90 pinned, isActive:false).
+Article calibration closed at v8 (WP post 1402): belief arc + honest-manual
+-protocol beat + objection FAQs + E-E-A-T signals; external Google-guidelines
+evaluation: "comprehensively satisfies". First COLD cadence run: Fri Aug 7
+(speed-to-lead) → review → Publish → WP draft + LinkedIn/Medium syndication
++ social batch.
+
+Social: GHL accountIds verified on prod — Facebook page 1161919113682494,
+Instagram 17841442150320188, LinkedIn COMPANY page 107216928 (personal
+profile = manual long-form). No EL voice on the account → all video slots
+auto-convert to accent-tint carousels (non-EL conversion). Article-on-
+newsletter-day runs fall back to the Tuesday article slot set (3 feed posts
+9/12/15 local + 3 FB/IG stories per article day).
+
+⚠️ INCIDENT (2026-08-06): prod account's articleCalendarId found NULL
+(calendar intact, zero links) — cadence would have silently no-opped.
+Relinked. Guard: verify the account→calendar link before every cadence
+milestone; likely collateral from the staging-disable operation.
+
+Open: Azavea social timezone confirm (pre-Aug-7), EL voice decision for
+video formats, newsletter second wave (V3f), LinkedIn personal backlog
+compile, old pre-Omniply drafts sweep.

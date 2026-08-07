@@ -94,10 +94,30 @@ export async function resolveArticleSlot(
     return { slot, diagramBackground: null } // hook video uses Seedance, not the diagram image
   }
 
-  // art_hook_other — a real content section that is NOT the day's diagram-carousel
-  // section (diagram[0]); never a non-content section like "Key Takeaways".
   const diagramHeading = diagrams[0]?.sectionTitle?.trim()
   const secs = contentSections(ctx)
+
+  if (source === 'art_hook_unused') {
+    // A section NO other slot has used across BOTH days: not diagram[0]
+    // (day-1 carousel + day-2 hook), not diagram[1] (day-2 carousel), and
+    // not art_hook_other's pick (the first non-diagram[0] section).
+    const diagram1Heading = diagrams[1]?.sectionTitle?.trim()
+    const hookOtherHeading = secs.find((s) => s.heading.trim() !== diagramHeading)?.heading.trim()
+    const used = new Set([diagramHeading, diagram1Heading, hookOtherHeading].filter(Boolean))
+    const unused =
+      secs.find((s) => !used.has(s.heading.trim())) ??
+      // Short articles: fall back to any non-diagram[0] section beyond the
+      // hook_other pick, then rotate deterministically.
+      secs.find((s) => s.heading.trim() !== diagramHeading && s.heading.trim() !== hookOtherHeading) ??
+      (secs.length ? secs[2 % secs.length] : undefined)
+    const slot: SlotContent = unused
+      ? { text: unused.text, title: unused.heading }
+      : { text: ctx.h2SectionText, title: ctx.h2Title }
+    return { slot, diagramBackground: null }
+  }
+
+  // art_hook_other — a real content section that is NOT the day's diagram-carousel
+  // section (diagram[0]); never a non-content section like "Key Takeaways".
   const other = secs.find((s) => s.heading.trim() !== diagramHeading) ?? secs[0]
   const slot: SlotContent = other
     ? { text: other.text, title: other.heading }

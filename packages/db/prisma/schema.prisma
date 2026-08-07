@@ -363,6 +363,9 @@ model SocialAutomationRun {
   id             String                       @id @default(cuid())
   userId         String
   user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Null = the standard day-1 slot set for the weekday. 'article_day2' =
+  // azavea companion run (publish day + 1) using the unused-sections set.
+  slotVariant    String?
   jobId          String?
   job            ArticleJob?                  @relation(fields: [jobId], references: [id], onDelete: SetNull)
   sitePageId     String?

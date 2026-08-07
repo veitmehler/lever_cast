@@ -2,7 +2,7 @@ import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from './log-context'
 import { ensureRunSlideCount } from './slide-count'
-import { matrixForDay, storySlotsForDay, applyVoiceCapability, type DaySlot } from './weekly-matrix'
+import { matrixForDay, storySlotsForDay, applyVoiceCapability, ARTICLE_DAY2_SLOTS, type DaySlot } from './weekly-matrix'
 import { accountHasVoice } from '../../lib/elevenlabs/settings'
 import { buildMatrixRunContext, processMatrixSlot } from './matrix-processor'
 import { processStorySlot } from './story-processor'
@@ -27,8 +27,16 @@ interface SlotEntry {
 }
 
 /** The 3 matrix slots for a run, keyed P1/P2/P3 in time order. */
-function slotEntriesForRun(kind: 'article' | 'newsletter', scheduledDate: string, hasVoice: boolean): SlotEntry[] {
-  const slots = applyVoiceCapability(matrixForDay(kind, isoWeekdayOf(scheduledDate)), hasVoice)
+function slotEntriesForRun(
+  kind: 'article' | 'newsletter',
+  scheduledDate: string,
+  hasVoice: boolean,
+  slotVariant?: string | null,
+): SlotEntry[] {
+  // Azavea companion run (publish day + 1): fixed unused-sections set,
+  // independent of the weekday's matrix.
+  const base = slotVariant === 'article_day2' ? ARTICLE_DAY2_SLOTS : matrixForDay(kind, isoWeekdayOf(scheduledDate))
+  const slots = applyVoiceCapability(base, hasVoice)
   return slots.map((daySlot, i) => ({ slotKey: `P${i + 1}`, daySlot }))
 }
 
@@ -73,7 +81,7 @@ export async function runSocialAutomation(
   // Story derivation runs on the transformed entries, so pitch_hook companions
   // become pitch_carousel automatically.
   const hasVoice = await accountHasVoice(run.userId)
-  const feedEntries = slotEntriesForRun(kind, run.scheduledDate, hasVoice)
+  const feedEntries = slotEntriesForRun(kind, run.scheduledDate, hasVoice, run.slotVariant)
   const storySlots = storySlotsForDay(kind, feedEntries)
   if (!hasVoice) {
     logger.info({ runId }, '[social-automation] no working voice — video slots substituted with accent carousels')

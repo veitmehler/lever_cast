@@ -9,7 +9,7 @@ import { useState } from 'react'
 import { TOKENS } from '@/components/marketing/Marketing'
 
 const FIELD =
-  'w-full bg-transparent border-0 border-b py-3 text-[18px] outline-none transition-colors placeholder:opacity-50'
+  'w-full bg-transparent border-0 border-b py-3 text-[18px] text-white outline-none transition-colors placeholder:opacity-40 focus:border-[#C3F43B]'
 
 export function ContactForm() {
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
@@ -42,7 +42,7 @@ export function ContactForm() {
   if (state === 'sent') {
     return (
       <div className="rounded-xl px-6 py-10 text-center" style={{ background: 'rgba(132,180,32,0.08)' }}>
-        <p className="text-xl font-bold" style={{ color: TOKENS.accentDeep }}>Message sent.</p>
+        <p className="text-xl font-bold" style={{ color: TOKENS.lime }}>Message sent.</p>
         <p className="mt-2 text-[18px]" style={{ color: TOKENS.muted }}>
           We read every message and reply within one business day.
         </p>
@@ -54,25 +54,25 @@ export function ContactForm() {
     <form onSubmit={onSubmit} className="space-y-8">
       <div className="grid gap-8 md:grid-cols-2">
         <label className="block">
-          <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.accentDeep }}>Name</span>
-          <input name="name" required maxLength={100} placeholder="Dr. Jane Miller" className={FIELD} style={{ borderColor: TOKENS.line }} />
+          <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.lime }}>Name</span>
+          <input name="name" required maxLength={100} placeholder="Dr. Jane Miller" className={FIELD} style={{ borderColor: "rgba(255,255,255,0.28)" }} />
         </label>
         <label className="block">
-          <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.accentDeep }}>Email</span>
-          <input name="email" type="email" required maxLength={254} placeholder="you@yourpractice.com" className={FIELD} style={{ borderColor: TOKENS.line }} />
+          <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.lime }}>Email</span>
+          <input name="email" type="email" required maxLength={254} placeholder="you@yourpractice.com" className={FIELD} style={{ borderColor: "rgba(255,255,255,0.28)" }} />
         </label>
       </div>
       <label className="block">
-        <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.accentDeep }}>Practice (optional)</span>
-        <input name="practice" maxLength={150} placeholder="Your practice name and city" className={FIELD} style={{ borderColor: TOKENS.line }} />
+        <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.lime }}>Practice (optional)</span>
+        <input name="practice" maxLength={150} placeholder="Your practice name and city" className={FIELD} style={{ borderColor: "rgba(255,255,255,0.28)" }} />
       </label>
       <label className="block">
-        <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.accentDeep }}>Message</span>
-        <textarea name="message" required maxLength={4000} rows={5} placeholder="What would you like to know?" className={`${FIELD} resize-none`} style={{ borderColor: TOKENS.line }} />
+        <span className="text-sm font-bold uppercase tracking-[0.14em]" style={{ color: TOKENS.lime }}>Message</span>
+        <textarea name="message" required maxLength={4000} rows={5} placeholder="What would you like to know?" className={`${FIELD} resize-none`} style={{ borderColor: "rgba(255,255,255,0.28)" }} />
       </label>
       {/* Honeypot: hidden from humans, filled by naive bots */}
       <input name="website" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden="true" />
-      {state === 'error' && <p className="text-[16px]" style={{ color: '#B4231F' }}>{error}</p>}
+      {state === 'error' && <p className="text-[16px]" style={{ color: '#FF8A80' }}>{error}</p>}
       <button
         type="submit"
         disabled={state === 'sending'}

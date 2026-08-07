@@ -11,7 +11,7 @@ export default function ContactPage() {
   return (
     <main>
       <SiteHeader />
-      <Section>
+      <Section dark>
         <H2>Talk to us.</H2>
         <P lead>
           Questions about the platform, your practice, or whether Omniply fits: send them over. A human

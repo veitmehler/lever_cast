@@ -699,3 +699,29 @@ export async function addGhlInboundMessage(
     return false
   }
 }
+
+/** Contact tags (DM agent: ai-off human-takeover check). Empty array on failure. */
+export async function getGhlContactTags(apiKey: string, contactId: string): Promise<string[]> {
+  try {
+    const data = await ghlRequest<{ contact?: { tags?: string[] } }>(apiKey, `/contacts/${contactId}`)
+    return data.contact?.tags ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Send an outbound conversation message on a native channel (IG/FB/SMS…). */
+export async function sendGhlConversationMessage(
+  apiKey: string,
+  opts: { type: string; contactId: string; message: string },
+): Promise<boolean> {
+  try {
+    await ghlRequest(apiKey, '/conversations/messages', {
+      method: 'POST',
+      body: { type: opts.type, contactId: opts.contactId, message: opts.message },
+    })
+    return true
+  } catch {
+    return false
+  }
+}

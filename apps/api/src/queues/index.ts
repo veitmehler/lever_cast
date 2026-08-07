@@ -83,6 +83,7 @@ export const QUEUES = {
   OAUTH_STATE_CLEANUP: 'oauth-state-cleanup',
   AGENT_RETENTION_CLEANUP: 'agent-retention-cleanup',
   AGENT_FINALIZE: 'agent-finalize',
+  AGENT_DM_TURN: 'agent-dm-turn',
   AZAVEA_CADENCE: 'azavea-cadence',
   DB_BACKUP: 'db-backup',
   PG_CONN_MONITOR: 'pg-conn-monitor',

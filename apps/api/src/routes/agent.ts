@@ -18,6 +18,8 @@ import { randomBytes } from 'node:crypto'
 import { prisma, canonicalAccountUserId, brandSettingsForUser } from '@omniply/shared'
 import { resolvePromptByKey } from '../lib/prompt-resolver'
 import { logger } from '../lib/logger'
+import { acceptDmWebhook, type DmJobData } from '../agent/dm'
+import { getBoss, QUEUES } from '../queues/index'
 import { requireAuth } from '../middleware/auth'
 import { fillPrompt } from '../newsletter/llm'
 import { agentContextForAccount, clearAgentContextFor } from '../agent/context'
@@ -44,6 +46,27 @@ export async function agentRoutes(app: FastifyInstance) {
     reply.header('Cache-Control', 'public, max-age=3600')
     return AGENT_LOADER_JS
   })
+
+  // Social DM transport webhook (snapshot workflow "AI DM Responder").
+  // Token-addressed per account (custom value omniply_dm_webhook). Enqueues
+  // and returns fast — GHL webhook timeouts never wait on the LLM.
+  app.post<{ Params: { token: string } }>(
+    '/agent/ghl-dm/:token',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const status = await acceptDmWebhook(
+        request.params.token,
+        (request.body ?? {}) as Record<string, unknown>,
+        async (data: DmJobData) => {
+          const boss = await getBoss()
+          await boss.send(QUEUES.AGENT_DM_TURN, data, { expireInSeconds: 300 })
+        },
+      )
+      if (status === 'unknown-token') return reply.status(404).send({ error: 'unknown token' })
+      logger.info({ status }, '[agent-dm] webhook')
+      return reply.send({ ok: true, status })
+    },
+  )
 
   // The chat panel the loader iframes (same-origin /boot + /chat calls).
   app.get('/agent/w/:token', async (request, reply) => {

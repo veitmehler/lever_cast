@@ -59,6 +59,14 @@ export function resolveSocialCta(
       return `Encourage readers to book an appointment with us ${linkPhrase}.`
     case 'custom':
       return customText
+    case 'dm_keyword': {
+      // customText = 'KEYWORD|asset description', e.g. 'SPINE|our 2-Minute
+      // Spine Check'. Comment automation (snapshot workflows) DMs the trigger
+      // link when the keyword appears in a comment (DM responder plan D3).
+      const [keyword, asset] = customText.split('|').map((s) => s.trim())
+      if (!keyword) return customText
+      return `Invite readers to comment the word "${keyword.toUpperCase()}" on this post to get ${asset || 'our free guide'} sent to them by direct message.`
+    }
     default:
       // Legacy / unset — inject the raw custom text exactly as before.
       return customText

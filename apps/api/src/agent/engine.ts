@@ -40,6 +40,10 @@ export interface TurnInput {
   conversationId?: string | null
   visitorKey: string
   message: string
+  /** 'web' (widget, default) or 'ghl-dm' (social DM transport). */
+  channel?: 'web' | 'ghl-dm'
+  /** DM transport: the GHL contact behind the thread (contact exists from birth). */
+  ghlContactId?: string | null
 }
 
 export interface TurnResult {
@@ -143,14 +147,32 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
   if (input.conversationId && (!conversation || conversation.accountId !== input.accountId || conversation.visitorKey !== input.visitorKey)) {
     throw new AgentTurnError('bad-conversation')
   }
+  const channel = input.channel ?? 'web'
+
+  // DM threads are long-lived: find the latest conversation for this visitor
+  // instead of requiring the caller to track ids across webhook calls.
+  if (!conversation && channel === 'ghl-dm') {
+    conversation = await prisma.agentConversation.findFirst({
+      where: { accountId: input.accountId, visitorKey: input.visitorKey, channel },
+      orderBy: { createdAt: 'desc' },
+    })
+    // Turn-capped DM thread: roll over to a fresh conversation (cost control
+    // per conversation without ever bricking the social thread).
+    if (conversation && conversation.turnCount >= MAX_VISITOR_TURNS) conversation = null
+  }
   conversation ??= await prisma.agentConversation.create({
-    data: { accountId: input.accountId, visitorKey: input.visitorKey },
+    data: {
+      accountId: input.accountId,
+      visitorKey: input.visitorKey,
+      channel,
+      ...(input.ghlContactId ? { ghlContactId: input.ghlContactId } : {}),
+    },
   })
 
   const base = { conversationId: conversation.id, bookingUrl: ctx.bookingUrl, guideTitle: null as string | null, guideLink: null as string | null }
 
   // ── Pre-filters (no LLM) ─────────────────────────────────────────────────
-  if (conversation.turnCount >= MAX_VISITOR_TURNS) {
+  if (channel !== 'ghl-dm' && conversation.turnCount >= MAX_VISITOR_TURNS) {
     const reply = `We've covered a lot! For anything more, the ${ctx.practiceName} front desk is the best next step${ctx.phone ? `: ${ctx.phone}` : ''}.`
     await persistTurn({ conversationId: conversation.id, visitorText: message, reply, action: null, filtered: false, endedReason: 'turn-cap' })
     return { ...base, reply, action: null, ended: 'turn-cap' }
@@ -212,6 +234,15 @@ export async function runAgentTurn(input: TurnInput): Promise<TurnResult> {
     knowledge: ctx.knowledge,
     openStatus,
     knownDetails: knownDetailsPromptBlock(known),
+    channelStyle:
+      channel === 'ghl-dm'
+        ? [
+            '=== CHANNEL: SOCIAL DM (Facebook/Instagram) ===',
+            'Replies MUST be 1 to 3 short sentences. No markdown, no headers, no bullet lists. Links pasted as plain URLs.',
+            'Guides: when the visitor wants a guide, attach send_guide_link IMMEDIATELY. Never ask for an email address; the link arrives right here in the chat.',
+            'Human handoff: if the visitor asks for a human, a real person, or to stop talking to a bot, attach request_human and say a team member will take over this conversation shortly.',
+          ].join('\n')
+        : '',
     guides: ctx.guides.map((g) => `${g.slug} — ${g.title}`).join('\n') || '(none)',
     history: history || '(first message)',
     message,

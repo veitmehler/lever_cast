@@ -23,3 +23,15 @@ describe('resolveSocialCta', () => {
     expect(resolveSocialCta(undefined, '')).toBe('')
   })
 })
+
+describe('dm_keyword preset (comment-to-DM automation)', () => {
+  it('emits a comment-keyword CTA from KEYWORD|asset custom text', () => {
+    const cta = resolveSocialCta('dm_keyword', 'spine|our 2-Minute Spine Check')
+    expect(cta).toMatch(/comment the word "SPINE"/)
+    expect(cta).toMatch(/2-Minute Spine Check/)
+    expect(cta).toMatch(/direct message/)
+  })
+  it('degrades to raw text when no keyword present', () => {
+    expect(resolveSocialCta('dm_keyword', '')).toBe('')
+  })
+})

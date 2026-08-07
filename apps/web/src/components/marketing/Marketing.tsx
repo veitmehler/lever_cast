@@ -490,9 +490,9 @@ export function ProsePage({ title, updated, children }: { title: string; updated
   return (
     <main>
       <SiteHeader />
-      <Section>
+      <Section dark>
         <H2>{title}</H2>
-        {updated && <p className="mb-8 text-sm" style={{ color: TOKENS.muted }}>Last updated: {updated}</p>}
+        {updated && <p className="mb-8 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>Last updated: {updated}</p>}
         {children}
       </Section>
       <MarketingFooter />

@@ -58,3 +58,15 @@ describe('matrixForDay', () => {
     expect(matrixForDay('newsletter', 2)).toBe(DEFAULT_WEEKLY_SOCIAL_MATRIX[1])
   })
 })
+
+describe('ARTICLE_DAY2_SLOTS (azavea 6-day cadence)', () => {
+  it('is a 3-slot article-only set with no Key-Takeaways repeat', async () => {
+    const { ARTICLE_DAY2_SLOTS, sourceKind, applyVoiceCapability } = await import('../weekly-matrix')
+    expect(ARTICLE_DAY2_SLOTS).toHaveLength(3)
+    for (const s of ARTICLE_DAY2_SLOTS) expect(sourceKind(s.source)).toBe('article')
+    expect(ARTICLE_DAY2_SLOTS.map((s) => s.source)).not.toContain('art_keytakeaways')
+    // No-voice accounts (azavea today): every slot renders as a carousel.
+    const noVoice = applyVoiceCapability(ARTICLE_DAY2_SLOTS, false)
+    expect(noVoice.every((s) => s.postType === 'carousel')).toBe(true)
+  })
+})

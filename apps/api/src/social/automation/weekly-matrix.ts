@@ -19,6 +19,7 @@ export type PostSource =
   | 'art_keytakeaways' // reel bullets from Key Takeaways
   | 'art_hook_diagram0' // hook video from the 1st diagram section
   | 'art_hook_other' // hook video from a section ≠ that day's diagram-carousel section
+  | 'art_hook_unused' // hook from a section no other slot (either day) has used
 
 export type SourceKind = 'newsletter' | 'article'
 
@@ -90,7 +91,21 @@ const ARTICLE_SOURCES: ReadonlySet<PostSource> = new Set([
   'art_keytakeaways',
   'art_hook_diagram0',
   'art_hook_other',
+  'art_hook_unused',
 ])
+
+/**
+ * Azavea 6-day cadence: each MWF article gets a SECOND run the next day
+ * (Tue/Thu/Sat) drawing on sections day 1 didn't use. Thursday's set with
+ * the Key-Takeaways repeat swapped for a hook from an untouched section
+ * (user decision 2026-08-07). Runs with slotVariant 'article_day2' use this
+ * set regardless of weekday.
+ */
+export const ARTICLE_DAY2_SLOTS: DaySlot[] = [
+  { hour: 9, postType: 'hook_video', source: 'art_hook_diagram0' },
+  { hour: 12, postType: 'hook_video', source: 'art_hook_unused' },
+  { hour: 15, postType: 'carousel', source: 'art_diagram_1' },
+]
 
 export function sourceKind(source: PostSource): SourceKind {
   return ARTICLE_SOURCES.has(source) ? 'article' : 'newsletter'

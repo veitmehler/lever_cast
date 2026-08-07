@@ -2,6 +2,15 @@ import { prisma } from '@omniply/shared'
 import { getBoss, QUEUES } from '../../queues/index'
 import { formatScheduledDate, utcDateKey } from './schedule'
 import { generationGateForUser } from '../../lib/account-billing'
+import { verticalForUser } from '../../lib/prompt-resolver'
+import { logger } from '../../lib/logger'
+
+/** YYYY-MM-DD + n days (UTC-safe). */
+function addDays(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, (d ?? 1) + days))
+  return dt.toISOString().slice(0, 10)
+}
 
 /**
  * How long pg-boss lets a SOCIAL_GENERATE job sit `active` before expiring it.
@@ -36,9 +45,12 @@ export async function enqueueSocialAutomation(
   // weekday matrix). Post times still apply the user's timezone via slotToUtc.
   const scheduledDate = utcDateKey(opts.publishingDate)
 
+  // Guards are scoped to the day-1 run (slotVariant null) — the azavea
+  // companion run below has its own idempotency check.
   const inProgress = await prisma.socialAutomationRun.findFirst({
     where: {
       jobId: opts.jobId,
+      slotVariant: null,
       status: { in: ['pending', 'processing', 'scheduling'] },
     },
   })
@@ -47,7 +59,7 @@ export async function enqueueSocialAutomation(
   }
 
   const awaitingApproval = await prisma.socialAutomationRun.findFirst({
-    where: { jobId: opts.jobId, status: 'ready' },
+    where: { jobId: opts.jobId, slotVariant: null, status: 'ready' },
   })
   if (awaitingApproval) {
     return {
@@ -58,7 +70,7 @@ export async function enqueueSocialAutomation(
   }
 
   const completed = await prisma.socialAutomationRun.findFirst({
-    where: { jobId: opts.jobId, status: 'completed' },
+    where: { jobId: opts.jobId, slotVariant: null, status: 'completed' },
   })
   if (completed) {
     return { runId: completed.id, enqueued: false, message: 'Social set already scheduled for this article' }
@@ -84,6 +96,44 @@ export async function enqueueSocialAutomation(
       expireInSeconds: SOCIAL_GENERATE_EXPIRE_SECONDS,
     },
   )
+
+  // Azavea 6-day cadence (user-locked 2026-08-07): each article also gets a
+  // companion run the NEXT day (Tue/Thu/Sat) from sections day 1 didn't use
+  // (ARTICLE_DAY2_SLOTS). Both runs generate now → one review sitting; only
+  // the scheduled dates differ. Azavea-only; clinics keep the single run.
+  try {
+    if ((await verticalForUser(opts.userId)) === 'azavea') {
+      const existingDay2 = await prisma.socialAutomationRun.findFirst({
+        where: { jobId: opts.jobId, slotVariant: 'article_day2', status: { not: 'failed' } },
+      })
+      if (!existingDay2) {
+        const day2Date = addDays(scheduledDate, 1)
+        const day2 = await prisma.socialAutomationRun.create({
+          data: {
+            userId: opts.userId,
+            jobId: opts.jobId,
+            sitePageId: opts.sitePageId,
+            scheduledDate: day2Date,
+            slotVariant: 'article_day2',
+            status: 'pending',
+            groupId: `${opts.jobId}-${day2Date}`,
+          },
+        })
+        await boss.send(
+          QUEUES.SOCIAL_GENERATE,
+          { runId: day2.id },
+          {
+            singletonKey: `social-generate-${opts.jobId}-day2`,
+            expireInSeconds: SOCIAL_GENERATE_EXPIRE_SECONDS,
+          },
+        )
+        logger.info({ jobId: opts.jobId, day2RunId: day2.id, day2Date }, '[social-automation] azavea day-2 companion run enqueued')
+      }
+    }
+  } catch (err) {
+    // The day-1 run is already committed — never fail the enqueue over the companion.
+    logger.error({ err, jobId: opts.jobId }, '[social-automation] azavea day-2 companion enqueue failed')
+  }
 
   return { runId: run.id, enqueued: true }
 }

@@ -101,10 +101,15 @@ export async function processDmTurn(data: DmJobData): Promise<void> {
     return
   }
 
-  // Human-takeover check (layer 2 — the workflow also filters on the tag).
+  // Suppression check (layer 2 — the workflow also filters on these tags):
+  // 'ai-off' = human takeover; 'in comment reply workflow' = the contact is
+  // inside a scripted comment-reply funnel, which owns the thread until it
+  // removes the tag (then the agent inherits open-ended Q&A).
+  const SUPPRESS_TAGS = ['ai-off', 'in comment reply workflow']
   const tags = await getGhlContactTags(creds.apiKey, data.contactId)
-  if (tags.some((t) => t.toLowerCase() === 'ai-off')) {
-    logger.info({ accountId: data.accountId, contactId: data.contactId }, '[agent-dm] ai-off — skipping')
+  const hit = tags.find((t) => SUPPRESS_TAGS.includes(t.toLowerCase().trim()))
+  if (hit) {
+    logger.info({ accountId: data.accountId, contactId: data.contactId, tag: hit }, '[agent-dm] suppressed — skipping')
     return
   }
 

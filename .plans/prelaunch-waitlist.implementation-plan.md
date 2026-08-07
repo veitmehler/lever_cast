@@ -1,6 +1,6 @@
 # Pre-Launch Waitlist — implementation plan
 
-**Status: PLAN — 2026-08-07. Decisions locked by user: (1) founding cohort =
+**Status: CODE SIDE IMPLEMENTED + DEPLOYED both envs 2026-08-07 (c525d43/ef5264e): P1 gate, P2 block+endpoints (live-verified: join ok, tags applied), P3 promo enabled on Azavea (tag gWUF1AO8a7tPalVjzOcu, from 'Veit @ Omniply' <azavea@azavea.ai>, azavea step-32 override seeded). REMAINING: P4 GHL workflows (user, copy below), azavea.ai sending-domain verification (user), spot count decision. Original decisions:** (1) founding cohort =
 Do It WITH You concierge onboarding + locked founders price; (2) HARD gate on
 checkout until launch; (3) weekly nurture = the existing per-article promo
 email machinery pointed at the waitlist tag.**

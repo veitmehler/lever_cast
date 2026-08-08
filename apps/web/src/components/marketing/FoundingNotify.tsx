@@ -71,7 +71,7 @@ export function FoundingNotify() {
       <div className="text-center text-3xl font-bold md:text-4xl" style={{ color: TOKENS.lime }}>
         Omniply opens September&nbsp;8
       </div>
-      <p className="text-[18px] leading-relaxed md:text-[20px]" style={{ padding: '30px 0' }}>
+      <p className="text-center text-[18px] leading-relaxed md:text-[20px]" style={{ padding: '30px 0', color: '#fff' }}>
         {PITCH}
       </p>
       <div className="flex flex-col items-center gap-3">

@@ -869,6 +869,9 @@ model SitePage {
   featuredImageId      String?
   featuredImage        Media?                @relation("SitePageFeaturedImage", fields: [featuredImageId], references: [id])
   publishedAt          DateTime?
+  // Internal publish target (azavea vertical): live on omniply.io/articles.
+  internalPublishedAt  DateTime?
+  internalSlug         String?               @unique
   readingTime          Int?
   seoTitle             String?
   seoDescription       String?

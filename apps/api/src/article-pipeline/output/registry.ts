@@ -1,12 +1,17 @@
 import { HtmlTarget } from './html-target'
 import { BundleTarget } from './bundle-target'
 import { WordPressTarget } from './wordpress-target'
+import { InternalTarget } from './internal-target'
 import type { OutputTarget } from './types'
 
 const registry: Record<string, OutputTarget> = {
   html:      new HtmlTarget(),
   bundle:    new BundleTarget(),
   wordpress: new WordPressTarget(),
+  // AZAVEA VERTICAL ONLY (brand-consolidation Phase A): selected solely by
+  // the vertical-gated branch in the publish/output routes. Clinic paths
+  // (wordpress publish, html download, bundle) are untouched by design.
+  internal:  new InternalTarget(),
 }
 
 export function getOutputTarget(name: string): OutputTarget {

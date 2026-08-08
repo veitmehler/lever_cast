@@ -19,6 +19,7 @@ import { enqueuePromoEmail } from '../article-pipeline/promo-email/enqueue'
 import { enqueueSocialAutomation } from '../social/automation/enqueue'
 import { enqueueSocialDispatch } from '../social/automation/enqueue-dispatch'
 import { logger } from '../lib/logger'
+import { verticalForUser } from '../lib/prompt-resolver'
 
 function calculateReadingTimeFromHtml(html: string): number {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -493,6 +494,24 @@ export async function articleRoutes(app: FastifyInstance) {
         logger.error({ jobId, err }, '[publish] failed to enqueue syndication'),
       )
 
+      // AZAVEA VERTICAL ONLY: always publish internally on approval (the UI's
+      // wordpress request is also substituted below; this covers publishes
+      // where no WP connection exists). Skipped if an internal attempt is
+      // already in flight or done.
+      if ((await verticalForUser(user.id)) === 'azavea') {
+        void (async () => {
+          const existing = await prisma.outputAttempt.findFirst({
+            where: { jobId, target: 'internal', status: { in: ['pending', 'success'] } },
+          })
+          if (existing) return
+          const attempt = await prisma.outputAttempt.create({
+            data: { jobId, userId: user.id, target: 'internal', status: 'pending', payloadHash: 'internal-auto' },
+          })
+          const boss = await getBoss()
+          await boss.send(QUEUES.ARTICLE_OUTPUT, { jobId, target: 'internal', attemptId: attempt.id, config: {} })
+        })().catch((err) => logger.error({ jobId, err }, '[publish] failed to enqueue internal publish'))
+      }
+
       // Promotional email → GHL Email Campaign, scheduled for the publish day.
       // Gated on the global per-user setting; full config is re-checked in the worker.
       const ghl = await ghlSettingsForUser(user.id)
@@ -570,9 +589,17 @@ export async function articleRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { clerkId } })
     if (!user) return reply.status(404).send({ error: 'User not found' })
 
-    const { jobId, target } = request.params
-    if (!VALID_TARGETS.includes(target)) {
+    const { jobId, target: requestedTarget } = request.params
+    if (!VALID_TARGETS.includes(requestedTarget)) {
       return reply.status(400).send({ error: `Invalid target. Valid: ${VALID_TARGETS.join(', ')}` })
+    }
+    // AZAVEA VERTICAL ONLY: its essays publish internally (omniply.io/articles),
+    // so a 'wordpress' request is substituted with 'internal'. Clinics are
+    // untouched: their vertical never matches, and html/bundle pass through
+    // for everyone (the clinic HTML download path stays exactly as-is).
+    let target = requestedTarget
+    if (requestedTarget === 'wordpress' && (await verticalForUser(user.id)) === 'azavea') {
+      target = 'internal'
     }
 
     const job = await prisma.articleJob.findFirst({

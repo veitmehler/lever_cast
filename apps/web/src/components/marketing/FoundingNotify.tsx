@@ -27,7 +27,8 @@ function storedLead(): { name?: string; email?: string } | null {
 }
 
 export function FoundingNotify() {
-  const [state, setState] = useState<'idle' | 'busy' | 'joined'>('idle')
+  const [state, setState] = useState<'idle' | 'form' | 'busy' | 'joined'>('idle')
+  const [email, setEmail] = useState('')
   useEffect(() => {
     try {
       if (localStorage.getItem(JOINED_KEY)) setState('joined')
@@ -38,19 +39,14 @@ export function FoundingNotify() {
 
   if (Date.now() >= LAUNCH_TS) return null
 
-  async function join() {
-    const lead = storedLead()
-    if (!lead?.email) {
-      window.location.href = '/x-ray'
-      return
-    }
+  async function joinWith(joinEmail: string, name?: string) {
     setState('busy')
     try {
       const api = /^staging\./.test(window.location.hostname) ? 'https://staging-svc.omniply.io' : 'https://svc.omniply.io'
       const res = await fetch(`${api}/api/marketing/waitlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: lead.name ?? '', email: lead.email }),
+        body: JSON.stringify({ name: name ?? '', email: joinEmail }),
       })
       if (!res.ok) throw new Error(`http ${res.status}`)
       try {
@@ -62,6 +58,12 @@ export function FoundingNotify() {
     } catch {
       setState('idle')
     }
+  }
+
+  function join() {
+    const lead = storedLead()
+    if (lead?.email) void joinWith(lead.email, lead.name)
+    else setState('form') // no email on file: inline opt-in, never a dead end
   }
 
   return (
@@ -77,6 +79,33 @@ export function FoundingNotify() {
           <div className="rounded-xl px-10 py-5 text-lg font-bold" style={{ background: 'rgba(195,244,59,0.12)', color: TOKENS.lime }}>
             You&apos;re on the list ✓
           </div>
+        ) : state === 'form' ? (
+          <form
+            className="w-full max-w-sm"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (email.trim()) void joinWith(email.trim())
+            }}
+          >
+            <input
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your best email"
+              autoComplete="email"
+              className="w-full border-0 border-b bg-transparent py-3 text-center text-[17px] text-white outline-none placeholder:opacity-40 focus:border-[#C3F43B]"
+              style={{ borderColor: 'rgba(255,255,255,0.35)' }}
+            />
+            <button
+              type="submit"
+              className="mx-auto mt-4 block rounded-xl px-10 py-4 text-lg font-bold shadow-lg transition-transform hover:scale-[1.02]"
+              style={{ background: TOKENS.lime, color: '#0B0B0C' }}
+            >
+              Please notify me when it goes live
+            </button>
+          </form>
         ) : (
           <button
             onClick={join}
@@ -90,7 +119,7 @@ export function FoundingNotify() {
         <p className="text-center text-sm opacity-70">
           {state === 'joined'
             ? 'We will email you the moment the doors open.'
-            : 'One click if you have taken the X-Ray. Otherwise it takes you there first.'}
+            : 'No spam. One email when the doors open.'}
         </p>
       </div>
     </div>

@@ -338,16 +338,13 @@
     </div>
 
     <div class="film" id="foundbox" style="display:none">
-      <div class="lbl">Omniply opens September 8</div>
-      <p class="punch" style="margin-top:10px">Your X-Ray just showed you the leaks. The founding cohort gets them fixed first: we onboard your practice WITH you, live and step by step, and your founders price is locked in from day one. Limited spots, then the doors close until launch.</p>
-      <button class="btn" id="joinbtn" type="button" style="margin-top:14px">Reserve my founding spot</button>
-      <div class="under" id="joinunder">One click. We already have your report on file.</div>
+      <div style="text-align:center;font-size:26px;line-height:1.25;font-weight:700;color:var(--lime)">Omniply opens September&nbsp;8</div>
+      <p style="padding:30px 0;margin:0;font-size:16px;line-height:1.6">Your X-Ray just showed you where patients quietly slip away. When Omniply goes live, the first twelve practices receive concierge onboarding: we build your entire system together in a live working session... your voice, your calendar, your first month of content... so you learn it while it takes shape. Those twelve also keep their monthly rate locked from day one, for as long as they stay. Once the twelve places are filled, the doors close while we get them up and running.</p>
+      <button class="btn" id="joinbtn" type="button" style="display:block;margin:0 auto">Please notify me when it goes live</button>
+      <div id="joinunder" style="text-align:center;font-size:12px;opacity:.75;margin-top:10px">One click. We already have your report on file.</div>
     </div>
 
-    <div class="ctabox">
-      <a class="btn" id="cta" href="/walkthrough">Watch the 12-minute Practice Autopilot Walkthrough &rarr;</a>
-      <div class="under">No call. No pressure. The exact system, on screen.</div>
-    </div>
+
   </section>
 </div>
 
@@ -781,8 +778,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
     $('leaknum').innerHTML = money(r.totalLeak) + '<small> / month</small>'
     $('leakdrift').textContent = money(r.driftLeak)
     $('leakresp').textContent = money(r.responseLeak)
-    $('punch').innerHTML = 'That’s &asymp; <b>' + r.priceMultiple + '&times;</b> the monthly cost of fixing it. Recovering <b>one patient a month</b> pays for the whole system.'
-    $('cta').href = XRAY.CONFIG.VIDEO_URL
+    $('punch').innerHTML = 'Recovering <b>one patient a month</b> would more than cover fixing this. The X-Ray shows you where to start.'
+    if ($('cta')) $('cta').href = XRAY.CONFIG.VIDEO_URL
 
     renderAssumptions(r)
   }
@@ -847,7 +844,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
     $('leaknum').innerHTML = money(r.totalLeak) + '<small> / month</small>'
     $('leakdrift').textContent = money(r.driftLeak)
     $('leakresp').textContent = money(r.responseLeak)
-    $('punch').innerHTML = 'That’s &asymp; <b>' + r.priceMultiple + '&times;</b> the monthly cost of fixing it. Recovering <b>one patient a month</b> pays for the whole system.'
+    $('punch').innerHTML = 'Recovering <b>one patient a month</b> would more than cover fixing this. The X-Ray shows you where to start.'
     paintFormula()
   }
 
@@ -895,17 +892,17 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
   var JOINED_KEY = 'omniply-founding-joined'
   try { if (localStorage.getItem(JOINED_KEY)) done() } catch (e) { /* noop */ }
   function done () {
-    btn.textContent = "You're on the founding list ✓"
+    btn.textContent = "You're on the list ✓"
     btn.disabled = true
     btn.style.opacity = '0.75'
     btn.style.cursor = 'default'
-    if (under) under.textContent = 'We will email you when the doors open on September 8.'
+    if (under) under.textContent = 'We will email you the moment the doors open.'
   }
   btn.addEventListener('click', function () {
     var lead = storedLead()
     if (!lead || !lead.email) { under.textContent = 'Please complete the X-Ray first so we know where to reach you.'; return }
     btn.disabled = true
-    btn.textContent = 'Reserving…'
+    btn.textContent = 'One moment…'
     fetch(API + '/api/marketing/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -916,7 +913,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
       done()
     }).catch(function () {
       btn.disabled = false
-      btn.textContent = 'Reserve my founding spot'
+      btn.textContent = 'Please notify me when it goes live'
       under.textContent = 'Something went wrong, please tap again.'
     })
   })

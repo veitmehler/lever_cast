@@ -67,7 +67,10 @@ export function FoundingNotify() {
   }
 
   return (
-    <div className="my-10">
+    <div
+      className="my-10 rounded-2xl px-6 py-10 md:px-10"
+      style={{ background: `linear-gradient(180deg, ${TOKENS.ink}, ${TOKENS.inkDeep})`, color: '#fff' }}
+    >
       <div className="text-center text-3xl font-bold md:text-4xl" style={{ color: TOKENS.lime }}>
         Omniply opens September&nbsp;8
       </div>

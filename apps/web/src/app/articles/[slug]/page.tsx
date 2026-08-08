@@ -59,9 +59,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   if (!article) notFound()
 
   return (
-    <main style={{ background: '#fff' }}>
+    <main
+      style={
+        {
+          background: '#fff',
+          // .article-body colors itself with the app-theme vars — define them
+          // here so marketing pages render dark-on-light regardless of the
+          // app globals (this was white-on-white before).
+          '--card-foreground': '#1C2B36',
+          '--border': '#E2E7EB',
+          '--muted-foreground': '#55636E',
+          '--card': '#F4F7F9',
+          '--muted': '#EDF1F4',
+          '--primary': '#5F8A14',
+        } as React.CSSProperties
+      }
+    >
       <SiteHeader />
-      <article className="mx-auto max-w-3xl px-6 py-14">
+      <article className="mx-auto w-full max-w-[1024px] px-5 py-14 md:px-8">
         <div className="mb-2 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: TOKENS.accentDeep }}>
           Omniply Essays
         </div>

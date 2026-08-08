@@ -10,8 +10,8 @@
 import React from 'react'
 
 export const TOKENS = {
-  ink: '#18181A',
-  inkDeep: '#0E0E0F',
+  ink: '#0A2A3F',
+  inkDeep: '#052234',
   paper: '#F5F6F4',
   body: '#1A1A1C',
   muted: '#55555C',
@@ -429,7 +429,7 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
   return (
     <header
       className="sticky top-0 z-50 px-6 py-4"
-      style={{ background: 'rgba(14,14,15,0.88)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #232325' }}
+      style={{ background: 'rgba(5,34,52,0.9)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #164863' }}
     >
       <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
         <a href="/home" className="flex items-center gap-3 font-mono text-sm font-bold tracking-[0.25em] text-white no-underline">
@@ -440,8 +440,17 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
           </span>
         </a>
         <nav className="flex items-center gap-5 text-sm">
+          <a href="/articles" className="text-white/60 hover:text-white">
+            Articles
+          </a>
           <a href="/walkthrough" className="hidden text-white/60 hover:text-white sm:inline">
             Walkthrough
+          </a>
+          <a href="/about" className="hidden text-white/60 hover:text-white md:inline">
+            About
+          </a>
+          <a href="/contact" className="hidden text-white/60 hover:text-white md:inline">
+            Contact
           </a>
           <a
             href={XRAY_URL}

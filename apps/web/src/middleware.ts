@@ -51,6 +51,7 @@ const isPublicRoute = createRouteMatcher([
   '/terms(.*)',
   '/privacy(.*)',
   '/refund-policy(.*)',
+  '/articles(.*)',
   '/api/marketing-contact',
   // Practice X-Ray funnel (static pages in public/, clean URLs via rewrites).
   '/x-ray(.*)',

@@ -474,11 +474,18 @@ if (typeof module !== 'undefined' && module.exports) module.exports = XRAY
 
   // ── Currency ──────────────────────────────────────────────────────────────
   var SYMBOLS = { USD: '$', AUD: '$', CAD: '$', NZD: '$', GBP: '£', EUR: '€' }
-  var REGION_TO_CCY = { AU: 'AUD', CA: 'CAD', NZ: 'NZD', GB: 'GBP', IE: 'EUR', DE: 'EUR', FR: 'EUR', NL: 'EUR', ES: 'EUR', IT: 'EUR', AT: 'EUR', BE: 'EUR' }
+  // Currency detection via TIMEZONE, not locale: in-app browsers (Instagram,
+  // Facebook) report the device LANGUAGE region (en-GB on "English (UK)"
+  // phones anywhere in the world), while the timezone tracks the actual OS
+  // clock. USD default — primary market. The selector always allows override.
   var currency = 'USD'
   try {
-    var region = (Intl.DateTimeFormat().resolvedOptions().locale || navigator.language || '').split('-')[1]
-    if (region && REGION_TO_CCY[region]) currency = REGION_TO_CCY[region]
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+    if (/^Australia\//.test(tz)) currency = 'AUD'
+    else if (/^Pacific\/(Auckland|Chatham)/.test(tz)) currency = 'NZD'
+    else if (tz === 'Europe/London' || tz === 'Europe/Belfast') currency = 'GBP'
+    else if (/^Europe\/(Dublin|Berlin|Paris|Amsterdam|Madrid|Rome|Vienna|Brussels|Lisbon|Helsinki|Athens|Bratislava|Ljubljana|Luxembourg|Malta|Nicosia|Riga|Tallinn|Vilnius|Zagreb)$/.test(tz)) currency = 'EUR'
+    else if (/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax|Regina|St_Johns|Moncton)$/.test(tz)) currency = 'CAD'
   } catch (e) { /* USD default */ }
   $('currency').value = currency
   $('currency').addEventListener('change', function () { currency = this.value; renderQuestion() })

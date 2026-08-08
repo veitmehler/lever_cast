@@ -62,6 +62,12 @@ async function main() {
     'https://staging.chiro.omniply.io',
     'https://app.socioply.com',
     'https://www.socioply.com',
+    // Marketing hosts: the static funnels (x-ray, walkthrough) and the
+    // React marketing pages call svc directly (waitlist join, x-ray publish).
+    'https://omniply.io',
+    'https://www.omniply.io',
+    'https://azavea.omniply.io',
+    'https://staging.omniply.io',
   ]
   await app.register(cors, {
     origin: [...webOrigins, ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : [])],

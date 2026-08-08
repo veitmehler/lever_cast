@@ -20,13 +20,13 @@ import {
   StatBand,
   ConsistencyGraph,
   ReactivationLoop,
-  PricingBlock,
   MapPackDiagram,
   Faq,
   FaqJsonLd,
   type FaqEntry,
   MarketingFooter,
 } from '@/components/marketing/Marketing'
+import { FoundingNotify } from '@/components/marketing/FoundingNotify'
 
 export const metadata: Metadata = {
   title: 'Omniply for Chiropractors... Plug the Leak in Your Practice',
@@ -64,7 +64,7 @@ const FAQ_ITEMS: FaqEntry[] = [
     a: 'Completely. We never write, buy or fake reviews. The system makes it effortless for genuinely happy patients to leave one: a printed QR card for your front desk that opens your Google review form, plus well-timed follow-ups. The reviews are real. There are simply more of them, because asking finally happens consistently.',
   },
   {
-    q: 'What exactly does $397 include? Any hidden costs?',
+    q: 'What exactly is included? Any hidden costs?',
     a: 'Everything in the loop: weekly patient-education articles, the weekly newsletter with 25,000 email sends included, social posts with designed graphics, your branded lead-magnet guides, the 2-Minute Spine Check on your website, the AI response and recall systems, and the review engine. No per-piece fees, no content credits, no surprises.',
   },
   {
@@ -257,11 +257,11 @@ export default function ChiropractorsPage() {
         <H2>Recovering one patient a month pays for the entire system.</H2>
         <P>
           Take your average visit fee. A typical patient&apos;s first year is worth roughly twelve visits of
-          it. The whole system costs $397 a month. <strong>One recovered patient covers it. The second one is
-          profit.</strong> That&apos;s the entire business case... your own numbers, doing arithmetic you can
+          it. <strong>Recovering one patient a month more than covers the entire system. The second one is
+          profit.</strong> That&apos;s the whole business case... your own numbers, doing arithmetic you can
           check. The X-Ray does it for you, with every assumption shown.
         </P>
-        <PricingBlock vertical />
+        <FoundingNotify />
       </Section>
 
       {/* ── Founder ── */}
@@ -296,8 +296,8 @@ export default function ChiropractorsPage() {
           posts, how it answers, what the recall messages look like. No call. No salesperson.
         </P>
         <P>
-          $397 a month. Everything in the loop. Cancel anytime. We&apos;re not asking you to become a
-          marketer... we&apos;re asking you to stop having to be one.
+          Everything in the loop, one flat monthly rate, cancel anytime. We&apos;re not asking you to become
+          a marketer... we&apos;re asking you to stop having to be one.
         </P>
         <Cta href={XRAY_URL} sub="free · 2 minutes · your report is yours to keep">
           X-Ray My Practice

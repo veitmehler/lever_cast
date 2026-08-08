@@ -8,6 +8,7 @@
  * Copy style is dash-free (house rule). All diagrams are inline SVG.
  */
 import React from 'react'
+import Link from 'next/link'
 
 export const TOKENS = {
   ink: '#0A2A3F',
@@ -440,18 +441,18 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
           </span>
         </a>
         <nav className="flex items-center gap-5 text-sm">
-          <a href="/articles" className="text-white/60 hover:text-white">
+          <Link href="/articles" className="text-white/60 hover:text-white">
             Articles
-          </a>
+          </Link>
           <a href="/walkthrough" className="hidden text-white/60 hover:text-white sm:inline">
             Walkthrough
           </a>
-          <a href="/about" className="hidden text-white/60 hover:text-white md:inline">
+          <Link href="/about" className="hidden text-white/60 hover:text-white md:inline">
             About
-          </a>
-          <a href="/contact" className="hidden text-white/60 hover:text-white md:inline">
+          </Link>
+          <Link href="/contact" className="hidden text-white/60 hover:text-white md:inline">
             Contact
-          </a>
+          </Link>
           <a
             href={XRAY_URL}
             className="rounded-lg px-4 py-2 font-bold"
@@ -483,7 +484,7 @@ export function MarketingFooter() {
       </p>
       <nav className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2">
         {links.map((l) => (
-          <a key={l.href} href={l.href} className="hover:text-white/85">{l.label}</a>
+          <Link key={l.href} href={l.href} className="hover:text-white/85">{l.label}</Link>
         ))}
       </nav>
       <p className="mt-6 text-white/40">

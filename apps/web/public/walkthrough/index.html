@@ -82,8 +82,13 @@
   <div class="buy">
     <div style="text-align:center;font-size:26px;line-height:1.25;font-weight:700;color:var(--lime)">Omniply opens September&nbsp;8</div>
     <p style="padding:30px 0;margin:0;font-size:16px;line-height:1.6">Your X-Ray just showed you where patients quietly slip away. When Omniply goes live, the first twelve practices receive concierge onboarding: we build your entire system together in a live working session... your voice, your calendar, your first month of content... so you learn it while it takes shape. Those twelve also keep their monthly rate locked from day one, for as long as they stay. Once the twelve places are filled, the doors close while we get them up and running.</p>
-    <a class="btn" id="checkout" href="#" style="display:block;margin:0 auto;text-align:center;max-width:340px">Please notify me when it goes live</a>
-    <div class="under" id="buyunder" style="text-align:center;font-size:12px;opacity:.8;margin-top:10px">One click if you have taken the X-Ray. Otherwise it takes you there first.</div>
+    <a class="btn" id="checkout" href="#" style="display:block;margin:0 auto;text-align:center;max-width:360px">Notify me when the video goes live</a>
+    <form id="optin" style="display:none;max-width:360px;margin:0 auto">
+      <input type="email" id="optin-email" required placeholder="Your best email" autocomplete="email"
+             style="width:100%;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.35);color:var(--ink);font:inherit;font-size:16px;padding:10px 2px;outline:none;text-align:center" />
+      <button class="btn" type="submit" style="display:block;margin:14px auto 0">Notify me when the video goes live</button>
+    </form>
+    <div class="under" id="buyunder" style="text-align:center;font-size:12px;opacity:.8;margin-top:10px">No spam. One email when the doors open, one when the video is ready.</div>
   </div>
 </div>
 <footer>© Omniply · <a href="https://www.omniply.io">omniply.io</a></footer>
@@ -123,23 +128,41 @@
       try { localStorage.setItem(JOINED_KEY, '1') } catch (e) { /* noop */ }
       joinedState()
     } else {
-      btn.textContent = 'Please notify me when it goes live'
-      btn.addEventListener('click', function (ev) {
-        var lead = storedLead()
-        if (!lead || !lead.email) return // no stored X-Ray lead: fall through to the quiz
-        ev.preventDefault()
-        btn.textContent = 'One moment…'
+      btn.textContent = 'Notify me when the video goes live'
+      function joinWith (email, name) {
         fetch(API + '/api/marketing/waitlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: lead.name || '', email: lead.email })
+          body: JSON.stringify({ name: name || '', email: email })
         }).then(function (r) {
           if (!r.ok) throw new Error('http ' + r.status)
           try { localStorage.setItem(JOINED_KEY, '1') } catch (e) { /* noop */ }
+          var form = document.getElementById('optin')
+          if (form) form.style.display = 'none'
+          btn.style.display = 'block'
           joinedState()
-        }).catch(function () { btn.textContent = 'Please notify me when it goes live' })
+        }).catch(function () { btn.textContent = 'Notify me when the video goes live' })
+      }
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault()
+        var lead = storedLead()
+        if (lead && lead.email) {
+          btn.textContent = 'One moment…'
+          joinWith(lead.email, lead.name)
+        } else {
+          // No email on file: reveal the inline opt-in.
+          btn.style.display = 'none'
+          var form = document.getElementById('optin')
+          if (form) { form.style.display = 'block'; document.getElementById('optin-email').focus() }
+        }
       })
-      btn.href = '/x-ray'
+      var form = document.getElementById('optin')
+      if (form) form.addEventListener('submit', function (ev) {
+        ev.preventDefault()
+        var email = document.getElementById('optin-email').value.trim()
+        if (!email) return
+        joinWith(email, '')
+      })
     }
   } else {
     btn.addEventListener('click', function (ev) { ev.preventDefault() })
@@ -150,6 +173,13 @@
   if (CONFIG.VIDEO_EMBED_URL) {
     var f = document.getElementById('frame')
     f.innerHTML = '<iframe src="' + CONFIG.VIDEO_EMBED_URL + '" allow="autoplay; fullscreen" allowfullscreen></iframe>'
+  } else {
+    // No video yet: hide the empty placeholder + chapter list — the page IS
+    // the notify pitch until the video exists.
+    var fr = document.getElementById('frame')
+    if (fr) fr.style.display = 'none'
+    var ch = document.querySelector('.chapters')
+    if (ch) ch.style.display = 'none'
   }
 })()
 </script>

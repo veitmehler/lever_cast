@@ -48,15 +48,24 @@ only. Clinics: untouched, WordPress as always.
 
 ## Phase C — azavea.ai static business card (half session)
 
-- New tiny static project (4–5 hand-written HTML pages, no framework, no
-  build): Home ("Azavea Inc. builds Omniply" + link out), About, Contact
-  (posts to the existing marketing endpoint or mailto), Terms, Privacy.
-  Navy+lime, same design language.
-- Host as its own Vercel static project; DNS azavea.ai → Vercel.
-- `vercel.json`: 410 responses for `/product/*`, `/listing/*`, `/shop/*`,
-  `/news/*`, old article slugs (everything not in the 5 pages).
-- **Then kill the WordPress install + its hosting** — this is the security
-  fix. Export nothing except any images worth keeping.
+STATUS 2026-08-13: SITE BUILT + DEPLOYED. Awaiting user DNS change, then WP deletion.
+
+- DONE: `sites/azavea-ai/` in repo (4 hand-written pages: Home, Contact
+  [email + link to omniply.io/contact, no form], Terms, Privacy; navy+lime,
+  white logo, no framework). Deployed as own Vercel project `azavea-ai` in
+  team azavea-media → https://azavea-ai.vercel.app. Domains azavea.ai +
+  www.azavea.ai attached. sitemap.xml (4 URLs) + robots.txt live.
+- DONE: `vercel.json` 410s verified live for /product/*, /listing/*,
+  /shop/*, /news/*, wp-* paths, xmlrpc.php, and ALL unknown paths
+  (catch-all 410 — old article slugs included).
+- DONE: cold archive of the WP content via public REST →
+  `../azavea-ai-wp-archive/` (189 posts, 18 pages, 672 media + files).
+- USER: Cloudflare DNS — `A @ 76.76.21.21` + `CNAME www cname.vercel-dns.com`,
+  both DNS-only (grey cloud). Touch ONLY these two records: MX stays
+  (team@azavea.ai mail/GHL login), school.azavea.ai (Vercel/motek),
+  leads.azavea.ai (Vercel/medici-leads), crm.azavea.ai stay untouched.
+- USER: after site verified on domain → delete the WordPress on Hostinger
+  (optionally grab a Hostinger panel DB dump first; REST archive exists).
 
 ## Phase D — GSC cleanup (user + me, ~1 hour; answer to "fastest way")
 

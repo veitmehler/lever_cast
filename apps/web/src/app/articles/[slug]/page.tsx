@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { SiteHeader, MarketingFooter, TOKENS } from '@/components/marketing/Marketing'
+import { DiagramLightbox } from '../DiagramLightbox'
 import '../../article-typography.css'
 import '../article-marketing.css'
 
@@ -122,6 +123,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: article.schemaJson }} />
       )}
       <MarketingFooter />
+      <DiagramLightbox />
     </main>
   )
 }

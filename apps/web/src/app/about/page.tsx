@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ProsePage, P, H3 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
-  title: 'About... Omniply by Azavea Inc.',
+  title: 'About... Omniply',
   description: 'The company behind Omniply.',
 }
 
@@ -11,7 +11,7 @@ export default function AboutPage() {
   return (
     <ProsePage title="About Omniply">
       <P lead>
-        Omniply is built and operated by Azavea Inc., founded on sixteen years of running marketing for
+        Omniply is built on sixteen years of running marketing for
         health professionals and local practices.
       </P>
       <P>
@@ -30,8 +30,8 @@ export default function AboutPage() {
       </P>
       <H3>Contact</H3>
       <P>
-        Azavea Inc. &middot; <a href="mailto:support@omniply.io" className="underline">support@omniply.io</a>{' '}
-        &middot; or use the <a href="/contact" className="underline">contact form</a>.
+        <a href="mailto:support@omniply.io" className="underline">support@omniply.io</a> &middot; or use the{' '}
+        <a href="/contact" className="underline">contact form</a>.
       </P>
     </ProsePage>
   )

@@ -77,7 +77,7 @@ function SourcesBox({ citations }: { citations: unknown }) {
   return (
     <div className="sources-box">
       <details>
-        <summary>Sources &amp; References ({references.length})</summary>
+        <summary>Sources &amp; References</summary>
         <ul>
           {references.map((r) => (
             <li key={r.link_url}>

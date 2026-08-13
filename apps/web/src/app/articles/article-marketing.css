@@ -40,3 +40,9 @@
     font-size: 1.4375rem !important; /* 23px */
   }
 }
+
+/* GEO summary accent bar: brand lime, not the dark-green link color
+   (--primary must stay dark green for readable links on white). */
+.marketing-article .article-body .geo-summary {
+  border-left-color: #C3F43B !important;
+}

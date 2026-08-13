@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { ProsePage, P, H3 } from '@/components/marketing/Marketing'
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default function AboutPage() {
       </P>
       <H3>We run our own marketing on Omniply</H3>
       <P>
-        Every article in <a href="/articles" className="underline">our articles section</a> is
+        Every article in <Link href="/articles" className="underline">our articles section</Link> is
         researched, written, illustrated, and published by the same engine your practice gets... same
         pipeline, same review flow, same voice matching. We would not sell an autopilot we do not fly
         ourselves.

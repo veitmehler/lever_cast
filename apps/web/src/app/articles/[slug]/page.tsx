@@ -70,37 +70,21 @@ function normalizeSources(citations: unknown): { references: SourceLink[]; inlin
 }
 
 function SourcesBox({ citations }: { citations: unknown }) {
-  const { references, inline } = normalizeSources(citations)
-  const total = references.length + inline.length
-  if (total === 0) return null
+  // Curated Tier-2 references only (user-locked): inline grounding
+  // citations already appear as links inside the article body.
+  const { references } = normalizeSources(citations)
+  if (references.length === 0) return null
   return (
     <div className="sources-box">
       <details>
-        <summary>Sources &amp; References ({total})</summary>
-        {references.length > 0 && (
-          <>
-            <h4>Further reading</h4>
-            <ul>
-              {references.map((r) => (
-                <li key={r.link_url}>
-                  <a href={r.link_url} target="_blank" rel="noopener nofollow">{r.link_title || r.link_url}</a>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {inline.length > 0 && (
-          <>
-            <h4>Cited in this article</h4>
-            <ul>
-              {inline.map((r) => (
-                <li key={r.link_url}>
-                  <a href={r.link_url} target="_blank" rel="noopener nofollow">{r.link_title || r.link_url}</a>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+        <summary>Sources &amp; References ({references.length})</summary>
+        <ul>
+          {references.map((r) => (
+            <li key={r.link_url}>
+              <a href={r.link_url} target="_blank" rel="noopener nofollow">{r.link_title || r.link_url}</a>
+            </li>
+          ))}
+        </ul>
       </details>
     </div>
   )

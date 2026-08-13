@@ -53,19 +53,27 @@
 }
 
 /* TOC + Sources disclosure indicator: the shared CSS hides the native
-   marker with no replacement — add a rotating chevron. */
+   marker with no replacement. Chevron sits right-aligned in the box,
+   sized and vertically centered with the summary text, in the text color. */
+.marketing-article .article-body nav.article-toc details summary,
+.marketing-article .sources-box summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75em;
+}
 .marketing-article .article-body nav.article-toc details summary::after,
 .marketing-article .sources-box summary::after {
   content: '▸';
   display: inline-block;
-  margin-left: 0.5em;
-  font-size: 0.85em;
+  flex-shrink: 0;
+  font-size: 1em;
+  line-height: 1;
+  color: currentColor;
   transition: transform 0.15s ease;
-  color: #5F8A14;
 }
 .marketing-article .article-body nav.article-toc details[open] summary::after,
-.marketing-article .sources-box details[open] summary::after,
-.marketing-article details[open] > summary.sources-summary::after {
+.marketing-article .sources-box details[open] summary::after {
   transform: rotate(90deg);
 }
 

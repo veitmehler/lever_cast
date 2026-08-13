@@ -51,3 +51,64 @@
 .marketing-article .article-body figure.article-diagram img {
   cursor: zoom-in;
 }
+
+/* TOC + Sources disclosure indicator: the shared CSS hides the native
+   marker with no replacement — add a rotating chevron. */
+.marketing-article .article-body nav.article-toc details summary::after,
+.marketing-article .sources-box summary::after {
+  content: '▸';
+  display: inline-block;
+  margin-left: 0.5em;
+  font-size: 0.85em;
+  transition: transform 0.15s ease;
+  color: #5F8A14;
+}
+.marketing-article .article-body nav.article-toc details[open] summary::after,
+.marketing-article .sources-box details[open] summary::after,
+.marketing-article details[open] > summary.sources-summary::after {
+  transform: rotate(90deg);
+}
+
+/* Sources & References box (end of article) */
+.marketing-article .sources-box {
+  margin-top: 3rem;
+  padding: 0.9em 1.2em;
+  background: #EDF1F4;
+  border: 1px solid #E2E7EB;
+  border-radius: 0.5rem;
+}
+.marketing-article .sources-box summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 18px;
+  color: #1C2B36;
+  list-style: none;
+}
+.marketing-article .sources-box summary::-webkit-details-marker {
+  display: none;
+}
+.marketing-article .sources-box h4 {
+  margin: 1.1em 0 0.4em;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #55636E;
+}
+.marketing-article .sources-box ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.marketing-article .sources-box li {
+  margin: 0.35em 0;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.marketing-article .sources-box a {
+  color: #5F8A14;
+  text-decoration: none;
+}
+.marketing-article .sources-box a:hover {
+  text-decoration: underline;
+}

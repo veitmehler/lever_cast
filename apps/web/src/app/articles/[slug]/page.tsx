@@ -22,6 +22,7 @@ interface PublicArticle {
   readingTime: number | null
   publishedAt: string
   primaryKeyword: string | null
+  citations: unknown
   featuredImage: { url: string; width: number | null; height: number | null; alt: string } | null
 }
 
@@ -35,6 +36,74 @@ async function fetchArticle(slug: string): Promise<PublicArticle | null> {
   } catch {
     return null
   }
+}
+
+interface SourceLink {
+  link_title: string
+  link_url: string
+}
+
+/** Normalize the citations JSON (two-tier / legacy dict / plain array). */
+function normalizeSources(citations: unknown): { references: SourceLink[]; inline: SourceLink[] } {
+  const asLinks = (v: unknown): SourceLink[] =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map((x) => ({ link_title: String(x.link_title ?? x.link_url ?? ''), link_url: String(x.link_url ?? '') }))
+          .filter((x) => x.link_url.startsWith('http'))
+      : []
+  if (Array.isArray(citations)) return { references: asLinks(citations), inline: [] }
+  if (citations && typeof citations === 'object') {
+    const c = citations as Record<string, unknown>
+    const references = asLinks(c.resource_links)
+    const refUrls = new Set(references.map((r) => r.link_url))
+    // Dedupe inline sources against the curated references and themselves.
+    const seen = new Set<string>()
+    const inline = asLinks(c.inline_sources).filter((x) => {
+      if (refUrls.has(x.link_url) || seen.has(x.link_url)) return false
+      seen.add(x.link_url)
+      return true
+    })
+    return { references, inline }
+  }
+  return { references: [], inline: [] }
+}
+
+function SourcesBox({ citations }: { citations: unknown }) {
+  const { references, inline } = normalizeSources(citations)
+  const total = references.length + inline.length
+  if (total === 0) return null
+  return (
+    <div className="sources-box">
+      <details>
+        <summary>Sources &amp; References ({total})</summary>
+        {references.length > 0 && (
+          <>
+            <h4>Further reading</h4>
+            <ul>
+              {references.map((r) => (
+                <li key={r.link_url}>
+                  <a href={r.link_url} target="_blank" rel="noopener nofollow">{r.link_title || r.link_url}</a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {inline.length > 0 && (
+          <>
+            <h4>Cited in this article</h4>
+            <ul>
+              {inline.map((r) => (
+                <li key={r.link_url}>
+                  <a href={r.link_url} target="_blank" rel="noopener nofollow">{r.link_title || r.link_url}</a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </details>
+    </div>
+  )
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -113,6 +182,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       </section>
       <article className="mx-auto w-full max-w-[1024px] px-5 py-14 md:px-8">
         <div className="article-body" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+        <SourcesBox citations={article.citations} />
         {article.disclaimer && (
           <p className="mt-12 border-t pt-6 text-sm italic" style={{ color: TOKENS.muted, borderColor: TOKENS.line }}>
             {article.disclaimer}

@@ -64,17 +64,17 @@
 }
 .marketing-article .article-body nav.article-toc details summary::after,
 .marketing-article .sources-box summary::after {
-  content: '▸';
+  content: '+';
   display: inline-block;
   flex-shrink: 0;
-  font-size: 1em;
+  font-size: 1.2em;
+  font-weight: 600;
   line-height: 1;
   color: currentColor;
-  transition: transform 0.15s ease;
 }
 .marketing-article .article-body nav.article-toc details[open] summary::after,
 .marketing-article .sources-box details[open] summary::after {
-  transform: rotate(90deg);
+  content: '−'; /* U+2212 minus: same width as the plus */
 }
 
 /* Sources & References box (end of article) */

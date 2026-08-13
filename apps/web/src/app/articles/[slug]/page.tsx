@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { SiteHeader, MarketingFooter, TOKENS } from '@/components/marketing/Marketing'
 import '../../article-typography.css'
+import '../article-marketing.css'
 
 export const revalidate = 300
 
@@ -19,6 +20,7 @@ interface PublicArticle {
   schemaJson: string | null
   readingTime: number | null
   publishedAt: string
+  primaryKeyword: string | null
   featuredImage: { url: string; width: number | null; height: number | null; alt: string } | null
 }
 
@@ -58,14 +60,19 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const article = await fetchArticle(slug)
   if (!article) notFound()
 
+  const category = article.primaryKeyword
+    ? article.primaryKeyword.replace(/\b\w/g, (c: string) => c.toUpperCase())
+    : 'Practice Marketing'
+
   return (
     <main
+      className="marketing-article"
       style={
         {
           background: '#fff',
           // .article-body colors itself with the app-theme vars — define them
           // here so marketing pages render dark-on-light regardless of the
-          // app globals (this was white-on-white before).
+          // app globals.
           '--card-foreground': '#1C2B36',
           '--border': '#E2E7EB',
           '--muted-foreground': '#55636E',
@@ -76,25 +83,34 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       }
     >
       <SiteHeader />
+      {/* ── Hero: featured image ground + navy 0.72 overlay + white title/meta ── */}
+      <section
+        className="relative flex min-h-[380px] items-end md:min-h-[460px]"
+        style={{
+          backgroundImage: article.featuredImage
+            ? `linear-gradient(rgba(5,34,52,0.72), rgba(5,34,52,0.72)), url(${article.featuredImage.url})`
+            : `linear-gradient(180deg, ${TOKENS.ink}, ${TOKENS.inkDeep})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="mx-auto w-full max-w-[1024px] px-5 pb-12 pt-32 md:px-8">
+          <div className="mb-3 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: TOKENS.lime }}>
+            {category}
+          </div>
+          <h1
+            className="text-4xl font-bold leading-tight text-white md:text-5xl"
+            style={{ textWrap: 'balance' } as React.CSSProperties}
+          >
+            {article.title}
+          </h1>
+          <div className="mt-5 text-[15px] text-white/75">
+            {new Date(article.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            {article.readingTime ? ` · ${article.readingTime} min read` : ''} · by the Omniply content engine, reviewed by a human
+          </div>
+        </div>
+      </section>
       <article className="mx-auto w-full max-w-[1024px] px-5 py-14 md:px-8">
-        <div className="mb-2 text-sm font-bold uppercase tracking-[0.16em]" style={{ color: TOKENS.accentDeep }}>
-          Omniply Essays
-        </div>
-        <h1 className="mb-4 text-4xl font-bold leading-tight" style={{ color: TOKENS.ink, textWrap: 'balance' } as React.CSSProperties}>
-          {article.title}
-        </h1>
-        <div className="mb-8 text-sm" style={{ color: TOKENS.muted }}>
-          {new Date(article.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          {article.readingTime ? ` · ${article.readingTime} min read` : ''} · by the Omniply content engine, reviewed by a human
-        </div>
-        {article.featuredImage && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={article.featuredImage.url}
-            alt={article.featuredImage.alt}
-            className="mb-10 w-full rounded-2xl"
-          />
-        )}
         <div className="article-body" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
         {article.disclaimer && (
           <p className="mt-12 border-t pt-6 text-sm italic" style={{ color: TOKENS.muted, borderColor: TOKENS.line }}>

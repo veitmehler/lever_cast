@@ -1,0 +1,39 @@
+/* ── Marketing-site article overrides ─────────────────────────────────────
+   Aligns the shared .article-body typography with the sales-letter scale
+   (body 20px, marketing heading sizes). Scoped under .marketing-article so
+   the in-app workflow preview keeps its own compact scale. Uses !important
+   at higher specificity to beat article-typography.css. */
+
+.marketing-article .article-body {
+  font-size: 20px !important;
+  line-height: 1.75 !important;
+}
+.marketing-article .article-body p,
+.marketing-article .article-body li {
+  font-size: 20px !important;
+}
+.marketing-article .article-body h2 {
+  font-size: 2.25rem !important; /* 36px — matches marketing H2 md */
+  line-height: 1.3 !important;
+}
+.marketing-article .article-body h3 {
+  font-size: 1.75rem !important; /* 28px */
+}
+.marketing-article .article-body h4 {
+  font-size: 1.375rem !important;
+}
+@media (max-width: 768px) {
+  .marketing-article .article-body {
+    font-size: 18px !important;
+  }
+  .marketing-article .article-body p,
+  .marketing-article .article-body li {
+    font-size: 18px !important;
+  }
+  .marketing-article .article-body h2 {
+    font-size: 1.875rem !important; /* 30px — marketing H2 base */
+  }
+  .marketing-article .article-body h3 {
+    font-size: 1.5rem !important;
+  }
+}

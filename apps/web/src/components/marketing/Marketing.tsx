@@ -469,6 +469,7 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
 /* ── Site footer: Azavea Inc. attribution + legal/credibility links ──────── */
 export function MarketingFooter() {
   const links = [
+    { href: '/articles', label: 'Articles' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
     { href: '/data-security', label: 'Data & AI' },

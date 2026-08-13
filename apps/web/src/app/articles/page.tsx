@@ -7,7 +7,7 @@ const DO_API_BASE = process.env.DO_API_BASE ?? 'https://svc.omniply.io'
 
 export const metadata: Metadata = {
   title: 'Articles... Omniply',
-  description: 'Essays on practice marketing, written and published by the same engine Omniply customers get.',
+  description: 'Articles on practice marketing, written and published by the same engine Omniply customers get.',
 }
 
 interface ArticleCard {
@@ -36,13 +36,13 @@ export default async function ArticlesIndexPage() {
     <main>
       <SiteHeader />
       <Section dark>
-        <H2>Essays from the engine room.</H2>
+        <H2>Articles from the engine room.</H2>
         <P lead>
           Every article here was researched, written, illustrated, and published by the same engine our
           customers get. We do not just sell the autopilot... we fly it. Judge us by the output.
         </P>
         <div className="mt-10 space-y-8">
-          {articles.length === 0 && <P>First essays landing shortly.</P>}
+          {articles.length === 0 && <P>First articles landing shortly.</P>}
           {articles.map((a) => (
             <a
               key={a.slug}

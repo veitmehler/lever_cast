@@ -22,7 +22,7 @@ export default function AboutPage() {
       </P>
       <H3>We run our own marketing on Omniply</H3>
       <P>
-        Every article on <a href="https://azavea.ai" className="underline" rel="noopener">azavea.ai</a> is
+        Every article in <a href="/articles" className="underline">our articles section</a> is
         researched, written, illustrated, and published by the same engine your practice gets... same
         pipeline, same review flow, same voice matching. We would not sell an autopilot we do not fly
         ourselves.

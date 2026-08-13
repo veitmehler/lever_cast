@@ -435,7 +435,7 @@ export function SiteHeader({ vertical }: { vertical?: string }) {
       <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
         <a href="/home" className="flex items-center gap-3 font-mono text-sm font-bold tracking-[0.25em] text-white no-underline">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.svg" alt="Omniply" className="h-7 w-7 rounded-md" />
+          <img src="/logo-white.svg" alt="Omniply" className="h-7 w-7" />
           <span>
             OMNIPLY{vertical ? <span className="font-normal text-white/50"> &middot; {vertical.toUpperCase()}</span> : null}
           </span>

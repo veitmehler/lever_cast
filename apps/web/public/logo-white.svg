@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linejoin="round">
+    <path d="M210 45 335 117 335 261 210 333 85 261 85 117 Z"/>
+    <path d="M352 168 468 235 468 369 352 436 236 369 236 235 Z"/>
+    <path d="M160 250 268 312 268 436 160 498 52 436 52 312 Z"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="13">
+    <line x1="230" y1="238" x2="283" y2="295"/>
+    <line x1="283" y1="295" x2="222" y2="337"/>
+    <line x1="230" y1="238" x2="222" y2="337"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="230" cy="238" r="40"/>
+    <circle cx="283" cy="295" r="40"/>
+    <circle cx="222" cy="337" r="40"/>
+  </g>
+</svg>

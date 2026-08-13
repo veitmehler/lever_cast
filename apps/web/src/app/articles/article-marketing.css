@@ -46,3 +46,8 @@
 .marketing-article .article-body .geo-summary {
   border-left-color: #C3F43B !important;
 }
+
+/* Diagram lightbox affordance (diagrams only, user-locked) */
+.marketing-article .article-body figure.article-diagram img {
+  cursor: zoom-in;
+}

@@ -233,11 +233,12 @@ Article Content Summary: {{article_summary}}
 
 Generate a brief disclaimer for this BUSINESS article that:
 1. Is ONE short paragraph (3-4 sentences)
-2. Opens with the transparency disclosure, exactly this sentence: "Published by Azavea Inc., the company behind Omniply."
-3. Notes that the content is general business information, not legal, financial, or professional advice, and that figures/examples are illustrative
+2. Opens with the honesty disclosure, exactly this sentence: "We publish what our own engine produces, reviewed by a human before it ships. It is the same engine our customers get."
+3. Notes that the content is general business information, not legal, financial, or professional advice, and that figures and examples are illustrative
 4. Notes that readers should evaluate decisions for their own practice circumstances
 5. Does NOT include medical/health warnings (this is not patient-facing health content)
-6. Is professional and unobtrusive
+6. Does NOT mention any company name
+7. Is professional and unobtrusive, with no dashes as punctuation
 
 Return ONLY the disclaimer text. No explanations, no markdown, no code blocks. Just the plain text disclaimer.`,
     isActive: true,

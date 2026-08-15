@@ -71,7 +71,16 @@ marketer... we&apos;re asking you to stop having to be one.
 q: 'What is included in the $397?',
 ```
 
-## 5. What does NOT need restoring
+## 5. GHL launch-morning actions (not code)
+
+- Re-enable the checkout orderform (taken offline after the test purchase).
+- **Insert the real checkout link into all three W2 "Launch Blast" emails**
+  (placeholder [CHECKOUT LINK] in each) and the real spot count [N] into
+  Email 2 — then bulk-add the `launch-blast` tag to the waitlist smart list
+  to start the drip. W2 waits must be back at 2 days (dry-run used 5 min).
+- Verify W2 is PUBLISHED before adding the tag (it was kept off pre-launch).
+
+## 6. What does NOT need restoring
 
 - The notify-pitch blocks hide themselves after 2026-09-08T14:00Z
   (x-ray + walkthrough statics and the FoundingNotify React component all

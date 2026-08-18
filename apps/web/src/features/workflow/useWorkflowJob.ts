@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { type SocialAutomationRunRow } from '@/features/social/SocialPreviewPanel'
 import { useAuthedFetch } from '@/lib/use-authed-fetch'
 import { ACTIVE_STATUSES, ENRICHMENT_ACTIVE } from './constants'
+import { markdownToHtml } from './markdown-to-html'
 import {
   buildFinalReviewText,
   buildReviewText,
@@ -648,6 +649,30 @@ export function useWorkflowJob() {
     }
   }
 
+  // Rich copy: text/html flavor so LinkedIn's / Medium's WYSIWYG editors keep
+  // headings, bold, lists and links on paste (both render raw markdown as
+  // literal characters). Plain-text flavor carries the markdown as fallback.
+  const handleCopySyndicationRich = async (title: string, content: string, platform: string) => {
+    const html = `<h1>${title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</h1>\n${markdownToHtml(content)}`
+    const plain = `# ${title}\n\n${content}`
+    try {
+      if (typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([plain], { type: 'text/plain' }),
+          }),
+        ])
+      } else {
+        await navigator.clipboard.writeText(plain)
+      }
+      setCopiedSyndication(platform)
+      setTimeout(() => setCopiedSyndication(null), 2500)
+    } catch {
+      toast.error('Copy failed — please select and copy manually')
+    }
+  }
+
   const handleApprove = async () => {
     setIsApproving(true)
     try {
@@ -741,6 +766,7 @@ export function useWorkflowJob() {
     handleCopySubstack,
     handleGenerateSyndication,
     handleCopySyndication,
+    handleCopySyndicationRich,
     handleApprove,
     handleCopySchema,
     handleCopy,

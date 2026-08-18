@@ -97,9 +97,11 @@ export function buildArticleSchema(opts: BuildSchemaOpts): string {
   if (brand.organizationEmail)   publisher.email     = brand.organizationEmail
   if (brand.organizationPhone)   publisher.telephone = brand.organizationPhone
   if (address)                   publisher.address   = address
-  if (brand.googleBusinessProfileUrl) {
-    publisher.sameAs = [brand.googleBusinessProfileUrl]
-  }
+  const sameAs = [
+    ...(brand.googleBusinessProfileUrl ? [brand.googleBusinessProfileUrl] : []),
+    ...(brand.socialProfileUrls ?? []),
+  ]
+  if (sameAs.length > 0) publisher.sameAs = sameAs
 
   // ── Image ─────────────────────────────────────────────────────────────────
   let image: Record<string, unknown> | undefined

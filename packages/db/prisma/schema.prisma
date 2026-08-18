@@ -1193,6 +1193,7 @@ model BrandSettings {
   organizationAddress      String? @db.Text // computed combined string (legacy + fallback)
   organizationCountryCode  String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
   organizationLogoUrl      String? // CDN URL for the business logo (used in schema publisher.logo)
+  socialProfileUrls        String[] @default([]) // org social profile URLs → publisher.sameAs in JSON-LD (alongside GBP)
   socialLogoUrl            String? // optional override for social quote cards / compositors; falls back to organizationLogoUrl
   socialAccountName        String? // social handle / display name for quote cards (e.g. "hormozi"); falls back to organizationName
   instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards

@@ -111,6 +111,25 @@ describe('buildArticleSchema — assembly', () => {
     })
   })
 
+  it('merges GBP and social profile urls into publisher.sameAs, omitting it when both are empty', () => {
+    expect(parse(opts()).publisher.sameAs).toBeUndefined()
+    const s = parse(
+      opts({
+        brand: brand({
+          googleBusinessProfileUrl: 'https://g.page/clinic',
+          socialProfileUrls: ['https://www.facebook.com/omniply', 'https://www.instagram.com/omniply_marketing'],
+        }),
+      }),
+    )
+    expect(s.publisher.sameAs).toEqual([
+      'https://g.page/clinic',
+      'https://www.facebook.com/omniply',
+      'https://www.instagram.com/omniply_marketing',
+    ])
+    const socialOnly = parse(opts({ brand: brand({ socialProfileUrls: ['https://www.facebook.com/omniply'] }) }))
+    expect(socialOnly.publisher.sameAs).toEqual(['https://www.facebook.com/omniply'])
+  })
+
   it('includes the image only when a featured image url is present, with optional dimensions', () => {
     expect(parse(opts()).image).toBeUndefined()
     const s = parse(opts({ featuredImageUrl: 'https://cdn/img.jpg', featuredImageWidth: 1200, featuredImageHeight: 630 }))

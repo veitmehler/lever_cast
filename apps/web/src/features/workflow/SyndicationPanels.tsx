@@ -14,6 +14,7 @@ export function SyndicationPanels({ workflow }: { workflow: WorkflowView }) {
     jobId,
     sitePage,
     displayStatus,
+    attempts,
     syndicationArticles,
     syndicationLoading,
     syndicationGenerated,
@@ -22,7 +23,12 @@ export function SyndicationPanels({ workflow }: { workflow: WorkflowView }) {
     copiedSyndication,
     handleGenerateSyndication,
     handleCopySyndication,
+    handleCopySyndicationRich,
   } = workflow
+
+  // Live article URL (internal /articles or clinic WordPress) — Medium's
+  // import tool pulls straight from it, images included, canonical set.
+  const liveUrl = attempts.find((a) => a.status === 'success' && a.resultUrl)?.resultUrl ?? null
 
   return (
     <>
@@ -111,20 +117,65 @@ export function SyndicationPanels({ workflow }: { workflow: WorkflowView }) {
               <div key={art.platform}>
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <h3 className="text-base font-semibold text-card-foreground leading-snug">{art.title}</h3>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => void handleCopySyndication(
-                      `# ${art.title}\n\n${art.content}`,
-                      art.platform,
-                    )}
-                  >
-                    {copiedSyndication === art.platform
-                      ? <><ClipboardCheck className="h-3.5 w-3.5 mr-1.5 text-green-500" />Copied!</>
-                      : <><ClipboardCopy className="h-3.5 w-3.5 mr-1.5" />Copy</>}
-                  </Button>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleCopySyndicationRich(art.title, art.content, art.platform)}
+                    >
+                      {copiedSyndication === art.platform
+                        ? <><ClipboardCheck className="h-3.5 w-3.5 mr-1.5 text-green-500" />Copied!</>
+                        : <><ClipboardCopy className="h-3.5 w-3.5 mr-1.5" />
+                            Copy for {art.platform === 'linkedin' ? 'LinkedIn' : 'Medium'}</>}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => void handleCopySyndication(
+                        `# ${art.title}\n\n${art.content}`,
+                        `${art.platform}-md`,
+                      )}
+                    >
+                      {copiedSyndication === `${art.platform}-md`
+                        ? <ClipboardCheck className="h-3.5 w-3.5 text-green-500" />
+                        : <>Markdown</>}
+                    </Button>
+                  </div>
                 </div>
+                {art.platform === 'linkedin' && (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Paste into a LinkedIn article draft — headings, bold, lists and links carry over.
+                    Upload the featured image and diagrams manually (LinkedIn drops pasted images).
+                  </p>
+                )}
+                {art.platform === 'medium' && (
+                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 mb-3 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-card-foreground">
+                      Best for Medium: import instead of pasting.
+                    </p>
+                    <p>
+                      Use{' '}
+                      <a
+                        href="https://medium.com/p/import"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-foreground"
+                      >
+                        medium.com/p/import
+                      </a>
+                      {liveUrl ? (
+                        <> with the live article URL:{' '}
+                          <span className="font-mono break-all text-card-foreground">{liveUrl}</span>
+                        </>
+                      ) : (
+                        <> with the live article URL once published</>
+                      )}
+                      {' '}— Medium pulls the images and sets the canonical link back to your site.
+                      The copy below is the Medium-tailored variant if you prefer to paste.
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-lg border border-border bg-muted/40 p-4 max-h-96 overflow-y-auto">
                   <pre className="text-sm text-card-foreground whitespace-pre-wrap font-sans leading-relaxed">
                     {art.content}

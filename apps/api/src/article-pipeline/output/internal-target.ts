@@ -42,11 +42,21 @@ export class InternalTarget implements OutputTarget {
       slug = await this.uniqueSlug(payload.slug, sitePage.id)
     }
 
+    // Display date = the article's NOMINAL date (topic publishing/scheduled
+    // date), not the approval click — backdated/backfill articles sort into
+    // the past on /articles instead of piling up on approval day
+    // (user request 2026-08-19).
+    const topic = await prisma.articleJob.findUnique({
+      where: { id: payload.jobId },
+      select: { topic: { select: { publishingDate: true, scheduledDate: true } } },
+    })
+    const nominalDate = topic?.topic?.publishingDate ?? topic?.topic?.scheduledDate ?? new Date()
+
     await prisma.sitePage.update({
       where: { id: sitePage.id },
       data: {
         internalSlug: slug,
-        internalPublishedAt: sitePage.internalPublishedAt ?? new Date(),
+        internalPublishedAt: sitePage.internalPublishedAt ?? nominalDate,
       },
     })
 

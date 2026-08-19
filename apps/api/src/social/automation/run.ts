@@ -19,6 +19,7 @@ import { sectionAtIndex } from './article-social-selectors'
 import { resolveNewsletterSlotContent } from './newsletter-content'
 import type { SlotContent } from './content'
 import { listAutomationPlatforms } from './platforms'
+import { PLATFORM_CHAR_LIMITS } from './captions'
 import { generateBatchedCaptionsForPlatform, type CaptionSlotInput } from '../generators/batched-captions'
 import { processStorySlot } from './story-processor'
 import { finalizeGenerationCounts, updateGenerationProgress, loadPriorAssets } from './spec-processor'
@@ -93,12 +94,32 @@ async function pregenerateBatchedCaptions(opts: {
   logCtx: AutomationLogContext
 }): Promise<Record<string, Record<string, string>>> {
   const { feedEntries, ctx, logCtx } = opts
-  if (feedEntries.length < 2) return {}
+  if (feedEntries.length === 0) return {}
+
+  const platforms = await listAutomationPlatforms(logCtx.userId, false)
+  const bySlot: Record<string, Record<string, string>> = {}
+
+  // Key-Takeaways slots publish the article's takeaways VERBATIM — no
+  // caption generator, ever (user decision 2026-08-19). Only truncation to
+  // the platform limit is applied.
+  const llmEntries: SlotEntry[] = []
+  for (const e of feedEntries) {
+    if (e.daySlot.source === 'art_keytakeaways' && ctx.articleCtx?.keyTakeawaysText) {
+      const kt = ctx.articleCtx.keyTakeawaysText.trim()
+      for (const platform of platforms) {
+        const limit = PLATFORM_CHAR_LIMITS[platform] ?? 2000
+        ;(bySlot[e.slotKey] ??= {})[platform] =
+          kt.length <= limit ? kt : kt.slice(0, limit - 1).trim() + '…'
+      }
+    } else {
+      llmEntries.push(e)
+    }
+  }
 
   const slots: CaptionSlotInput[] = []
-  for (const e of feedEntries) {
+  for (const e of llmEntries) {
     const sc = tryResolveSlotTextOnly(e.daySlot.source, ctx)
-    if (!sc?.text) return {} // legacy source in the mix — whole run uses per-slot captions
+    if (!sc?.text) return bySlot // legacy source in the mix — those slots use per-slot captions
     slots.push({
       slotKey: e.slotKey,
       postType: e.daySlot.postType,
@@ -106,9 +127,8 @@ async function pregenerateBatchedCaptions(opts: {
       text: sc.text,
     })
   }
+  if (slots.length === 0) return bySlot
 
-  const platforms = await listAutomationPlatforms(logCtx.userId, false)
-  const bySlot: Record<string, Record<string, string>> = {}
   await Promise.all(
     platforms.map(async (platform) => {
       try {

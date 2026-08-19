@@ -1,5 +1,12 @@
 # Social: hard section assignment, batched captions, KT music-video
 
+STATUS 2026-08-19: Phases 1+2 DEPLOYED both envs + E2E-verified (captions
+distinct even under modulo wrap; runs 6/6 incl. stories). Bundled fixes
+shipped same day: promo essay→article (FORCE-reseeded prod) and an ffmpeg-8
+regression (blend=all_expr ~0.01x realtime → replaced with fade+overlay,
+3s vs 90s+ benchmark; story slots were timing out). Phase 3 (kt_music_video)
+NOT BUILT YET — matrix KT slots run as carousel/reel until it lands.
+
 Origin: 2026-08-18 cadence test — the Aug 17 article's two runs produced
 near-identical carousels. Diagnosis: (a) no-voice substitution collapsed all
 video slots to carousels (format variety lost), (b) captions generated blind

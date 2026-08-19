@@ -59,16 +59,18 @@ Takeaways as bullet text, background music from the admin library, NO
 voiceover. Short video loops on FB/IG; readers need 2–3 loops to finish the
 bullets = watch-time retention. All ingredients exist:
 
-- Background: `generateSeedanceClip` (already used by hook videos). Prompt:
-  calm abstract motion in brand palette (per-account diagram style guide
-  colors); admin Step 217 fal-model override respected.
-- Overlay: brand tint + bullets rendered as a transparent PNG (reuse the
-  tips_bullets story text renderer, new 4:5 feed aspect variant) composited
-  over the clip with the existing ffmpeg overlay pass (same machinery as
-  the hook video's title overlay). Logo per diagramLogoVariant.
-- Music: `pickMusicTrack` from admin music_tracks library, mixed at full
-  level (no narration -> no ducking), 2s fade-out. Mix pass is remux-only,
-  cheap.
+- Background (user-adjusted 2026-08-19): `generateSeedanceClip` prompt is
+  CONTENT-RELATED (derived from the article topic/section imagery), NOT
+  brand-palette abstract. Admin Step 217 fal-model override respected.
+- Overlay (user-adjusted): the color overlay MUST be a DARK brand color
+  from the account palette (semi-transparent tint over the clip so text
+  reads); bullet text is ALWAYS WHITE. Rendered as a transparent PNG
+  (reuse the tips_bullets story text renderer, new 4:5 feed aspect
+  variant) composited with the existing ffmpeg overlay pass. Logo per
+  diagramLogoVariant.
+- Music (user-adjusted): `pickMusicTrack` from admin music_tracks library,
+  mixed at −12 dB below full level (no narration -> no ducking beyond
+  that), 2s fade-out. Mix pass is remux-only, cheap.
 - Duration: keep the raw 5–7s clip length (platforms auto-loop; do NOT
   concat/extend).
 - Fallback chain (ffmpeg reliability is a known watch item): any failure ->

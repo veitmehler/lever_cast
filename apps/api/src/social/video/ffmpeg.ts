@@ -479,8 +479,38 @@ export async function overlayTitleOnVideo(
 export interface TitleFadeFilters {
   /** Comma-joined drawbox + drawtext chain rendering the title box. */
   overlayChain: string
-  /** `blend` all_expr cross-fading from the clean base (A) to the overlaid copy (B). */
-  blendExpr: string
+}
+
+/**
+ * Filtergraph lines that composite a fading-in title layer over `inputLabel`,
+ * writing the result to `outLabel`.
+ *
+ * ffmpeg 8 regressed `blend=all_expr` (the old crossfade approach) to
+ * ~0.01x realtime — a 3s 1080x1920 clip took 90s+ of CPU (observed on both
+ * droplets, 2026-08-19). This replaces it with native filters: the title
+ * box+text is drawn once on a transparent RGBA canvas, alpha-faded in with
+ * `fade`, and composited with `overlay` — visually identical, orders of
+ * magnitude faster, and version-stable.
+ *
+ * fadeDuration <= 0 → the title is baked directly into the stream (no layer,
+ * no fade), which is also the cheapest possible path.
+ */
+export function titleFadeGraph(
+  inputLabel: string,
+  outLabel: string,
+  overlayChain: string,
+  width: number,
+  height: number,
+  fadeStart: number,
+  fadeDuration: number,
+): string[] {
+  if (fadeDuration <= 0) {
+    return [`[${inputLabel}]${overlayChain}[${outLabel}]`]
+  }
+  const layer =
+    `color=c=black@0.0:s=${width}x${height}:r=30,format=rgba,` +
+    `${overlayChain},fade=t=in:st=${fadeStart}:d=${fadeDuration}:alpha=1[__ttl_${outLabel}]`
+  return [layer, `[${inputLabel}][__ttl_${outLabel}]overlay=shortest=1[${outLabel}]`]
 }
 
 /**
@@ -499,8 +529,6 @@ export async function buildTitleFadeFilters(
   width: number,
   height: number,
   fontPath: string = defaultFontPath(),
-  fadeStart = 1.0,
-  fadeDuration = 0.5,
 ): Promise<TitleFadeFilters> {
   const scale = height / 1080
 
@@ -530,16 +558,7 @@ export async function buildTitleFadeFilters(
     ...textFilters,
   ].join(',')
 
-  // fadeDuration <= 0 → title fully visible from the first frame (no fade-in).
-  let blendExpr: string
-  if (fadeDuration <= 0) {
-    blendExpr = 'B'
-  } else {
-    const ramp = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
-    blendExpr = `A*(1-${ramp})+B*${ramp}`
-  }
-
-  return { overlayChain, blendExpr }
+  return { overlayChain }
 }
 
 /**
@@ -563,15 +582,9 @@ export async function overlayTitleOnVideoFadeIn(
   const { width, height } = await probeVideo(inputPath)
   const dir = path.dirname(outputPath)
 
-  const { overlayChain, blendExpr } = await buildTitleFadeFilters(
-    dir, title, width, height, fontPath, fadeStart, fadeDuration,
-  )
+  const { overlayChain } = await buildTitleFadeFilters(dir, title, width, height, fontPath)
 
-  const filterComplex = [
-    `[0:v]split[base][dup]`,
-    `[dup]${overlayChain}[overlaid]`,
-    `[base][overlaid]blend=all_expr='${blendExpr}'[out]`,
-  ].join(';')
+  const filterComplex = titleFadeGraph('0:v', 'out', overlayChain, width, height, fadeStart, fadeDuration).join(';')
 
   await runFfmpeg([
     '-i', inputPath,
@@ -630,14 +643,7 @@ export async function overlayTitleOnVideoStripFadeIn(
     ...textFilters,
   ].join(',')
 
-  const ramp       = `clip((T-${fadeStart})/${fadeDuration}\\,0\\,1)`
-  const blendExpr  = `A*(1-${ramp})+B*${ramp}`
-
-  const filterComplex = [
-    `[0:v]split[base][dup]`,
-    `[dup]${overlayChain}[overlaid]`,
-    `[base][overlaid]blend=all_expr='${blendExpr}'[out]`,
-  ].join(';')
+  const filterComplex = titleFadeGraph('0:v', 'out', overlayChain, width, height, fadeStart, fadeDuration).join(';')
 
   await runFfmpeg([
     '-i', inputPath,

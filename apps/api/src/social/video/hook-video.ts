@@ -109,10 +109,11 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
     `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p`
 
   // Title overlay laid out at the output resolution (text is rendered at
-  // 1080p instead of being upscaled from the 720p Seedance frame).
-  // fadeStart=0, fadeDuration=0 → title is visible from the first frame (no fade-in).
-  const { overlayChain, blendExpr } = await buildTitleFadeFilters(
-    opts.tmpDir, opts.title, width, height, defaultFontPath(), 0, 0,
+  // 1080p instead of being upscaled from the 720p Seedance frame). The title
+  // is visible from the first frame, so it is baked straight into the intro
+  // stream (no split/blend — see titleFadeGraph's ffmpeg-8 note).
+  const { overlayChain } = await buildTitleFadeFilters(
+    opts.tmpDir, opts.title, width, height, defaultFontPath(),
   )
 
   const introTrim = needsTrim ? `trim=duration=${MAX_INTRO_SECS},setpts=PTS-STARTPTS,` : ''
@@ -121,9 +122,7 @@ export async function buildHookVideo(opts: HookVideoOptions): Promise<HookVideoR
   const introDelayMs = Math.round(introDuration * 1000)
 
   const filterParts = [
-    `[0:v]${introTrim}${scalePad},split[ibase][idup]`,
-    `[idup]${overlayChain}[iover]`,
-    `[ibase][iover]blend=all_expr='${blendExpr}'[v0]`,
+    `[0:v]${introTrim}${scalePad},${overlayChain}[v0]`,
     ...localImages.map((_, i) => `[${i + 1}:v]${scalePad}[v${i + 1}]`),
     `${Array.from({ length: n + 1 }, (_, i) => `[v${i}]`).join('')}concat=n=${n + 1}:v=1:a=0[vout]`,
     opts.voiceAudioPath

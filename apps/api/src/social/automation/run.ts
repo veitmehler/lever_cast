@@ -2,9 +2,24 @@ import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from './log-context'
 import { ensureRunSlideCount } from './slide-count'
-import { matrixForDay, storySlotsForDay, applyVoiceCapability, ARTICLE_DAY2_SLOTS, type DaySlot } from './weekly-matrix'
+import {
+  matrixForDay,
+  storySlotsForDay,
+  applyVoiceCapability,
+  ARTICLE_DAY2_SLOTS,
+  AZAVEA_ARTICLE_DAY1_SLOTS,
+  sectionIndexOfSource,
+  sourceKind,
+  type DaySlot,
+} from './weekly-matrix'
 import { accountHasVoice } from '../../lib/elevenlabs/settings'
-import { buildMatrixRunContext, processMatrixSlot } from './matrix-processor'
+import { verticalForUser } from '../../lib/prompt-resolver'
+import { buildMatrixRunContext, processMatrixSlot, type MatrixRunContext } from './matrix-processor'
+import { sectionAtIndex } from './article-social-selectors'
+import { resolveNewsletterSlotContent } from './newsletter-content'
+import type { SlotContent } from './content'
+import { listAutomationPlatforms } from './platforms'
+import { generateBatchedCaptionsForPlatform, type CaptionSlotInput } from '../generators/batched-captions'
 import { processStorySlot } from './story-processor'
 import { finalizeGenerationCounts, updateGenerationProgress, loadPriorAssets } from './spec-processor'
 import { mapWithConcurrency } from '../../lib/concurrency'
@@ -32,12 +47,89 @@ function slotEntriesForRun(
   scheduledDate: string,
   hasVoice: boolean,
   slotVariant?: string | null,
+  vertical?: string | null,
 ): SlotEntry[] {
-  // Azavea companion run (publish day + 1): fixed unused-sections set,
-  // independent of the weekday's matrix.
-  const base = slotVariant === 'article_day2' ? ARTICLE_DAY2_SLOTS : matrixForDay(kind, isoWeekdayOf(scheduledDate))
+  // Azavea cadence (hard-bound sections, arc-distance interleave — see
+  // .plans/social-sections-kt-video plan): day 2 = KT + sections 2/4;
+  // day 1 = sections 1/3/5. Other accounts use the weekday matrix.
+  const base =
+    slotVariant === 'article_day2'
+      ? ARTICLE_DAY2_SLOTS
+      : vertical === 'azavea' && kind === 'article'
+        ? AZAVEA_ARTICLE_DAY1_SLOTS
+        : matrixForDay(kind, isoWeekdayOf(scheduledDate))
   const slots = applyVoiceCapability(base, hasVoice)
   return slots.map((daySlot, i) => ({ slotKey: `P${i + 1}`, daySlot }))
+}
+
+/**
+ * Text-only slot resolution for caption pre-generation — no S3, no image
+ * work. Returns null for sources whose text needs the full resolver
+ * (legacy selector sources); those runs skip batching and use the per-slot
+ * caption path.
+ */
+function tryResolveSlotTextOnly(source: DaySlot['source'], ctx: MatrixRunContext): SlotContent | null {
+  if (sourceKind(source) === 'newsletter') {
+    return ctx.newsletterCtx ? resolveNewsletterSlotContent(source, ctx.newsletterCtx) : null
+  }
+  if (!ctx.articleCtx) return null
+  if (source === 'art_keytakeaways') {
+    return { text: ctx.articleCtx.keyTakeawaysText, title: 'Key Takeaways' }
+  }
+  const idx = sectionIndexOfSource(source)
+  if (idx !== null) return sectionAtIndex(ctx.articleCtx, idx)
+  return null
+}
+
+/**
+ * Phase 2 of the sections/KT plan: ONE caption call per platform covering
+ * all feed slots, so the model writes mutually distinct captions. Returns
+ * slotKey → platform → caption; empty map (or missing platforms) falls back
+ * to the legacy per-slot path inside buildPostsForSpec.
+ */
+async function pregenerateBatchedCaptions(opts: {
+  feedEntries: SlotEntry[]
+  ctx: MatrixRunContext
+  logCtx: AutomationLogContext
+}): Promise<Record<string, Record<string, string>>> {
+  const { feedEntries, ctx, logCtx } = opts
+  if (feedEntries.length < 2) return {}
+
+  const slots: CaptionSlotInput[] = []
+  for (const e of feedEntries) {
+    const sc = tryResolveSlotTextOnly(e.daySlot.source, ctx)
+    if (!sc?.text) return {} // legacy source in the mix — whole run uses per-slot captions
+    slots.push({
+      slotKey: e.slotKey,
+      postType: e.daySlot.postType,
+      title: sc.title ?? ctx.contextTitle,
+      text: sc.text,
+    })
+  }
+
+  const platforms = await listAutomationPlatforms(logCtx.userId, false)
+  const bySlot: Record<string, Record<string, string>> = {}
+  await Promise.all(
+    platforms.map(async (platform) => {
+      try {
+        const captions = await generateBatchedCaptionsForPlatform({
+          platform,
+          articleTitle: ctx.contextTitle,
+          slots,
+          logCtx,
+        })
+        for (const [slotKey, caption] of Object.entries(captions)) {
+          ;(bySlot[slotKey] ??= {})[platform] = caption
+        }
+      } catch (err) {
+        logger.warn(
+          { ...logCtx, platform, err },
+          '[social-automation] batched captions failed — per-slot fallback for platform',
+        )
+      }
+    }),
+  )
+  return bySlot
 }
 
 export async function runSocialAutomation(
@@ -81,7 +173,8 @@ export async function runSocialAutomation(
   // Story derivation runs on the transformed entries, so pitch_hook companions
   // become pitch_carousel automatically.
   const hasVoice = await accountHasVoice(run.userId)
-  const feedEntries = slotEntriesForRun(kind, run.scheduledDate, hasVoice, run.slotVariant)
+  const vertical = kind === 'article' ? await verticalForUser(run.userId) : null
+  const feedEntries = slotEntriesForRun(kind, run.scheduledDate, hasVoice, run.slotVariant, vertical)
   const storySlots = storySlotsForDay(kind, feedEntries)
   if (!hasVoice) {
     logger.info({ runId }, '[social-automation] no working voice — video slots substituted with accent carousels')
@@ -166,6 +259,11 @@ export async function runSocialAutomation(
   // WAVE 2 — story slots in parallel AFTER wave 1 settles (stories reuse feed
   // assets). Heavy local stages stay bounded by the ffmpeg/Chromium/provider
   // semaphores. currentSpec shows the most recently STARTED slot.
+  // Batched captions (one call per platform, all slots together) BEFORE the
+  // wave — distinctness across the day's captions is enforced in-prompt.
+  const captionsBySlot =
+    feedToRun.length > 0 ? await pregenerateBatchedCaptions({ feedEntries: feedToRun, ctx, logCtx: baseCtx }) : {}
+
   await mapWithConcurrency(feedToRun, FEED_WAVE_CONCURRENCY, async (entry) => {
     await prisma.socialAutomationRun.update({
       where: { id: runId },
@@ -181,6 +279,7 @@ export async function runSocialAutomation(
       slideCount,
       diagramLogoVariant,
       logCtx: baseCtx,
+      pregeneratedCaptions: captionsBySlot[entry.slotKey],
     })
 
     await updateGenerationProgress(runId)

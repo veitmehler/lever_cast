@@ -44,10 +44,11 @@ export const AZAVEA_PROMPT_OVERRIDES: VerticalPromptOverride[] = [
       'Voice: punchy, direct, owner-to-owner, no hype, no dashes as punctuation. ' +
       'The body must be valid, email-safe HTML (use <p>, <strong>, <ul>/<li>, and <a href> only, no <html>, <head>, <body>, <style>, or <script> tags, no external CSS). ' +
       'Always include exactly one clear call-to-action link to the article. ' +
+      'Always call the published piece an "article", never an "essay". ' +
       'Output ONLY a single JSON object and nothing else, in the exact shape: ' +
       '{"subject": "<subject line>", "bodyHtml": "<email body html>"}. ' +
       'Do not wrap the JSON in markdown code fences. Do not add commentary.',
-    userPrompt: `Write a short email to the Omniply founding waitlist announcing this newly published Azavea essay.
+    userPrompt: `Write a short email to the Omniply founding waitlist announcing this newly published Omniply article.
 
 ARTICLE TITLE: {{title}}
 
@@ -65,7 +66,7 @@ FULL ARTICLE BODY (for context, do NOT reproduce it):
 Requirements:
 - Reader: a chiropractic practice OWNER who took the Practice X-Ray and reserved a founding spot. They think in patients, hours and dollars, not marketing jargon.
 - Subject line: 4 to 9 words, specific and curiosity-driven, no clickbait, no emoji.
-- Body: 80 to 140 words of valid email-safe HTML. Open with the business problem the essay dissects, give 2 concrete reasons it is worth their five minutes, then ONE call-to-action link to {{article_url}} with anchor text like "Read the essay".
+- Body: 80 to 140 words of valid email-safe HTML. Open with the business problem the article dissects, give 2 concrete reasons it is worth their five minutes, then ONE call-to-action link to {{article_url}} with anchor text like "Read the article".
 - Close with exactly this line, verbatim, as the final paragraph: <p>Doors open September 8. Your founding spot and price are locked.</p>
 - Second person, no "Dear reader", no signature block, no dashes as punctuation.
 - If {{article_url}} is empty, still write the email with the CTA href="#".

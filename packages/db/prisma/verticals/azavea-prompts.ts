@@ -44,6 +44,7 @@ export const AZAVEA_PROMPT_OVERRIDES: VerticalPromptOverride[] = [
       'Voice: punchy, direct, owner-to-owner, no hype, no dashes as punctuation. ' +
       'The body must be valid, email-safe HTML (use <p>, <strong>, <ul>/<li>, and <a href> only, no <html>, <head>, <body>, <style>, or <script> tags, no external CSS). ' +
       'Always include exactly one clear call-to-action link to the article. ' +
+      'Always call the published piece an "article", never an "essay". ' +
       'Output ONLY a single JSON object and nothing else, in the exact shape: ' +
       '{"subject": "<subject line>", "bodyHtml": "<email body html>"}. ' +
       'Do not wrap the JSON in markdown code fences. Do not add commentary.',

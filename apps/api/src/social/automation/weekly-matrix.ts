@@ -14,12 +14,21 @@ export type PostSource =
   | 'nl_tips' // quote card from quickHits.tips
   | 'nl_feature' // image carousel from the feature article
   // ── Article sources ──
-  | 'art_diagram_0' // diagram carousel, 1st diagram section (fallback → image carousel)
-  | 'art_diagram_1' // diagram carousel, 2nd diagram section (fallback → image carousel)
+  | 'art_diagram_0' // legacy: diagram carousel, 1st diagram section (fallback → image carousel)
+  | 'art_diagram_1' // legacy: diagram carousel, 2nd diagram section (fallback → image carousel)
   | 'art_keytakeaways' // reel bullets from Key Takeaways
-  | 'art_hook_diagram0' // hook video from the 1st diagram section
-  | 'art_hook_other' // hook video from a section ≠ that day's diagram-carousel section
-  | 'art_hook_unused' // hook from a section no other slot (either day) has used
+  | 'art_hook_diagram0' // legacy: hook video from the 1st diagram section
+  | 'art_hook_other' // legacy: hook video from a section ≠ that day's diagram-carousel section
+  | 'art_hook_unused' // legacy: hook from a section no other slot (either day) has used
+  // Hard-bound content sections (.plans/social-sections-kt-video plan, user
+  // decision 2026-08-19): index N = the (N+1)th content H2 section (Key
+  // Takeaways / FAQ / Conclusion excluded). No free selection — every slot's
+  // section is fixed by the matrix; wraps modulo when an article runs short.
+  | 'art_section_0'
+  | 'art_section_1'
+  | 'art_section_2'
+  | 'art_section_3'
+  | 'art_section_4'
 
 export type SourceKind = 'newsletter' | 'article'
 
@@ -53,11 +62,12 @@ export const DEFAULT_WEEKLY_SOCIAL_MATRIX: Record<Weekday, DaySlot[]> = {
     { hour: 12, postType: 'quote', source: 'nl_tips' },
     { hour: 15, postType: 'carousel', source: 'nl_feature' },
   ],
-  // Tue — article
+  // Tue — article (hard-bound sections 1 + 3; KT anchors the noon slot —
+  // becomes kt_music_video when Phase 3 of the sections/KT plan lands)
   2: [
-    { hour: 9, postType: 'carousel', source: 'art_diagram_0' },
+    { hour: 9, postType: 'hook_video', source: 'art_section_0' },
     { hour: 12, postType: 'video_reel', source: 'art_keytakeaways' },
-    { hour: 15, postType: 'hook_video', source: 'art_hook_other' },
+    { hour: 15, postType: 'carousel', source: 'art_section_2' },
   ],
   // Wed — newsletter (brand-tinted carousel for feed variety)
   3: [
@@ -65,11 +75,11 @@ export const DEFAULT_WEEKLY_SOCIAL_MATRIX: Record<Weekday, DaySlot[]> = {
     { hour: 12, postType: 'quote', source: 'nl_tips' },
     { hour: 15, postType: 'video_reel', source: 'nl_overview' },
   ],
-  // Thu — article
+  // Thu — article (same hard-bound shape as Tue)
   4: [
-    { hour: 9, postType: 'hook_video', source: 'art_hook_diagram0' },
+    { hour: 9, postType: 'hook_video', source: 'art_section_0' },
     { hour: 12, postType: 'video_reel', source: 'art_keytakeaways' },
-    { hour: 15, postType: 'carousel', source: 'art_diagram_1' },
+    { hour: 15, postType: 'carousel', source: 'art_section_2' },
   ],
   // Fri — newsletter
   5: [
@@ -92,7 +102,18 @@ const ARTICLE_SOURCES: ReadonlySet<PostSource> = new Set([
   'art_hook_diagram0',
   'art_hook_other',
   'art_hook_unused',
+  'art_section_0',
+  'art_section_1',
+  'art_section_2',
+  'art_section_3',
+  'art_section_4',
 ])
+
+/** Parse an `art_section_N` source to its 0-based section index (null otherwise). */
+export function sectionIndexOfSource(source: PostSource): number | null {
+  const m = /^art_section_(\d)$/.exec(source)
+  return m ? Number(m[1]) : null
+}
 
 /**
  * Azavea 6-day cadence: each MWF article gets a SECOND run the next day
@@ -102,9 +123,21 @@ const ARTICLE_SOURCES: ReadonlySet<PostSource> = new Set([
  * set regardless of weekday.
  */
 export const ARTICLE_DAY2_SLOTS: DaySlot[] = [
-  { hour: 9, postType: 'hook_video', source: 'art_hook_diagram0' },
-  { hour: 12, postType: 'hook_video', source: 'art_hook_unused' },
-  { hour: 15, postType: 'carousel', source: 'art_diagram_1' },
+  // KT anchors day 2 (postType flips to kt_music_video when Phase 3 lands).
+  { hour: 9, postType: 'carousel', source: 'art_keytakeaways', designVariant: 'brand_tint' },
+  { hour: 12, postType: 'carousel', source: 'art_section_1' },
+  { hour: 15, postType: 'carousel', source: 'art_section_3', designVariant: 'brand_tint_accent' },
+]
+
+/**
+ * Azavea article DAY 1 (no-voice account, sections interleaved for
+ * story-arc distance — user decision 2026-08-19): sections 1/3/5 as
+ * diagram carousels with alternating tints. Day 2 covers KT + 2/4.
+ */
+export const AZAVEA_ARTICLE_DAY1_SLOTS: DaySlot[] = [
+  { hour: 9, postType: 'carousel', source: 'art_section_0' },
+  { hour: 12, postType: 'carousel', source: 'art_section_2', designVariant: 'brand_tint' },
+  { hour: 15, postType: 'carousel', source: 'art_section_4', designVariant: 'brand_tint_accent' },
 ]
 
 export function sourceKind(source: PostSource): SourceKind {

@@ -29,6 +29,33 @@ beforeEach(() => {
   findMany.mockResolvedValue([]) // no stylized diagrams
 })
 
+describe('resolveArticleSlot hard-bound sections (art_section_N)', () => {
+  it('binds each index to its content section, skipping non-content H2s', async () => {
+    const r0 = await resolveArticleSlot('art_section_0', 'job1', ctx)
+    expect(r0.slot).toMatchObject({ title: 'Why posture matters', text: 'section A body' })
+    const r1 = await resolveArticleSlot('art_section_1', 'job1', ctx)
+    expect(r1.slot).toMatchObject({ title: 'Daily stretches', text: 'section B body' })
+  })
+
+  it('wraps modulo when the index exceeds the section count', async () => {
+    const r = await resolveArticleSlot('art_section_4', 'job1', ctx) // 2 content sections → 4 % 2 = 0
+    expect(r.slot).toMatchObject({ title: 'Why posture matters', text: 'section A body' })
+  })
+
+  it('attaches the SECTION-MATCHED stylized diagram when one exists', async () => {
+    findMany.mockResolvedValue([
+      { sectionTitle: 'Daily stretches', stylizedPngS3Key: 'k2' },
+      { sectionTitle: 'Why posture matters', stylizedPngS3Key: 'k1' },
+    ])
+    const { readS3Object } = await import('@omniply/shared')
+    ;(readS3Object as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ body: Buffer.from('png') })
+    const r = await resolveArticleSlot('art_section_1', 'job1', ctx)
+    expect(r.slot.title).toBe('Daily stretches')
+    expect(r.diagramBackground).not.toBeNull()
+    expect((readS3Object as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('k2')
+  })
+})
+
 describe('resolveArticleSlot section selection', () => {
   it('art_keytakeaways uses the key-takeaways text', async () => {
     const r = await resolveArticleSlot('art_keytakeaways', 'job1', ctx)

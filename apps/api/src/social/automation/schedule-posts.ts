@@ -16,13 +16,15 @@ export async function buildPostsForSpec(opts: {
   assets: SpecAssets
   scheduledAt: Date
   articleCtx: ArticleContentContext
+  /** Batched captions (platform → caption); a missing platform falls back to the per-slot call. */
+  pregeneratedCaptions?: Record<string, string>
 }): Promise<{
   built: number
   skipped: number
   failed: number
   preview: SpecPreviewPayload
 }> {
-  const { logCtx, spec, assets, scheduledAt, articleCtx } = opts
+  const { logCtx, spec, assets, scheduledAt, articleCtx, pregeneratedCaptions } = opts
   const platforms = await listAutomationPlatforms(logCtx.userId, spec.isStory)
 
   let built = 0
@@ -45,11 +47,13 @@ export async function buildPostsForSpec(opts: {
 
   for (const platform of platforms) {
     const platformCtx = withPlatform(logCtx, platform)
-    const caption = await generatePlatformCaption({
-      postType: assets.postType,
-      articleCtx,
-      logCtx: platformCtx,
-    })
+    const caption =
+      pregeneratedCaptions?.[platform] ??
+      (await generatePlatformCaption({
+        postType: assets.postType,
+        articleCtx,
+        logCtx: platformCtx,
+      }))
     const videoUrl = assets.videoUrl
     // Video posts carry ONLY the video. Some specs (hook_video) keep their
     // source carousel slides in assets.mediaUrls for cross-spec reuse —

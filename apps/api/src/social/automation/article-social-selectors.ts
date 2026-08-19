@@ -1,7 +1,7 @@
 import { prisma, readS3Object } from '@omniply/shared'
 import { logger } from '../../lib/logger'
 import type { ArticleContentContext, H2Section, SlotContent } from './content'
-import type { PostSource } from './weekly-matrix'
+import { sectionIndexOfSource, type PostSource } from './weekly-matrix'
 
 /**
  * Non-content H2s injected by enrichment (Key Takeaways / TOC / FAQ / etc.). These
@@ -44,7 +44,7 @@ function sectionTextByHeading(ctx: ArticleContentContext, heading: string): Slot
   return sec ? { text: sec.text, title: sec.heading } : null
 }
 
-function sectionAtIndex(ctx: ArticleContentContext, index: number): SlotContent {
+export function sectionAtIndex(ctx: ArticleContentContext, index: number): SlotContent {
   const secs = contentSections(ctx)
   if (secs.length === 0) return { text: ctx.h2SectionText, title: ctx.h2Title }
   const sec = secs[index % secs.length]
@@ -96,6 +96,27 @@ export async function resolveArticleSlot(
 
   const diagramHeading = diagrams[0]?.sectionTitle?.trim()
   const secs = contentSections(ctx)
+
+  const sectionIdx = sectionIndexOfSource(source)
+  if (sectionIdx !== null) {
+    // Hard-bound section (art_section_N): deterministic, no free selection.
+    // Wraps modulo when the article has fewer sections than the matrix
+    // expects (logged — a wrap means two slots share a section).
+    if (secs.length > 0 && sectionIdx >= secs.length) {
+      logger.warn(
+        { jobId, source, sectionCount: secs.length },
+        '[article-social] hard-bound section index beyond section count — wrapping',
+      )
+    }
+    const slot = sectionAtIndex(ctx, sectionIdx)
+    // Carousel background = THIS section's stylized diagram (matched by
+    // heading; the pipeline emits one diagram per section).
+    const ref = diagrams.find((d) => d.sectionTitle.trim() === slot.title?.trim())
+    return {
+      slot,
+      diagramBackground: ref ? await diagramBuffer(ref.stylizedPngS3Key, jobId) : null,
+    }
+  }
 
   if (source === 'art_hook_unused') {
     // A section NO other slot has used across BOTH days: not diagram[0]

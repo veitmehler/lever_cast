@@ -19,12 +19,12 @@ describe('applyVoiceCapability (non-EL conversion)', () => {
 
   it('converts hook_video and video_reel to accent-tinted carousels, same source/hour', () => {
     const tue = applyVoiceCapability(matrixForDay('article', 2), false)
-    // Tue original: carousel(art_diagram_0), video_reel(art_keytakeaways), hook_video(art_hook_other)
+    // Tue original: hook_video(art_section_0), video_reel(art_keytakeaways), carousel(art_section_2)
     expect(tue.map((s) => s.postType)).toEqual(['carousel', 'carousel', 'carousel'])
+    expect(tue[0]).toMatchObject({ designVariant: 'brand_tint_accent', source: 'art_section_0', hour: 9 })
     expect(tue[1]).toMatchObject({ designVariant: 'brand_tint_accent', source: 'art_keytakeaways', hour: 12 })
-    expect(tue[2]).toMatchObject({ designVariant: 'brand_tint_accent', source: 'art_hook_other', hour: 15 })
     // The pre-existing classic carousel is untouched (no variant).
-    expect(tue[0].designVariant).toBeUndefined()
+    expect(tue[2].designVariant).toBeUndefined()
   })
 
   it('leaves Wed/Sat primary brand_tint carousels as primary (accent only on converted slots)', () => {

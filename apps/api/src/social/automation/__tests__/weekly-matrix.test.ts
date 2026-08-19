@@ -27,17 +27,14 @@ describe('DEFAULT_WEEKLY_SOCIAL_MATRIX', () => {
     }
   })
 
-  it('Tue/Thu match the spec (diagram carousel + key-takeaways reel + hook video)', () => {
-    expect(DEFAULT_WEEKLY_SOCIAL_MATRIX[2].map((s) => [s.postType, s.source])).toEqual([
-      ['carousel', 'art_diagram_0'],
-      ['video_reel', 'art_keytakeaways'],
-      ['hook_video', 'art_hook_other'],
-    ])
-    expect(DEFAULT_WEEKLY_SOCIAL_MATRIX[4].map((s) => [s.postType, s.source])).toEqual([
-      ['hook_video', 'art_hook_diagram0'],
-      ['video_reel', 'art_keytakeaways'],
-      ['carousel', 'art_diagram_1'],
-    ])
+  it('Tue/Thu match the spec (hard-bound sections 1+3 with KT anchoring noon)', () => {
+    for (const day of [2, 4] as const) {
+      expect(DEFAULT_WEEKLY_SOCIAL_MATRIX[day].map((s) => [s.postType, s.source])).toEqual([
+        ['hook_video', 'art_section_0'],
+        ['video_reel', 'art_keytakeaways'],
+        ['carousel', 'art_section_2'],
+      ])
+    }
   })
 })
 
@@ -60,13 +57,32 @@ describe('matrixForDay', () => {
 })
 
 describe('ARTICLE_DAY2_SLOTS (azavea 6-day cadence)', () => {
-  it('is a 3-slot article-only set with no Key-Takeaways repeat', async () => {
-    const { ARTICLE_DAY2_SLOTS, sourceKind, applyVoiceCapability } = await import('../weekly-matrix')
-    expect(ARTICLE_DAY2_SLOTS).toHaveLength(3)
+  it('day 2 = KT anchor + hard-bound sections 2/4 (all carousels, article-only)', async () => {
+    const { ARTICLE_DAY2_SLOTS, sourceKind } = await import('../weekly-matrix')
+    expect(ARTICLE_DAY2_SLOTS.map((s) => [s.postType, s.source])).toEqual([
+      ['carousel', 'art_keytakeaways'],
+      ['carousel', 'art_section_1'],
+      ['carousel', 'art_section_3'],
+    ])
     for (const s of ARTICLE_DAY2_SLOTS) expect(sourceKind(s.source)).toBe('article')
-    expect(ARTICLE_DAY2_SLOTS.map((s) => s.source)).not.toContain('art_keytakeaways')
-    // No-voice accounts (azavea today): every slot renders as a carousel.
-    const noVoice = applyVoiceCapability(ARTICLE_DAY2_SLOTS, false)
-    expect(noVoice.every((s) => s.postType === 'carousel')).toBe(true)
+  })
+
+  it('azavea day 1 = hard-bound sections 1/3/5 as carousels', async () => {
+    const { AZAVEA_ARTICLE_DAY1_SLOTS, sourceKind } = await import('../weekly-matrix')
+    expect(AZAVEA_ARTICLE_DAY1_SLOTS.map((s) => s.source)).toEqual([
+      'art_section_0',
+      'art_section_2',
+      'art_section_4',
+    ])
+    expect(AZAVEA_ARTICLE_DAY1_SLOTS.every((s) => s.postType === 'carousel')).toBe(true)
+    for (const s of AZAVEA_ARTICLE_DAY1_SLOTS) expect(sourceKind(s.source)).toBe('article')
+  })
+
+  it('sectionIndexOfSource parses hard-bound sources and rejects others', async () => {
+    const { sectionIndexOfSource } = await import('../weekly-matrix')
+    expect(sectionIndexOfSource('art_section_0')).toBe(0)
+    expect(sectionIndexOfSource('art_section_4')).toBe(4)
+    expect(sectionIndexOfSource('art_keytakeaways')).toBeNull()
+    expect(sectionIndexOfSource('nl_feature')).toBeNull()
   })
 })

@@ -249,6 +249,8 @@ export async function processMatrixSlot(opts: {
   slideCount: number
   diagramLogoVariant: 'light' | 'dark'
   logCtx: AutomationLogContext
+  /** Batched captions for this slot (platform → caption); absent → per-slot path. */
+  pregeneratedCaptions?: Record<string, string>
 }): Promise<{ ok: boolean; error?: string }> {
   const { run, slotKey, daySlot, ctx, timeZone, slideCount, diagramLogoVariant, logCtx } = opts
   const specCtx = withSlotKey(logCtx, slotKey)
@@ -290,6 +292,7 @@ export async function processMatrixSlot(opts: {
           assets,
           scheduledAt,
           articleCtx: captionCtxForSlot(resolved.slot, ctx.contextTitle),
+          pregeneratedCaptions: opts.pregeneratedCaptions,
         })
 
         if (buildResult.failed > 0 && buildResult.built === 0) {

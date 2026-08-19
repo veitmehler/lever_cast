@@ -13,9 +13,9 @@ describe('storySlotsForDay — article days', () => {
     expect(new Set(stories.map((s) => s.storyType))).toEqual(
       new Set(['pitch_carousel', 'pitch_hook', 'quote']),
     )
-    // Tue feed: P1 carousel, P2 video_reel, P3 hook_video.
-    expect(byType.pitch_carousel.promotesFeedKey).toBe('P1')
-    expect(byType.pitch_hook.promotesFeedKey).toBe('P3')
+    // Tue feed: P1 hook_video, P2 video_reel, P3 carousel.
+    expect(byType.pitch_hook.promotesFeedKey).toBe('P1')
+    expect(byType.pitch_carousel.promotesFeedKey).toBe('P3')
     expect(byType.quote.promotesFeedKey).toBeUndefined()
   })
 

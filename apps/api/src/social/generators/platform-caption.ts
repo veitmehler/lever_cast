@@ -12,7 +12,7 @@ import { loadPlainLanguageConfig, formatExemplars } from '../../article-pipeline
 import { sanitizeDashesText } from '../../lib/text/dash-sanitizer'
 import { recordLLMUsage } from '../../lib/llm-usage'
 
-const PLATFORM_TONE: Record<string, string> = {
+export const PLATFORM_TONE: Record<string, string> = {
   linkedin:  'professional, thought-leadership tone; 1–2 short paragraphs; minimal hashtags',
   twitter:   'punchy, concise, conversational; no title repetition; 0–2 hashtags max',
   threads:   'casual, conversational, slightly playful; short sentences',
@@ -23,7 +23,7 @@ const PLATFORM_TONE: Record<string, string> = {
 
 // Kept in lockstep with the DB row (stepNumber 203) — see
 // packages/db/prisma/deai-prompts.ts and .plans/de-ai-writing.implementation-plan.md.
-const DEF_SYS =
+export const CAPTION_SYSTEM_PROMPT =
   'You write platform-native social media captions that HOOK. The first line decides everything: it must ' +
   'earn the tap on "more" with a concrete scene, striking image, or surprising specific — never a summary, ' +
   'never the title restated. Open a curiosity loop and do not close it. Match the platform tone and brand ' +
@@ -121,7 +121,7 @@ export async function generatePlatformCaption(opts: {
 
     const adapter = getLLMAdapter(provider)
     const run = await adapter.call({
-      systemPrompt: t?.systemPrompt ?? DEF_SYS,
+      systemPrompt: t?.systemPrompt ?? CAPTION_SYSTEM_PROMPT,
       userPrompt,
       model,
       temperature: 0.6,

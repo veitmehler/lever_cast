@@ -80,6 +80,9 @@ bullets = watch-time retention. All ingredients exist:
   that), 2s fade-out. Mix pass is remux-only, cheap.
 - Duration: keep the raw 5–7s clip length (platforms auto-loop; do NOT
   concat/extend).
+- Caption (user decision 2026-08-19, ALREADY LIVE for all KT slots): the
+  article's Key Takeaways VERBATIM — never through a caption LLM; only
+  platform char-limit truncation. Same rule applies to this video type.
 - Fallback chain (ffmpeg reliability is a known watch item): any failure ->
   existing KT quote-card/carousel fallback, error logged on the spec.
 - Stories: the paired story slot pitches it via the existing

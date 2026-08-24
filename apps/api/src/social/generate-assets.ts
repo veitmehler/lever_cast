@@ -53,6 +53,42 @@ function generationId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
+/**
+ * Prompt for the single per-post carousel background (user decision
+ * 2026-08-24): an industry motif as a soft background element for visual
+ * depth — NOT content-specific per slide. Motif rotates per generation so
+ * a day's posts don't share the identical image.
+ */
+const BACKGROUND_MOTIFS: Record<string, string[]> = {
+  chiropractic: [
+    'an elegant minimal line-art icon of a human spine',
+    'softly rendered abstract vertebrae shapes as geometric forms',
+    'a subtle silhouette of hands performing a gentle chiropractic adjustment',
+    'a minimal standing posture silhouette with a clean vertical alignment line',
+  ],
+  default: [
+    'soft overlapping abstract geometric shapes',
+    'gentle flowing gradient waves',
+    'a calm arrangement of translucent circles',
+  ],
+}
+
+export function themedBackgroundPrompt(industry: string | null | undefined, seed: string): string {
+  // Chiro motifs for chiropractic clinics AND the azavea vertical (industry
+  // "B2B practice-growth software" — its audience is chiropractors).
+  const key = /chiro|practice-growth/i.test(industry ?? '') ? 'chiropractic' : 'default'
+  const motifs = BACKGROUND_MOTIFS[key]
+  let h = 0
+  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  const motif = motifs[h % motifs.length]
+  return (
+    `Minimalist professional background for a social media graphic: ${motif}, ` +
+    'positioned off-center as a large soft background element, muted professional palette, ' +
+    'gentle gradient, generous negative space, subtle depth of field, ' +
+    'no text, no letters, no words, no numbers, no people, no logos'
+  )
+}
+
 export async function generateQuoteCardAsset(opts: {
   userId: string
   content: string
@@ -188,30 +224,39 @@ export async function generateCarouselAssets(opts: {
     diagramBgUrl = reg.url
   }
 
+  // ONE AI background per post, reused across every slide (user decision
+  // 2026-08-24): an industry-motif image for visual depth instead of a unique
+  // image per slide — ~10x fewer image calls; the alternating half-panels
+  // keep slides visually distinct. Diagram mode already reuses its diagram.
+  let sharedBg: Buffer | null = null
+  let sharedBgUrl: string | null = null
+  if (!useDiagram) {
+    sharedBg = await generateCarouselBackground(
+      themedBackgroundPrompt(brand.industry, genId),
+      jobId,
+      opts.imageModel,
+      opts.userId,
+    )
+    const reg = await registerSocialMedia({
+      userId: opts.userId,
+      buffer: sharedBg,
+      s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${genId}.png`,
+      title: 'Carousel background',
+      altText: 'Carousel background',
+      source: 'carousel_slide',
+      jobId,
+    })
+    sharedBgUrl = reg.url
+  }
+
   // Slides run in PARALLEL (concurrency 3) — each slide's chain (background gen
   // → register → composite → register) is independent; results keep index order
   // via mapWithConcurrency. See .plans/production-throughput.implementation-plan.md 1c.
   const slideResults = await mapWithConcurrency(slidePlans, SLIDE_CONCURRENCY, async (plan, i) => {
-    const bg = useDiagram
-      ? opts.diagramBackground!
-      : await generateCarouselBackground(plan.imagePrompt || plan.headlineText || '', jobId, opts.imageModel, opts.userId)
-
-    // Save the raw background before compositing — S4/S6 use these clean images for pitch slides.
-    let bgUrl: string
-    if (useDiagram) {
-      bgUrl = diagramBgUrl!
-    } else {
-      const bgRegistered = await registerSocialMedia({
-        userId: opts.userId,
-        buffer: bg,
-        s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${i + 1}-${genId}.png`,
-        title: `Carousel background ${i + 1}`,
-        altText: `Background for slide ${i + 1}`,
-        source: 'carousel_slide',
-        jobId,
-      })
-      bgUrl = bgRegistered.url
-    }
+    // Shared background (diagram or the single themed image) for every slide;
+    // S4/S6 read backgroundImageUrls for their pitch slides.
+    const bg = useDiagram ? opts.diagramBackground! : sharedBg!
+    const bgUrl = useDiagram ? diagramBgUrl! : sharedBgUrl!
 
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,

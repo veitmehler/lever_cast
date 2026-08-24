@@ -227,7 +227,8 @@ export async function generateKtMusicVideoAsset(opts: {
   if (bullets.length === 0) throw new Error('KT music video: no takeaway bullets found')
 
   // Dark brand overlay: primary brand color, darkened until white text clears
-  // it comfortably (relative luminance ≤ 0.18).
+  // it comfortably (relative luminance ≤ 0.10 — a bright brand blue at 0.18
+  // still read as a light wash in QA).
   const veilColor = darkBrandVeilHex(brand.primaryColor)
 
   // Content-related background clip (user spec: content imagery, not brand-
@@ -282,7 +283,7 @@ function darkBrandVeilHex(brandHex: string | null | undefined): string {
   let r = parseInt(hex.slice(0, 2), 16)
   let g = parseInt(hex.slice(2, 4), 16)
   let b = parseInt(hex.slice(4, 6), 16)
-  for (let i = 0; i < 8 && relativeLuminance(rgbHex(r, g, b)) > 0.18; i++) {
+  for (let i = 0; i < 8 && relativeLuminance(rgbHex(r, g, b)) > 0.1; i++) {
     r = Math.round(r * 0.75)
     g = Math.round(g * 0.75)
     b = Math.round(b * 0.75)

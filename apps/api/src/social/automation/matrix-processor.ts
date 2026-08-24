@@ -15,7 +15,7 @@ import {
   type NewsletterContentContext,
 } from './newsletter-content'
 import { generateQuoteCardAsset, generateCarouselAssets } from '../generate-assets'
-import { generateVideoReelAsset, generateHookVideoAsset } from '../generate-video-assets'
+import { generateVideoReelAsset, generateHookVideoAsset, generateKtMusicVideoAsset } from '../generate-video-assets'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 
 /** Shared admin-configurable Fal.ai image model for social carousels/slideshows (Step 218). */
@@ -50,6 +50,8 @@ export async function generateMatrixAsset(opts: {
   /** Brand-tinted carousel design (from the matrix DaySlot): Wed/Sat primary
    *  tint, or the no-voice accent tint. */
   designVariant?: 'brand_tint' | 'brand_tint_accent'
+  /** Azavea classic half-panel slots: per-slide themed AI backgrounds, no diagram mode. */
+  perSlideBg?: boolean
 }): Promise<SpecAssets> {
   const { userId, assetJobId, postType, resolved, contextTitle, slideCount, diagramLogoVariant } = opts
   const { slot } = resolved
@@ -161,6 +163,42 @@ export async function generateMatrixAsset(opts: {
         }
       }
     }
+    case 'kt_music_video': {
+      try {
+        const kt = await generateKtMusicVideoAsset({
+          userId,
+          keyTakeawaysText: slot.text,
+          topic: contextTitle,
+          jobId: assetJobId,
+        })
+        return { postType: 'kt_music_video', videoUrl: kt.videoUrl, title: 'Key Takeaways' }
+      } catch (err) {
+        // Same resilience stance as the other video types: a Seedance/ffmpeg
+        // failure degrades to a brand-tinted KT carousel rather than losing
+        // the slot. Caption stays the verbatim takeaways either way.
+        logger.warn(
+          { assetJobId, err },
+          '[matrix-processor] kt_music_video generation failed — falling back to tinted carousel',
+        )
+        const carousel = await generateCarouselAssets({
+          userId,
+          content: slot.text,
+          topic,
+          articleUrl: '',
+          slideCount,
+          jobId: assetJobId,
+          designVariant: 'brand_tint',
+          imageModel: await socialImageModel(),
+        })
+        return {
+          postType: 'carousel',
+          mediaUrls: carousel.imageUrls,
+          imageUrl: carousel.imageUrls[0],
+          title: carousel.slides[0]?.headline ?? topic,
+          backgroundImageUrls: carousel.backgroundImageUrls,
+        }
+      }
+    }
     case 'carousel':
     default: {
       const carousel = await generateCarouselAssets({
@@ -170,7 +208,10 @@ export async function generateMatrixAsset(opts: {
         articleUrl: '',
         slideCount,
         jobId: assetJobId,
-        diagramBackground: resolved.diagramBackground ?? undefined,
+        // perSlideBg slots (azavea classic half-panel design) use fresh themed
+        // AI images per slide INSTEAD of diagram mode.
+        diagramBackground: opts.perSlideBg ? undefined : resolved.diagramBackground ?? undefined,
+        perSlideBackgrounds: opts.perSlideBg,
         diagramLogoVariant,
         // Wed/Sat only, from the matrix — the hook_video fallback carousel above
         // deliberately does NOT pass this (Tue/Thu fallbacks stay classic).
@@ -281,6 +322,7 @@ export async function processMatrixSlot(opts: {
           slideCount,
           diagramLogoVariant,
           designVariant: daySlot.designVariant,
+          perSlideBg: daySlot.perSlideBg,
         })
 
         const scheduledAt = ensureFutureScheduleDate(slotToUtc(run.scheduledDate, daySlot.hour, 0, timeZone))

@@ -18,6 +18,8 @@ import {
   defaultFontPath,
 } from './video/ffmpeg'
 import { buildVideoReel, buildHookVideo } from './video/hook-video'
+import { generateSeedanceClip, downloadSeedanceClip } from './video/seedance'
+import { relativeLuminance } from '../article-pipeline/enrichment/diagram-theme'
 import { buildQuoteVideo, buildLoopedStoryReel } from './video/quote-video'
 import { buildSlideshowVideo } from './video/slideshow-video'
 import { registerSocialMedia, registerSocialVideo } from './media-register'
@@ -192,6 +194,107 @@ export async function generateVideoReelAsset(opts: {
     }
   })
 }
+
+/**
+ * Key-Takeaways music video (Phase 3, .plans/social-sections-kt-video plan):
+ * a 5–7s content-related Seedance clip, washed with a DARK brand-color
+ * overlay, the article's Key Takeaways as WHITE bullets VERBATIM, and
+ * library music at −12 dB. No voiceover by design — the short loop is the
+ * watch-time mechanic (readers replay to finish the bullets).
+ */
+export async function generateKtMusicVideoAsset(opts: {
+  userId: string
+  /** VERBATIM Key Takeaways text — parsed into bullets, never rewritten. */
+  keyTakeawaysText: string
+  topic: string
+  jobId?: string
+}): Promise<{ postType: 'kt_music_video'; videoUrl: string; mediaId: string; width: number; height: number }> {
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+
+  const [brand, videoModelTemplate] = await Promise.all([
+    loadSocialBrandTheme(opts.userId),
+    loadPromptTemplate(207, { userId: opts.userId }),
+  ])
+  const falModel = videoModelTemplate?.defaultModel ?? 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
+
+  // Verbatim bullets: split lines, strip list markers, keep the words untouched.
+  const bullets = opts.keyTakeawaysText
+    .split('\n')
+    .map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim())
+    .filter((l) => l.length > 0)
+    // The source text often opens with its own "Key Takeaways" heading —
+    // that's a label, not a takeaway.
+    .filter((l) => !/^key takeaways?\s*:?$/i.test(l))
+    .slice(0, 6)
+  if (bullets.length === 0) throw new Error('KT music video: no takeaway bullets found')
+
+  // Dark brand overlay: primary brand color, darkened until white text clears
+  // it comfortably (relative luminance ≤ 0.10 — a bright brand blue at 0.18
+  // still read as a light wash in QA).
+  const veilColor = darkBrandVeilHex(brand.primaryColor)
+
+  // Content-related background clip (user spec: content imagery, not brand-
+  // palette abstract) — same prompt generator the video reel uses.
+  const videoPrompt = await generateVideoReelPrompt({
+    userId: opts.userId,
+    topic: opts.topic,
+    details: opts.keyTakeawaysText.slice(0, 1500),
+    specialInstructions: brand.videoSpecialInstructions,
+    videoModel: falModel,
+  })
+
+  return withTempDir('kt-music-video-', async (tmpDir) => {
+    const seedanceUrl = await generateSeedanceClip({
+      prompt: videoPrompt,
+      duration: '6',
+      resolution: '720p',
+      aspectRatio: '9:16',
+      model: falModel,
+    })
+    const rawPath = path.join(tmpDir, 'kt-raw.mp4')
+    await downloadSeedanceClip(seedanceUrl, rawPath)
+
+    const overlaidPath = path.join(tmpDir, 'kt-overlaid.mp4')
+    await overlayBulletsOnVideo(rawPath, overlaidPath, bullets, undefined, veilColor, 0.85)
+
+    const probe = await probeVideo(overlaidPath)
+    const musicPath = await addBackgroundMusic(overlaidPath, tmpDir, {
+      videoDuration: probe.duration,
+      baseGainDb: 12,
+    })
+
+    const uploaded = await uploadVideoFile({
+      userId: opts.userId,
+      filePath: musicPath,
+      s3Key: `social/${opts.userId}/${jobId}/kt-music-video-${genId}.mp4`,
+      title: 'Key Takeaways video',
+      width: probe.width,
+      height: probe.height,
+      jobId,
+    })
+
+    return { postType: 'kt_music_video' as const, ...uploaded, width: probe.width, height: probe.height }
+  })
+}
+
+/** Darken a brand hex until white text reads comfortably on it (L ≤ 0.18). */
+function darkBrandVeilHex(brandHex: string | null | undefined): string {
+  const hex = /^#?[0-9a-fA-F]{6}$/.test((brandHex ?? '').trim())
+    ? (brandHex as string).trim().replace(/^#/, '')
+    : '052234'
+  let r = parseInt(hex.slice(0, 2), 16)
+  let g = parseInt(hex.slice(2, 4), 16)
+  let b = parseInt(hex.slice(4, 6), 16)
+  for (let i = 0; i < 8 && relativeLuminance(rgbHex(r, g, b)) > 0.1; i++) {
+    r = Math.round(r * 0.75)
+    g = Math.round(g * 0.75)
+    b = Math.round(b * 0.75)
+  }
+  return `0x${hex2(r)}${hex2(g)}${hex2(b)}`
+}
+const hex2 = (n: number) => n.toString(16).padStart(2, '0')
+const rgbHex = (r: number, g: number, b: number) => `#${hex2(r)}${hex2(g)}${hex2(b)}`
 
 /**
  * S2: reuse F2's raw Seedance background but generate fresh bullets from a

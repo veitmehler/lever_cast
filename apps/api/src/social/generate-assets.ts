@@ -164,6 +164,11 @@ export async function generateCarouselAssets(opts: {
   designVariant?: 'brand_tint' | 'brand_tint_accent'
   /** Fal.ai image model for AI slide backgrounds (admin-configurable). */
   imageModel?: string
+  /**
+   * Classic half-panel carousels (azavea): fresh themed background per slide
+   * instead of the shared single image (user decision 2026-08-24).
+   */
+  perSlideBackgrounds?: boolean
 }): Promise<GeneratedCarousel> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
@@ -230,7 +235,8 @@ export async function generateCarouselAssets(opts: {
   // keep slides visually distinct. Diagram mode already reuses its diagram.
   let sharedBg: Buffer | null = null
   let sharedBgUrl: string | null = null
-  if (!useDiagram) {
+  const perSlideBg = !!opts.perSlideBackgrounds && !useDiagram
+  if (!useDiagram && !perSlideBg) {
     sharedBg = await generateCarouselBackground(
       themedBackgroundPrompt(brand.industry, genId),
       jobId,
@@ -253,10 +259,35 @@ export async function generateCarouselAssets(opts: {
   // → register → composite → register) is independent; results keep index order
   // via mapWithConcurrency. See .plans/production-throughput.implementation-plan.md 1c.
   const slideResults = await mapWithConcurrency(slidePlans, SLIDE_CONCURRENCY, async (plan, i) => {
-    // Shared background (diagram or the single themed image) for every slide;
-    // S4/S6 read backgroundImageUrls for their pitch slides.
-    const bg = useDiagram ? opts.diagramBackground! : sharedBg!
-    const bgUrl = useDiagram ? diagramBgUrl! : sharedBgUrl!
+    // Background: diagram > per-slide themed images (azavea classic slots) >
+    // the single shared themed image. S4/S6 read backgroundImageUrls for
+    // their pitch slides.
+    let bg: Buffer
+    let bgUrl: string
+    if (useDiagram) {
+      bg = opts.diagramBackground!
+      bgUrl = diagramBgUrl!
+    } else if (perSlideBg) {
+      bg = await generateCarouselBackground(
+        themedBackgroundPrompt(brand.industry, `${genId}-${i}`),
+        jobId,
+        opts.imageModel,
+        opts.userId,
+      )
+      const reg = await registerSocialMedia({
+        userId: opts.userId,
+        buffer: bg,
+        s3Key: `social/${opts.userId}/${jobId}/carousel-bg-${i + 1}-${genId}.png`,
+        title: `Carousel background ${i + 1}`,
+        altText: `Background for slide ${i + 1}`,
+        source: 'carousel_slide',
+        jobId,
+      })
+      bgUrl = reg.url
+    } else {
+      bg = sharedBg!
+      bgUrl = sharedBgUrl!
+    }
 
     const buffer = await renderCarouselSlide(bg, {
       slide: plan,

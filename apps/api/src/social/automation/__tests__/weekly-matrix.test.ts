@@ -57,13 +57,18 @@ describe('matrixForDay', () => {
 })
 
 describe('ARTICLE_DAY2_SLOTS (azavea 6-day cadence)', () => {
-  it('day 2 = KT anchor + hard-bound sections 2/4 (all carousels, article-only)', async () => {
+  it('day 2 = KT music-video anchor + hard-bound sections 2/4 (article-only)', async () => {
     const { ARTICLE_DAY2_SLOTS, sourceKind } = await import('../weekly-matrix')
     expect(ARTICLE_DAY2_SLOTS.map((s) => [s.postType, s.source])).toEqual([
-      ['carousel', 'art_keytakeaways'],
+      ['kt_music_video', 'art_keytakeaways'],
       ['carousel', 'art_section_1'],
       ['carousel', 'art_section_3'],
     ])
+    // Classic half-panel slot gets fresh per-slide backgrounds (2026-08-24).
+    expect(ARTICLE_DAY2_SLOTS[1].perSlideBg).toBe(true)
+    // kt_music_video is voiceless by design — never substituted away.
+    const { applyVoiceCapability } = await import('../weekly-matrix')
+    expect(applyVoiceCapability(ARTICLE_DAY2_SLOTS, false)[0].postType).toBe('kt_music_video')
     for (const s of ARTICLE_DAY2_SLOTS) expect(sourceKind(s.source)).toBe('article')
   })
 

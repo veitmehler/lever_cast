@@ -26,6 +26,8 @@ export interface MusicMixOptions {
   duckRampSec?: number
   /** End-of-video fade-out length. Defaults to 2s. */
   fadeOutSec?: number
+  /** Overall music level in dB below full volume (e.g. 12 → −12 dB). Applied before ducking. */
+  baseGainDb?: number
 }
 
 /**
@@ -50,6 +52,10 @@ export function buildMusicFilterChain(opts: MusicMixOptions): string {
     `atrim=0:${dur.toFixed(3)}`,
     `asetpts=PTS-STARTPTS`,
   ]
+
+  if (opts.baseGainDb !== undefined && opts.baseGainDb > 0) {
+    parts.push(`volume=${Math.pow(10, -opts.baseGainDb / 20).toFixed(4)}`)
+  }
 
   if (opts.duckAtSec !== undefined) {
     const duckDb = opts.duckDb ?? 20

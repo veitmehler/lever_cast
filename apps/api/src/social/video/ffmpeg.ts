@@ -721,23 +721,57 @@ export async function overlayBulletsOnVideo(
   outputPath: string,
   bullets: string[],
   fontPath: string = helveticaNeweLightFontPath(),
+  /** Veil color as 0xRRGGBB (ffmpeg drawbox syntax). Default black. */
+  veilColor: string = 'black',
+  veilOpacity = 0.75,
 ): Promise<void> {
-  const { height } = await probeVideo(inputPath)
+  const { width, height } = await probeVideo(inputPath)
   const scale = height / 1080
 
-  const bulletFontSize = Math.round(36 * scale)
-  const bulletLineHeight = Math.round(52 * scale)
-  // One extra line-height of blank space between consecutive bullets.
-  const interBulletGap = bulletLineHeight
-
+  // Fit the block to the ACTUAL frame (2026-08-24 KT-video QA: fixed 50-char
+  // wrap overflowed a 704px-wide Seedance frame, and long verbatim bullets
+  // overflowed vertically). Wrap width derives from the frame width; the font
+  // auto-shrinks to fit the height, then trailing bullets drop with an
+  // ellipsis as the last resort.
+  const usableW = width * 0.84 // x = 8% margin each side
+  const maxBlockH = height * 0.88
   const list = bullets.slice(0, 6)
-  const wrappedBullets = list.map((b) => wrapBulletLines(b, 50))
+
+  let bulletFontSize = Math.round(36 * scale)
+  let bulletLineHeight = Math.round(52 * scale)
+  let interBulletGap = bulletLineHeight
+  let wrappedBullets: string[][] = []
+  for (let base = 36; base >= 24; base -= 2) {
+    bulletFontSize = Math.round(base * scale)
+    bulletLineHeight = Math.round(base * 1.44 * scale)
+    interBulletGap = bulletLineHeight
+    const chars = Math.max(20, Math.floor(usableW / (bulletFontSize * 0.52)))
+    wrappedBullets = list.map((b) => wrapBulletLines(b, chars))
+    const lines = wrappedBullets.reduce((n, g) => n + g.length, 0)
+    const h = lines * bulletLineHeight + (wrappedBullets.length - 1) * interBulletGap
+    if (h <= maxBlockH) break
+  }
+
+  // Still too tall at the floor → drop trailing bullets, mark with ellipsis.
+  {
+    const fits = (groups: string[][]) =>
+      groups.reduce((n, g) => n + g.length, 0) * bulletLineHeight +
+        Math.max(0, groups.length - 1) * interBulletGap <=
+      maxBlockH
+    while (wrappedBullets.length > 1 && !fits(wrappedBullets)) {
+      wrappedBullets.pop()
+    }
+    if (wrappedBullets.length < list.length) {
+      const last = wrappedBullets[wrappedBullets.length - 1]
+      last[last.length - 1] = last[last.length - 1].replace(/[.,;:\s]*$/, '') + '…'
+    }
+  }
 
   // Total block height: all wrapped lines + one gap between each bullet pair.
   const totalLines = wrappedBullets.reduce((n, lines) => n + lines.length, 0)
   const totalGaps  = wrappedBullets.length - 1
   const bulletBlockHeight = totalLines * bulletLineHeight + totalGaps * interBulletGap
-  const startY = Math.round((height - bulletBlockHeight) / 2)
+  const startY = Math.max(Math.round(height * 0.06), Math.round((height - bulletBlockHeight) / 2))
 
   const dir = path.dirname(outputPath)
   const bulletFilters: string[] = []
@@ -754,7 +788,7 @@ export async function overlayBulletsOnVideo(
   }
 
   const vf = [
-    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,
+    `drawbox=x=0:y=0:w=iw:h=ih:color=${veilColor}@${veilOpacity}:t=fill`,
     ...bulletFilters,
   ].join(',')
 

@@ -383,14 +383,15 @@ async function buildTintedHookOverlaySvg(
   const { slide } = input
   const tint = input.tint!
 
-  const fontSize = 48
-  const lineH = 62
+  const fontSize = 56
+  const lineH = 72
   const padV = 40
   const regionH = TINT_TEXT_BOTTOM - TINT_TEXT_TOP
 
-  // 80% width text zone at 48px HelveticaNeue Medium (~0.52em avg advance).
-  const textZoneW = Math.round(SLIDE_SIZE * 0.8)
-  const maxChars = Math.max(22, Math.floor(textZoneW / (fontSize * 0.52)))
+  // 84% width text zone at 56px HelveticaNeue Medium (~0.52em avg advance).
+  // (Global bump 2026-08-24: tinted slides read too small in-feed.)
+  const textZoneW = Math.round(SLIDE_SIZE * 0.84)
+  const maxChars = Math.max(20, Math.floor(textZoneW / (fontSize * 0.52)))
 
   const displayText = slide.headlineText?.trim() || slide.bodyText?.split('\n')[0]?.trim() || ''
   const lines = wrapText(displayText, maxChars, 5)
@@ -422,8 +423,8 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
   const { slide } = input
   const tint = input.tint!
 
-  const headlineFontSz = 48
-  const headlineLineH = 62
+  const headlineFontSz = 56
+  const headlineLineH = 72
   const headlineMaxChars = 22
   const headBodyGap = 34
   const paragraphGap = 16
@@ -433,14 +434,17 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
   const headlineBlockH = headLines.length * headlineLineH
 
   // Auto-fit the body: shrink until the whole block fits the centering region.
+  // Global bump 2026-08-24 (user: tinted text too small/narrow in-feed):
+  // base 38px wrapping ~30 chars, floor raised to 30px (was 30px base with a
+  // 22px floor).
   const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
-  let bodyFontSz = 30
-  let bodyLineH = 42
+  let bodyFontSz = 38
+  let bodyLineH = 53
   let bodyGroups: string[][] = []
   let bodyBlockH = 0
-  for (let fs = 30; fs >= 22; fs -= 2) {
+  for (let fs = 38; fs >= 30; fs -= 2) {
     const lineH = Math.round(fs * 1.4)
-    const maxChars = Math.max(24, Math.round(34 * (fs / 30)))
+    const maxChars = Math.max(24, Math.round(30 * (fs / 38)))
     const groups = paragraphs.map((p) => wrapText(p.trim(), maxChars, 99))
     const lines = groups.reduce((n, g) => n + g.length, 0)
     const gaps = groups.length > 0 ? (groups.length - 1) * paragraphGap : 0
@@ -451,6 +455,42 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
     bodyGroups = groups
     bodyBlockH = h
     if (headlineBlockH + gap + h <= regionH) break
+  }
+
+  // With the raised shrink floor, an unusually long slide can still overflow
+  // the region — trim trailing body lines to fit and mark the cut with an
+  // ellipsis rather than drawing into the logo zone.
+  {
+    const gap = headLines.length > 0 && bodyBlockH > 0 ? headBodyGap : 0
+    let available = regionH - headlineBlockH - gap
+    const kept: string[][] = []
+    let used = 0
+    let truncated = false
+    for (const group of bodyGroups) {
+      const groupGap = kept.length > 0 ? paragraphGap : 0
+      const keepLines: string[] = []
+      for (const line of group) {
+        if (used + groupGap + (keepLines.length + 1) * bodyLineH > available) {
+          truncated = true
+          break
+        }
+        keepLines.push(line)
+      }
+      if (keepLines.length > 0) {
+        kept.push(keepLines)
+        used += groupGap + keepLines.length * bodyLineH
+      }
+      if (truncated) break
+    }
+    if (truncated && kept.length > 0) {
+      const last = kept[kept.length - 1]
+      last[last.length - 1] = last[last.length - 1].replace(/[.,;:\s]*$/, '') + '…'
+    }
+    if (truncated) {
+      bodyGroups = kept
+      bodyBlockH = used
+    }
+    void available
   }
 
   const gapH = headLines.length > 0 && bodyBlockH > 0 ? headBodyGap : 0
@@ -464,7 +504,7 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
     bodyGroups.flat().map((l) => measureLineWidth(l, FONT_LIGHT, bodyFontSz)),
   )
   const widest = Math.max(0, ...headWidths, ...bodyWidths)
-  const blockW = Math.min(Math.max(widest, 320), SLIDE_SIZE - 2 * 120)
+  const blockW = Math.min(Math.max(widest, 320), SLIDE_SIZE - 2 * 100)
   const x0 = Math.round((SLIDE_SIZE - blockW) / 2)
 
   const elements: string[] = []

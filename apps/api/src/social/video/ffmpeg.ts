@@ -721,6 +721,9 @@ export async function overlayBulletsOnVideo(
   outputPath: string,
   bullets: string[],
   fontPath: string = helveticaNeweLightFontPath(),
+  /** Veil color as 0xRRGGBB (ffmpeg drawbox syntax). Default black. */
+  veilColor: string = 'black',
+  veilOpacity = 0.75,
 ): Promise<void> {
   const { height } = await probeVideo(inputPath)
   const scale = height / 1080
@@ -754,7 +757,7 @@ export async function overlayBulletsOnVideo(
   }
 
   const vf = [
-    `drawbox=x=0:y=0:w=iw:h=ih:color=black@0.75:t=fill`,
+    `drawbox=x=0:y=0:w=iw:h=ih:color=${veilColor}@${veilOpacity}:t=fill`,
     ...bulletFilters,
   ].join(',')
 

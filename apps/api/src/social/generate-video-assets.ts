@@ -223,6 +223,9 @@ export async function generateKtMusicVideoAsset(opts: {
     .split('\n')
     .map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim())
     .filter((l) => l.length > 0)
+    // The source text often opens with its own "Key Takeaways" heading —
+    // that's a label, not a takeaway.
+    .filter((l) => !/^key takeaways?\s*:?$/i.test(l))
     .slice(0, 6)
   if (bullets.length === 0) throw new Error('KT music video: no takeaway bullets found')
 
@@ -253,7 +256,7 @@ export async function generateKtMusicVideoAsset(opts: {
     await downloadSeedanceClip(seedanceUrl, rawPath)
 
     const overlaidPath = path.join(tmpDir, 'kt-overlaid.mp4')
-    await overlayBulletsOnVideo(rawPath, overlaidPath, bullets, undefined, veilColor, 0.8)
+    await overlayBulletsOnVideo(rawPath, overlaidPath, bullets, undefined, veilColor, 0.85)
 
     const probe = await probeVideo(overlaidPath)
     const musicPath = await addBackgroundMusic(overlaidPath, tmpDir, {

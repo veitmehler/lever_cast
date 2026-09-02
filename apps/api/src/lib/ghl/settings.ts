@@ -1,6 +1,44 @@
 import { ghlSettingsForUser } from '@omniply/shared'
 import { decrypt, encrypt } from '@omniply/shared'
 import type { GhlAccountIds } from './types'
+import { registerGhlKeyLocation } from './client'
+
+type GhlSettingsRow = NonNullable<Awaited<ReturnType<typeof ghlSettingsForUser>>>
+
+/**
+ * Decrypted, guaranteed-freshest API key for a settings row (2026-09-02:
+ * second silent token death — refresh previously lived ONLY in
+ * getGhlCredentials, so promo/newsletter paths ran on stale tokens).
+ * Minted location OAuth tokens live ~24h: refresh proactively when expiry is
+ * near OR unknown-but-oauth; every key is registered so ghlRequest's 401
+ * retry can self-heal anything this misses.
+ */
+async function freshApiKey(row: GhlSettingsRow): Promise<string | null> {
+  if (!row.ghlApiKey || !row.ghlLocationId) return null
+
+  const nearExpiry =
+    row.ghlTokenExpiresAt != null && row.ghlTokenExpiresAt.getTime() - Date.now() < 10 * 60 * 1000
+  const oauthWithoutExpiry = row.ghlAuthType === 'oauth' && row.ghlTokenExpiresAt == null
+
+  if (nearExpiry || oauthWithoutExpiry) {
+    const { mintLocationToken } = await import('./app-oauth')
+    const minted = await mintLocationToken(row.ghlLocationId)
+    if (minted) {
+      const { prisma } = await import('@omniply/shared')
+      await prisma.ghlSettings.update({
+        where: { id: row.id },
+        data: { ghlApiKey: encrypt(minted.token), ghlTokenExpiresAt: minted.expiresAt, ghlAuthType: 'oauth' },
+      })
+      registerGhlKeyLocation(minted.token, row.ghlLocationId)
+      return minted.token
+    }
+  }
+
+  const apiKey = decrypt(row.ghlApiKey)
+  if (!apiKey) return null
+  registerGhlKeyLocation(apiKey, row.ghlLocationId)
+  return apiKey
+}
 
 export interface GhlCredentials {
   apiKey: string
@@ -11,27 +49,11 @@ export interface GhlCredentials {
 
 export async function getGhlCredentials(userId: string): Promise<GhlCredentials | null> {
   const row = await ghlSettingsForUser(userId)
-  if (!row?.ghlApiKey || !row.ghlLocationId) {
+  if (!row?.ghlApiKey || !row.ghlLocationId || !row.ghlUserId) {
     return null
   }
 
-  // OAuth-provisioned locations: mint a fresh location token when the stored
-  // one is near expiry (agency grant does the heavy lifting).
-  if (row.ghlAuthType === 'oauth' && row.ghlTokenExpiresAt && row.ghlTokenExpiresAt.getTime() - Date.now() < 10 * 60 * 1000) {
-    const { mintLocationToken } = await import('./app-oauth')
-    const minted = await mintLocationToken(row.ghlLocationId)
-    if (minted) {
-      const { prisma } = await import('@omniply/shared')
-      await prisma.ghlSettings.update({
-        where: { id: row.id },
-        data: { ghlApiKey: encrypt(minted.token), ghlTokenExpiresAt: minted.expiresAt },
-      })
-      row.ghlApiKey = encrypt(minted.token)
-    }
-  }
-  if (!row.ghlUserId) return null
-
-  const apiKey = decrypt(row.ghlApiKey)
+  const apiKey = await freshApiKey(row)
   if (!apiKey) return null
 
   return {
@@ -84,7 +106,7 @@ export async function getPromoEmailConfig(userId: string): Promise<PromoEmailCon
   ) {
     return null
   }
-  const apiKey = decrypt(row.ghlApiKey)
+  const apiKey = await freshApiKey(row)
   if (!apiKey) return null
 
   return {
@@ -128,7 +150,7 @@ export async function getNewsletterEmailConfig(userId: string): Promise<Newslett
   ) {
     return null
   }
-  const apiKey = decrypt(row.ghlApiKey)
+  const apiKey = await freshApiKey(row)
   if (!apiKey) return null
 
   return {

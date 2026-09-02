@@ -1,8 +1,8 @@
-# Launch-Day Copy Restore (September 8, 2026)
+# Launch-Day Copy Restore (September 15, 2026 — shifted from Sept 8 on 2026-09-02)
 
 Every price mention and sales CTA removed pre-launch (commit f3d917b,
 2026-08-08), verbatim, with its restore location. The notify-pitch blocks
-auto-expire (date-gated to 2026-09-08T14:00Z) — but the ORIGINAL copy below
+auto-expire (date-gated to 2026-09-15T14:00Z) — but the ORIGINAL copy below
 must be put back by hand where noted. Full diff reference:
 `git show f3d917b` (removed side) / `git show 7211e3f:<path>` (originals).
 
@@ -82,7 +82,7 @@ q: 'What is included in the $397?',
 
 ## 6. What does NOT need restoring
 
-- The notify-pitch blocks hide themselves after 2026-09-08T14:00Z
+- The notify-pitch blocks hide themselves after 2026-09-15T14:00Z
   (x-ray + walkthrough statics and the FoundingNotify React component all
   date-gate). Remove them at leisure post-launch.
 - `PricingBlock` component: never deleted.

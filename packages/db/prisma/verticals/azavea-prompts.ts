@@ -67,7 +67,7 @@ Requirements:
 - Reader: a chiropractic practice OWNER who took the Practice X-Ray and reserved a founding spot. They think in patients, hours and dollars, not marketing jargon.
 - Subject line: 4 to 9 words, specific and curiosity-driven, no clickbait, no emoji.
 - Body: 80 to 140 words of valid email-safe HTML. Open with the business problem the article dissects, give 2 concrete reasons it is worth their five minutes, then ONE call-to-action link to {{article_url}} with anchor text like "Read the article".
-- Close with exactly this line, verbatim, as the final paragraph: <p>Doors open September 8. Your founding spot and price are locked.</p>
+- Close with exactly this line, verbatim, as the final paragraph: <p>Doors open September 15. Your founding spot and price are locked.</p>
 - Second person, no "Dear reader", no signature block, no dashes as punctuation.
 - If {{article_url}} is empty, still write the email with the CTA href="#".
 

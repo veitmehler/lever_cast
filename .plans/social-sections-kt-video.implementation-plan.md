@@ -1,11 +1,17 @@
 # Social: hard section assignment, batched captions, KT music-video
 
-STATUS 2026-08-19: Phases 1+2 DEPLOYED both envs + E2E-verified (captions
-distinct even under modulo wrap; runs 6/6 incl. stories). Bundled fixes
-shipped same day: promo essay→article (FORCE-reseeded prod) and an ffmpeg-8
-regression (blend=all_expr ~0.01x realtime → replaced with fade+overlay,
-3s vs 90s+ benchmark; story slots were timing out). Phase 3 (kt_music_video)
-NOT BUILT YET — matrix KT slots run as carousel/reel until it lands.
+STATUS 2026-08-24: ALL PHASES DEPLOYED both envs. Phase 3 kt_music_video
+BUILT + visually QA'd on staging (3 iterations: frame-width-derived bullet
+wrap, height auto-fit w/ ellipsis, heading-line filter, veil 0.85 darkened
+to L<=0.10): 6s Seedance content clip, dark brand veil, white VERBATIM
+takeaways, music -12dB. Azavea day-2 P1 only (main-app KT slot unchanged —
+user scoped 2026-08-24). Same day: tint text bump GLOBAL (56/38px, floor
+30, trim-to-fit), perSlideBg flag on azavea classic slots (d1 P1, d2 P2 —
+per-slide themed chiro-motif bgs, diagram mode off), one-shared-bg for all
+other non-diagram carousels (cost fix for the $26 Gemini day).
+
+(2026-08-19) Phases 1+2 E2E-verified; promo essay→article reseeded;
+ffmpeg-8 blend=all_expr regression replaced with fade+overlay.
 
 Origin: 2026-08-18 cadence test — the Aug 17 article's two runs produced
 near-identical carousels. Diagnosis: (a) no-voice substitution collapsed all

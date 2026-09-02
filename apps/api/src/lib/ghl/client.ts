@@ -16,10 +16,57 @@ export interface GhlRequestOptions {
   version?: string
 }
 
+// ── 401 self-heal (2026-09-02: second silent token death) ────────────────────
+// Minted location OAuth tokens live ~24h. The proactive refresh in
+// lib/ghl/settings.ts is the primary mechanism; this registry is the safety
+// net: loaders register decrypted key → locationId, and a 401 here re-mints
+// from the agency grant, persists, and retries the request ONCE.
+const keyLocations = new Map<string, string>()
+const inflightRefresh = new Map<string, Promise<string | null>>()
+
+/** Register a decrypted location API key so a 401 can self-heal. */
+export function registerGhlKeyLocation(apiKey: string, locationId: string): void {
+  if (apiKey && locationId) keyLocations.set(apiKey, locationId)
+}
+
+async function refreshLocationKey(locationId: string): Promise<string | null> {
+  const existing = inflightRefresh.get(locationId)
+  if (existing) return existing
+  const p = (async () => {
+    try {
+      const { mintLocationToken } = await import('./app-oauth')
+      const minted = await mintLocationToken(locationId)
+      if (!minted) return null
+      const { prisma, encrypt } = await import('@omniply/shared')
+      await prisma.ghlSettings.updateMany({
+        where: { ghlLocationId: locationId },
+        data: {
+          ghlApiKey: encrypt(minted.token),
+          ghlTokenExpiresAt: minted.expiresAt,
+          ghlAuthType: 'oauth',
+          lastVerifiedAt: new Date(),
+          lastError: null,
+        },
+      })
+      registerGhlKeyLocation(minted.token, locationId)
+      logger.info({ locationId }, '[ghl] location token re-minted after 401')
+      return minted.token
+    } catch (err) {
+      logger.error({ locationId, err }, '[ghl] token refresh after 401 failed')
+      return null
+    } finally {
+      inflightRefresh.delete(locationId)
+    }
+  })()
+  inflightRefresh.set(locationId, p)
+  return p
+}
+
 async function ghlRequest<T>(
   apiKey: string,
   path: string,
   options: GhlRequestOptions = {},
+  isRetry = false,
 ): Promise<T> {
   const url = `${GHL_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
   const method = options.method ?? 'GET'
@@ -60,6 +107,14 @@ async function ghlRequest<T>(
   )
 
   if (!response.ok) {
+    // Expired location token: re-mint from the agency grant and retry once.
+    if (response.status === 401 && !isRetry) {
+      const locationId = keyLocations.get(apiKey)
+      if (locationId) {
+        const fresh = await refreshLocationKey(locationId)
+        if (fresh) return ghlRequest<T>(fresh, path, options, true)
+      }
+    }
     const message =
       typeof data === 'object' && data !== null && 'message' in data
         ? String((data as { message?: unknown }).message)

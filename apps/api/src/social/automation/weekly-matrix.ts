@@ -204,7 +204,10 @@ export function storySlotsForDay(kind: SourceKind, feedEntries: FeedEntry[]): St
   return feedEntries.map((fe, i) => {
     const slotKey = `S${i + 1}`
     const { postType, hour, source } = fe.daySlot
-    if (postType === 'carousel') {
+    if (postType === 'carousel' || postType === 'story_text') {
+      // story_text (2026-09-03): the 9:16 story PITCHES the feed story post
+      // (reuses its hook slide) — the old generic pull-quote had no relation
+      // to the beat and read as nonsense.
       return { slotKey, storyType: 'pitch_carousel', anchorHour: hour, promotesFeedKey: fe.slotKey, source }
     }
     if (postType === 'hook_video') {

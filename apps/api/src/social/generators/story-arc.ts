@@ -80,6 +80,7 @@ ARC RULES:
 - Every beat except the last ends mid-tension with an open loop to the next.
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
+- Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
 - 120 to 220 words per post. Short lines. Line breaks between thoughts.
 
 For EACH beat also produce its Instagram slide breakdown:

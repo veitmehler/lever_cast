@@ -136,6 +136,7 @@ export async function generateStorySlidesAsset(opts: {
       tint,
       tintLogoBuffer,
       arrowBuffer: isHook ? arrowBuffer : null,
+      storyMode: true,
     })
     const reg = await registerSocialMedia({
       userId: opts.userId,

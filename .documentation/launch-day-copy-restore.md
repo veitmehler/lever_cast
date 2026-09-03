@@ -71,7 +71,19 @@ marketer... we&apos;re asking you to stop having to be one.
 q: 'What is included in the $397?',
 ```
 
-## 5. GHL launch-morning actions (not code)
+## 5. Story-post personal-profile window (set 2026-09-03)
+
+Automated story beats route to Veit's PERSONAL LinkedIn until Sep 9
+(algorithm warm-up), then the profile belongs to the hand-crafted launch
+arc. Two flips, one SQL each (ask Claude):
+- **Sep 9 morning**: UNSET accountIds.linkedinPersonal on the azavea
+  ghlSettings row (story beats fall back to the company page).
+- **Sep 16**: RESTORE linkedinPersonal AND re-add the 3 parked narrator
+  beats (Dec-2022 plugin / postponed-launch / engine-kept-producing) to
+  brand_settings.storyBeats — parked so automated arcs can't repeat the
+  launch posts' stories on the same profile.
+
+## 5b. GHL launch-morning actions (not code)
 
 - Re-enable the checkout orderform (taken offline after the test purchase).
 - **Insert the real checkout link into all three W2 "Launch Blast" emails**

@@ -423,7 +423,9 @@ async function buildTintedHookOverlaySvg(
   return { svg, bannerBottom }
 }
 
-async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<string> {
+async function buildTintedSlideOverlaySvg(
+  input: CarouselSlideInput,
+): Promise<{ svg: string; blockBottom: number }> {
   const { slide } = input
   const tint = input.tint!
 
@@ -520,32 +522,51 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
   const elements: string[] = []
 
   for (let i = 0; i < headLines.length; i++) {
-    elements.push(
-      await justifiedLineSvg(
-        headLines[i], x0, currentY + headlineFontSz + i * headlineLineH,
-        blockW, FONT_MEDIUM, headlineFontSz, tint.textColor, i === headLines.length - 1,
-      ),
-    )
+    if (input.storyMode) {
+      // Story slides: centered, NATURAL spacing — letter-spaced justification
+      // read as "stretched text" (user 2026-09-03).
+      elements.push(
+        `<text x="${SLIDE_SIZE / 2}" y="${currentY + headlineFontSz + i * headlineLineH}" text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${tint.textColor}">${escapeXml(headLines[i])}</text>`,
+      )
+    } else {
+      elements.push(
+        await justifiedLineSvg(
+          headLines[i], x0, currentY + headlineFontSz + i * headlineLineH,
+          blockW, FONT_MEDIUM, headlineFontSz, tint.textColor, i === headLines.length - 1,
+        ),
+      )
+    }
   }
   if (headLines.length > 0) currentY += headlineBlockH + gapH
 
   for (const lines of bodyGroups) {
     for (let i = 0; i < lines.length; i++) {
-      elements.push(
-        await justifiedLineSvg(
-          lines[i], x0, currentY + bodyFontSz,
-          blockW, FONT_LIGHT, bodyFontSz, tint.textColor, i === lines.length - 1,
-        ),
-      )
+      if (input.storyMode) {
+        elements.push(
+          `<text x="${SLIDE_SIZE / 2}" y="${currentY + bodyFontSz}" text-anchor="middle" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${escapeXml(lines[i])}</text>`,
+        )
+      } else {
+        elements.push(
+          await justifiedLineSvg(
+            lines[i], x0, currentY + bodyFontSz,
+            blockW, FONT_LIGHT, bodyFontSz, tint.textColor, i === lines.length - 1,
+          ),
+        )
+      }
       currentY += bodyLineH
     }
     currentY += paragraphGap
   }
 
-  return `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
+  const blockBottom = TINT_TEXT_TOP + Math.max(0, Math.round((regionH - totalH) / 2)) + totalH
+
+  return {
+    svg: `<svg width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${SLIDE_SIZE}" height="${SLIDE_SIZE}" fill="${tint.overlayColor}" fill-opacity="${tint.overlayOpacity}"/>
   ${elements.join('\n  ')}
-</svg>`
+</svg>`,
+    blockBottom,
+  }
 }
 
 async function downloadImage(url: string): Promise<Buffer> {
@@ -702,6 +723,7 @@ export async function renderCarouselSlide(
 ): Promise<Buffer> {
   let overlaySvg: string
   let hookBannerBottom: number | null = null
+  let contentBlockBottom: number | null = null
   if (input.tint) {
     // Brand-tint design: full-width-banner hook, justified block for the rest.
     if (input.slide.type === 'hook') {
@@ -709,7 +731,9 @@ export async function renderCarouselSlide(
       overlaySvg = hook.svg
       hookBannerBottom = hook.bannerBottom
     } else {
-      overlaySvg = await buildTintedSlideOverlaySvg(input)
+      const tinted = await buildTintedSlideOverlaySvg(input)
+      overlaySvg = tinted.svg
+      contentBlockBottom = tinted.blockBottom
     }
   } else {
     switch (input.slide.type) {
@@ -764,10 +788,15 @@ export async function renderCarouselSlide(
         const meta = await sharp(input.arrowBuffer).metadata()
         const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
         const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
+        // Content slides: sit just below the text block, floored at the
+        // title-slide's typical height (~72%), never over the logo.
+        const floorY = Math.round(SLIDE_SIZE * 0.72)
+        const belowText = (contentBlockBottom ?? floorY) + 30 + Math.round(arrowH / 2)
+        const contentCenterY = Math.min(Math.max(floorY, belowText), logoTop - Math.round(arrowH / 2) - 16)
         const centerY =
           input.slide.type === 'hook' && hookBannerBottom != null
             ? Math.round((hookBannerBottom + logoTop) / 2)
-            : logoTop + Math.round(arrowH / 2)
+            : contentCenterY
         composites.push({
           input: arrowPng,
           left: logoLeft - ARROW_W - (input.slide.type === 'hook' ? 0 : 24),

@@ -128,9 +128,9 @@ export async function generateStorySlidesAsset(opts: {
     opts.userId,
   )
 
-  // Soften: flat brand canvas + motif at ~45% alpha. Under the slide's 0.85
-  // wash the motif reads at ~7% — texture, not a competing subject (user
-  // feedback 2026-09-03: full-contrast line art distracted from the text).
+  // Soften: flat brand canvas + motif at ~70% alpha (0.45 read too faint —
+  // dialed up 2026-09-03 evening). Under the slide's 0.85 wash the motif
+  // reads at ~10% — present as texture, still behind the text.
   const hex = (tint.overlayColor ?? '#052234').replace('#', '')
   const canvasBgColor = {
     r: parseInt(hex.slice(0, 2), 16),
@@ -141,7 +141,7 @@ export async function generateStorySlidesAsset(opts: {
   const softMotif = await sharp(rawMotif)
     .resize(1080, 1080, { fit: 'cover', position: 'centre' })
     .removeAlpha()
-    .ensureAlpha(0.45)
+    .ensureAlpha(0.7)
     .png()
     .toBuffer()
   const bg = await sharp({ create: { width: 1080, height: 1080, channels: 4, background: canvasBgColor } })

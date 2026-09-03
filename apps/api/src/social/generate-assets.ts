@@ -74,9 +74,11 @@ const BACKGROUND_MOTIFS: Record<string, string[]> = {
   ],
 }
 
-/** Vector-illustration model for motif backgrounds (icon aesthetics beat
- *  general image models here; admin-configurable model = v2). */
-export const MOTIF_IMAGE_MODEL = 'fal-ai/recraft-v3'
+/** Motif background model. Recraft was tried first (2026-09-03) but kept
+ *  baking gibberish pseudo-labels into illustrations despite hard wordless
+ *  directives; gemini flash-image produces clean wordless flat icons.
+ *  Admin-configurable model = v2. */
+export const MOTIF_IMAGE_MODEL = 'gemini-3.1-flash-image'
 
 export function themedBackgroundPrompt(industry: string | null | undefined, seed: string): string {
   // Chiro motifs for chiropractic clinics AND the azavea vertical (industry

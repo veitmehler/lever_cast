@@ -102,6 +102,18 @@ shaped how you practice" → recorded → transcribed → `storyBeats`. Text
 fallback field. (Ship main-app phase with the TEXT field if the voice
 recording plumbing is tight; voice upgrade = v2.)
 
+## STATUS 2026-09-03: P1 COMPLETE — deployed prod + staging, E2E-verified
+
+Arc generator live (4 beats from the 12-beat narrator pool, real moments
+woven with article numbers), all slot types verified (4 story slots ×8
+slides, KT video d2 midday, variety carousel d1 midday), hook banner +
+arrows QA'd, story slides sized up to 52px base after QA, prompt
+hard-forbids merging narrator moments / false dates (caught in E2E).
+Narrator seeded BOTH envs (12 beats mined from project history).
+NOT yet set: linkedinPersonal accountId for azavea (deliberate — launch
+arc owns the personal profile until Sep 16; flip after).
+P2 fine-tune next: run against the queued cadence articles with Veit.
+
 ## Phases + timeline (launch Sep 15)
 
 - **P1 — build on azavea** (~2 days, target Sep 4-5): migration, arc

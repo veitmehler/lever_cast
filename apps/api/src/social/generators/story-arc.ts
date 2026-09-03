@@ -88,7 +88,7 @@ ARC RULES:
 - Beats 2 and onward OPEN with one short re-anchoring line that orients a first-time reader (half a sentence referencing where the story stands) before continuing.
 - Every beat except the last ends mid-tension with an open loop to the next.
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
-- EVENING beats (beat 2${opts.beatCount >= 4 ? ' and beat 4' : ''}) end with exactly this call-to-action line as the final line: "${opts.ctaLine}"${opts.ctaLine ? '' : ' (no CTA line provided: end naturally)'}
+- EVENING beats (beat 2${opts.beatCount >= 4 ? ' and beat 4' : ''}): the POST TEXT ends with exactly this call-to-action line as its final line: "${opts.ctaLine}"${opts.ctaLine ? '' : ' (no CTA line provided: end naturally)'}
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
 - Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
 - NEVER invent events, experiments, tests, products, conversations, or timelines that are not explicitly described in a narrator moment or the article. If a moment lacks detail, stay abstract rather than inventing specifics.
@@ -98,7 +98,8 @@ ARC RULES:
 For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
-- last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue; on EVENING beats it also carries the call-to-action line.
+- last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
+- NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
 - 4 to 6 slides per beat.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...]}, ...]`
@@ -217,6 +218,9 @@ export async function generateStoryArc(opts: {
       : []
     if (!postText || slides.length < 3) throw new Error('Story arc: beat missing postText or slides')
     const stripDashes = (txt: string) => txt.replace(/\s*[—–]\s*/g, ', ')
+    if (/swipe/i.test(slides[slides.length - 1] ?? '')) {
+      logger.warn({ ...logCtx, beat: beats.length + 1 }, '[story-arc] final slide invites swiping despite rule — review will catch')
+    }
     beats.push({
       postText: stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim()),
       slides: await Promise.all(
@@ -225,6 +229,15 @@ export async function generateStoryArc(opts: {
         ),
       ),
     })
+  }
+
+  // Evening beats get a DEDICATED CTA slide (deterministic layout — the
+  // model kept blending the CTA into content slides).
+  const ctaLine = theme.socialCallToAction?.trim() || ''
+  if (ctaLine) {
+    for (let i = 1; i < beats.length; i += 2) {
+      beats[i].slides.push(ctaLine)
+    }
   }
 
   logger.info({ ...logCtx, beats: beats.length }, '[story-arc] arc generated')

@@ -1,3 +1,4 @@
+import sharp from 'sharp'
 import { loadSocialBrandTheme, loadLogoBuffer, loadTintLogo } from './brand-theme'
 import { tintScheme, type TintScheme } from './compositors/brand-tint'
 import { registerSocialMedia } from './media-register'
@@ -118,12 +119,33 @@ export async function generateStorySlidesAsset(opts: {
   const arrowBuffer = await loadContinuationArrow(tint.logoVariant)
   const logoBuffer = await loadLogoBuffer(brand.logoUrl)
 
-  const bg = await generateCarouselBackground(
+  const rawMotif = await generateCarouselBackground(
     themedBackgroundPrompt(brand.industry, genId),
     jobId,
     MOTIF_IMAGE_MODEL,
     opts.userId,
   )
+
+  // Soften: flat brand canvas + motif at ~45% alpha. Under the slide's 0.85
+  // wash the motif reads at ~7% — texture, not a competing subject (user
+  // feedback 2026-09-03: full-contrast line art distracted from the text).
+  const hex = (tint.overlayColor ?? '#052234').replace('#', '')
+  const canvasBgColor = {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+    alpha: 1,
+  }
+  const softMotif = await sharp(rawMotif)
+    .resize(1080, 1080, { fit: 'cover', position: 'centre' })
+    .removeAlpha()
+    .ensureAlpha(0.45)
+    .png()
+    .toBuffer()
+  const bg = await sharp({ create: { width: 1080, height: 1080, channels: 4, background: canvasBgColor } })
+    .composite([{ input: softMotif }])
+    .png()
+    .toBuffer()
 
   const bgReg = await registerSocialMedia({
     userId: opts.userId,
@@ -350,10 +372,13 @@ export async function generateCarouselAssets(opts: {
       bg = opts.diagramBackground!
       bgUrl = diagramBgUrl!
     } else if (perSlideBg) {
+      // REAL photographic images per slide (user decision 2026-09-03): the
+      // slide planner's own image prompts through the shared gemini image
+      // model — motif icons stay on story slides only.
       bg = await generateCarouselBackground(
-        themedBackgroundPrompt(brand.industry, `${genId}-${i}`),
+        plan.imagePrompt || plan.headlineText || '',
         jobId,
-        MOTIF_IMAGE_MODEL,
+        opts.imageModel,
         opts.userId,
       )
       const reg = await registerSocialMedia({

@@ -102,7 +102,19 @@ shaped how you practice" → recorded → transcribed → `storyBeats`. Text
 fallback field. (Ship main-app phase with the TEXT field if the voice
 recording plumbing is tight; voice upgrade = v2.)
 
-## STATUS 2026-09-03 (evening): P1+P2 FINE-TUNE COMPLETE — ship quality
+## STATUS 2026-09-03 (final): DESIGN LOCKED after user review rounds
+
+Final visual/CTA design (on top of the earlier fine-tune): LEFT-aligned
+text in a horizontally centered block (no justification, no centering);
+FIXED arrow row at y=830 with story text region capped at 780; motif =
+gemini flash-image wordless flat icon at 0.70 alpha on brand canvas
+(~10% perceived); NO URLs on any slide; dedicated CTA slide = comment
+hook ('Comment "XRAY" ...' azavea; parameterize keyword for clinics in
+P3) wired to the EXISTING comment-keyword funnel; captions split per
+platform (IG hook replaces URL line, FB link + hook, LinkedIn link only).
+⚠️ Comment funnel E2E test is now LOAD-BEARING before first dispatch.
+
+## (superseded) P1+P2 FINE-TUNE COMPLETE — ship quality
 
 Final design after 4 QA cycles on the Sep 2 article: FULL article into the
 arc writer with RETELL-the-article's-own-scenes instruction (solves

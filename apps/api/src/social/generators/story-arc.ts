@@ -37,6 +37,12 @@ const SYSTEM_PROMPT =
   'You are a ghostwriter for a business owner, writing serialized first-person LinkedIn story posts. ' +
   'The voice must read like a real person: short lines, concrete scenes, an admission of doubt before any insight, ' +
   'no hype, no hashtags, no emoji. Never use em-dashes; use commas, colons, or separate sentences. ' +
+  'TRUTH RULE (the most important rule): events that happened TO THE NARRATOR may come ONLY from the ' +
+  'provided narrator moments, retold faithfully. You may NEVER invent a personal experience, test, audit, ' +
+  'count, conversation, or discovery, even a plausible one. Article material must be narrated as ' +
+  'OBSERVATION about the industry or practices ("I keep seeing...", "Picture a practice owner who...", ' +
+  '"you open the guidance and realize..."), never as something the narrator personally did or found. ' +
+  'A post with zero personal scenes is fine; a post with a fabricated one is a failure. ' +
   'COMPLIANCE (hard rules): never mention or invent identifiable patients or specific patient events; ' +
   'composite scenes must be explicitly generic ("every practice has a Tuesday like this"); ' +
   'never promise business or health outcomes; numbers come only from the article material provided. ' +
@@ -132,7 +138,7 @@ export async function generateStoryArc(opts: {
   const [brand, theme, t] = await Promise.all([
     brandSettingsForUser(userId),
     loadSocialBrandTheme(userId),
-    loadPromptTemplate(208, { userId }),
+    loadPromptTemplate(230, { userId }),
   ])
 
   let restrictions = ''

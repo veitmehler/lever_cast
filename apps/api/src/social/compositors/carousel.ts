@@ -188,13 +188,15 @@ function buildContentSlideOverlaySvg(input: CarouselSlideInput): string {
   const textX  = isRightPanel ? SLIDE_SIZE / 2 + 52 : 52
 
   const startY         = 68
-  const headlineFontSz = 42
-  const headlineLineH  = 54
-  const headlineMaxC   = 22
+  const headlineFontSz = 44
+  const headlineLineH  = 56
+  const headlineMaxC   = 20
   const headlineMaxL   = 3
-  const bodyFontSz     = 28
-  const bodyLineH      = 40
-  const bodyMaxChars   = 29
+  // 2026-09-03 bump (parity with the tinted-slide sizes): the half-panel
+  // body ran 28px with a fixed 29-char wrap, producing small ragged text.
+  const bodyFontSz     = 34
+  const bodyLineH      = 48
+  const bodyMaxChars   = Math.max(20, Math.floor((SLIDE_SIZE / 2 - 2 * 52) / (34 * 0.52)))
   // Allow the body to fill the available vertical space rather than truncating
   // at 7 lines — narration reads the full text, so the slide must show it too.
   // The currentY overflow guard below still prevents drawing past the frame.

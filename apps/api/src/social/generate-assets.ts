@@ -63,8 +63,8 @@ const BACKGROUND_MOTIFS: Record<string, string[]> = {
   chiropractic: [
     'an elegant minimal line-art icon of a human spine',
     'softly rendered abstract vertebrae shapes as geometric forms',
-    'a subtle silhouette of hands performing a gentle chiropractic adjustment',
-    'a minimal standing posture silhouette with a clean vertical alignment line',
+    'a simple line-art icon of two hands, iconographic and abstract',
+    'an abstract stick-figure posture icon with a clean vertical alignment line',
   ],
   default: [
     'soft overlapping abstract geometric shapes',
@@ -82,9 +82,10 @@ export function themedBackgroundPrompt(industry: string | null | undefined, seed
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0
   const motif = motifs[h % motifs.length]
   return (
-    `Minimalist professional background for a social media graphic: ${motif}, ` +
-    'positioned off-center as a large soft background element, muted professional palette, ' +
-    'gentle gradient, generous negative space, subtle depth of field, ' +
+    `Flat minimalist vector illustration background for a social media graphic: ${motif}, ` +
+    'clean geometric iconographic style, positioned off-center as a large soft background element, ' +
+    'muted professional palette, gentle gradient, generous negative space, ' +
+    'STRICTLY no photorealism, no realistic human bodies or figures, ' +
     'no text, no letters, no words, no numbers, no people, no logos'
   )
 }

@@ -21,6 +21,7 @@ import type { SlotContent } from './content'
 import { listAutomationPlatforms } from './platforms'
 import { PLATFORM_CHAR_LIMITS } from './captions'
 import { generateBatchedCaptionsForPlatform, type CaptionSlotInput } from '../generators/batched-captions'
+import { generateStoryArc, articleMaterialFromCtx } from '../generators/story-arc'
 import { processStorySlot } from './story-processor'
 import { finalizeGenerationCounts, updateGenerationProgress, loadPriorAssets } from './spec-processor'
 import { mapWithConcurrency } from '../../lib/concurrency'
@@ -83,6 +84,54 @@ function tryResolveSlotTextOnly(source: DaySlot['source'], ctx: MatrixRunContext
 }
 
 /**
+ * Generate + persist the article's story arc BEFORE the wave when any
+ * art_story slot is present (engagement v2). Idempotent: an existing arc on
+ * SitePage.storyArcJson is reused (day 2 reads day 1's arc). Azavea's
+ * 2-day window always generates 4 beats so day 2 finds its half. Failure
+ * logs and returns — story slots then degrade to section carousels.
+ */
+async function ensureStoryArc(opts: {
+  run: { jobId: string | null; userId: string }
+  feedEntries: SlotEntry[]
+  ctx: MatrixRunContext
+  vertical: string | null
+  logCtx: AutomationLogContext
+}): Promise<void> {
+  const { run, feedEntries, ctx, vertical, logCtx } = opts
+  if (!run.jobId || !ctx.articleCtx) return
+  if (!feedEntries.some((e) => e.daySlot.source === 'art_story')) return
+
+  try {
+    const page = await prisma.sitePage.findFirst({
+      where: { jobId: run.jobId },
+      select: { id: true, storyArcJson: true, internalSlug: true },
+    })
+    if (!page || (Array.isArray(page.storyArcJson) && page.storyArcJson.length > 0)) return
+
+    const beatCount = vertical === 'azavea' ? 4 : 2
+    const attempt = await prisma.outputAttempt.findFirst({
+      where: { jobId: run.jobId, status: 'success', resultUrl: { not: null } },
+      select: { resultUrl: true },
+    })
+    const beats = await generateStoryArc({
+      userId: run.userId,
+      articleTitle: ctx.articleCtx.title,
+      articleMaterial: articleMaterialFromCtx(ctx.articleCtx),
+      articleUrl: attempt?.resultUrl ?? '',
+      beatCount,
+      logCtx,
+    })
+    await prisma.sitePage.update({
+      where: { id: page.id },
+      data: { storyArcJson: beats as unknown as object },
+    })
+    logger.info({ ...logCtx, beats: beats.length }, '[social-automation] story arc generated + stored')
+  } catch (err) {
+    logger.warn({ ...logCtx, err }, '[social-automation] story arc generation failed — section fallback')
+  }
+}
+
+/**
  * Phase 2 of the sections/KT plan: ONE caption call per platform covering
  * all feed slots, so the model writes mutually distinct captions. Returns
  * slotKey → platform → caption; empty map (or missing platforms) falls back
@@ -92,6 +141,7 @@ async function pregenerateBatchedCaptions(opts: {
   feedEntries: SlotEntry[]
   ctx: MatrixRunContext
   logCtx: AutomationLogContext
+  jobId?: string | null
 }): Promise<Record<string, Record<string, string>>> {
   const { feedEntries, ctx, logCtx } = opts
   if (feedEntries.length === 0) return {}
@@ -103,7 +153,26 @@ async function pregenerateBatchedCaptions(opts: {
   // caption generator, ever (user decision 2026-08-19). Only truncation to
   // the platform limit is applied.
   const llmEntries: SlotEntry[] = []
+  // Story beats publish their postText VERBATIM as content/caption on every
+  // platform — no caption LLM (same rule as Key Takeaways).
+  let storyArc: { postText?: string }[] | null = null
+  const jobIdForArc = opts.jobId ?? null
+  if (jobIdForArc && feedEntries.some((e) => e.daySlot.source === 'art_story')) {
+    const page = await prisma.sitePage.findFirst({ where: { jobId: jobIdForArc }, select: { storyArcJson: true } })
+    storyArc = (page?.storyArcJson as { postText?: string }[] | null) ?? null
+  }
   for (const e of feedEntries) {
+    if (e.daySlot.source === 'art_story') {
+      const beat = storyArc?.[e.daySlot.beatIndex ?? 0]
+      if (beat?.postText) {
+        for (const platform of platforms) {
+          const limit = PLATFORM_CHAR_LIMITS[platform] ?? 2000
+          const t = beat.postText
+          ;(bySlot[e.slotKey] ??= {})[platform] = t.length <= limit ? t : t.slice(0, limit - 1).trim() + '…'
+        }
+      }
+      continue // story slots NEVER go to the caption LLM (fallback carousel reuses section content caption-free)
+    }
     if (e.daySlot.source === 'art_keytakeaways' && ctx.articleCtx?.keyTakeawaysText) {
       const kt = ctx.articleCtx.keyTakeawaysText.trim()
       for (const platform of platforms) {
@@ -279,10 +348,16 @@ export async function runSocialAutomation(
   // WAVE 2 — story slots in parallel AFTER wave 1 settles (stories reuse feed
   // assets). Heavy local stages stay bounded by the ffmpeg/Chromium/provider
   // semaphores. currentSpec shows the most recently STARTED slot.
+  // Story arc first (engagement v2): generated once per article, persisted,
+  // read by both cadence days' story slots + the caption pregen below.
+  await ensureStoryArc({ run, feedEntries: feedToRun, ctx, vertical, logCtx: baseCtx })
+
   // Batched captions (one call per platform, all slots together) BEFORE the
   // wave — distinctness across the day's captions is enforced in-prompt.
   const captionsBySlot =
-    feedToRun.length > 0 ? await pregenerateBatchedCaptions({ feedEntries: feedToRun, ctx, logCtx: baseCtx }) : {}
+    feedToRun.length > 0
+      ? await pregenerateBatchedCaptions({ feedEntries: feedToRun, ctx, logCtx: baseCtx, jobId: run.jobId })
+      : {}
 
   await mapWithConcurrency(feedToRun, FEED_WAVE_CONCURRENCY, async (entry) => {
     await prisma.socialAutomationRun.update({

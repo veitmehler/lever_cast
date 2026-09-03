@@ -57,29 +57,29 @@ describe('matrixForDay', () => {
 })
 
 describe('ARTICLE_DAY2_SLOTS (azavea 6-day cadence)', () => {
-  it('day 2 = KT music-video anchor + hard-bound sections 2/4 (article-only)', async () => {
-    const { ARTICLE_DAY2_SLOTS, sourceKind } = await import('../weekly-matrix')
-    expect(ARTICLE_DAY2_SLOTS.map((s) => [s.postType, s.source])).toEqual([
-      ['kt_music_video', 'art_keytakeaways'],
-      ['carousel', 'art_section_1'],
-      ['carousel', 'art_section_3'],
+  it('day 2 = story beats am/pm around the KT music-video anchor', async () => {
+    const { ARTICLE_DAY2_SLOTS, sourceKind, applyVoiceCapability } = await import('../weekly-matrix')
+    expect(ARTICLE_DAY2_SLOTS.map((s) => [s.hour, s.postType, s.source])).toEqual([
+      [7, 'story_text', 'art_story'],
+      [12, 'kt_music_video', 'art_keytakeaways'],
+      [19, 'story_text', 'art_story'],
     ])
-    // Classic half-panel slot gets fresh per-slide backgrounds (2026-08-24).
-    expect(ARTICLE_DAY2_SLOTS[1].perSlideBg).toBe(true)
-    // kt_music_video is voiceless by design — never substituted away.
-    const { applyVoiceCapability } = await import('../weekly-matrix')
-    expect(applyVoiceCapability(ARTICLE_DAY2_SLOTS, false)[0].postType).toBe('kt_music_video')
+    expect(ARTICLE_DAY2_SLOTS.map((s) => s.beatIndex)).toEqual([2, undefined, 3])
+    // story_text and kt_music_video are voiceless by design — never substituted.
+    const noVoice = applyVoiceCapability(ARTICLE_DAY2_SLOTS, false)
+    expect(noVoice.map((s) => s.postType)).toEqual(['story_text', 'kt_music_video', 'story_text'])
     for (const s of ARTICLE_DAY2_SLOTS) expect(sourceKind(s.source)).toBe('article')
   })
 
-  it('azavea day 1 = hard-bound sections 1/3/5 as carousels', async () => {
+  it('azavea day 1 = story beats am/pm around ONE section carousel (variety)', async () => {
     const { AZAVEA_ARTICLE_DAY1_SLOTS, sourceKind } = await import('../weekly-matrix')
-    expect(AZAVEA_ARTICLE_DAY1_SLOTS.map((s) => s.source)).toEqual([
-      'art_section_0',
-      'art_section_2',
-      'art_section_4',
+    expect(AZAVEA_ARTICLE_DAY1_SLOTS.map((s) => [s.hour, s.postType, s.source])).toEqual([
+      [7, 'story_text', 'art_story'],
+      [12, 'carousel', 'art_section_0'],
+      [19, 'story_text', 'art_story'],
     ])
-    expect(AZAVEA_ARTICLE_DAY1_SLOTS.every((s) => s.postType === 'carousel')).toBe(true)
+    expect(AZAVEA_ARTICLE_DAY1_SLOTS.map((s) => s.beatIndex)).toEqual([0, undefined, 1])
+    expect(AZAVEA_ARTICLE_DAY1_SLOTS[1].perSlideBg).toBe(true)
     for (const s of AZAVEA_ARTICLE_DAY1_SLOTS) expect(sourceKind(s.source)).toBe('article')
   })
 

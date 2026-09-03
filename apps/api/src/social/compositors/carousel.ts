@@ -38,6 +38,8 @@ export interface CarouselSlideInput {
   diagramMode?: boolean
   /** Pre-loaded continuation-arrow glyph (color already chosen) for the hook slide. */
   arrowBuffer?: Buffer | null
+  /** Story slides (engagement v2): short texts render LARGER (52px base, 36px floor). */
+  storyMode?: boolean
   /** F4 panel scheme: 'light' (dark diagram) → white panel/navy text; 'dark' → navy panel/white text. */
   diagramVariant?: 'light' | 'dark'
   /**
@@ -438,13 +440,19 @@ async function buildTintedSlideOverlaySvg(input: CarouselSlideInput): Promise<st
   // base 38px wrapping ~30 chars, floor raised to 30px (was 30px base with a
   // 22px floor).
   const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
-  let bodyFontSz = 38
-  let bodyLineH = 53
+  // Story slides carry 20-35 words by design — start larger so short text
+  // fills the frame instead of floating in it.
+  const baseFs = input.storyMode ? 52 : 38
+  const floorFs = input.storyMode ? 36 : 30
+  let bodyFontSz = baseFs
+  let bodyLineH = Math.round(baseFs * 1.4)
   let bodyGroups: string[][] = []
   let bodyBlockH = 0
-  for (let fs = 38; fs >= 30; fs -= 2) {
+  for (let fs = baseFs; fs >= floorFs; fs -= 2) {
     const lineH = Math.round(fs * 1.4)
-    const maxChars = Math.max(24, Math.round(30 * (fs / 38)))
+    const maxChars = input.storyMode
+      ? Math.max(18, Math.floor((SLIDE_SIZE - 2 * 100) / (fs * 0.52)))
+      : Math.max(24, Math.round(30 * (fs / 38)))
     const groups = paragraphs.map((p) => wrapText(p.trim(), maxChars, 99))
     const lines = groups.reduce((n, g) => n + g.length, 0)
     const gaps = groups.length > 0 ? (groups.length - 1) * paragraphGap : 0

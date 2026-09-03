@@ -27,6 +27,8 @@ export interface DispatchPublishOptions {
   replyToTweetId?: string
   postAsStory?: boolean
   scheduledAt?: Date
+  /** Story posts: route LinkedIn to the PERSONAL profile when mapped. */
+  preferPersonalProfile?: boolean
   logCtx?: Partial<AutomationLogContext>
 }
 
@@ -102,7 +104,10 @@ async function publishViaGhl(
     }
   }
 
-  const accountId = creds.accountIds[platform]
+  const accountId =
+    platform === 'linkedin' && options.preferPersonalProfile && creds.accountIds.linkedinPersonal
+      ? creds.accountIds.linkedinPersonal
+      : creds.accountIds[platform]
   if (!accountId) {
     logger.warn(baseLog, '[dispatcher] GHL account not mapped for platform')
     return {

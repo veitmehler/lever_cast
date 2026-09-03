@@ -880,6 +880,7 @@ model SitePage {
   excerpt              String?               @db.VarChar(160)
   primaryKeyword       String?
   schemaJson           String?               @db.Text // JSON-LD from Step 16 (generate_schema_markup)
+  storyArcJson         Json? // generated story-arc beats (engagement v2) — one arc per article, both cadence days read it
   enrichmentStatus     String                @default("pending") // pending | in_progress | completed | failed
   enrichmentError      String?
   enrichedAt           DateTime?
@@ -1194,6 +1195,8 @@ model BrandSettings {
   organizationCountryCode  String? @db.VarChar(2) // ISO 3166-1 alpha-2, auto-derived from addressCountryName
   organizationLogoUrl      String? // CDN URL for the business logo (used in schema publisher.logo)
   socialProfileUrls        String[] @default([]) // org social profile URLs → publisher.sameAs in JSON-LD (alongside GBP)
+  storyNarratorName        String? // first-person narrator for story-arc posts (falls back to defaultAuthorName)
+  storyBeats               String? @db.Text // REAL owner story moments (newline-separated) — the arc generator's authenticity pool
   socialLogoUrl            String? // optional override for social quote cards / compositors; falls back to organizationLogoUrl
   socialAccountName        String? // social handle / display name for quote cards (e.g. "hormozi"); falls back to organizationName
   instagramVerified        Boolean @default(false) // show Instagram-style blue verified badge on quote cards
@@ -1526,6 +1529,7 @@ model Newsletter {
   secondaryArticle Json?
   teasers          Json? // [{title,body,cta,link} ×3]
   quickHits        Json? // {tips:[..4], facts:[..4]}
+  storyArcJson     Json? // generated story-arc beats (engagement v2, main-app phase)
   fun              Json? // {triviaQuestion,triviaAnswer,joke}
   modules          Json? // {recipe?,recipe2?}
   subjectLine      String?

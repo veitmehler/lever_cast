@@ -29,6 +29,9 @@ export type PostSource =
   | 'art_section_2'
   | 'art_section_3'
   | 'art_section_4'
+  // Story-arc beat (engagement v2): content = the article's generated story
+  // arc, indexed by DaySlot.beatIndex. See .plans/story-arc-posts plan.
+  | 'art_story'
 
 export type SourceKind = 'newsletter' | 'article'
 
@@ -54,6 +57,8 @@ export interface DaySlot {
    * shared single image, and NO diagram mode. Ignored by tinted/diagram slots.
    */
   perSlideBg?: boolean
+  /** art_story slots: which beat of the article's story arc this slot posts. */
+  beatIndex?: number
 }
 
 export type CarouselDesignVariant = 'brand_tint' | 'brand_tint_accent'
@@ -113,6 +118,7 @@ const ARTICLE_SOURCES: ReadonlySet<PostSource> = new Set([
   'art_section_2',
   'art_section_3',
   'art_section_4',
+  'art_story',
 ])
 
 /** Parse an `art_section_N` source to its 0-based section index (null otherwise). */
@@ -129,11 +135,11 @@ export function sectionIndexOfSource(source: PostSource): number | null {
  * set regardless of weekday.
  */
 export const ARTICLE_DAY2_SLOTS: DaySlot[] = [
-  // KT music-video anchors day 2 (Phase 3): Seedance bg, dark brand overlay,
-  // white VERBATIM takeaway bullets, library music at -12 dB, no voice.
-  { hour: 9, postType: 'kt_music_video', source: 'art_keytakeaways' },
-  { hour: 12, postType: 'carousel', source: 'art_section_1', perSlideBg: true },
-  { hour: 15, postType: 'carousel', source: 'art_section_3', designVariant: 'brand_tint_accent' },
+  // Story-arc restructure (2026-09-03): morning/evening story beats around
+  // the midday KT music-video anchor.
+  { hour: 7, postType: 'story_text', source: 'art_story', beatIndex: 2 },
+  { hour: 12, postType: 'kt_music_video', source: 'art_keytakeaways' },
+  { hour: 19, postType: 'story_text', source: 'art_story', beatIndex: 3 },
 ]
 
 /**
@@ -142,9 +148,11 @@ export const ARTICLE_DAY2_SLOTS: DaySlot[] = [
  * diagram carousels with alternating tints. Day 2 covers KT + 2/4.
  */
 export const AZAVEA_ARTICLE_DAY1_SLOTS: DaySlot[] = [
-  { hour: 9, postType: 'carousel', source: 'art_section_0', perSlideBg: true },
-  { hour: 12, postType: 'carousel', source: 'art_section_2', designVariant: 'brand_tint' },
-  { hour: 15, postType: 'carousel', source: 'art_section_4', designVariant: 'brand_tint_accent' },
+  // Story beats am/pm; ONE section carousel kept at midday for variety
+  // (user decision 2026-09-03) — per-slide motif backgrounds.
+  { hour: 7, postType: 'story_text', source: 'art_story', beatIndex: 0 },
+  { hour: 12, postType: 'carousel', source: 'art_section_0', perSlideBg: true },
+  { hour: 19, postType: 'story_text', source: 'art_story', beatIndex: 1 },
 ]
 
 export function sourceKind(source: PostSource): SourceKind {

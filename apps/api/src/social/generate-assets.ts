@@ -87,10 +87,12 @@ export function themedBackgroundPrompt(industry: string | null | undefined, seed
   const motif = motifs[h % motifs.length]
   return (
     `Flat minimalist vector illustration background for a social media graphic: ${motif}, ` +
-    'clean geometric iconographic style, positioned off-center as a large soft background element, ' +
+    'ONE single subject only on a plain background, clean geometric iconographic style, ' +
+    'positioned off-center as a large soft background element, ' +
     'muted professional palette, gentle gradient, generous negative space, ' +
     'STRICTLY no photorealism, no realistic human bodies or figures, ' +
-    'no text, no letters, no words, no numbers, no people, no logos'
+    'completely WORDLESS: no text, no letters, no labels, no captions, no typography, ' +
+    'no interface elements, no diagrams with annotations, no numbers, no people, no logos'
   )
 }
 

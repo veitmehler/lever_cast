@@ -639,7 +639,9 @@ export async function overlayTitleOnVideoStripFadeIn(
   )
 
   const overlayChain = [
-    `drawbox=x=0:y=${stripY}:w=iw:h=${stripH}:color=black@0.65:t=fill`,
+    // 0.8 (was 0.65, 2026-09-03): near-white motif canvases left the strip
+    // mid-grey and the white title marginal.
+    `drawbox=x=0:y=${stripY}:w=iw:h=${stripH}:color=black@0.8:t=fill`,
     ...textFilters,
   ].join(',')
 

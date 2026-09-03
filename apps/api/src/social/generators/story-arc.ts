@@ -81,6 +81,8 @@ ARC RULES:
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
 - Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
+- NEVER invent events, experiments, tests, products, conversations, or timelines that are not explicitly described in a narrator moment or the article. If a moment lacks detail, stay abstract rather than inventing specifics.
+- Every number in every post must appear VERBATIM in the article material or a narrator moment. No derived, estimated, or invented figures.
 - 120 to 220 words per post. Short lines. Line breaks between thoughts.
 
 For EACH beat also produce its Instagram slide breakdown:
@@ -169,11 +171,24 @@ export async function generateStoryArc(opts: {
     userPrompt,
     model,
     temperature: 0.7,
-    maxTokens: 1400 * beatCount,
+    maxTokens: 2000 * beatCount,
   })
   await recordLLMUsage(userId, 'story_arc', run)
 
-  const parsed = extractJsonArray(run.content)
+  let parsed = extractJsonArray(run.content)
+  if (!parsed || parsed.length < beatCount) {
+    // One retry — truncated/malformed JSON is the dominant failure mode.
+    logger.warn({ ...logCtx }, '[story-arc] unparseable output — retrying once')
+    const retry = await adapter.call({
+      systemPrompt: t?.systemPrompt ?? SYSTEM_PROMPT,
+      userPrompt,
+      model,
+      temperature: 0.6,
+      maxTokens: 2000 * beatCount,
+    })
+    await recordLLMUsage(userId, 'story_arc', retry)
+    parsed = extractJsonArray(retry.content)
+  }
   if (!parsed || parsed.length < beatCount) {
     throw new Error(`Story arc: expected ${beatCount} beats, got ${parsed?.length ?? 'unparseable'}`)
   }
@@ -186,10 +201,13 @@ export async function generateStoryArc(opts: {
       ? b.slides.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim())
       : []
     if (!postText || slides.length < 3) throw new Error('Story arc: beat missing postText or slides')
+    const stripDashes = (txt: string) => txt.replace(/\s*[—–]\s*/g, ', ')
     beats.push({
-      postText: (await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim(),
+      postText: stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim()),
       slides: await Promise.all(
-        slides.map(async (s) => (await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()),
+        slides.map(async (s) =>
+          stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()),
+        ),
       ),
     })
   }

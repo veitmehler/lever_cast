@@ -127,7 +127,20 @@ async function ensureStoryArc(opts: {
     })
     logger.info({ ...logCtx, beats: beats.length }, '[social-automation] story arc generated + stored')
   } catch (err) {
-    logger.warn({ ...logCtx, err }, '[social-automation] story arc generation failed — section fallback')
+    // Concurrent-runs race (late approvals enqueue both cadence days at
+    // once): the sibling run may store the arc moments after our attempt
+    // failed. Wait briefly and re-read before conceding to the fallback.
+    logger.warn({ ...logCtx, err }, '[social-automation] story arc generation failed — re-checking for sibling arc')
+    await new Promise((r) => setTimeout(r, 30_000))
+    const again = await prisma.sitePage.findFirst({
+      where: { jobId: run.jobId },
+      select: { storyArcJson: true },
+    })
+    if (Array.isArray(again?.storyArcJson) && again.storyArcJson.length > 0) {
+      logger.info({ ...logCtx }, '[social-automation] sibling run stored the arc — using it')
+      return
+    }
+    logger.warn({ ...logCtx }, '[social-automation] no arc available — section fallback')
   }
 }
 

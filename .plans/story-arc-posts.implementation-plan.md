@@ -102,7 +102,21 @@ shaped how you practice" → recorded → transcribed → `storyBeats`. Text
 fallback field. (Ship main-app phase with the TEXT field if the voice
 recording plumbing is tight; voice upgrade = v2.)
 
-## STATUS 2026-09-03: P1 COMPLETE — deployed prod + staging, E2E-verified
+## STATUS 2026-09-03 (evening): P1+P2 FINE-TUNE COMPLETE — ship quality
+
+Final design after 4 QA cycles on the Sep 2 article: FULL article into the
+arc writer with RETELL-the-article's-own-scenes instruction (solves
+fabrication-vs-abstraction: the plain-language layer's composite scenes are
+pre-vetted narrative material); serial 4-beat arc with one-line re-anchors;
+middle slides 40-60 words; arrows on all non-final slides; Recraft V3
+motifs (vector_illustration style, hard-WORDLESS directive after gibberish
+labels); IG 9:16 stories = pitch companions of their feed beat (old generic
+pull-quotes made no sense); evening beats end with brand.socialCallToAction
+verbatim (azavea = X-Ray line, set in DB); step-230 prompt override (208
+COLLIDED with social_story_pitch_slide — restored). Personal-LinkedIn
+window live until Sep 9 (launch doc has the flips).
+
+## (earlier) P1 COMPLETE — deployed prod + staging, E2E-verified
 
 Arc generator live (4 beats from the 12-beat narrator pool, real moments
 woven with article numbers), all slot types verified (4 story slots ×8

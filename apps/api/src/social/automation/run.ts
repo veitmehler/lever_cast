@@ -155,6 +155,7 @@ async function pregenerateBatchedCaptions(opts: {
   ctx: MatrixRunContext
   logCtx: AutomationLogContext
   jobId?: string | null
+  vertical?: string | null
 }): Promise<Record<string, Record<string, string>>> {
   const { feedEntries, ctx, logCtx } = opts
   if (feedEntries.length === 0) return {}
@@ -174,13 +175,28 @@ async function pregenerateBatchedCaptions(opts: {
     const page = await prisma.sitePage.findFirst({ where: { jobId: jobIdForArc }, select: { storyArcJson: true } })
     storyArc = (page?.storyArcJson as { postText?: string }[] | null) ?? null
   }
+  // Comment-keyword hook (platform CTA split, 2026-09-03): IG replaces the
+  // URL CTA line (dead text there), FB gets it IN ADDITION to the link.
+  const storyHook =
+    opts.vertical === 'azavea'
+      ? 'Comment "XRAY" and I will send you the free 2-minute Practice X-Ray.'
+      : ''
   for (const e of feedEntries) {
     if (e.daySlot.source === 'art_story') {
       const beat = storyArc?.[e.daySlot.beatIndex ?? 0]
       if (beat?.postText) {
         for (const platform of platforms) {
           const limit = PLATFORM_CHAR_LIMITS[platform] ?? 2000
-          const t = beat.postText
+          let t = beat.postText
+          if (storyHook && platform === 'facebook' && /omniply\.io|http/i.test(t.split('\n').pop() ?? '')) {
+            t = `${t}\n\nOr just comment "XRAY" and I will send it straight to you.`
+          } else if (storyHook && platform === 'instagram') {
+            const lines = t.split('\n')
+            if (/omniply\.io|http/i.test(lines[lines.length - 1] ?? '')) {
+              lines[lines.length - 1] = storyHook
+              t = lines.join('\n')
+            }
+          }
           ;(bySlot[e.slotKey] ??= {})[platform] = t.length <= limit ? t : t.slice(0, limit - 1).trim() + '…'
         }
       }
@@ -369,7 +385,7 @@ export async function runSocialAutomation(
   // wave — distinctness across the day's captions is enforced in-prompt.
   const captionsBySlot =
     feedToRun.length > 0
-      ? await pregenerateBatchedCaptions({ feedEntries: feedToRun, ctx, logCtx: baseCtx, jobId: run.jobId })
+      ? await pregenerateBatchedCaptions({ feedEntries: feedToRun, ctx, logCtx: baseCtx, jobId: run.jobId, vertical })
       : {}
 
   await mapWithConcurrency(feedToRun, FEED_WAVE_CONCURRENCY, async (entry) => {

@@ -434,7 +434,10 @@ async function buildTintedSlideOverlaySvg(
   const headlineMaxChars = 22
   const headBodyGap = 34
   const paragraphGap = 16
-  const regionH = TINT_TEXT_BOTTOM - TINT_TEXT_TOP
+  // Story slides reserve the 780-880 band for the FIXED swipe arrow (arrow
+  // jumped around when anchored to the text block — user 2026-09-03).
+  const regionBottom = input.storyMode ? 780 : TINT_TEXT_BOTTOM
+  const regionH = regionBottom - TINT_TEXT_TOP
 
   const headLines = slide.headlineText ? wrapText(slide.headlineText, headlineMaxChars, 4) : []
   const headlineBlockH = headLines.length * headlineLineH
@@ -523,10 +526,11 @@ async function buildTintedSlideOverlaySvg(
 
   for (let i = 0; i < headLines.length; i++) {
     if (input.storyMode) {
-      // Story slides: centered, NATURAL spacing — letter-spaced justification
-      // read as "stretched text" (user 2026-09-03).
+      // Story slides: LEFT-aligned natural lines inside the horizontally
+      // centered block (centered body text read unprofessional; justification
+      // read stretched — user 2026-09-03).
       elements.push(
-        `<text x="${SLIDE_SIZE / 2}" y="${currentY + headlineFontSz + i * headlineLineH}" text-anchor="middle" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${tint.textColor}">${escapeXml(headLines[i])}</text>`,
+        `<text x="${x0}" y="${currentY + headlineFontSz + i * headlineLineH}" font-family="${FONT_MEDIUM}" font-size="${headlineFontSz}" fill="${tint.textColor}">${escapeXml(headLines[i])}</text>`,
       )
     } else {
       elements.push(
@@ -543,7 +547,7 @@ async function buildTintedSlideOverlaySvg(
     for (let i = 0; i < lines.length; i++) {
       if (input.storyMode) {
         elements.push(
-          `<text x="${SLIDE_SIZE / 2}" y="${currentY + bodyFontSz}" text-anchor="middle" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${escapeXml(lines[i])}</text>`,
+          `<text x="${x0}" y="${currentY + bodyFontSz}" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${escapeXml(lines[i])}</text>`,
         )
       } else {
         elements.push(
@@ -788,15 +792,13 @@ export async function renderCarouselSlide(
         const meta = await sharp(input.arrowBuffer).metadata()
         const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
         const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
-        // Content slides: sit just below the text block, floored at the
-        // title-slide's typical height (~72%), never over the logo.
-        const floorY = Math.round(SLIDE_SIZE * 0.72)
-        const belowText = (contentBlockBottom ?? floorY) + 30 + Math.round(arrowH / 2)
-        const contentCenterY = Math.min(Math.max(floorY, belowText), logoTop - Math.round(arrowH / 2) - 16)
+        // Content slides: ONE fixed position (center y=830) — the story text
+        // region ends at 780, so overlap is impossible and the arrow never
+        // jumps between slides.
         const centerY =
           input.slide.type === 'hook' && hookBannerBottom != null
             ? Math.round((hookBannerBottom + logoTop) / 2)
-            : contentCenterY
+            : 830
         composites.push({
           input: arrowPng,
           left: logoLeft - ARROW_W - (input.slide.type === 'hook' ? 0 : 24),

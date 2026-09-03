@@ -1,5 +1,6 @@
 import { prisma, brandSettingsForUser } from '@omniply/shared'
 import { loadSocialBrandTheme } from '../brand-theme'
+import { verticalForUser } from '../../lib/prompt-resolver'
 import { getLLMAdapter } from '../../article-pipeline/llm/factory'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 import { loadPlainLanguageConfig } from '../../article-pipeline/enrichment/plain-language'
@@ -100,6 +101,7 @@ For EACH beat also produce its Instagram slide breakdown:
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
 - last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
 - NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
+- Slides must NEVER contain URLs: they are not clickable on Instagram. URLs belong in the post text only.
 - 4 to 6 slides per beat.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...]}, ...]`
@@ -231,12 +233,20 @@ export async function generateStoryArc(opts: {
     })
   }
 
-  // Evening beats get a DEDICATED CTA slide (deterministic layout — the
-  // model kept blending the CTA into content slides).
+  // Evening beats get a DEDICATED CTA slide (deterministic layout). The
+  // SLIDE carries the comment-keyword hook, not a URL: slide text is not
+  // clickable on Instagram, and comments feed the keyword funnel + capture
+  // the lead (user decision 2026-09-03). Clinics get a parameterized
+  // keyword in P3; azavea uses XRAY.
   const ctaLine = theme.socialCallToAction?.trim() || ''
-  if (ctaLine) {
+  const vertical = await verticalForUser(userId).catch(() => null)
+  const commentHook =
+    vertical === 'azavea'
+      ? 'Comment "XRAY" and I will send you the free 2-minute Practice X-Ray.'
+      : ctaLine
+  if (commentHook) {
     for (let i = 1; i < beats.length; i += 2) {
-      beats[i].slides.push(ctaLine)
+      beats[i].slides.push(commentHook)
     }
   }
 

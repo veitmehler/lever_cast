@@ -14,7 +14,7 @@ import {
   resolveNewsletterSlotContent,
   type NewsletterContentContext,
 } from './newsletter-content'
-import { generateQuoteCardAsset, generateCarouselAssets } from '../generate-assets'
+import { generateQuoteCardAsset, generateCarouselAssets, generateStorySlidesAsset } from '../generate-assets'
 import { generateVideoReelAsset, generateHookVideoAsset, generateKtMusicVideoAsset } from '../generate-video-assets'
 import { loadPromptTemplate } from '../../article-pipeline/enrichment/prompt-template'
 
@@ -163,6 +163,44 @@ export async function generateMatrixAsset(opts: {
         }
       }
     }
+    case 'story_text': {
+      // Story beat (engagement v2): IG gets the tinted slide carousel; the
+      // post text itself IS the caption everywhere (verbatim, set by the
+      // run-level pregen). No storySlides → the arc is missing: degrade to
+      // a tinted section carousel so the slot still posts.
+      if (resolved.slot.storySlides?.length) {
+        const story = await generateStorySlidesAsset({
+          userId,
+          slides: resolved.slot.storySlides,
+          jobId: assetJobId,
+          imageModel: await socialImageModel(),
+        })
+        return {
+          postType: 'story_text',
+          mediaUrls: story.imageUrls,
+          imageUrl: story.imageUrls[0],
+          title: resolved.slot.title ?? contextTitle,
+        }
+      }
+      logger.warn({ assetJobId }, '[matrix-processor] story slot without arc — tinted carousel fallback')
+      const fallback = await generateCarouselAssets({
+        userId,
+        content: slot.text,
+        topic,
+        articleUrl: '',
+        slideCount,
+        jobId: assetJobId,
+        designVariant: 'brand_tint_accent',
+        imageModel: await socialImageModel(),
+      })
+      return {
+        postType: 'carousel',
+        mediaUrls: fallback.imageUrls,
+        imageUrl: fallback.imageUrls[0],
+        title: fallback.slides[0]?.headline ?? topic,
+        backgroundImageUrls: fallback.backgroundImageUrls,
+      }
+    }
     case 'kt_music_video': {
       try {
         const kt = await generateKtMusicVideoAsset({
@@ -271,13 +309,14 @@ async function resolveSlot(
   source: PostSource,
   ctx: MatrixRunContext,
   jobId: string | null,
+  beatIndex?: number,
 ): Promise<ResolvedSlot> {
   if (sourceKind(source) === 'newsletter') {
     if (!ctx.newsletterCtx) throw new Error('Newsletter context missing for newsletter slot')
     return { slot: resolveNewsletterSlotContent(source, ctx.newsletterCtx), diagramBackground: null }
   }
   if (!ctx.articleCtx || !jobId) throw new Error('Article context missing for article slot')
-  return resolveArticleSlot(source, jobId, ctx.articleCtx)
+  return resolveArticleSlot(source, jobId, ctx.articleCtx, beatIndex)
 }
 
 /** Process one matrix slot: resolve content → generate → build scheduled posts → record. */
@@ -310,7 +349,7 @@ export async function processMatrixSlot(opts: {
     // chain (image gen retries + video gen retries + narration + ffmpeg).
     const { assets, buildResult } = await withTimeout(
       async () => {
-        const resolved = await resolveSlot(daySlot.source, ctx, run.jobId)
+        const resolved = await resolveSlot(daySlot.source, ctx, run.jobId, daySlot.beatIndex)
         const assetJobId = `${run.jobId ?? run.newsletterId}-${slotKey}`
 
         const assets = await generateMatrixAsset({

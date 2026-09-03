@@ -72,6 +72,8 @@ export interface SlotContent {
   text: string
   title?: string
   quoteText?: string
+  /** art_story slots: the beat's IG slide texts (hook first). */
+  storySlides?: string[]
 }
 
 function h2SlotContent(slotKey: string, ctx: ArticleContentContext): SlotContent {

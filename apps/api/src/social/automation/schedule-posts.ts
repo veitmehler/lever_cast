@@ -58,12 +58,19 @@ export async function buildPostsForSpec(opts: {
     // Video posts carry ONLY the video. Some specs (hook_video) keep their
     // source carousel slides in assets.mediaUrls for cross-spec reuse —
     // copying those onto the post makes GHL reject it as multi-media.
-    const mediaUrls = !videoUrl && assets.mediaUrls?.length
+    // Story posts (engagement v2): the slide carousel goes ONLY to
+    // Instagram (which requires media); LinkedIn/Facebook publish the story
+    // as a pure TEXT post.
+    const isStoryText = assets.postType === 'story_text'
+    const storyTextOnly = isStoryText && platform !== 'instagram'
+    const mediaUrls = !videoUrl && !storyTextOnly && assets.mediaUrls?.length
       ? trimSlidesForPlatform(assets.mediaUrls, platform)
       : undefined
-    const imageUrl = videoUrl ? undefined : mediaUrls?.[0] ?? assets.imageUrl
+    const imageUrl = videoUrl || storyTextOnly ? undefined : mediaUrls?.[0] ?? assets.imageUrl
 
-    if (!videoUrl && !imageUrl && !mediaUrls?.length) {
+    // Text-only is valid ONLY for story posts on LinkedIn/Facebook; every
+    // other post type still requires media.
+    if (!videoUrl && !imageUrl && !mediaUrls?.length && !storyTextOnly) {
       skipped++
       continue
     }

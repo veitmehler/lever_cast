@@ -29,6 +29,7 @@ async function dispatchReadyPost(post: Post, logCtx: AutomationLogContext): Prom
         videoUrl,
         postAsStory: post.postAsStory,
         scheduledAt,
+        preferPersonalProfile: post.postType === 'story_text',
         logCtx: platformCtx,
       })
 

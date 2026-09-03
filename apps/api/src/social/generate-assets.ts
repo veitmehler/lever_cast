@@ -89,6 +89,68 @@ export function themedBackgroundPrompt(industry: string | null | undefined, seed
   )
 }
 
+/**
+ * Story-arc IG carousel (engagement v2): the beat's slides rendered as
+ * brand-tinted cards over ONE shared motif background. Slide 1 renders as
+ * the tint HOOK banner (big, centered, swipe arrows); the rest as tint
+ * content blocks. Zero new compositor machinery — synthetic slide plans
+ * through renderCarouselSlide.
+ */
+export async function generateStorySlidesAsset(opts: {
+  userId: string
+  slides: string[]
+  jobId?: string
+  imageModel?: string
+}): Promise<{ imageUrls: string[] }> {
+  const brand = await loadSocialBrandTheme(opts.userId)
+  const genId = generationId()
+  const jobId = opts.jobId ?? genId
+
+  const tint = tintScheme(brand.primaryColor)
+  const tintLogoBuffer = await loadTintLogo(brand, tint.logoVariant)
+  const arrowBuffer = await loadContinuationArrow(tint.logoVariant)
+  const logoBuffer = await loadLogoBuffer(brand.logoUrl)
+
+  const bg = await generateCarouselBackground(
+    themedBackgroundPrompt(brand.industry, genId),
+    jobId,
+    opts.imageModel,
+    opts.userId,
+  )
+
+  const imageUrls: string[] = []
+  for (let i = 0; i < opts.slides.length; i++) {
+    const isHook = i === 0
+    const plan = {
+      type: (isHook ? 'hook' : 'content') as 'hook' | 'content',
+      headlineText: isHook ? opts.slides[i] : null,
+      bodyText: isHook ? null : opts.slides[i],
+      imagePrompt: '',
+    }
+    const buffer = await renderCarouselSlide(bg, {
+      slide: plan,
+      slideIndex: i,
+      totalSlides: opts.slides.length,
+      brand,
+      logoBuffer,
+      tint,
+      tintLogoBuffer,
+      arrowBuffer: isHook ? arrowBuffer : null,
+    })
+    const reg = await registerSocialMedia({
+      userId: opts.userId,
+      buffer,
+      s3Key: `social/${opts.userId}/${jobId}/story-slide-${i + 1}-${genId}.png`,
+      title: `Story slide ${i + 1}`,
+      altText: opts.slides[i].slice(0, 120),
+      source: 'carousel_slide',
+      jobId,
+    })
+    imageUrls.push(reg.url)
+  }
+  return { imageUrls }
+}
+
 export async function generateQuoteCardAsset(opts: {
   userId: string
   content: string

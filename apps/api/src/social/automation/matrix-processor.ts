@@ -179,6 +179,7 @@ export async function generateMatrixAsset(opts: {
           postType: 'story_text',
           mediaUrls: story.imageUrls,
           imageUrl: story.imageUrls[0],
+          backgroundImageUrls: story.backgroundImageUrls,
           title: resolved.slot.title ?? contextTitle,
         }
       }

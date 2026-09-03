@@ -73,6 +73,10 @@ const BACKGROUND_MOTIFS: Record<string, string[]> = {
   ],
 }
 
+/** Vector-illustration model for motif backgrounds (icon aesthetics beat
+ *  general image models here; admin-configurable model = v2). */
+export const MOTIF_IMAGE_MODEL = 'fal-ai/recraft-v3'
+
 export function themedBackgroundPrompt(industry: string | null | undefined, seed: string): string {
   // Chiro motifs for chiropractic clinics AND the azavea vertical (industry
   // "B2B practice-growth software" — its audience is chiropractors).
@@ -102,7 +106,7 @@ export async function generateStorySlidesAsset(opts: {
   slides: string[]
   jobId?: string
   imageModel?: string
-}): Promise<{ imageUrls: string[] }> {
+}): Promise<{ imageUrls: string[]; backgroundImageUrls: string[] }> {
   const brand = await loadSocialBrandTheme(opts.userId)
   const genId = generationId()
   const jobId = opts.jobId ?? genId
@@ -115,9 +119,19 @@ export async function generateStorySlidesAsset(opts: {
   const bg = await generateCarouselBackground(
     themedBackgroundPrompt(brand.industry, genId),
     jobId,
-    opts.imageModel,
+    MOTIF_IMAGE_MODEL,
     opts.userId,
   )
+
+  const bgReg = await registerSocialMedia({
+    userId: opts.userId,
+    buffer: bg,
+    s3Key: `social/${opts.userId}/${jobId}/story-bg-${genId}.png`,
+    title: 'Story background',
+    altText: 'Story background',
+    source: 'carousel_slide',
+    jobId,
+  })
 
   const imageUrls: string[] = []
   for (let i = 0; i < opts.slides.length; i++) {
@@ -136,7 +150,7 @@ export async function generateStorySlidesAsset(opts: {
       logoBuffer,
       tint,
       tintLogoBuffer,
-      arrowBuffer: isHook ? arrowBuffer : null,
+      arrowBuffer: i < opts.slides.length - 1 ? arrowBuffer : null,
       storyMode: true,
     })
     const reg = await registerSocialMedia({
@@ -150,7 +164,9 @@ export async function generateStorySlidesAsset(opts: {
     })
     imageUrls.push(reg.url)
   }
-  return { imageUrls }
+  // Parallel background array (single shared motif) — the S-slot pitch
+  // builder reads backgrounds per slide.
+  return { imageUrls, backgroundImageUrls: imageUrls.map(() => bgReg.url) }
 }
 
 export async function generateQuoteCardAsset(opts: {
@@ -304,7 +320,7 @@ export async function generateCarouselAssets(opts: {
     sharedBg = await generateCarouselBackground(
       themedBackgroundPrompt(brand.industry, genId),
       jobId,
-      opts.imageModel,
+      MOTIF_IMAGE_MODEL,
       opts.userId,
     )
     const reg = await registerSocialMedia({
@@ -335,7 +351,7 @@ export async function generateCarouselAssets(opts: {
       bg = await generateCarouselBackground(
         themedBackgroundPrompt(brand.industry, `${genId}-${i}`),
         jobId,
-        opts.imageModel,
+        MOTIF_IMAGE_MODEL,
         opts.userId,
       )
       const reg = await registerSocialMedia({

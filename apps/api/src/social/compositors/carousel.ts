@@ -628,20 +628,27 @@ export async function generateCarouselBackground(
 
   const prompt = promptText
 
+  // Recraft's input schema differs from flux (no steps/safety params; a
+  // style selector instead) — and its vector_illustration style is exactly
+  // the motif-icon aesthetic (2026-09-03).
+  const falInput = model.includes('recraft')
+    ? { prompt, image_size: 'square_hd', style: 'vector_illustration' }
+    : {
+        prompt,
+        image_size: 'square_hd',
+        num_inference_steps: 4,
+        // These are benign on-brand marketing backgrounds; the safety checker
+        // false-positives on ordinary scene prompts and returns a black image.
+        enable_safety_checker: false,
+      }
+
   const result = await instrumentCall({ provider: 'fal-ai', op: `image:${model}` }, () =>
     withRetry(
       () =>
         withTimeout(
           (signal) =>
             fal.subscribe(model, {
-              input: {
-                prompt,
-                image_size: 'square_hd',
-                num_inference_steps: 4,
-                // These are benign on-brand marketing backgrounds; the safety checker
-                // false-positives on ordinary scene prompts and returns a black image.
-                enable_safety_checker: false,
-              },
+              input: falInput,
               pollInterval: 2000,
               logs: false,
               abortSignal: signal,
@@ -748,16 +755,22 @@ export async function renderCarouselSlide(
       }
     }
 
-    if (input.slide.type === 'hook' && input.arrowBuffer && hookBannerBottom != null) {
+    // Swipe cue: hook slides center the arrows between banner and logo;
+    // story content slides (arrowBuffer passed on every non-final slide,
+    // 2026-09-03) sit them left of the logo on its baseline.
+    if (input.arrowBuffer && (input.slide.type === 'hook' ? hookBannerBottom != null : true)) {
       const ARROW_W = 100
       try {
         const meta = await sharp(input.arrowBuffer).metadata()
         const arrowH = Math.round((ARROW_W * (meta.height ?? 55)) / (meta.width ?? 87))
         const arrowPng = await sharp(input.arrowBuffer).resize({ width: ARROW_W }).png().toBuffer()
-        const centerY = Math.round((hookBannerBottom + logoTop) / 2)
+        const centerY =
+          input.slide.type === 'hook' && hookBannerBottom != null
+            ? Math.round((hookBannerBottom + logoTop) / 2)
+            : logoTop + Math.round(arrowH / 2)
         composites.push({
           input: arrowPng,
-          left: logoLeft - ARROW_W,
+          left: logoLeft - ARROW_W - (input.slide.type === 'hook' ? 0 : 24),
           top: centerY - Math.round(arrowH / 2),
         })
       } catch (err) {

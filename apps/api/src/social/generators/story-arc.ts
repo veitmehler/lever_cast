@@ -57,6 +57,7 @@ function buildUserPrompt(opts: {
   articleTitle: string
   articleMaterial: string
   articleUrl: string
+  ctaLine: string
   priorPosts: string[]
 }): string {
   const prior = opts.priorPosts.length
@@ -83,8 +84,11 @@ ${prior}
 
 ARC RULES:
 - Beat 1 opens on a concrete scene or surprising observation, never a summary.
+- The article's own scenes, metaphors, and story boxes are your PRIMARY narrative material: RETELL them in the narrator's voice (they are pre-approved composites). Prefer retelling an article scene over abstract observation.
+- Beats 2 and onward OPEN with one short re-anchoring line that orients a first-time reader (half a sentence referencing where the story stands) before continuing.
 - Every beat except the last ends mid-tension with an open loop to the next.
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
+- EVENING beats (beat 2${opts.beatCount >= 4 ? ' and beat 4' : ''}) end with exactly this call-to-action line as the final line: "${opts.ctaLine}"${opts.ctaLine ? '' : ' (no CTA line provided: end naturally)'}
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
 - Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
 - NEVER invent events, experiments, tests, products, conversations, or timelines that are not explicitly described in a narrator moment or the article. If a moment lacks detail, stay abstract rather than inventing specifics.
@@ -93,9 +97,9 @@ ARC RULES:
 
 For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
-- middle slides = 20 to 35 words each, each CUT at a moment of tension so the swipe is the payoff.
-- last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue.
-- 5 to 8 slides per beat.
+- middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
+- last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue; on EVENING beats it also carries the call-to-action line.
+- 4 to 6 slides per beat.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...]}, ...]`
 }
@@ -115,14 +119,18 @@ function extractJsonArray(raw: string): unknown[] | null {
 
 /** Build the article material block from the run's content context. */
 export function articleMaterialFromCtx(ctx: ArticleContentContext): string {
+  // FULL article (user decision 2026-09-03): the plain-language layer bakes
+  // composite scenes/metaphors/story boxes into the sections — feeding them
+  // whole gives the writer truthful, pre-vetted narrative material instead
+  // of a fact digest that forces invention or abstraction.
   const sections = ctx.h2Sections
-    .slice(0, 8)
-    .map((s) => `## ${s.heading}\n${s.text.slice(0, 400)}`)
+    .slice(0, 10)
+    .map((s) => `## ${s.heading}\n${s.text.slice(0, 2500)}`)
     .join('\n\n')
-  return [ctx.introText?.slice(0, 800), ctx.keyTakeawaysText?.slice(0, 800), sections]
+  return [ctx.introText?.slice(0, 2000), ctx.keyTakeawaysText?.slice(0, 1500), sections]
     .filter(Boolean)
     .join('\n\n')
-    .slice(0, 6000)
+    .slice(0, 24000)
 }
 
 export async function generateStoryArc(opts: {
@@ -166,6 +174,7 @@ export async function generateStoryArc(opts: {
     articleTitle: opts.articleTitle,
     articleMaterial: opts.articleMaterial,
     articleUrl: opts.articleUrl,
+    ctaLine: theme.socialCallToAction?.trim() || '',
     priorPosts: prior.map((p) => p.content),
   })
 

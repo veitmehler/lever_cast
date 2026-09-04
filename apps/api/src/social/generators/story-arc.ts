@@ -92,6 +92,7 @@ ARC RULES:
 - HARD RULE: an article scene may NEVER become the narrator's own experience. The narrator is a software builder: no patients, no patient files, no clinic, no board letters or investigations addressed to them. First person is a commentary lens, never invented events.
 - Beats 2 and onward OPEN with one short re-anchoring line that orients a first-time reader (half a sentence referencing where the story stands) before continuing.
 - Every beat except the last ends mid-tension with an open loop to the next.
+- SCHEDULE: beats alternate morning (7:00) and evening (19:00), starting with a morning beat. A MORNING beat's open loop points at TONIGHT ("Tonight: ..."); an EVENING beat's open loop (except the last beat, which resolves) points at TOMORROW ("Tomorrow: ..."). Never use the wrong label.
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
 - EVENING beats (beat 2${opts.beatCount >= 4 ? ' and beat 4' : ''}): the POST TEXT ends with exactly this call-to-action line as its final line: "${opts.ctaLine}"${opts.ctaLine ? '' : ' (no CTA line provided: end naturally)'}
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
@@ -105,12 +106,15 @@ For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
 - When a beat presents an enumerated list (pillars, steps, reasons), give each item its OWN slide whose text starts with its number and a period ("1. ...", "2. ..."). Never number slides that are not list items.
+- When a slide lists tasks, steps, or actions, put each on its OWN line starting with "- " (hyphen space), one action per line, so they render as bullet points.
 - last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
 - NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
-- Slides must NEVER contain URLs: they are not clickable on Instagram. URLs belong in the post text only.
+- Slides must NEVER contain any web address: no https:// links AND no bare domains or paths like example.com/page. Nothing on a slide is clickable on Instagram. URLs belong in the post text only.
 - 4 to 6 slides per beat.
 
-Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...]}, ...]`
+EVENING beats additionally output "ctaBridge": ONE short sentence (max 14 words) that ties that beat's content to the offer of a free practice assessment, WITHOUT naming the assessment, giving instructions, or including any URL (the call-to-action itself is appended automatically after it). Morning beats omit the field.
+
+Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...], "ctaBridge": "..."}, ...]`
 }
 
 function extractJsonArray(raw: string): unknown[] | null {
@@ -217,9 +221,34 @@ export async function generateStoryArc(opts: {
     throw new Error(`Story arc: expected ${beatCount} beats, got ${parsed?.length ?? 'unparseable'}`)
   }
 
+  // Deterministic no-URL guarantee for slides (bare domains slipped past the
+  // prompt rule — user 2026-09-04): drop any sentence containing a web address.
+  const URL_RX = /https?:\/\/\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|io|net|org|ai|co|app|dev|us)\b(?:\/\S*)?/i
+  const stripUrlSentences = (s: string) =>
+    s
+      .split('\n')
+      .map((line) =>
+        line
+          .split(/(?<=[.!?])\s+/)
+          .filter((seg) => !URL_RX.test(seg))
+          .join(' '),
+      )
+      .filter((l) => l.trim().length > 0)
+      .join('\n')
+      .trim()
+  // Morning beats (even index) tease the SAME-DAY evening post; evening beats
+  // tease tomorrow morning. The model cannot know the slot map, so enforce the
+  // open-loop label deterministically (user 2026-09-04: "Tomorrow" on a 7:00
+  // post whose sequel lands at 19:00).
+  const fixLoopLabel = (txt: string, idx: number) => {
+    if (idx === beatCount - 1) return txt
+    return idx % 2 === 0 ? txt.replace(/\bTomorrow:/g, 'Tonight:') : txt.replace(/\bTonight:/g, 'Tomorrow:')
+  }
+
   const beats: StoryBeat[] = []
+  const ctaBridges: (string | null)[] = []
   for (const raw of parsed.slice(0, beatCount)) {
-    const b = raw as { postText?: unknown; slides?: unknown }
+    const b = raw as { postText?: unknown; slides?: unknown; ctaBridge?: unknown }
     const postText = typeof b.postText === 'string' ? b.postText.trim() : ''
     const slides = Array.isArray(b.slides)
       ? b.slides.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim())
@@ -234,13 +263,28 @@ export async function generateStoryArc(opts: {
     if (/swipe/i.test(slides[slides.length - 1] ?? '')) {
       logger.warn({ ...logCtx, beat: beats.length + 1 }, '[story-arc] final slide invites swiping despite rule — review will catch')
     }
+    const beatIdx = beats.length
+    // One content-aware sentence bridging the beat into the appended CTA slide
+    // (user 2026-09-04: the bare hook after content read disconnected). Hook
+    // text itself stays verbatim; discard the bridge if it smuggles a URL.
+    const bridgeRaw = typeof b.ctaBridge === 'string' ? b.ctaBridge.split('\n')[0].trim() : ''
+    const bridge = bridgeRaw && !URL_RX.test(bridgeRaw) && bridgeRaw.length <= 160 ? stripDashes(bridgeRaw) : null
+    ctaBridges.push(bridge)
     beats.push({
-      postText: blankLineThoughts(stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim())),
-      slides: await Promise.all(
-        slides.map(async (s) =>
-          stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()),
-        ),
+      postText: fixLoopLabel(
+        blankLineThoughts(stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim())),
+        beatIdx,
       ),
+      slides: (
+        await Promise.all(
+          slides.map(async (s) =>
+            fixLoopLabel(
+              stripUrlSentences(stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim())),
+              beatIdx,
+            ),
+          ),
+        )
+      ).filter((s) => s.length > 0),
     })
   }
 
@@ -257,7 +301,8 @@ export async function generateStoryArc(opts: {
       : ctaLine
   if (commentHook) {
     for (let i = 1; i < beats.length; i += 2) {
-      beats[i].slides.push(commentHook)
+      const bridge = ctaBridges[i]
+      beats[i].slides.push(bridge ? `${bridge}\n${commentHook}` : commentHook)
     }
   }
 

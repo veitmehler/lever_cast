@@ -460,6 +460,10 @@ async function buildTintedSlideOverlaySvg(
     ? (slide.bodyText ?? '').trim().replace(/^\d{1,2}\.\s+/, '')
     : (slide.bodyText ?? '')
   const paragraphs = bodyTextClean.split('\n').filter((p) => p.trim().length > 0)
+  // Story slides: a line starting with "- " renders as a bullet point with a
+  // hanging indent (user 2026-09-04: task lists read as prose otherwise).
+  const bulletFlags = paragraphs.map((p) => input.storyMode === true && /^-\s+/.test(p.trim()))
+  const paraTexts = paragraphs.map((p) => p.trim().replace(/^-\s+/, ''))
   // Story slides carry 20-35 words by design — start larger so short text
   // fills the frame instead of floating in it.
   const baseFs = input.storyMode ? 52 : 38
@@ -473,7 +477,7 @@ async function buildTintedSlideOverlaySvg(
     const maxChars = input.storyMode
       ? Math.max(18, Math.floor((SLIDE_SIZE - 2 * 100) / (fs * 0.52)))
       : Math.max(24, Math.round(30 * (fs / 38)))
-    const groups = paragraphs.map((p) => wrapText(p.trim(), maxChars, 99))
+    const groups = paraTexts.map((p, gi) => wrapText(p, bulletFlags[gi] ? Math.max(10, maxChars - 2) : maxChars, 99))
     const lines = groups.reduce((n, g) => n + g.length, 0)
     const gaps = groups.length > 0 ? (groups.length - 1) * paragraphGap : 0
     const h = lines * lineH + gaps
@@ -563,11 +567,16 @@ async function buildTintedSlideOverlaySvg(
   }
   if (headLines.length > 0) currentY += headlineBlockH + gapH
 
-  for (const lines of bodyGroups) {
+  for (let gi = 0; gi < bodyGroups.length; gi++) {
+    const lines = bodyGroups[gi]
+    const isBullet = bulletFlags[gi] === true
+    const bulletIndent = isBullet ? Math.round(bodyFontSz * 1.1) : 0
     for (let i = 0; i < lines.length; i++) {
       if (input.storyMode) {
+        const lineX = isBullet && i > 0 ? x0 + bulletIndent : x0
+        const lineText = isBullet && i === 0 ? `• ${lines[i]}` : lines[i]
         elements.push(
-          `<text x="${x0}" y="${currentY + bodyFontSz}" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${escapeXml(lines[i])}</text>`,
+          `<text x="${lineX}" y="${currentY + bodyFontSz}" font-family="${FONT_LIGHT}" font-size="${bodyFontSz}" fill="${tint.textColor}">${escapeXml(lineText)}</text>`,
         )
       } else {
         elements.push(

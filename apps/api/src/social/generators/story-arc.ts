@@ -44,6 +44,7 @@ const SYSTEM_PROMPT =
   'OBSERVATION about the industry or practices ("I keep seeing...", "Picture a practice owner who...", ' +
   '"you open the guidance and realize..."), never as something the narrator personally did or found. ' +
   'A post with zero personal scenes is fine; a post with a fabricated one is a failure. ' +
+  'The narrator is a software builder, not a clinician: patients, patient files, clinics, or board letters may never appear as the narrator\'s own. Default voice is first-person OBSERVER: "I" as a commentary lens on the industry, never invented events. ' +
   'COMPLIANCE (hard rules): never mention or invent identifiable patients or specific patient events; ' +
   'composite scenes must be explicitly generic ("every practice has a Tuesday like this"); ' +
   'never promise business or health outcomes; numbers come only from the article material provided. ' +
@@ -86,7 +87,9 @@ ${prior}
 
 ARC RULES:
 - Beat 1 opens on a concrete scene or surprising observation, never a summary.
-- The article's own scenes, metaphors, and story boxes are your PRIMARY narrative material: RETELL them in the narrator's voice (they are pre-approved composites). Prefer retelling an article scene over abstract observation.
+- VOICE: first-person observer throughout. The narrator comments as "I" even on article material ("I keep seeing...", "I read the FTC notices so you do not have to", "Here is what jumped out at me").
+- The article's own scenes, metaphors, and story boxes are your PRIMARY narrative material: RETELL them as scenes the narrator PRESENTS about a practice owner ("Picture the owner who...", "The scene from the article stuck with me: ..."). Prefer retelling an article scene over abstract observation.
+- HARD RULE: an article scene may NEVER become the narrator's own experience. The narrator is a software builder: no patients, no patient files, no clinic, no board letters or investigations addressed to them. First person is a commentary lens, never invented events.
 - Beats 2 and onward OPEN with one short re-anchoring line that orients a first-time reader (half a sentence referencing where the story stands) before continuing.
 - Every beat except the last ends mid-tension with an open loop to the next.
 - The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
@@ -96,11 +99,12 @@ ARC RULES:
 - NEVER invent events, experiments, tests, products, conversations, or timelines that are not explicitly described in a narrator moment or the article. If a moment lacks detail, stay abstract rather than inventing specifics.
 - Every number in every post must appear VERBATIM in the article material or a narrator moment. No derived, estimated, or invented figures.
 - Write every figure as numerals exactly as printed in the source (15.6%, $5,000, 30-40%); NEVER spell numbers out in words, even in spoken-style lines.
-- 120 to 220 words per post. Short lines. Line breaks between thoughts.
+- 120 to 220 words per post. Short lines. Separate THOUGHTS with a BLANK line (a thought may span several sentences); never run two thoughts together in one paragraph.
 
 For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
+- When a beat presents an enumerated list (pillars, steps, reasons), give each item its OWN slide whose text starts with its number and a period ("1. ...", "2. ..."). Never number slides that are not list items.
 - last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
 - NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
 - Slides must NEVER contain URLs: they are not clickable on Instagram. URLs belong in the post text only.
@@ -222,11 +226,16 @@ export async function generateStoryArc(opts: {
       : []
     if (!postText || slides.length < 3) throw new Error('Story arc: beat missing postText or slides')
     const stripDashes = (txt: string) => txt.replace(/\s*[—–]\s*/g, ', ')
+    // Guarantee a blank line after every thought in the post text: upgrade any
+    // single line break to a paragraph break (user 2026-09-04). Slides keep
+    // their own spacing (renderer concern).
+    const blankLineThoughts = (txt: string) =>
+      txt.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').replace(/([^\n])\n(?!\n)/g, '$1\n\n')
     if (/swipe/i.test(slides[slides.length - 1] ?? '')) {
       logger.warn({ ...logCtx, beat: beats.length + 1 }, '[story-arc] final slide invites swiping despite rule — review will catch')
     }
     beats.push({
-      postText: stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim()),
+      postText: blankLineThoughts(stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim())),
       slides: await Promise.all(
         slides.map(async (s) =>
           stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()),

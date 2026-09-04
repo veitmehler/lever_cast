@@ -238,6 +238,7 @@ Task:
 2. Flag any claims that appear incorrect, outdated, or unverifiable
 3. Note any statistics that need verification
 4. Highlight potentially misleading information
+5. Check EVERY court case or legal citation: does the described holding match what that case actually decided? Flag any case asserted as "precedent" or as establishing a legal rule beyond its actual holding (e.g. a sanctions ruling described as establishing general liability)
 
 Return as JSON array with:
 - claim: the specific text

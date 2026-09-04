@@ -36,6 +36,7 @@ const BATCH_RULES = `Rules for EVERY caption:
 - Open a loop the caption does not close; the payoff lives in the content, not the caption.
 - Curiosity through specificity; no clickbait cliches ("you won't believe").
 - When mentioning court cases or legal decisions: describe them ONLY as examples of what actually happened in that specific case; NEVER assert a case as "precedent" or claim it establishes a legal rule for a different context unless the source material explicitly states that holding applies.
+- Write every figure as numerals exactly as printed in the source (15.6%, $5,000, 30-40%); NEVER spell numbers out in words.
 - Stay under {{charLimit}} characters per caption.
 - Do not use markdown or em-dashes.
 - Match native {{platform}} posting style.

@@ -95,6 +95,7 @@ ARC RULES:
 - Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
 - NEVER invent events, experiments, tests, products, conversations, or timelines that are not explicitly described in a narrator moment or the article. If a moment lacks detail, stay abstract rather than inventing specifics.
 - Every number in every post must appear VERBATIM in the article material or a narrator moment. No derived, estimated, or invented figures.
+- Write every figure as numerals exactly as printed in the source (15.6%, $5,000, 30-40%); NEVER spell numbers out in words, even in spoken-style lines.
 - 120 to 220 words per post. Short lines. Line breaks between thoughts.
 
 For EACH beat also produce its Instagram slide breakdown:

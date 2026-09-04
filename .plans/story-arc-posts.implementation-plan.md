@@ -165,7 +165,10 @@ P2 fine-tune next: run against the queued cadence articles with Veit.
   and no destination-pointer phrases on slides (link in bio, pinned/first
   comment, read the article — the semantic class, not one phrasing), no
   "swipe" on final slides, correct Tonight/Tomorrow label (re-verify the
-  deterministic normalizers actually ran).
+  deterministic normalizers actually ran); (d) action lists rendered as
+  prose (2+ imperative sentences, neither "- " bullets nor numbered slides)
+  → flag: the auto-bulletizer is heuristic (curated imperative-verb list)
+  and a list phrased without imperatives slips both layers.
 - **P4 — post-launch v2**: FB carousel A/B, voice-recorded beats capture,
   cheap-graphic carousel refinements, cross-article "season" arcs.
 

@@ -279,6 +279,9 @@ export async function generateStoryArc(opts: {
       /\b(minute|min|hour|second|day|week|month|year)s?\b/i.test(bridgeRaw) ||
       /let someone else run the audit|landing on your desk/i.test(bridgeRaw) ||
       ctaBridges.includes(stripDashes(bridgeRaw))
+    if (bridgeUnsafe && beatIdx % 2 === 1) {
+      logger.warn({ ...logCtx, beat: beatIdx, bridgeRaw: bridgeRaw.slice(0, 160) }, '[story-arc] ctaBridge rejected — using fallback pivot')
+    }
     ctaBridges.push(bridgeUnsafe ? null : stripDashes(bridgeRaw))
     beats.push({
       postText: fixLoopLabel(

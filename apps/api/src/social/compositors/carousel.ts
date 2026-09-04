@@ -429,6 +429,16 @@ async function buildTintedSlideOverlaySvg(
   const { slide } = input
   const tint = input.tint!
 
+  // Numbered list slides (story mode): a leading "N. " on the body text is
+  // stripped and rendered as an oversized numeral above the text block
+  // (user 2026-09-04: one enumerated item per slide, large number in design).
+  const listNum = input.storyMode
+    ? ((slide.bodyText ?? '').trim().match(/^(\d{1,2})\.\s+/)?.[1] ?? null)
+    : null
+  const numeralFs = 180
+  const numeralGap = 36
+  const numeralBlockH = listNum ? numeralFs + numeralGap : 0
+
   const headlineFontSz = 56
   const headlineLineH = 72
   const headlineMaxChars = 22
@@ -446,7 +456,10 @@ async function buildTintedSlideOverlaySvg(
   // Global bump 2026-08-24 (user: tinted text too small/narrow in-feed):
   // base 38px wrapping ~30 chars, floor raised to 30px (was 30px base with a
   // 22px floor).
-  const paragraphs = (slide.bodyText ?? '').split('\n').filter((p) => p.trim().length > 0)
+  const bodyTextClean = listNum
+    ? (slide.bodyText ?? '').trim().replace(/^\d{1,2}\.\s+/, '')
+    : (slide.bodyText ?? '')
+  const paragraphs = bodyTextClean.split('\n').filter((p) => p.trim().length > 0)
   // Story slides carry 20-35 words by design — start larger so short text
   // fills the frame instead of floating in it.
   const baseFs = input.storyMode ? 52 : 38
@@ -469,7 +482,7 @@ async function buildTintedSlideOverlaySvg(
     bodyLineH = lineH
     bodyGroups = groups
     bodyBlockH = h
-    if (headlineBlockH + gap + h <= regionH) break
+    if (numeralBlockH + headlineBlockH + gap + h <= regionH) break
   }
 
   // With the raised shrink floor, an unusually long slide can still overflow
@@ -477,7 +490,7 @@ async function buildTintedSlideOverlaySvg(
   // ellipsis rather than drawing into the logo zone.
   {
     const gap = headLines.length > 0 && bodyBlockH > 0 ? headBodyGap : 0
-    let available = regionH - headlineBlockH - gap
+    let available = regionH - numeralBlockH - headlineBlockH - gap
     const kept: string[][] = []
     let used = 0
     let truncated = false
@@ -509,7 +522,7 @@ async function buildTintedSlideOverlaySvg(
   }
 
   const gapH = headLines.length > 0 && bodyBlockH > 0 ? headBodyGap : 0
-  const totalH = headlineBlockH + gapH + bodyBlockH
+  const totalH = numeralBlockH + headlineBlockH + gapH + bodyBlockH
   let currentY = TINT_TEXT_TOP + Math.max(0, Math.round((regionH - totalH) / 2))
 
   // One shared block width so headline and body justify to the same edges,
@@ -523,6 +536,13 @@ async function buildTintedSlideOverlaySvg(
   const x0 = Math.round((SLIDE_SIZE - blockW) / 2)
 
   const elements: string[] = []
+
+  if (listNum) {
+    elements.push(
+      `<text x="${x0}" y="${currentY + Math.round(numeralFs * 0.78)}" font-family="${FONT_MEDIUM}" font-size="${numeralFs}" fill="${tint.textColor}">${listNum}</text>`,
+    )
+    currentY += numeralBlockH
+  }
 
   for (let i = 0; i < headLines.length; i++) {
     if (input.storyMode) {

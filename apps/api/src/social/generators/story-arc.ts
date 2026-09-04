@@ -112,7 +112,7 @@ For EACH beat also produce its Instagram slide breakdown:
 - Slides must NEVER direct the reader to the article or any external destination: no web addresses (https:// or bare domains like example.com/page), no "link in bio", no "pinned comment", no "first comment", no "full breakdown at...", no "read the article". On slides the article may appear only as a SOURCE ("The article cited..."), never as a destination. Links and the article mention belong in the post text only.
 - 4 to 6 slides per beat.
 
-EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words), a question or turn toward getting help, phrased from THAT beat's specific subject (after an audit beat: "Or let someone else run the audit."; after a burnout beat: "What if the writing stopped landing on your desk?"). Never copy these examples; each evening bridge must be DIFFERENT from the others. It must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
+EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words) written in your own words, a question or turn toward getting help that picks up THAT beat's specific subject (its scene, task, or pain) and offers relief from it. Each evening bridge must be DIFFERENT from the others. It must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...], "ctaBridge": "..."}, ...]`
 }

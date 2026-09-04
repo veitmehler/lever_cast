@@ -154,7 +154,16 @@ P2 fine-tune next: run against the queued cadence articles with Veit.
   the COMPANY page until Sep 16).
 - **P3 — main app** (before Sep 15): default-vertical matrix restructure,
   narrator fields in onboarding (text input minimum), enabled for launch
-  clinics.
+  clinics. Pre-flight compliance verifier (runs on every beat before the run
+  turns `ready`): (a) every figure in postText/slides must exist VERBATIM in
+  the article material or a narrator moment (digit extraction + source
+  lookup); (b) numeric-consistency: no slide may carry two different
+  durations/quantities referring to different things (added 2026-09-04 after
+  a "15-minute audit" bridge collided with the "2-minute Practice X-Ray"
+  hook on one slide — the bridge validator now rejects digits/durations
+  outright, the verifier generalizes the check to ALL slides); (c) no URL,
+  no "swipe" on final slides, correct Tonight/Tomorrow label (re-verify the
+  deterministic normalizers actually ran).
 - **P4 — post-launch v2**: FB carousel A/B, voice-recorded beats capture,
   cheap-graphic carousel refinements, cross-article "season" arcs.
 

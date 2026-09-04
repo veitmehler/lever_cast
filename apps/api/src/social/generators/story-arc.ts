@@ -112,7 +112,7 @@ For EACH beat also produce its Instagram slide breakdown:
 - Slides must NEVER contain any web address: no https:// links AND no bare domains or paths like example.com/page. Nothing on a slide is clickable on Instagram. URLs belong in the post text only.
 - 4 to 6 slides per beat.
 
-EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words), a question or turn toward getting help ("Want that checked for you instead?"). It may reference the beat's subject, but it must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
+EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words), a question or turn toward getting help, phrased from THAT beat's specific subject (after an audit beat: "Or let someone else run the audit."; after a burnout beat: "What if the writing stopped landing on your desk?"). Never copy these examples; each evening bridge must be DIFFERENT from the others. It must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...], "ctaBridge": "..."}, ...]`
 }
@@ -276,7 +276,9 @@ export async function generateStoryArc(opts: {
       bridgeRaw.length > 120 ||
       URL_RX.test(bridgeRaw) ||
       /\d/.test(bridgeRaw) ||
-      /\b(minute|min|hour|second|day|week|month|year)s?\b/i.test(bridgeRaw)
+      /\b(minute|min|hour|second|day|week|month|year)s?\b/i.test(bridgeRaw) ||
+      /let someone else run the audit|landing on your desk/i.test(bridgeRaw) ||
+      ctaBridges.includes(stripDashes(bridgeRaw))
     ctaBridges.push(bridgeUnsafe ? null : stripDashes(bridgeRaw))
     beats.push({
       postText: fixLoopLabel(

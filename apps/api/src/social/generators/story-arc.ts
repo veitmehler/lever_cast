@@ -106,7 +106,7 @@ For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
 - When a beat presents an enumerated sequence (pillars, steps, reasons), give each item its OWN slide whose text starts with its number and a period ("1. ...", "2. ..."). NEVER label items "Step 1", "Pillar 2", "Phase 3" or similar: the "N. " prefix is the ONLY numbering. Never number slides that are not list items.
-- The "- " (hyphen space) bullet form is ONLY for a short secondary checklist WITHIN one slide (one action per line, no "Step N" labels). A beat's PRIMARY enumerated sequence always uses the one-item-per-slide "N. " form above, never bullets.
+- Any slide that lists TWO OR MORE actions, tasks, or checks MUST put each on its own line starting with "- " (hyphen space, one action per line, no "Step N" labels), unless the beat's primary numbered sequence already gives each item its own slide. NEVER present a list of actions as consecutive sentences in a paragraph. A beat's PRIMARY enumerated sequence always uses the one-item-per-slide "N. " form above, never bullets.
 - last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
 - NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
 - Slides must NEVER direct the reader to the article or any external destination: no web addresses (https:// or bare domains like example.com/page), no "link in bio", no "pinned comment", no "first comment", no "full breakdown at...", no "read the article". On slides the article may appear only as a SOURCE ("The article cited..."), never as a destination. Links and the article mention belong in the post text only.
@@ -249,6 +249,35 @@ export async function generateStoryArc(opts: {
     s
       .replace(/^(?:Step|Pillar|Phase|Part|Rule|Task)\s+(\d{1,2})\s*[:.]\s*/i, '$1. ')
       .replace(/^-\s+(?:Step|Pillar|Phase|Part|Rule|Task)\s+\d{1,2}\s*[:.]\s*/gim, '- ')
+  // Conservative auto-bulletizer: a task list flattened into prose (an intro
+  // ending ":" followed by imperative-start sentences, or 3+ imperative
+  // starts without one) is rewritten onto "- " lines; non-imperative
+  // follow-up sentences attach to the preceding bullet (user 2026-09-04: the
+  // audit checklist rendered as a paragraph). Heuristic by design —
+  // unrecognized prose passes through untouched.
+  const IMPERATIVE_RX =
+    /^(search|review|check|open|scan|flag|ask|count|compare|list|audit|remove|delete|rewrite|verify|read|look|find|test|measure|track|update|replace)\b/i
+  const bulletizeProseTasks = (s: string) => {
+    if (/^-\s/m.test(s) || /^\d{1,2}\.\s/.test(s.trim())) return s
+    return s
+      .split('\n')
+      .map((line) => {
+        const m = line.match(/^([^:]{0,80}:)\s+(.+)$/)
+        const body = m ? m[2] : line
+        const sentences = body.split(/(?<=[.!?]["')]?)\s+/)
+        const imperatives = sentences.filter((x) => IMPERATIVE_RX.test(x.trim())).length
+        if (sentences.length < 2 || imperatives < (m ? 2 : 3)) return line
+        const out: string[] = []
+        for (const raw of sentences) {
+          const t = raw.trim()
+          if (IMPERATIVE_RX.test(t)) out.push(`- ${t.charAt(0).toUpperCase()}${t.slice(1)}`)
+          else if (out.length > 0 && out[out.length - 1].startsWith('- ')) out[out.length - 1] += ` ${t}`
+          else out.push(t)
+        }
+        return (m ? [m[1], ...out] : out).join('\n')
+      })
+      .join('\n')
+  }
   // Morning beats (even index) tease the SAME-DAY evening post; evening beats
   // tease tomorrow morning. The model cannot know the slot map, so enforce the
   // open-loop label deterministically (user 2026-09-04: "Tomorrow" on a 7:00
@@ -305,7 +334,7 @@ export async function generateStoryArc(opts: {
         await Promise.all(
           slides.map(async (s) =>
             fixLoopLabel(
-              stripUrlSentences(normalizeListMarkers(stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()))),
+              stripUrlSentences(bulletizeProseTasks(normalizeListMarkers(stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim())))),
               beatIdx,
             ),
           ),

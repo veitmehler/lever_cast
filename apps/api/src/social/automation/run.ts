@@ -1,4 +1,5 @@
 import { prisma, brandSettingsForUser } from '@omniply/shared'
+import { Prisma } from '@prisma/client'
 import { logger } from '../../lib/logger'
 import type { AutomationLogContext } from './log-context'
 import { ensureRunSlideCount } from './slide-count'
@@ -121,10 +122,20 @@ async function ensureStoryArc(opts: {
       beatCount,
       logCtx,
     })
-    await prisma.sitePage.update({
-      where: { id: page.id },
+    // FIRST write wins: when both cadence-day runs process concurrently they
+    // both pass the null check above and generate in parallel; an
+    // unconditional update let the LAST write clobber the arc the sibling had
+    // already rendered slides from (posted days could carry two different
+    // arcs — found 2026-09-04). The loser discards its beats and reuses the
+    // stored arc via the normal selectors.
+    const claimed = await prisma.sitePage.updateMany({
+      where: { id: page.id, storyArcJson: { equals: Prisma.AnyNull } },
       data: { storyArcJson: beats as unknown as object },
     })
+    if (claimed.count === 0) {
+      logger.info({ ...logCtx }, '[social-automation] sibling run stored the arc first — discarding this generation')
+      return
+    }
     logger.info({ ...logCtx, beats: beats.length }, '[social-automation] story arc generated + stored')
   } catch (err) {
     // Concurrent-runs race (late approvals enqueue both cadence days at

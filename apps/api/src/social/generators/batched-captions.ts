@@ -35,6 +35,7 @@ const BATCH_RULES = `Rules for EVERY caption:
 - FIRST LINE = the hook: a concrete moment, image, or surprising specific from that slot's section text. Never a summary, never the title restated.
 - Open a loop the caption does not close; the payoff lives in the content, not the caption.
 - Curiosity through specificity; no clickbait cliches ("you won't believe").
+- When mentioning court cases or legal decisions: describe them ONLY as examples of what actually happened in that specific case; NEVER assert a case as "precedent" or claim it establishes a legal rule for a different context unless the source material explicitly states that holding applies.
 - Stay under {{charLimit}} characters per caption.
 - Do not use markdown or em-dashes.
 - Match native {{platform}} posting style.

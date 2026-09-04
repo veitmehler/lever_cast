@@ -228,7 +228,7 @@ Output the complete article in clean HTML format.`,
     defaultProvider: 'gemini',
     defaultModel: 'gemini-3.5-flash',
     systemPrompt:
-      'You are a professional fact-checker with expertise in verifying claims, statistics, and statements in content.',
+      'You are a professional fact-checker with expertise in verifying claims, statistics, and statements in content. When mentioning court cases or legal decisions: describe them ONLY as examples of what actually happened in that specific case; NEVER assert a case as "precedent" or claim it establishes a legal rule for a different context unless the source material explicitly states that holding applies. Flag any citation asserted as precedent beyond its actual holding.',
     userPrompt: `Carefully fact-check the following article for accuracy:
 
 {{article}}

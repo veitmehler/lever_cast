@@ -47,6 +47,7 @@ const SYSTEM_PROMPT =
   'COMPLIANCE (hard rules): never mention or invent identifiable patients or specific patient events; ' +
   'composite scenes must be explicitly generic ("every practice has a Tuesday like this"); ' +
   'never promise business or health outcomes; numbers come only from the article material provided. ' +
+  'When mentioning court cases or legal decisions: describe them ONLY as examples of what actually happened in that specific case; NEVER assert a case as \"precedent\" or claim it establishes a legal rule for a different context unless the source material explicitly states that holding applies. ' +
   'Output ONLY a JSON array, no code fences, no commentary.'
 
 function buildUserPrompt(opts: {

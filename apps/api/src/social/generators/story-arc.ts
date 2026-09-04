@@ -112,7 +112,7 @@ For EACH beat also produce its Instagram slide breakdown:
 - Slides must NEVER contain any web address: no https:// links AND no bare domains or paths like example.com/page. Nothing on a slide is clickable on Instagram. URLs belong in the post text only.
 - 4 to 6 slides per beat.
 
-EVENING beats additionally output "ctaBridge": ONE short sentence (max 14 words) that ties that beat's content to the offer of a free practice assessment, WITHOUT naming the assessment, giving instructions, or including any URL (the call-to-action itself is appended automatically after it). Morning beats omit the field.
+EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words), a question or turn toward getting help ("Want that checked for you instead?"). It may reference the beat's subject, but it must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
 
 Return ONLY a JSON array of ${opts.beatCount} objects: [{"postText": "...", "slides": ["...", ...], "ctaBridge": "..."}, ...]`
 }
@@ -264,12 +264,20 @@ export async function generateStoryArc(opts: {
       logger.warn({ ...logCtx, beat: beats.length + 1 }, '[story-arc] final slide invites swiping despite rule — review will catch')
     }
     const beatIdx = beats.length
-    // One content-aware sentence bridging the beat into the appended CTA slide
-    // (user 2026-09-04: the bare hook after content read disconnected). Hook
-    // text itself stays verbatim; discard the bridge if it smuggles a URL.
+    // One content-aware pivot line bridging the beat into the appended CTA
+    // slide (user 2026-09-04: the bare hook after content read disconnected).
+    // The hook line owns the only number on that slide, so a bridge carrying
+    // any digit or duration is rejected outright (user 2026-09-04: "15 min"
+    // bridge collided with the hook's "2-minute") — the fallback pivots cover
+    // rejection, so the slide never regresses to the bare hook.
     const bridgeRaw = typeof b.ctaBridge === 'string' ? b.ctaBridge.split('\n')[0].trim() : ''
-    const bridge = bridgeRaw && !URL_RX.test(bridgeRaw) && bridgeRaw.length <= 160 ? stripDashes(bridgeRaw) : null
-    ctaBridges.push(bridge)
+    const bridgeUnsafe =
+      !bridgeRaw ||
+      bridgeRaw.length > 120 ||
+      URL_RX.test(bridgeRaw) ||
+      /\d/.test(bridgeRaw) ||
+      /\b(minute|min|hour|second|day|week|month|year)s?\b/i.test(bridgeRaw)
+    ctaBridges.push(bridgeUnsafe ? null : stripDashes(bridgeRaw))
     beats.push({
       postText: fixLoopLabel(
         blankLineThoughts(stripDashes((await sanitizeDashesText(postText, { ...logCtx, surface: 'story_post' })).trim())),
@@ -299,10 +307,17 @@ export async function generateStoryArc(opts: {
     vertical === 'azavea'
       ? 'Comment "XRAY" and I will send you the free 2-minute Practice X-Ray.'
       : ctaLine
+  // Pre-approved pivots when the generated bridge was rejected: fixed,
+  // compliance-vetted, number-free — the CTA slide always keeps a bridge.
+  const BRIDGE_FALLBACKS = [
+    'Want this handled for you instead?',
+    'There is a faster way to see the same thing.',
+    'You do not have to find this alone.',
+  ]
   if (commentHook) {
     for (let i = 1; i < beats.length; i += 2) {
-      const bridge = ctaBridges[i]
-      beats[i].slides.push(bridge ? `${bridge}\n${commentHook}` : commentHook)
+      const bridge = ctaBridges[i] ?? BRIDGE_FALLBACKS[Math.floor(i / 2) % BRIDGE_FALLBACKS.length]
+      beats[i].slides.push(`${bridge}\n${commentHook}`)
     }
   }
 

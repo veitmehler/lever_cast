@@ -161,8 +161,10 @@ P2 fine-tune next: run against the queued cadence articles with Veit.
   durations/quantities referring to different things (added 2026-09-04 after
   a "15-minute audit" bridge collided with the "2-minute Practice X-Ray"
   hook on one slide — the bridge validator now rejects digits/durations
-  outright, the verifier generalizes the check to ALL slides); (c) no URL,
-  no "swipe" on final slides, correct Tonight/Tomorrow label (re-verify the
+  outright, the verifier generalizes the check to ALL slides); (c) no URL
+  and no destination-pointer phrases on slides (link in bio, pinned/first
+  comment, read the article — the semantic class, not one phrasing), no
+  "swipe" on final slides, correct Tonight/Tomorrow label (re-verify the
   deterministic normalizers actually ran).
 - **P4 — post-launch v2**: FB carousel A/B, voice-recorded beats capture,
   cheap-graphic carousel refinements, cross-article "season" arcs.

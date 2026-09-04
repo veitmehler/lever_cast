@@ -93,7 +93,7 @@ ARC RULES:
 - Beats 2 and onward OPEN with one short re-anchoring line that orients a first-time reader (half a sentence referencing where the story stands) before continuing.
 - Every beat except the last ends mid-tension with an open loop to the next.
 - SCHEDULE: beats alternate morning (7:00) and evening (19:00), starting with a morning beat. A MORNING beat's open loop points at TONIGHT ("Tonight: ..."); an EVENING beat's open loop (except the last beat, which resolves) points at TOMORROW ("Tomorrow: ..."). Never use the wrong label.
-- The LAST beat resolves the arc and may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
+- The LAST beat resolves the arc and its POST TEXT (never a slide) may include exactly one soft mention of the article${opts.articleUrl ? ` (link: ${opts.articleUrl})` : ''}.
 - EVENING beats (beat 2${opts.beatCount >= 4 ? ' and beat 4' : ''}): the POST TEXT ends with exactly this call-to-action line as its final line: "${opts.ctaLine}"${opts.ctaLine ? '' : ' (no CTA line provided: end naturally)'}
 - Beats never reuse a scene, opening, or anecdote from each other or from the prior posts above.
 - Narrator moments are FACTS: never merge two different moments into one scene, and never attach a date or timeframe to a moment unless it appears in that moment's own text.
@@ -105,11 +105,11 @@ ARC RULES:
 For EACH beat also produce its Instagram slide breakdown:
 - slides[0] = the hook line ALONE (one punchy sentence, max 12 words).
 - middle slides = 40 to 60 words each (3 to 4 short sentences), each CUT at a moment of tension so the swipe is the payoff.
-- When a beat presents an enumerated list (pillars, steps, reasons), give each item its OWN slide whose text starts with its number and a period ("1. ...", "2. ..."). Never number slides that are not list items.
-- When a slide lists tasks, steps, or actions, put each on its OWN line starting with "- " (hyphen space), one action per line, so they render as bullet points.
+- When a beat presents an enumerated sequence (pillars, steps, reasons), give each item its OWN slide whose text starts with its number and a period ("1. ...", "2. ..."). NEVER label items "Step 1", "Pillar 2", "Phase 3" or similar: the "N. " prefix is the ONLY numbering. Never number slides that are not list items.
+- The "- " (hyphen space) bullet form is ONLY for a short secondary checklist WITHIN one slide (one action per line, no "Step N" labels). A beat's PRIMARY enumerated sequence always uses the one-item-per-slide "N. " form above, never bullets.
 - last slide = the open loop (or, for the final beat, the resolution) plus a short follow cue. The open loop must point FORWARD IN TIME at the next post ("Tomorrow: ..." / "Part 2 tonight."), NEVER at further swiping: the word "swipe" is FORBIDDEN on the last slide (there is nothing after it).
 - NEVER put the call-to-action line in any slide: it is appended as its own dedicated final slide automatically.
-- Slides must NEVER contain any web address: no https:// links AND no bare domains or paths like example.com/page. Nothing on a slide is clickable on Instagram. URLs belong in the post text only.
+- Slides must NEVER direct the reader to the article or any external destination: no web addresses (https:// or bare domains like example.com/page), no "link in bio", no "pinned comment", no "first comment", no "full breakdown at...", no "read the article". On slides the article may appear only as a SOURCE ("The article cited..."), never as a destination. Links and the article mention belong in the post text only.
 - 4 to 6 slides per beat.
 
 EVENING beats additionally output "ctaBridge": ONE short PIVOT line (max 12 words), a question or turn toward getting help, phrased from THAT beat's specific subject (after an audit beat: "Or let someone else run the audit."; after a burnout beat: "What if the writing stopped landing on your desk?"). Never copy these examples; each evening bridge must be DIFFERENT from the others. It must contain NO digits, NO durations, NO statistics, NO URL, and must not name or describe the offer itself (the call-to-action is appended automatically after it and carries its own number). Morning beats omit the field.
@@ -224,18 +224,31 @@ export async function generateStoryArc(opts: {
   // Deterministic no-URL guarantee for slides (bare domains slipped past the
   // prompt rule — user 2026-09-04): drop any sentence containing a web address.
   const URL_RX = /https?:\/\/\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|io|net|org|ai|co|app|dev|us)\b(?:\/\S*)?/i
+  // Destination pointers are banned as a semantic CLASS, not a phrasing: each
+  // ban of one surface form (URL → bare domain → "linked in the first
+  // comment") just mutated the expression (user 2026-09-04). Slides may cite
+  // the article as a source, never point at it as a destination.
+  const POINTER_RX =
+    /link in bio|pinned comment|first comment|in the comments|comments? below|full breakdown|read the (?:full )?article|find the (?:full )?article|linked in the/i
   const stripUrlSentences = (s: string) =>
     s
       .split('\n')
       .map((line) =>
         line
           .split(/(?<=[.!?])\s+/)
-          .filter((seg) => !URL_RX.test(seg))
+          .filter((seg) => !URL_RX.test(seg) && !POINTER_RX.test(seg))
           .join(' '),
       )
       .filter((l) => l.trim().length > 0)
       .join('\n')
       .trim()
+  // "Step 3: ..." → "3. ..." so the numeral slide design triggers: the label
+  // form slipped between the numbered-slide and bullet rules (user
+  // 2026-09-04). Bullet lines drop the redundant label entirely.
+  const normalizeListMarkers = (s: string) =>
+    s
+      .replace(/^(?:Step|Pillar|Phase|Part|Rule|Task)\s+(\d{1,2})\s*[:.]\s*/i, '$1. ')
+      .replace(/^-\s+(?:Step|Pillar|Phase|Part|Rule|Task)\s+\d{1,2}\s*[:.]\s*/gim, '- ')
   // Morning beats (even index) tease the SAME-DAY evening post; evening beats
   // tease tomorrow morning. The model cannot know the slot map, so enforce the
   // open-loop label deterministically (user 2026-09-04: "Tomorrow" on a 7:00
@@ -292,7 +305,7 @@ export async function generateStoryArc(opts: {
         await Promise.all(
           slides.map(async (s) =>
             fixLoopLabel(
-              stripUrlSentences(stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim())),
+              stripUrlSentences(normalizeListMarkers(stripDashes((await sanitizeDashesText(s, { ...logCtx, surface: 'story_slide' })).trim()))),
               beatIdx,
             ),
           ),
